@@ -114,28 +114,54 @@ export class AdtRuntimeClient {
   // Domain Object Factories
   // ============================================================================
 
-  getProfiler<R extends IProfilerResults = typeof profilerDocuments>(
-    results: R = profilerDocuments as unknown as R,
-  ): Profiler<R> {
-    return new Profiler<R>(this.connection, this.logger, results);
+  getProfiler(): Profiler<typeof profilerDocuments>;
+  getProfiler<R extends IProfilerResults>(results: R): Profiler<R>;
+  getProfiler(
+    results: IProfilerResults = profilerDocuments,
+  ): Profiler<IProfilerResults> {
+    return new Profiler<IProfilerResults>(
+      this.connection,
+      this.logger,
+      results,
+    );
   }
 
-  getCrossTrace<R extends ICrossTraceResultSet = typeof crossTraceDocuments>(
-    results: R = crossTraceDocuments as unknown as R,
-  ): CrossTrace<R> {
-    return new CrossTrace<R>(this.connection, this.logger, results);
+  getCrossTrace(): CrossTrace<typeof crossTraceDocuments>;
+  getCrossTrace<R extends ICrossTraceResultSet>(results: R): CrossTrace<R>;
+  getCrossTrace(
+    results: ICrossTraceResultSet = crossTraceDocuments,
+  ): CrossTrace<ICrossTraceResultSet> {
+    return new CrossTrace<ICrossTraceResultSet>(
+      this.connection,
+      this.logger,
+      results,
+    );
   }
 
-  getSt05Trace<R extends ISt05TraceResults = typeof st05TraceDocuments>(
-    results: R = st05TraceDocuments as unknown as R,
-  ): St05Trace<R> {
-    return new St05Trace<R>(this.connection, this.logger, results);
+  getSt05Trace(): St05Trace<typeof st05TraceDocuments>;
+  getSt05Trace<R extends ISt05TraceResults>(results: R): St05Trace<R>;
+  getSt05Trace(
+    results: ISt05TraceResults = st05TraceDocuments,
+  ): St05Trace<ISt05TraceResults> {
+    return new St05Trace<ISt05TraceResults>(
+      this.connection,
+      this.logger,
+      results,
+    );
   }
 
-  getApplicationLog<
-    R extends IApplicationLogResults = typeof applicationLogDocuments,
-  >(results: R = applicationLogDocuments as unknown as R): ApplicationLog<R> {
-    return new ApplicationLog<R>(this.connection, this.logger, results);
+  getApplicationLog(): ApplicationLog<typeof applicationLogDocuments>;
+  getApplicationLog<R extends IApplicationLogResults>(
+    results: R,
+  ): ApplicationLog<R>;
+  getApplicationLog(
+    results: IApplicationLogResults = applicationLogDocuments,
+  ): ApplicationLog<IApplicationLogResults> {
+    return new ApplicationLog<IApplicationLogResults>(
+      this.connection,
+      this.logger,
+      results,
+    );
   }
 
   /**
@@ -144,49 +170,85 @@ export class AdtRuntimeClient {
    * The intersection is spelled here rather than given a name: one getter has
    * this set, and a composite earns a name when more than one handler does.
    */
-  getAtc<R extends IAtcResults = typeof atcDocuments>(
-    results: R = atcDocuments as unknown as R,
-  ): AdtAtc<R> {
-    return new AdtAtc<R>(this.connection, this.logger, results);
+  getAtc(): AdtAtc<typeof atcDocuments>;
+  getAtc<R extends IAtcResults>(results: R): AdtAtc<R>;
+  getAtc(results: IAtcResults = atcDocuments): AdtAtc<IAtcResults> {
+    return new AdtAtc<IAtcResults>(this.connection, this.logger, results);
   }
 
-  getAtcLog<R extends IAtcLogResults = typeof atcLogDocuments>(
-    results: R = atcLogDocuments as unknown as R,
-  ): AtcLog<R> {
-    return new AtcLog<R>(this.connection, this.logger, results);
+  getAtcLog(): AtcLog<typeof atcLogDocuments>;
+  getAtcLog<R extends IAtcLogResults>(results: R): AtcLog<R>;
+  getAtcLog(results: IAtcLogResults = atcLogDocuments): AtcLog<IAtcLogResults> {
+    return new AtcLog<IAtcLogResults>(this.connection, this.logger, results);
   }
 
-  getDdicActivation<
-    R extends IDdicActivationResults = typeof ddicActivationDocuments,
-  >(results: R = ddicActivationDocuments as unknown as R): DdicActivation<R> {
-    return new DdicActivation<R>(this.connection, this.logger, results);
+  getDdicActivation(): DdicActivation<typeof ddicActivationDocuments>;
+  getDdicActivation<R extends IDdicActivationResults>(
+    results: R,
+  ): DdicActivation<R>;
+  getDdicActivation(
+    results: IDdicActivationResults = ddicActivationDocuments,
+  ): DdicActivation<IDdicActivationResults> {
+    return new DdicActivation<IDdicActivationResults>(
+      this.connection,
+      this.logger,
+      results,
+    );
   }
 
-  getDumps<R extends IRuntimeDumpsResults = typeof runtimeDumpsDocuments>(
-    results: R = runtimeDumpsDocuments as unknown as R,
-  ): RuntimeDumps<R> {
-    return new RuntimeDumps<R>(this.connection, this.logger, results);
+  getDumps(): RuntimeDumps<typeof runtimeDumpsDocuments>;
+  getDumps<R extends IRuntimeDumpsResults>(results: R): RuntimeDumps<R>;
+  getDumps(
+    results: IRuntimeDumpsResults = runtimeDumpsDocuments,
+  ): RuntimeDumps<IRuntimeDumpsResults> {
+    return new RuntimeDumps<IRuntimeDumpsResults>(
+      this.connection,
+      this.logger,
+      results,
+    );
   }
 
   // ============================================================================
   // Feed, SystemMessages, GatewayErrorLog Factories
   // ============================================================================
 
-  getFeeds<R extends IFeedResults = typeof feedDocuments>(
-    results: R = feedDocuments as unknown as R,
-  ): FeedRepository<R> {
-    return new FeedRepository<R>(this.connection, this.logger, results);
+  getFeeds(): FeedRepository<typeof feedDocuments>;
+  getFeeds<R extends IFeedResults>(results: R): FeedRepository<R>;
+  getFeeds(
+    results: IFeedResults = feedDocuments,
+  ): FeedRepository<IFeedResults> {
+    return new FeedRepository<IFeedResults>(
+      this.connection,
+      this.logger,
+      results,
+    );
   }
 
-  getSystemMessages<
-    R extends ISystemMessagesResults = typeof systemMessagesDocuments,
-  >(results: R = systemMessagesDocuments as unknown as R): SystemMessages<R> {
-    return new SystemMessages<R>(this.connection, this.logger, results);
+  getSystemMessages(): SystemMessages<typeof systemMessagesDocuments>;
+  getSystemMessages<R extends ISystemMessagesResults>(
+    results: R,
+  ): SystemMessages<R>;
+  getSystemMessages(
+    results: ISystemMessagesResults = systemMessagesDocuments,
+  ): SystemMessages<ISystemMessagesResults> {
+    return new SystemMessages<ISystemMessagesResults>(
+      this.connection,
+      this.logger,
+      results,
+    );
   }
 
-  getGatewayErrorLog<
-    R extends IGatewayErrorLogResults = typeof gatewayErrorLogDocuments,
-  >(results: R = gatewayErrorLogDocuments as unknown as R): GatewayErrorLog<R> {
-    return new GatewayErrorLog<R>(this.connection, this.logger, results);
+  getGatewayErrorLog(): GatewayErrorLog<typeof gatewayErrorLogDocuments>;
+  getGatewayErrorLog<R extends IGatewayErrorLogResults>(
+    results: R,
+  ): GatewayErrorLog<R>;
+  getGatewayErrorLog(
+    results: IGatewayErrorLogResults = gatewayErrorLogDocuments,
+  ): GatewayErrorLog<IGatewayErrorLogResults> {
+    return new GatewayErrorLog<IGatewayErrorLogResults>(
+      this.connection,
+      this.logger,
+      results,
+    );
   }
 }

@@ -35,8 +35,9 @@ export class St05Trace<R extends ISt05TraceResults = typeof st05TraceDocuments>
   constructor(
     private readonly connection: IAbapConnection,
     private readonly logger: ILogger,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    private readonly results: R = st05TraceDocuments as unknown as R,
+    // Required: a caller naming its own R hands its results. The shipped
+    // documents are the default of the getter, typed by its overloads.
+    private readonly results: R,
   ) {}
 
   async getState<E extends IAdtError = IAdtError>(

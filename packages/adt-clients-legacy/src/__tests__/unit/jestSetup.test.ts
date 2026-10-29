@@ -11,6 +11,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { functionIncludeDocuments } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { integrationHeadersOf } from '../../../../adt-clients/src/__tests__/helpers/adtHeaders';
 import { AdtFunctionIncludeLegacy } from '../../core/functionInclude/AdtFunctionIncludeLegacy';
@@ -33,6 +34,10 @@ describe('the Jest setup', () => {
     const include = new AdtFunctionIncludeLegacy(
       {} as IAbapConnection,
       undefined,
+      undefined,
+      undefined,
+      undefined,
+      functionIncludeDocuments,
     );
     const v1 = 'application/vnd.sap.adt.functions.fincludes+xml';
     expect(integrationHeadersOf(include, 'create')).toEqual({

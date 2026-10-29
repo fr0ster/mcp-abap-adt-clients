@@ -48,7 +48,7 @@ import { createTableType } from './create';
 import { checkDeletion, deleteTableType } from './delete';
 import { lockTableType } from './lock';
 import { getTableTypeMetadata, getTableTypeTransport } from './read';
-import { type ITableTypeConfig, tableTypeDocuments } from './types';
+import type { ITableTypeConfig, tableTypeDocuments } from './types';
 import { unlockTableType } from './unlock';
 import { updateTableType } from './update';
 import { validateTableTypeName } from './validation';
@@ -87,14 +87,12 @@ export class AdtDdicTableType<
 
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default: the shipped set
-    // satisfies the erased bound, which the compiler cannot see through the
-    // `unknown`s. A cast on a member would be the factory lying about what it
-    // answers.
-    protected readonly results: R = tableTypeDocuments as unknown as R,
+    logger: ILogger | undefined,
+    systemContext: IAdtSystemContext | undefined,
+    lockRegistry: LockRegistry | undefined,
+    // Required: a caller naming its own R hands its results. The shipped
+    // documents are the default of the getter, typed by its overloads.
+    protected readonly results: R,
   ) {
     this.connection = connection;
     this.logger = logger;

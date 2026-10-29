@@ -45,7 +45,7 @@ import { createMessageClass } from './create';
 import { checkDeletion, deleteMessageClass } from './delete';
 import { lockMessageClass } from './lock';
 import { getMessageClassSource } from './read';
-import { type IMessageClassConfig, messageClassDocuments } from './types';
+import type { IMessageClassConfig, messageClassDocuments } from './types';
 import { unlockMessageClass } from './unlock';
 import { updateMessageClass } from './update';
 
@@ -82,11 +82,12 @@ export class AdtMessageClass<
 
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    protected readonly results: R = messageClassDocuments as unknown as R,
+    logger: ILogger | undefined,
+    systemContext: IAdtSystemContext | undefined,
+    lockRegistry: LockRegistry | undefined,
+    // Required: a caller naming its own R hands its results. The shipped
+    // documents are the default of the getter, typed by its overloads.
+    protected readonly results: R,
   ) {
     this.connection = connection;
     this.logger = logger;

@@ -79,9 +79,10 @@ export class MemorySnapshots<
 
   constructor(
     private readonly connection: IAbapConnection,
-    _logger?: ILogger,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    private readonly results: R = memorySnapshotsDocuments as unknown as R,
+    _logger: ILogger | undefined,
+    // Required: no getter hands this out, so the caller passes the
+    // results — `memorySnapshotsDocuments` for the shipped ones.
+    private readonly results: R,
   ) {}
 
   private reading<K extends keyof IMemorySnapshotsResults>(

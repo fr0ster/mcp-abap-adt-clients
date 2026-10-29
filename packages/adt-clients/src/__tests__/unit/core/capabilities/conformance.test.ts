@@ -1,6 +1,9 @@
 import { AdtClass } from '../../../../core/class/AdtClass';
+import { classDocuments } from '../../../../core/class/types';
 import { AdtDomain } from '../../../../core/domain/AdtDomain';
+import { domainDocuments } from '../../../../core/domain/types';
 import { AdtServiceDefinition } from '../../../../core/serviceDefinition/AdtServiceDefinition';
+import { serviceDefinitionDocuments } from '../../../../core/serviceDefinition/types';
 
 /**
  * Records session toggles AND requests in ONE ordered trace, so the test can
@@ -31,17 +34,33 @@ const noopLogger = { info() {}, warn() {}, error() {}, debug() {} } as any;
 const cases = [
   {
     name: 'AdtClass',
-    make: (c: any) => new AdtClass(c, noopLogger),
+    make: (c: any) =>
+      new AdtClass(
+        c,
+        noopLogger,
+        undefined,
+        undefined,
+        undefined,
+        classDocuments,
+      ),
     cfg: { className: 'ZC' },
   },
   {
     name: 'AdtDomain',
-    make: (c: any) => new AdtDomain(c, noopLogger),
+    make: (c: any) =>
+      new AdtDomain(c, noopLogger, undefined, undefined, domainDocuments),
     cfg: { domainName: 'ZD' },
   },
   {
     name: 'AdtServiceDefinition',
-    make: (c: any) => new AdtServiceDefinition(c, noopLogger),
+    make: (c: any) =>
+      new AdtServiceDefinition(
+        c,
+        noopLogger,
+        undefined,
+        undefined,
+        serviceDefinitionDocuments,
+      ),
     cfg: { serviceDefinitionName: 'ZS' },
   },
 ];

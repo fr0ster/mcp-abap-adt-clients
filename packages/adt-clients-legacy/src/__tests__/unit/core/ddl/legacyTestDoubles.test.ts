@@ -4,6 +4,7 @@
  * asks nothing.
  */
 
+import { ddlDocuments } from '@mcp-abap-adt/adt-clients';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -37,11 +38,16 @@ describe('AdtDdl.checkCdsTestDoubles', () => {
   it('a legacy system refuses without a request', async () => {
     const { conn, calls } = makeConn();
 
+    const ddl = new AdtDdlLegacy(
+      conn,
+      createLibraryLogger(),
+      undefined,
+      undefined,
+      ddlDocuments,
+    );
     expectFailure(
       // @ts-expect-error -- 7.40 does not serve ddl.checkCdsTestDoubles; the refusal is for a caller outside the type system
-      await new AdtDdlLegacy(conn, createLibraryLogger()).checkCdsTestDoubles(
-        'ZI_VIEW',
-      ),
+      await ddl.checkCdsTestDoubles('ZI_VIEW'),
       'no endpoint on 7.40 SP04',
     );
     expect(calls).toHaveLength(0);

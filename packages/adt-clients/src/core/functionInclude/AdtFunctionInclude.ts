@@ -55,8 +55,11 @@ import {
 import { lockFunctionInclude } from './lock';
 import { readFunctionInclude } from './read';
 import { readFunctionIncludeSource } from './readSource';
-import type { ICreateFunctionIncludeParams } from './types';
-import { functionIncludeDocuments, type IFunctionIncludeConfig } from './types';
+import type {
+  functionIncludeDocuments,
+  ICreateFunctionIncludeParams,
+  IFunctionIncludeConfig,
+} from './types';
 import { unlockFunctionInclude } from './unlock';
 import { updateFunctionInclude } from './update';
 import { uploadFunctionIncludeSource } from './updateSource';
@@ -103,12 +106,13 @@ export class AdtFunctionInclude<
 
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    contentTypes?: IAdtContentTypes,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    protected readonly results: R = functionIncludeDocuments as unknown as R,
+    logger: ILogger | undefined,
+    systemContext: IAdtSystemContext | undefined,
+    contentTypes: IAdtContentTypes | undefined,
+    lockRegistry: LockRegistry | undefined,
+    // Required: a caller naming its own R hands its results. The shipped
+    // documents are the default of the getter, typed by its overloads.
+    protected readonly results: R,
   ) {
     this.connection = connection;
     this.logger = logger;

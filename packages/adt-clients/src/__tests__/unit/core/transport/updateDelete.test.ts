@@ -13,6 +13,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtRequest } from '../../../../core/transport/AdtRequest';
+import { transportDocuments } from '../../../../core/transport/types';
 import { headersOf } from '../../../helpers/adtHeaders';
 
 const ITEM_URL = '/sap/bc/adt/cts/transportrequests/DEVK900438';
@@ -83,10 +84,18 @@ describe('AdtRequest.update()', () => {
     );
 
     // The body goes in the options, where the contract puts it.
-    await new AdtRequest(connection).updateMetadata(
+    await new AdtRequest(
+      connection,
+      undefined,
+      undefined,
+      transportDocuments,
+    ).updateMetadata(
       { transportNumber: 'DEVK900438' },
       {
-        headers: headersOf(new AdtRequest(connection), 'updateMetadata'),
+        headers: headersOf(
+          new AdtRequest(connection, undefined, undefined, transportDocuments),
+          'updateMetadata',
+        ),
         source: edited,
       },
     );
@@ -120,12 +129,22 @@ describe('AdtRequest.update()', () => {
   it('touches neither the collection nor the search-configuration endpoint', async () => {
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await new AdtRequest(connection).updateMetadata(
+    await new AdtRequest(
+      connection,
+      undefined,
+      undefined,
+      transportDocuments,
+    ).updateMetadata(
       {
         transportNumber: 'DEVK900438',
         description: 'New description',
       },
-      { headers: headersOf(new AdtRequest(connection), 'updateMetadata') },
+      {
+        headers: headersOf(
+          new AdtRequest(connection, undefined, undefined, transportDocuments),
+          'updateMetadata',
+        ),
+      },
     );
 
     for (const call of calls) {
@@ -140,11 +159,21 @@ describe('AdtRequest.update()', () => {
     // it. What the caller must guarantee is that the document is valid.
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await new AdtRequest(connection).updateMetadata(
+    await new AdtRequest(
+      connection,
+      undefined,
+      undefined,
+      transportDocuments,
+    ).updateMetadata(
       {
         transportNumber: 'DEVK900438',
       },
-      { headers: headersOf(new AdtRequest(connection), 'updateMetadata') },
+      {
+        headers: headersOf(
+          new AdtRequest(connection, undefined, undefined, transportDocuments),
+          'updateMetadata',
+        ),
+      },
     );
 
     expect(calls).toHaveLength(1);
@@ -156,9 +185,19 @@ describe('AdtRequest.delete()', () => {
   it('issues exactly one DELETE to the item URL', async () => {
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await new AdtRequest(connection).delete(
+    await new AdtRequest(
+      connection,
+      undefined,
+      undefined,
+      transportDocuments,
+    ).delete(
       { transportNumber: 'DEVK900438' },
-      { headers: headersOf(new AdtRequest(connection), 'delete') },
+      {
+        headers: headersOf(
+          new AdtRequest(connection, undefined, undefined, transportDocuments),
+          'delete',
+        ),
+      },
     );
 
     expect(calls).toHaveLength(1);
@@ -169,9 +208,19 @@ describe('AdtRequest.delete()', () => {
   it('touches neither the collection nor the search-configuration endpoint', async () => {
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await new AdtRequest(connection).delete(
+    await new AdtRequest(
+      connection,
+      undefined,
+      undefined,
+      transportDocuments,
+    ).delete(
       { transportNumber: 'DEVK900438' },
-      { headers: headersOf(new AdtRequest(connection), 'delete') },
+      {
+        headers: headersOf(
+          new AdtRequest(connection, undefined, undefined, transportDocuments),
+          'delete',
+        ),
+      },
     );
 
     for (const call of calls) {
@@ -186,9 +235,19 @@ describe('AdtRequest.delete()', () => {
     // server's words, which a strategy can read.
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
-    await new AdtRequest(connection).delete(
+    await new AdtRequest(
+      connection,
+      undefined,
+      undefined,
+      transportDocuments,
+    ).delete(
       {},
-      { headers: headersOf(new AdtRequest(connection), 'delete') },
+      {
+        headers: headersOf(
+          new AdtRequest(connection, undefined, undefined, transportDocuments),
+          'delete',
+        ),
+      },
     );
 
     expect(calls).toHaveLength(1);

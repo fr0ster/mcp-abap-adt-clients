@@ -57,7 +57,7 @@ import { checkDeletion, deleteDdl } from './delete';
 import { lockDDLS } from './lock';
 import { getDdlMetadata, getDdlSource, getDdlTransport } from './read';
 import { checkCdsTestDoublesAvailability } from './testDoubles';
-import { ddlDocuments, type IDdlConfig } from './types';
+import type { ddlDocuments, IDdlConfig } from './types';
 import { unlockDDLS } from './unlock';
 import { updateDdl } from './update';
 import { validateDdlName } from './validation';
@@ -105,14 +105,12 @@ export class AdtDdl<
 
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default: the shipped set
-    // satisfies the erased bound, which the compiler cannot see through the
-    // `unknown`s. A cast on a member would be the factory lying about what it
-    // answers.
-    protected readonly results: R = ddlDocuments as unknown as R,
+    logger: ILogger | undefined,
+    systemContext: IAdtSystemContext | undefined,
+    lockRegistry: LockRegistry | undefined,
+    // Required: a caller naming its own R hands its results. The shipped
+    // documents are the default of the getter, typed by its overloads.
+    protected readonly results: R,
   ) {
     this.connection = connection;
     this.logger = logger;

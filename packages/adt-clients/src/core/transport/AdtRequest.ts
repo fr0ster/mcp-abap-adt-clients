@@ -66,9 +66,9 @@ import {
   sortAndCompressTransport,
 } from './objects';
 import { getTransport } from './read';
-import {
-  type IAbapObjectEntry,
-  type ITransportConfig,
+import type {
+  IAbapObjectEntry,
+  ITransportConfig,
   transportDocuments,
 } from './types';
 import { updateTransport } from './update';
@@ -131,10 +131,11 @@ export class AdtRequest<
 
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    protected readonly results: R = transportDocuments as unknown as R,
+    logger: ILogger | undefined,
+    systemContext: IAdtSystemContext | undefined,
+    // Required: a caller naming its own R hands its results. The shipped
+    // documents are the default of the getter, typed by its overloads.
+    protected readonly results: R,
   ) {
     this.connection = connection;
     this.logger = logger;

@@ -19,7 +19,9 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClient } from '../../../clients/AdtClient';
 import { AdtClass } from '../../../core/class/AdtClass';
+import { classDocuments } from '../../../core/class/types';
 import { AdtDomain } from '../../../core/domain/AdtDomain';
+import { domainDocuments } from '../../../core/domain/types';
 import {
   factoryOf,
   type IVerifierSession,
@@ -130,7 +132,15 @@ describe('verifyLockReleased', () => {
 
     const check = verifyLockReleased(
       open,
-      () => new AdtClass(conn),
+      () =>
+        new AdtClass(
+          conn,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          classDocuments,
+        ),
       config,
       'class ZCL_LOCKREL_UNIT',
     );
@@ -154,7 +164,15 @@ describe('verifyLockReleased', () => {
 
     await verifyLockReleased(
       open,
-      () => new AdtClass(conn),
+      () =>
+        new AdtClass(
+          conn,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          classDocuments,
+        ),
       config,
       'class ZCL_LOCKREL_UNIT',
     );
@@ -169,7 +187,20 @@ describe('verifyLockReleased', () => {
     const { open, close } = fakeSession();
 
     await expect(
-      verifyLockReleased(open, () => new AdtClass(conn), config, 'class X'),
+      verifyLockReleased(
+        open,
+        () =>
+          new AdtClass(
+            conn,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            classDocuments,
+          ),
+        config,
+        'class X',
+      ),
     ).rejects.toThrow(/took the lock but could not release it \(HTTP 500\)/);
     expect(close).toHaveBeenCalledTimes(1);
   });
@@ -195,7 +226,20 @@ describe('verifyLockReleased', () => {
     const { open, close } = fakeSession();
 
     await expect(
-      verifyLockReleased(open, () => new AdtClass(conn), config, 'class X'),
+      verifyLockReleased(
+        open,
+        () =>
+          new AdtClass(
+            conn,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            classDocuments,
+          ),
+        config,
+        'class X',
+      ),
     ).rejects.toThrow(/socket hang up/);
     expect(close).toHaveBeenCalledTimes(1);
   });
@@ -210,7 +254,15 @@ describe('verifyLockReleased', () => {
     await expect(
       verifyLockReleased(
         async () => ({ client: {} as AdtClient, close }),
-        () => new AdtClass(conn),
+        () =>
+          new AdtClass(
+            conn,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            classDocuments,
+          ),
         config,
         'class X',
         { warn } as any,
@@ -258,18 +310,54 @@ describe('factoryOf', () => {
         return {};
       }
       getClass() {
-        return new AdtClass(conn);
+        return new AdtClass(
+          conn,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          classDocuments,
+        );
       }
       getDomain() {
-        return new AdtDomain(conn);
+        return new AdtDomain(
+          conn,
+          undefined,
+          undefined,
+          undefined,
+          domainDocuments,
+        );
       }
       getNeedsArgument(_x: string) {
-        return new AdtDomain(conn);
+        return new AdtDomain(
+          conn,
+          undefined,
+          undefined,
+          undefined,
+          domainDocuments,
+        );
       }
     }
     const client = new FakeClient();
-    expect(factoryOf(client, new AdtDomain(conn))).toBe('getDomain');
-    expect(factoryOf(client, new AdtClass(conn))).toBe('getClass');
+    expect(
+      factoryOf(
+        client,
+        new AdtDomain(conn, undefined, undefined, undefined, domainDocuments),
+      ),
+    ).toBe('getDomain');
+    expect(
+      factoryOf(
+        client,
+        new AdtClass(
+          conn,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          classDocuments,
+        ),
+      ),
+    ).toBe('getClass');
     expect(factoryOf(client, { constructor: Map })).toBeUndefined();
   });
 
@@ -332,7 +420,15 @@ describe('verifyLockReleased — answers that are not a held lock', () => {
 
     const check = verifyLockReleased(
       open,
-      () => new AdtClass(conn),
+      () =>
+        new AdtClass(
+          conn,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          classDocuments,
+        ),
       config,
       'class ZCL_LOCKREL_UNIT',
     );
@@ -351,7 +447,15 @@ describe('verifyLockReleased — answers that are not a held lock', () => {
 
     const check = verifyLockReleased(
       open,
-      () => new AdtClass(conn),
+      () =>
+        new AdtClass(
+          conn,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          classDocuments,
+        ),
       config,
       'x',
     );

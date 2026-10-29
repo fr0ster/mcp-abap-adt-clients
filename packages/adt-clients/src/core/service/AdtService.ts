@@ -57,7 +57,7 @@ import type {
   IServiceBindingPublicationParams,
   ITransportCheckServiceBindingParams,
 } from './types';
-import { resolveBindingVariant, serviceDocuments } from './types';
+import { resolveBindingVariant, type serviceDocuments } from './types';
 
 export class AdtServiceBinding<
   R extends IServiceResults = typeof serviceDocuments,
@@ -105,9 +105,11 @@ export class AdtServiceBinding<
 
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    private readonly results: R = serviceDocuments as unknown as R,
+    logger: ILogger | undefined,
+    systemContext: IAdtSystemContext | undefined,
+    // Required: a caller naming its own R hands its results. The shipped
+    // documents are the default of the getter, typed by its overloads.
+    private readonly results: R,
   ) {
     this.connection = connection;
     this.logger = logger;

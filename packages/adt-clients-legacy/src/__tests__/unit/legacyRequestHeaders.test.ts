@@ -7,6 +7,7 @@
  */
 
 import { join } from 'node:path';
+import { utilDocuments } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { createLibraryLogger } from '../../../../adt-clients/src/__tests__/helpers/testLogger';
 import {
@@ -82,8 +83,9 @@ const ROWS: Row[] = [
   // @ts-expect-error -- the modern harness drives a 7.40 client as a caller outside the type system would: its gates refuse what 7.40 does not serve, and the run proves the runtime refusals
   ...requestRows(legacy, 'legacy '),
   ...utilRows(
-    // @ts-expect-error -- the modern harness drives the 7.40 utilities, whose codes are 7.40's, as a caller outside the type system would
-    (connection) => new AdtUtilsLegacy(connection, createLibraryLogger()),
+    (connection) =>
+      // @ts-expect-error -- the modern harness drives the 7.40 utilities, whose codes are 7.40's, as a caller outside the type system would
+      new AdtUtilsLegacy(connection, createLibraryLogger(), utilDocuments),
     'legacy ',
   ),
 ];

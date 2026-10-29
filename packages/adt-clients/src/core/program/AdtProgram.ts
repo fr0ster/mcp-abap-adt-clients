@@ -73,7 +73,7 @@ import {
   getProgramSource,
   getProgramTransport,
 } from './read';
-import { type IProgramConfig, programDocuments } from './types';
+import type { IProgramConfig, programDocuments } from './types';
 import { unlockProgram } from './unlock';
 import { uploadProgramSource } from './update';
 import { validateProgramName } from './validation';
@@ -126,15 +126,13 @@ export class AdtProgram<
 
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    contentTypes?: IAdtContentTypes,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default: `programDocuments`
-    // satisfies the erased bound, which the compiler cannot see through the
-    // `unknown`s. A cast on a member would be the factory lying about what it
-    // answers.
-    protected readonly results: R = programDocuments as unknown as R,
+    logger: ILogger | undefined,
+    systemContext: IAdtSystemContext | undefined,
+    contentTypes: IAdtContentTypes | undefined,
+    lockRegistry: LockRegistry | undefined,
+    // Required: a caller naming its own R hands its results. The shipped
+    // documents are the default of the getter, typed by its overloads.
+    protected readonly results: R,
   ) {
     this.connection = connection;
     this.logger = logger;

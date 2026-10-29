@@ -4,6 +4,7 @@
  * connection is the root package's `objectProperties.test.ts`'s.
  */
 
+import { utilDocuments } from '@mcp-abap-adt/adt-clients';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -45,7 +46,7 @@ const SE38 = '/sap/bc/adt/vit/wb/object_type/trant/object_name/SE38';
 describe('AdtUtilsLegacy.getObjectProperties', () => {
   it('answers an unsupported operation and asks nothing', async () => {
     const { connection, requests } = recording();
-    const utils = new AdtUtilsLegacy(connection, logger);
+    const utils = new AdtUtilsLegacy(connection, logger, utilDocuments);
 
     const answer = await utils.getObjectProperties(SE38);
 

@@ -6,6 +6,7 @@
  */
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { noopLogger } from '../../../utils/noopLogger';
 
 it('a function group metadata read sends v3, then v2 and v1', async () => {
@@ -20,7 +21,7 @@ it('a function group metadata read sends v3, then v2 and v1', async () => {
     ),
   } as unknown as IAbapConnection;
 
-  await new AdtUtils(connection, noopLogger).readObjectMetadata(
+  await new AdtUtils(connection, noopLogger, utilDocuments).readObjectMetadata(
     'FUGR/F',
     'ZFG_GUARD',
   );

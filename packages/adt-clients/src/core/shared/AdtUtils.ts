@@ -181,7 +181,7 @@ import type {
   IReadOptions,
   ISearchObjectsParams,
 } from './types';
-import { utilDocuments } from './utilResultSet';
+import type { utilDocuments } from './utilResultSet';
 
 /**
  * Declared against every atom, not only `IAdtSearchable`.
@@ -291,8 +291,9 @@ export class AdtUtils<
   constructor(
     connection: IAbapConnection,
     logger: ILogger,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    protected readonly results: R = utilDocuments as unknown as R,
+    // Required: a caller naming its own R hands its results. The shipped
+    // documents are the default of the getter, typed by its overloads.
+    protected readonly results: R,
   ) {
     // Wrapped once, here, where a connection enters the library. The wrapper
     // puts the request back on the answer and reads nothing: what a body means

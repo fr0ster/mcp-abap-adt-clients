@@ -4,6 +4,7 @@
  * `whereUsedAddress.test.ts`'s.
  */
 
+import { utilDocuments } from '@mcp-abap-adt/adt-clients';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -33,7 +34,7 @@ const recording = () => {
 describe('AdtUtilsLegacy refusals', () => {
   it('answer an unsupported operation, not a connection failure, and ask nothing', async () => {
     const { connection, urls } = recording();
-    const utils = new AdtUtilsLegacy(connection, logger);
+    const utils = new AdtUtilsLegacy(connection, logger, utilDocuments);
 
     for (const answer of [
       await utils.getSqlQuery(

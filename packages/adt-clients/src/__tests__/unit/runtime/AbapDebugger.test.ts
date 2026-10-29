@@ -652,7 +652,11 @@ describe('AbapDebugger', () => {
         }),
       ),
     } as unknown as IAbapConnection;
-    const debugger_ = new AbapDebugger(connection, {} as never);
+    const debugger_ = new AbapDebugger(
+      connection,
+      {} as never,
+      abapDebuggerDocuments,
+    );
 
     const answer = await debugger_.step('stepContinue');
     expect(answer.ok).toBe(false);
@@ -675,7 +679,11 @@ describe('AbapDebugger', () => {
         }),
       ),
     } as unknown as IAbapConnection;
-    const debugger_ = new AbapDebugger(connection, {} as never);
+    const debugger_ = new AbapDebugger(
+      connection,
+      {} as never,
+      abapDebuggerDocuments,
+    );
 
     const answer = await debugger_.step('stepContinue', {
       analyse: analyseDebuggeeEnd,

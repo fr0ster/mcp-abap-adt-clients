@@ -70,15 +70,15 @@ describe('AdtUtils readings', () => {
   });
 
   it('ships a default for every slot', () => {
-    const shipped = utilDocuments as unknown as Record<string, unknown>;
-    for (const slot of Object.keys(shipped)) {
-      expect(typeof shipped[slot]).toBe('function');
+    const shipped = Object.values(utilDocuments);
+    for (const reading of shipped) {
+      expect(typeof reading).toBe('function');
     }
     // Every default is the document. The parses that were defaults — search
     // hits, the type catalogue, the tree level, the inactive list, the run id —
     // are strategies in adt-strategies a caller passes.
-    for (const slot of Object.keys(shipped)) {
-      expect(shipped[slot]).toBe(rawDocument);
+    for (const reading of shipped) {
+      expect(reading).toBe(rawDocument);
     }
     // `satisfies`, so the shipped set is assignable to the contract it fills.
     const asContract: IUtilResults = utilDocuments;

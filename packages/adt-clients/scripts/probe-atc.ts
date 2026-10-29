@@ -147,6 +147,7 @@ export {
   verdictFor,
 } from './lib/atcProbeVerdict';
 
+import { utilDocuments } from '../src/core/shared/utilResultSet';
 import {
   assertKnownKeys,
   CANDIDATES,
@@ -539,7 +540,7 @@ async function main(): Promise<void> {
     );
 
     const rec = new Recorder(connection, outDir, logger);
-    const utils = new AdtUtils(connection, logger);
+    const utils = new AdtUtils(connection, logger, utilDocuments);
 
     // --- 1. Where does the check variant come from, and by which verb? --------
     const customizingGet = await rec.call(

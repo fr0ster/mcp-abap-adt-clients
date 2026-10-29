@@ -4,6 +4,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClass } from '../../core/class/AdtClass';
 import { AdtLocalTypes } from '../../core/class/AdtLocalTypes';
+import { classDocuments } from '../../core/class/types';
 import { getClassIncludeVersions } from '../../core/class/versions';
 import { expectResult } from '../helpers/contract';
 
@@ -23,7 +24,14 @@ describe('getClassIncludeVersions', () => {
       seen = o;
       return { data: FEED, status: 200, headers: {} } as IAdtWireResponse;
     });
-    const cls = new AdtClass(c);
+    const cls = new AdtClass(
+      c,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      classDocuments,
+    );
     const feed = expectResult(
       await cls.getVersions({ className: 'ZCL' }),
       'versions',
@@ -40,7 +48,14 @@ describe('getClassIncludeVersions', () => {
       seen = o;
       return { data: FEED, status: 200, headers: {} } as IAdtWireResponse;
     });
-    const local = new AdtLocalTypes(c);
+    const local = new AdtLocalTypes(
+      c,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      classDocuments,
+    );
     await local.getVersions({ className: 'ZCL' });
     expect(seen.url).toBe(
       '/sap/bc/adt/oo/classes/zcl/includes/implementations/versions',
@@ -64,7 +79,14 @@ describe('getClassIncludeVersions', () => {
       err.response = { status: 404, data: '', headers: {} };
       throw err;
     });
-    const answer = await new AdtClass(c).getVersions({ className: 'ZCL' });
+    const answer = await new AdtClass(
+      c,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      classDocuments,
+    ).getVersions({ className: 'ZCL' });
     expect(answer.ok).toBe(false);
     if (!answer.ok) {
       expect(answer.getError().origin).toBe('connection');

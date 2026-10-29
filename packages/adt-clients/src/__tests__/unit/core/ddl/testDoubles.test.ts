@@ -8,6 +8,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtDdl } from '../../../../core/ddl/AdtDdl';
+import { ddlDocuments } from '../../../../core/ddl/types';
 import { createLibraryLogger } from '../../../helpers/testLogger';
 
 type Call = { url: string; method: string };
@@ -35,9 +36,13 @@ describe('AdtDdl.checkCdsTestDoubles', () => {
   it('one POST to the test-doubles validation, naming the view', async () => {
     const { conn, calls } = makeConn();
 
-    await new AdtDdl(conn, createLibraryLogger()).checkCdsTestDoubles(
-      'ZI_VIEW',
-    );
+    await new AdtDdl(
+      conn,
+      createLibraryLogger(),
+      undefined,
+      undefined,
+      ddlDocuments,
+    ).checkCdsTestDoubles('ZI_VIEW');
 
     expect(calls).toHaveLength(1);
     expect(calls[0].method).toBe('POST');

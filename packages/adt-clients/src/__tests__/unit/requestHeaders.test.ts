@@ -20,11 +20,19 @@ import { AdtBatchConnection } from '../../batch';
 import { AdtAbapGitClient } from '../../clients/AdtAbapGitClient';
 import { AdtClient } from '../../clients/AdtClient';
 import { AdtExecutor } from '../../clients/AdtExecutor';
+import { abapGitDocuments } from '../../clients/abapGit/types';
 import { AdtUtils } from '../../core/shared/AdtUtils';
+import { utilDocuments } from '../../core/shared/utilResultSet';
 import { TraceScheduling } from '../../executors/traceScheduling';
 import { traceSchedulingDocuments } from '../../index.executors';
-import { AbapDebugger } from '../../runtime/debugger/AbapDebugger';
-import { AmdpDebugger } from '../../runtime/debugger/AmdpDebugger';
+import {
+  AbapDebugger,
+  abapDebuggerDocuments,
+} from '../../runtime/debugger/AbapDebugger';
+import {
+  AmdpDebugger,
+  amdpDebuggerDocuments,
+} from '../../runtime/debugger/AmdpDebugger';
 import { createLibraryLogger } from '../helpers/testLogger';
 import {
   expectCarriesItsPair,
@@ -59,9 +67,11 @@ function SCAN(): ReturnType<typeof scanImplementations> {
 
 function otherRows(): Row[] {
   const git = (connection: IAbapConnection) =>
-    new AdtAbapGitClient(connection, createLibraryLogger());
-  const abap = (connection: IAbapConnection) => new AbapDebugger(connection);
-  const amdp = (connection: IAbapConnection) => new AmdpDebugger(connection);
+    new AdtAbapGitClient(connection, createLibraryLogger(), abapGitDocuments);
+  const abap = (connection: IAbapConnection) =>
+    new AbapDebugger(connection, undefined, abapDebuggerDocuments);
+  const amdp = (connection: IAbapConnection) =>
+    new AmdpDebugger(connection, undefined, amdpDebuggerDocuments);
   const trace = { description: 'guard' };
   return [
     {
@@ -178,7 +188,10 @@ const modern = (connection: IAbapConnection) =>
 const ROWS: Row[] = [
   ...objectRows(modern),
   ...requestRows(modern),
-  ...utilRows((connection) => new AdtUtils(connection, createLibraryLogger())),
+  ...utilRows(
+    (connection) =>
+      new AdtUtils(connection, createLibraryLogger(), utilDocuments),
+  ),
   ...otherRows(),
 ];
 
@@ -240,7 +253,10 @@ describe('the batch path', () => {
     });
     const pair = pairFor('batch.getVariables');
 
-    const pending = m(new AbapDebugger(batch), 'getVariables')(['LV_GUARD'], {
+    const pending = m(
+      new AbapDebugger(batch, undefined, abapDebuggerDocuments),
+      'getVariables',
+    )(['LV_GUARD'], {
       headers: pair,
     });
     await batch.execute();

@@ -2,6 +2,8 @@
  * 7.40 SP04 does not serve the package item resource (`GET` answered `404`),
  * so the members that address it refuse without a request.
  */
+
+import { packageDocuments } from '@mcp-abap-adt/adt-clients';
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -43,9 +45,15 @@ describe('legacy package', () => {
     const { connection, calls } = recordingConnection();
 
     const failure = expectFailure(
-      (await call(new AdtPackageLegacy(connection))) as Parameters<
-        typeof expectFailure
-      >[0],
+      (await call(
+        new AdtPackageLegacy(
+          connection,
+          undefined,
+          undefined,
+          undefined,
+          packageDocuments,
+        ),
+      )) as Parameters<typeof expectFailure>[0],
       'legacy package',
     );
 
@@ -61,9 +69,15 @@ describe('legacy package', () => {
     async (_member, call) => {
       const { connection } = recordingConnection();
       const failure = expectFailure(
-        (await call(new AdtPackageLegacy(connection))) as Parameters<
-          typeof expectFailure
-        >[0],
+        (await call(
+          new AdtPackageLegacy(
+            connection,
+            undefined,
+            undefined,
+            undefined,
+            packageDocuments,
+          ),
+        )) as Parameters<typeof expectFailure>[0],
         'legacy package',
       );
       expect(failure.message).toContain('a legacy system (7.40 SP04) has no');
@@ -79,6 +93,7 @@ describe('legacy package', () => {
       undefined,
       undefined,
       registry,
+      packageDocuments,
     );
 
     await handler.lock(config);

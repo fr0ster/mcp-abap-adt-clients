@@ -50,7 +50,7 @@ import { requestHeaders } from '../../utils/requestHeaders';
 import { chain } from '../shared/chain';
 import { lockClassForMessageOrPlain, lockMessageIfGranted } from './lock';
 import { getMessageClassSource } from './read';
-import { type IMessageClassMessageConfig, messageDocuments } from './types';
+import type { IMessageClassMessageConfig, messageDocuments } from './types';
 import { unlockAllMessages, unlockMessageClass } from './unlock';
 import { buildMessageClassXml, parseMessageClass } from './xml';
 
@@ -83,9 +83,10 @@ export class AdtMessageClassMessage<
 
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    private readonly results: R = messageDocuments as unknown as R,
+    logger: ILogger | undefined,
+    // Required: a caller naming its own R hands its results. The shipped
+    // documents are the default of the getter, typed by its overloads.
+    private readonly results: R,
   ) {
     this.connection = connection;
     this.logger = logger;

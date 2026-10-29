@@ -40,7 +40,7 @@ import { AdtClassMemberBase } from './AdtClassMemberBase';
 import { checkClassLocalTypes } from './check';
 import { updateClassLocalTypes } from './includes';
 import { getClassImplementationsInclude } from './read';
-import { classDocuments } from './types';
+import type { classDocuments } from './types';
 
 // Types defined in @mcp-abap-adt/interfaces
 export type { ILocalTypesConfig } from '@mcp-abap-adt/interfaces-adt';
@@ -75,12 +75,13 @@ export class AdtLocalTypes<
 
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    contentTypes?: IAdtContentTypes,
-    lockRegistry?: LockRegistry,
-    // See AdtClass: the one cast is on the default, never on a member.
-    protected readonly results: R = classDocuments as unknown as R,
+    logger: ILogger | undefined,
+    systemContext: IAdtSystemContext | undefined,
+    contentTypes: IAdtContentTypes | undefined,
+    lockRegistry: LockRegistry | undefined,
+    // Required: a caller naming its own R hands its results. The shipped
+    // documents are the default of the getter, typed by its overloads.
+    protected readonly results: R,
   ) {
     super(connection, logger, systemContext, contentTypes, lockRegistry);
   }

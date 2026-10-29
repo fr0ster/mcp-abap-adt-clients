@@ -45,7 +45,7 @@ import {
   getBehaviorImplementationSource,
   getBehaviorImplementationTransport,
 } from './read';
-import { classDocuments, type IBehaviorImplementationConfig } from './types';
+import type { classDocuments, IBehaviorImplementationConfig } from './types';
 import { updateBehaviorImplementation } from './update';
 import { validateBehaviorImplementationName } from './validation';
 import {
@@ -122,10 +122,11 @@ export class AdtBehaviorImplementation<
 
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    private readonly results: R = classDocuments as unknown as R,
+    logger: ILogger | undefined,
+    lockRegistry: LockRegistry | undefined,
+    // Required: a caller naming its own R hands its results. The shipped
+    // documents are the default of the getter, typed by its overloads.
+    private readonly results: R,
     // Handed to the inner class so a create carries the master system and
     // master language the client knows, like a class create does.
     systemContext?: IAdtSystemContext,

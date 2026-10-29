@@ -51,7 +51,7 @@ import { createPackage } from './create';
 import { checkPackageDeletion, deletePackage } from './delete';
 import { lockPackage } from './lock';
 import { getPackage, getPackageTransport } from './read';
-import { type IPackageConfig, packageDocuments } from './types';
+import type { IPackageConfig, packageDocuments } from './types';
 import { unlockPackage } from './unlock';
 import { updatePackage } from './update';
 import { validatePackageBasic } from './validation';
@@ -82,11 +82,12 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
 
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    protected readonly results: R = packageDocuments as unknown as R,
+    logger: ILogger | undefined,
+    systemContext: IAdtSystemContext | undefined,
+    lockRegistry: LockRegistry | undefined,
+    // Required: a caller naming its own R hands its results. The shipped
+    // documents are the default of the getter, typed by its overloads.
+    protected readonly results: R,
   ) {
     this.connection = connection;
     this.logger = logger;

@@ -62,7 +62,7 @@ import { create as createClass } from './create';
 import { checkDeletion, deleteClass } from './delete';
 import { getClassSource } from './read';
 import { activateClassTestClasses } from './testclasses';
-import { classDocuments, type IClassConfig } from './types';
+import type { classDocuments, IClassConfig } from './types';
 import { updateClass } from './update';
 import { validateClassName } from './validation';
 
@@ -104,15 +104,13 @@ export class AdtClass<
 
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    contentTypes?: IAdtContentTypes,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default: `classDocuments`
-    // satisfies the erased bound, which the compiler cannot see through the
-    // eight `unknown`s. A cast on a *member* would be the factory lying about
-    // what it answers, which is exactly what this shape avoids.
-    protected readonly results: R = classDocuments as unknown as R,
+    logger: ILogger | undefined,
+    systemContext: IAdtSystemContext | undefined,
+    contentTypes: IAdtContentTypes | undefined,
+    lockRegistry: LockRegistry | undefined,
+    // Required: a caller naming its own R hands its results. The shipped
+    // documents are the default of the getter, typed by its overloads.
+    protected readonly results: R,
   ) {
     super(connection, logger, systemContext, contentTypes, lockRegistry);
   }

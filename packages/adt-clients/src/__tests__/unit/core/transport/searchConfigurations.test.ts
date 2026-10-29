@@ -97,7 +97,12 @@ describe('AdtRequest.searchConfigurations', () => {
       answering(CONFIGURATIONS),
     );
 
-    const answer = await new AdtRequest(connection).searchConfigurations();
+    const answer = await new AdtRequest(
+      connection,
+      undefined,
+      undefined,
+      transportDocuments,
+    ).searchConfigurations();
 
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toBe(
@@ -173,7 +178,12 @@ describe('AdtRequest.searchConfigurations', () => {
     });
 
     const seen: unknown[] = [];
-    const answer = await new AdtRequest(connection).searchConfigurations({
+    const answer = await new AdtRequest(
+      connection,
+      undefined,
+      undefined,
+      transportDocuments,
+    ).searchConfigurations({
       analyse: (verdict, wire) => {
         seen.push(wire?.status);
         return verdict === ADT_NO_FAILURE
@@ -196,7 +206,12 @@ describe('AdtRequest.searchConfigurations', () => {
   it('answers the configurations document as it arrived by default', async () => {
     const { connection } = connectionOver(() => answering(CONFIGURATIONS));
 
-    const answer = await new AdtRequest(connection).searchConfigurations();
+    const answer = await new AdtRequest(
+      connection,
+      undefined,
+      undefined,
+      transportDocuments,
+    ).searchConfigurations();
 
     if (!answer.ok) throw new Error('expected the document');
     expect(answer.getResult().value).toBe(CONFIGURATIONS);

@@ -94,7 +94,9 @@ describe('AdtUtils.search — one endpoint, the reading injected once', () => {
     }).search({ query: 'ZCL_*' });
 
     const shipped = createConnection();
-    await new AdtUtils(shipped.connection, logger).search({ query: 'ZCL_*' });
+    await new AdtUtils(shipped.connection, logger, utilDocuments).search({
+      query: 'ZCL_*',
+    });
 
     expect(injected.sent).toHaveLength(1);
     // The reading is about the answer. If these ever diverge, it has become a
@@ -106,7 +108,9 @@ describe('AdtUtils.search — one endpoint, the reading injected once', () => {
     const { connection } = createConnection();
 
     const value = expectResult(
-      await new AdtUtils(connection, logger).search({ query: 'ZCL_*' }),
+      await new AdtUtils(connection, logger, utilDocuments).search({
+        query: 'ZCL_*',
+      }),
       'search',
     );
 

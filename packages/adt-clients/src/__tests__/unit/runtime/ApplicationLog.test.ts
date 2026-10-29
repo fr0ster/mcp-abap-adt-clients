@@ -1,5 +1,8 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ApplicationLog } from '../../../runtime/applicationLog/ApplicationLog';
+import {
+  ApplicationLog,
+  applicationLogDocuments,
+} from '../../../runtime/applicationLog/ApplicationLog';
 
 describe('ApplicationLog', () => {
   function createConnectionMock() {
@@ -19,7 +22,11 @@ describe('ApplicationLog', () => {
 
   it('getObject() delegates to /sap/bc/adt/applicationlog/objects/Z_MY_LOG', async () => {
     const connection = createConnectionMock();
-    const appLog = new ApplicationLog(connection, createLogger());
+    const appLog = new ApplicationLog(
+      connection,
+      createLogger(),
+      applicationLogDocuments,
+    );
 
     await appLog.getObject('Z_MY_LOG');
 
@@ -37,7 +44,11 @@ describe('ApplicationLog', () => {
   // blues.v1+xml.
   it('getObject() sends exactly Accept application/vnd.sap.adt.blues.v1+xml', async () => {
     const connection = createConnectionMock();
-    const appLog = new ApplicationLog(connection, createLogger());
+    const appLog = new ApplicationLog(
+      connection,
+      createLogger(),
+      applicationLogDocuments,
+    );
 
     await appLog.getObject('Z_MY_LOG');
 
@@ -51,7 +62,11 @@ describe('ApplicationLog', () => {
 
   it('getSource() sends exactly Accept application/json', async () => {
     const connection = createConnectionMock();
-    const appLog = new ApplicationLog(connection, createLogger());
+    const appLog = new ApplicationLog(
+      connection,
+      createLogger(),
+      applicationLogDocuments,
+    );
 
     await appLog.getSource('Z_MY_LOG');
 
@@ -65,7 +80,11 @@ describe('ApplicationLog', () => {
 
   it('getSource() delegates to /sap/bc/adt/applicationlog/objects/Z_MY_LOG/source/main', async () => {
     const connection = createConnectionMock();
-    const appLog = new ApplicationLog(connection, createLogger());
+    const appLog = new ApplicationLog(
+      connection,
+      createLogger(),
+      applicationLogDocuments,
+    );
 
     await appLog.getSource('Z_MY_LOG');
 
@@ -79,7 +98,11 @@ describe('ApplicationLog', () => {
 
   it('validateName() delegates to /sap/bc/adt/applicationlog/objects/validation', async () => {
     const connection = createConnectionMock();
-    const appLog = new ApplicationLog(connection, createLogger());
+    const appLog = new ApplicationLog(
+      connection,
+      createLogger(),
+      applicationLogDocuments,
+    );
 
     await appLog.validateName('Z_MY_LOG');
 

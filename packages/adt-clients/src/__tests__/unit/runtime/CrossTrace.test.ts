@@ -1,5 +1,8 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { CrossTrace } from '../../../runtime/traces/CrossTraceDomain';
+import {
+  CrossTrace,
+  crossTraceDocuments,
+} from '../../../runtime/traces/CrossTraceDomain';
 
 describe('CrossTrace', () => {
   function createConnectionMock() {
@@ -19,7 +22,11 @@ describe('CrossTrace', () => {
 
   it('list() delegates to /sap/bc/adt/crosstrace/traces', async () => {
     const connection = createConnectionMock();
-    const crossTrace = new CrossTrace(connection, createLogger());
+    const crossTrace = new CrossTrace(
+      connection,
+      createLogger(),
+      crossTraceDocuments,
+    );
 
     await crossTrace.list();
 
@@ -33,7 +40,11 @@ describe('CrossTrace', () => {
 
   it('getById() delegates to /sap/bc/adt/crosstrace/traces/TRACE001', async () => {
     const connection = createConnectionMock();
-    const crossTrace = new CrossTrace(connection, createLogger());
+    const crossTrace = new CrossTrace(
+      connection,
+      createLogger(),
+      crossTraceDocuments,
+    );
 
     await crossTrace.getById('TRACE001');
 
@@ -47,7 +58,11 @@ describe('CrossTrace', () => {
 
   it('getRecords() delegates to /sap/bc/adt/crosstrace/traces/TRACE001/records', async () => {
     const connection = createConnectionMock();
-    const crossTrace = new CrossTrace(connection, createLogger());
+    const crossTrace = new CrossTrace(
+      connection,
+      createLogger(),
+      crossTraceDocuments,
+    );
 
     await crossTrace.getRecords('TRACE001');
 
@@ -61,7 +76,11 @@ describe('CrossTrace', () => {
 
   it('getRecordContent() delegates to /sap/bc/adt/crosstrace/traces/TRACE001/records/3/content', async () => {
     const connection = createConnectionMock();
-    const crossTrace = new CrossTrace(connection, createLogger());
+    const crossTrace = new CrossTrace(
+      connection,
+      createLogger(),
+      crossTraceDocuments,
+    );
 
     await crossTrace.getRecordContent('TRACE001', 3);
 
@@ -75,7 +94,11 @@ describe('CrossTrace', () => {
 
   it('getActivations() delegates to /sap/bc/adt/crosstrace/activations', async () => {
     const connection = createConnectionMock();
-    const crossTrace = new CrossTrace(connection, createLogger());
+    const crossTrace = new CrossTrace(
+      connection,
+      createLogger(),
+      crossTraceDocuments,
+    );
 
     await crossTrace.getActivations();
 

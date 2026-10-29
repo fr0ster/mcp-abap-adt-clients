@@ -8,6 +8,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtServiceDefinition } from '../../../core/serviceDefinition/AdtServiceDefinition';
+import { serviceDefinitionDocuments } from '../../../core/serviceDefinition/types';
 import { headersOf } from '../../helpers/adtHeaders';
 import { createTestsLogger } from '../../helpers/testLogger';
 
@@ -32,7 +33,13 @@ function fakeConn(): { conn: IAbapConnection; calls: any[] } {
 describe('AdtServiceDefinition.create is metadata-only', () => {
   it('does not put source code in the create POST body', async () => {
     const { conn, calls } = fakeConn();
-    const handler = new AdtServiceDefinition(conn, logger);
+    const handler = new AdtServiceDefinition(
+      conn,
+      logger,
+      undefined,
+      undefined,
+      serviceDefinitionDocuments,
+    );
 
     // The source can no longer be handed to `create` at all — the signature
     // refuses it, on the class as well as through the contract. The two calls

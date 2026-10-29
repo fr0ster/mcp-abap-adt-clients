@@ -38,7 +38,10 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { ClassExecutor } from '../../../../executors/class/ClassExecutor';
 import { classExecutorDocuments } from '../../../../index.executors';
-import { AmdpDebugger } from '../../../../runtime/debugger/AmdpDebugger';
+import {
+  AmdpDebugger,
+  amdpDebuggerDocuments,
+} from '../../../../runtime/debugger/AmdpDebugger';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import {
   configuredCase,
@@ -257,8 +260,16 @@ describe('AMDP debugger (AmdpDebugger)', () => {
       skipUnlessConfigured(error, testsLogger);
       throw error;
     }
-    onSession = new AmdpDebugger(session, connectionLogger);
-    onCommands = new AmdpDebugger(commands, connectionLogger);
+    onSession = new AmdpDebugger(
+      session,
+      connectionLogger,
+      amdpDebuggerDocuments,
+    );
+    onCommands = new AmdpDebugger(
+      commands,
+      connectionLogger,
+      amdpDebuggerDocuments,
+    );
     // The two name each other: each is ensured written (skip_activation in
     // the shared config), then both are activated in one group run — unless
     // both were already at their source and active, and nothing was written.

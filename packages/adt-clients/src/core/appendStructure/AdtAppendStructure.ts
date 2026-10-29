@@ -52,7 +52,7 @@ import {
   getAppendStructureSource,
   getAppendStructureTransport,
 } from './read';
-import { appendStructureDocuments, type IAppendStructureConfig } from './types';
+import type { appendStructureDocuments, IAppendStructureConfig } from './types';
 import { unlockAppendStructure } from './unlock';
 import { updateAppendStructure } from './update';
 import { validateAppendStructureName } from './validation';
@@ -92,11 +92,12 @@ export class AdtAppendStructure<
 
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    private readonly results: R = appendStructureDocuments as unknown as R,
+    logger: ILogger | undefined,
+    systemContext: IAdtSystemContext | undefined,
+    lockRegistry: LockRegistry | undefined,
+    // Required: a caller naming its own R hands its results. The shipped
+    // documents are the default of the getter, typed by its overloads.
+    private readonly results: R,
   ) {
     this.connection = connection;
     this.logger = logger;

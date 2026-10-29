@@ -19,6 +19,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
 import type { IAdtGroupReference } from '../../../core/shared/codeSets';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { headersOf } from '../../helpers/adtHeaders';
 
 /** What ADT answers when the objects were not deleted. */
@@ -72,7 +73,7 @@ const ONE_PACKAGE: IAdtGroupReference<'DEVC/K'>[] = [
 
 describe('deleteObjectsGroup', () => {
   it('answers the document as it came when no analyse is given', async () => {
-    const utils = new AdtUtils(answering(NOT_DELETED), logger);
+    const utils = new AdtUtils(answering(NOT_DELETED), logger, utilDocuments);
 
     const response = await utils.deleteObjectsGroup(ONE_PACKAGE, undefined, {
       headers: headersOf(utils, 'deleteObjectsGroup'),
@@ -86,7 +87,7 @@ describe('deleteObjectsGroup', () => {
   });
 
   it('answers a failure through analyseDeletion when the objects were not deleted', async () => {
-    const utils = new AdtUtils(answering(NOT_DELETED), logger);
+    const utils = new AdtUtils(answering(NOT_DELETED), logger, utilDocuments);
 
     const response = await utils.deleteObjectsGroup(ONE_PACKAGE, undefined, {
       headers: headersOf(utils, 'deleteObjectsGroup'),
@@ -108,7 +109,7 @@ describe('deleteObjectsGroup', () => {
   });
 
   it('answers a result when they were', async () => {
-    const utils = new AdtUtils(answering(DELETED), logger);
+    const utils = new AdtUtils(answering(DELETED), logger, utilDocuments);
 
     const response = await utils.deleteObjectsGroup(
       [{ name: 'ZGONE', type: 'CLAS/OC' }],
@@ -125,7 +126,7 @@ describe('deleteObjectsGroup', () => {
 
 describe('checkDeletionGroup', () => {
   it('answers a result when the objects cannot be deleted', async () => {
-    const utils = new AdtUtils(answering(NOT_DELETABLE), logger);
+    const utils = new AdtUtils(answering(NOT_DELETABLE), logger, utilDocuments);
 
     const response = await utils.checkDeletionGroup(ONE_PACKAGE, {
       headers: headersOf(utils, 'checkDeletionGroup'),
@@ -154,12 +155,15 @@ describe('the package URI the group operations ask about', () => {
       }),
     } as unknown as IAbapConnection;
 
-    await new AdtUtils(connection, logger).checkDeletionGroup(ONE_PACKAGE, {
-      headers: headersOf(
-        new AdtUtils(connection, logger),
-        'checkDeletionGroup',
-      ),
-    });
+    await new AdtUtils(connection, logger, utilDocuments).checkDeletionGroup(
+      ONE_PACKAGE,
+      {
+        headers: headersOf(
+          new AdtUtils(connection, logger, utilDocuments),
+          'checkDeletionGroup',
+        ),
+      },
+    );
 
     // `DEVC/K` fell through 40 mapped types to a fallback that lowercases the
     // type code, producing `/sap/bc/adt/devc/k/…`. ADT answers that address with

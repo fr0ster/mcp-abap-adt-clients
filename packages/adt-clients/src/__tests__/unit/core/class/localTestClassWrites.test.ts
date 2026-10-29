@@ -9,6 +9,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtLocalTestClass } from '../../../../core/class/AdtLocalTestClass';
+import { classDocuments } from '../../../../core/class/types';
 import { headersOf } from '../../../helpers/adtHeaders';
 import { createLibraryLogger } from '../../../helpers/testLogger';
 
@@ -37,7 +38,14 @@ function makeConn() {
 describe('AdtLocalTestClass — writing the tests', () => {
   it('update given a lock handle takes no lock of its own', async () => {
     const { conn, calls } = makeConn();
-    const h = new AdtLocalTestClass(conn, createLibraryLogger());
+    const h = new AdtLocalTestClass(
+      conn,
+      createLibraryLogger(),
+      undefined,
+      undefined,
+      undefined,
+      classDocuments,
+    );
 
     await h.update(
       {
@@ -58,7 +66,14 @@ describe('AdtLocalTestClass — writing the tests', () => {
     // there is: delete() takes no lock handle of its own. A truthy guard
     // rejected the empty string once — caught in review, 2026-08-14.
     const { conn, calls } = makeConn();
-    const h = new AdtLocalTestClass(conn, createLibraryLogger());
+    const h = new AdtLocalTestClass(
+      conn,
+      createLibraryLogger(),
+      undefined,
+      undefined,
+      undefined,
+      classDocuments,
+    );
 
     await h.update(
       { className: 'ZCL_TESTS' },
@@ -76,7 +91,14 @@ describe('AdtLocalTestClass — writing the tests', () => {
 
   it('delete empties the include and deletes no object', async () => {
     const { conn, calls } = makeConn();
-    const h = new AdtLocalTestClass(conn, createLibraryLogger());
+    const h = new AdtLocalTestClass(
+      conn,
+      createLibraryLogger(),
+      undefined,
+      undefined,
+      undefined,
+      classDocuments,
+    );
 
     await h.delete(
       { className: 'ZCL_TESTS' },

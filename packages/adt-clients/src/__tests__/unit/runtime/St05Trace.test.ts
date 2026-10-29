@@ -1,5 +1,8 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { St05Trace } from '../../../runtime/traces/St05Trace';
+import {
+  St05Trace,
+  st05TraceDocuments,
+} from '../../../runtime/traces/St05Trace';
 
 describe('St05Trace', () => {
   function createConnectionMock() {
@@ -19,7 +22,7 @@ describe('St05Trace', () => {
 
   it('getState() delegates to /sap/bc/adt/st05/trace/state', async () => {
     const connection = createConnectionMock();
-    const trace = new St05Trace(connection, createLogger());
+    const trace = new St05Trace(connection, createLogger(), st05TraceDocuments);
 
     await trace.getState();
 
@@ -33,7 +36,7 @@ describe('St05Trace', () => {
 
   it('getDirectory() delegates to /sap/bc/adt/st05/trace/directory', async () => {
     const connection = createConnectionMock();
-    const trace = new St05Trace(connection, createLogger());
+    const trace = new St05Trace(connection, createLogger(), st05TraceDocuments);
 
     await trace.getDirectory();
 

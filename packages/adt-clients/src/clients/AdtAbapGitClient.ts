@@ -3,7 +3,8 @@
  *
  * Standalone top-level class — NOT a factory on AdtClient (which is
  * reserved for IAdtObject<Config, State> implementations only).
- * Consumers instantiate directly: new AdtAbapGitClient(connection, logger, results?).
+ * Consumers instantiate directly: new AdtAbapGitClient(connection, logger, results)
+ * (`abapGitDocuments` for the shipped result set).
  *
  * Implements IAdtAbapGitClient. HTTP operations are delegated to
  * low-level functions in ./abapGit/*; this class owns the options,
@@ -32,7 +33,7 @@ import { getErrorLog } from './abapGit/getErrorLog';
 import { linkRepo } from './abapGit/link';
 import { listRepos } from './abapGit/listRepos';
 import { pullRepo } from './abapGit/pull';
-import { abapGitDocuments, type IAbapGitResults } from './abapGit/types';
+import type { abapGitDocuments, IAbapGitResults } from './abapGit/types';
 import { unlinkRepo } from './abapGit/unlink';
 
 /**
@@ -61,11 +62,12 @@ export class AdtAbapGitClient<
 
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
+    logger: ILogger | undefined,
     // The options (`contentTypeVersion`, which chose what `link` and `pull`
     // sent) are gone since 36.0.0: those members send the caller's `headers`.
-    // The one cast in this file, and it is on the default. See AdtClass.
-    results: R = abapGitDocuments as unknown as R,
+    // Required: no getter hands this out, so the caller passes the
+    // results — `abapGitDocuments` for the shipped ones.
+    results: R,
   ) {
     this.connection = connection;
     this.logger = logger;

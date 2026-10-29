@@ -19,6 +19,7 @@ import { AdtAbapGitClient } from '../../src/clients/AdtAbapGitClient';
 import { AdtClient } from '../../src/clients/AdtClient';
 import { AdtExecutor } from '../../src/clients/AdtExecutor';
 import { AdtRuntimeClient } from '../../src/clients/AdtRuntimeClient';
+import { abapGitDocuments } from '../../src/clients/abapGit/types';
 import { AbapDebugger } from '../../src/runtime/debugger/AbapDebugger';
 import { AmdpDebugger } from '../../src/runtime/debugger/AmdpDebugger';
 import {
@@ -135,7 +136,7 @@ export function clientsOn(
     adt: new AdtClient(connection, undefined, options),
     runtime: new AdtRuntimeClient(connection),
     executor: new AdtExecutor(connection),
-    abapGit: new AdtAbapGitClient(connection),
+    abapGit: new AdtAbapGitClient(connection, undefined, abapGitDocuments),
     more: Object.fromEntries(
       CLIENT_SETS.flatMap((set) =>
         Object.entries(set.build(connection, options)).map(([key, client]) => [

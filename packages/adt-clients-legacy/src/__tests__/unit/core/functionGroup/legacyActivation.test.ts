@@ -4,6 +4,7 @@
  * cloud, not on 7.40.
  */
 
+import { functionGroupDocuments } from '@mcp-abap-adt/adt-clients';
 import { RecordingConnection } from '../../../../../../adt-clients/src/__tests__/helpers/recordingConnection';
 import { createLibraryLogger } from '../../../../../../adt-clients/src/__tests__/helpers/testLogger';
 import { AdtFunctionGroupLegacy } from '../../../../core/functionGroup/AdtFunctionGroupLegacy';
@@ -13,7 +14,14 @@ describe('AdtFunctionGroupLegacy.activate', () => {
     const conn = new RecordingConnection();
     const sent = conn.sent;
 
-    await new AdtFunctionGroupLegacy(conn, createLibraryLogger()).activate(
+    await new AdtFunctionGroupLegacy(
+      conn,
+      createLibraryLogger(),
+      undefined,
+      undefined,
+      undefined,
+      functionGroupDocuments,
+    ).activate(
       { functionGroupName: 'ZFG_ACT' },
       {
         headers: { accept: 'application/xml', contentType: 'application/xml' },

@@ -61,7 +61,7 @@ import {
   getFunctionModuleTransport,
   getFunctionSource,
 } from './read';
-import { functionModuleDocuments, type IFunctionModuleConfig } from './types';
+import type { functionModuleDocuments, IFunctionModuleConfig } from './types';
 import { unlockFunctionModule } from './unlock';
 import { update } from './update';
 import { validateFunctionModuleName } from './validation';
@@ -112,12 +112,13 @@ export class AdtFunctionModule<
 
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    contentTypes?: IAdtContentTypes,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    protected readonly results: R = functionModuleDocuments as unknown as R,
+    logger: ILogger | undefined,
+    systemContext: IAdtSystemContext | undefined,
+    contentTypes: IAdtContentTypes | undefined,
+    lockRegistry: LockRegistry | undefined,
+    // Required: a caller naming its own R hands its results. The shipped
+    // documents are the default of the getter, typed by its overloads.
+    protected readonly results: R,
   ) {
     this.connection = connection;
     this.logger = logger;

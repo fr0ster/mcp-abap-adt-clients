@@ -5,13 +5,14 @@
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { noopLogger } from '../../../utils/noopLogger';
 import { createTestsLogger } from '../../helpers/testLogger';
 import { logTestStep } from '../../helpers/testProgressLogger';
 
 describe('AdtUtils.getObjectSourceUri', () => {
   const testsLogger = createTestsLogger();
-  const utils = new AdtUtils({} as IAbapConnection, noopLogger);
+  const utils = new AdtUtils({} as IAbapConnection, noopLogger, utilDocuments);
   const objectName = 'ZADT_TEST_OBJ';
   const functionGroup = 'ZADT_TEST_FG';
 

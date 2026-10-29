@@ -4,6 +4,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClient } from '../../clients/AdtClient';
 import { AdtMessageClassMessage } from '../../core/messageClass/AdtMessageClassMessage';
+import { messageDocuments } from '../../core/messageClass/types';
 import { parseMessageClass } from '../../core/messageClass/xml';
 import { noopLogger } from '../../utils/noopLogger';
 import { headersOf } from '../helpers/adtHeaders';
@@ -48,7 +49,7 @@ function recorder(classXml = CLASS_XML) {
 describe('AdtMessageClassMessage', () => {
   it('reads the class document the message lives in, and refuses when it is absent', async () => {
     const { conn } = recorder();
-    const m = new AdtMessageClassMessage(conn, noopLogger);
+    const m = new AdtMessageClassMessage(conn, noopLogger, messageDocuments);
     // There is no resource for one message: it is read through its class's
     // document, so that document is what comes back. Whether the message is in
     // it is the shipped `analyse`'s question — the read below succeeds only
@@ -64,7 +65,7 @@ describe('AdtMessageClassMessage', () => {
 
   it('update does LOCK_MSG + class LOCK + PUT(full class, lockhandle) + UNLOCK + UNLOCK_ALL', async () => {
     const { conn, calls } = recorder();
-    const m = new AdtMessageClassMessage(conn, noopLogger);
+    const m = new AdtMessageClassMessage(conn, noopLogger, messageDocuments);
     await m.update(
       { className: 'ZT', msgno: '001', msgtext: 'NEW' },
       { headers: headersOf(m, 'update') },
@@ -92,7 +93,7 @@ describe('AdtMessageClassMessage', () => {
 
   it('appends &corrNr= on the class PUT when transportRequest is set', async () => {
     const { conn, calls } = recorder();
-    const m = new AdtMessageClassMessage(conn, noopLogger);
+    const m = new AdtMessageClassMessage(conn, noopLogger, messageDocuments);
     await m.update(
       {
         className: 'ZT',
@@ -109,7 +110,7 @@ describe('AdtMessageClassMessage', () => {
 
   it('delete appends &corrNr= on the class PUT when transportRequest is set', async () => {
     const { conn, calls } = recorder();
-    const m = new AdtMessageClassMessage(conn, noopLogger);
+    const m = new AdtMessageClassMessage(conn, noopLogger, messageDocuments);
     await m.delete(
       {
         className: 'ZT',
@@ -125,7 +126,7 @@ describe('AdtMessageClassMessage', () => {
 
   it('delete: <mc:deletedmessages> for target + lockhandle; kept messages in <mc:messages>; correct lock chain; no HTTP DELETE', async () => {
     const { conn, calls } = recorder();
-    const m = new AdtMessageClassMessage(conn, noopLogger);
+    const m = new AdtMessageClassMessage(conn, noopLogger, messageDocuments);
     await m.delete(
       { className: 'ZT', msgno: '001' },
       { headers: headersOf(m, 'delete') },
@@ -168,7 +169,7 @@ describe('AdtMessageClassMessage', () => {
     // is created, read, changed and removed through its class's XML; it is not
     // validated, activated, checked, locked or versioned in its own right.
     const { conn } = recorder();
-    const m = new AdtMessageClassMessage(conn, noopLogger);
+    const m = new AdtMessageClassMessage(conn, noopLogger, messageDocuments);
     for (const name of [
       'validate',
       'activate',
@@ -185,7 +186,7 @@ describe('AdtMessageClassMessage', () => {
 
   it('upsert with selfExplanatory+description: PUT body emits mc:selfexplainatory and adtcore:description', async () => {
     const { conn, calls } = recorder();
-    const m = new AdtMessageClassMessage(conn, noopLogger);
+    const m = new AdtMessageClassMessage(conn, noopLogger, messageDocuments);
     await m.update(
       {
         className: 'ZT',
@@ -205,7 +206,7 @@ describe('AdtMessageClassMessage', () => {
   it('existing selfExplanatory+description round-trip when not overridden in update', async () => {
     // CLASS_XML_WITH_FLAGS has 001 with selfexplainatory="true" and description="D1"
     const { conn, calls } = recorder(CLASS_XML_WITH_FLAGS);
-    const m = new AdtMessageClassMessage(conn, noopLogger);
+    const m = new AdtMessageClassMessage(conn, noopLogger, messageDocuments);
     // Update only msgtext — selfExplanatory and description not specified
     await m.update(
       { className: 'ZT', msgno: '001', msgtext: 'UPDATED' },
@@ -221,7 +222,7 @@ describe('AdtMessageClassMessage', () => {
 
   it('create new message with selfExplanatory+description: PUT body emits both fields', async () => {
     const { conn, calls } = recorder();
-    const m = new AdtMessageClassMessage(conn, noopLogger);
+    const m = new AdtMessageClassMessage(conn, noopLogger, messageDocuments);
     // 003 does not exist in CLASS_XML — it will be pushed as a new message
     await m.create(
       {

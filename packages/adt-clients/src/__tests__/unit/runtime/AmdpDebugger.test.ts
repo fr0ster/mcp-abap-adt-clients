@@ -1,5 +1,8 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { AmdpDebugger } from '../../../runtime/debugger/AmdpDebugger';
+import {
+  AmdpDebugger,
+  amdpDebuggerDocuments,
+} from '../../../runtime/debugger/AmdpDebugger';
 import { headersOf } from '../../helpers/adtHeaders';
 
 /**
@@ -21,7 +24,11 @@ describe('AmdpDebugger', () => {
     const connection = {
       makeAdtRequest: jest.fn().mockResolvedValue(answer),
     } as unknown as IAbapConnection;
-    const debugger_ = new AmdpDebugger(connection);
+    const debugger_ = new AmdpDebugger(
+      connection,
+      undefined,
+      amdpDebuggerDocuments,
+    );
     const sent = () =>
       (connection.makeAdtRequest as jest.Mock).mock.calls[0][0] as {
         url: string;

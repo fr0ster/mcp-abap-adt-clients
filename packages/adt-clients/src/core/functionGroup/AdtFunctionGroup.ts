@@ -67,7 +67,7 @@ import {
   getFunctionGroupSource,
   getFunctionGroupTransport,
 } from './read';
-import { functionGroupDocuments, type IFunctionGroupConfig } from './types';
+import type { functionGroupDocuments, IFunctionGroupConfig } from './types';
 import { unlockFunctionGroup } from './unlock';
 import { updateFunctionGroup, uploadFunctionGroupSource } from './update';
 import { validateFunctionGroupName } from './validation';
@@ -114,12 +114,13 @@ export class AdtFunctionGroup<
 
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    contentTypes?: IAdtContentTypes,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    protected readonly results: R = functionGroupDocuments as unknown as R,
+    logger: ILogger | undefined,
+    systemContext: IAdtSystemContext | undefined,
+    contentTypes: IAdtContentTypes | undefined,
+    lockRegistry: LockRegistry | undefined,
+    // Required: a caller naming its own R hands its results. The shipped
+    // documents are the default of the getter, typed by its overloads.
+    protected readonly results: R,
   ) {
     this.connection = connection;
     this.logger = logger;

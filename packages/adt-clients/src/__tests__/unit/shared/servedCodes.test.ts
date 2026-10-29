@@ -11,6 +11,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { getEnhancementSource } from '../../../core/enhancement/read';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { whereUsedObjectUri } from '../../../core/shared/whereUsed';
 import { DDIC_VIEW } from '../../../endpoints/objects';
 import { buildObjectUri } from '../../../utils/activationUtils';
@@ -33,7 +34,7 @@ function recording() {
       return { status: 200, statusText: 'OK', data: '<x/>', headers: {} };
     }),
   } as unknown as IAbapConnection;
-  return { utils: new AdtUtils(connection, noopLogger), sent };
+  return { utils: new AdtUtils(connection, noopLogger, utilDocuments), sent };
 }
 
 describe('readObjectMetadata serves the codes it served, and only those', () => {

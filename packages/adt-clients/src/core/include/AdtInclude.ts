@@ -53,7 +53,7 @@ import {
 } from './enhancements';
 import { includeUrl, lockInclude } from './lock';
 import { getIncludeMetadata, getIncludeSource } from './read';
-import { includeDocuments } from './types';
+import type { includeDocuments } from './types';
 import { unlockInclude } from './unlock';
 import { uploadIncludeSource } from './update';
 
@@ -98,12 +98,13 @@ export class AdtInclude<
     // unread here now that the members are single requests with nothing to
     // narrate; removing it would make this one class take different arguments.
     // biome-ignore lint/correctness/noUnusedPrivateClassMembers: uniform constructor
-    private readonly logger?: ILogger,
+    private readonly logger: ILogger | undefined,
     // Read by `create` until 36.0.0; its headers are the caller's now.
     // biome-ignore lint/correctness/noUnusedPrivateClassMembers: uniform constructor
-    private readonly contentTypes?: IAdtContentTypes,
-    // The one cast in this file, and it is on the default. See AdtClass.
-    protected readonly results: R = includeDocuments as unknown as R,
+    private readonly contentTypes: IAdtContentTypes | undefined,
+    // Required: a caller naming its own R hands its results. The shipped
+    // documents are the default of the getter, typed by its overloads.
+    protected readonly results: R,
     // Last, so the constructor every consumer already calls keeps its shape.
     private readonly systemContext: IAdtSystemContext = {},
   ) {}

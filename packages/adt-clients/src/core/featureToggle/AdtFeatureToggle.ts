@@ -51,11 +51,11 @@ import { lockFeatureToggle } from './lock';
 import { readFeatureToggle } from './read';
 import { readFeatureToggleSource } from './readSource';
 import { toggleFeatureToggle } from './switch';
-import {
+import type {
   featureToggleDocuments,
-  type ICreateFeatureToggleParams,
-  type IDeleteFeatureToggleParams,
-  type IFeatureToggleConfig,
+  ICreateFeatureToggleParams,
+  IDeleteFeatureToggleParams,
+  IFeatureToggleConfig,
 } from './types';
 import { unlockFeatureToggle } from './unlock';
 import { updateFeatureToggle } from './update';
@@ -95,14 +95,12 @@ export class AdtFeatureToggle<
 
   constructor(
     connection: IAbapConnection,
-    logger?: ILogger,
-    systemContext?: IAdtSystemContext,
-    lockRegistry?: LockRegistry,
-    // The one cast in this file, and it is on the default: the shipped set
-    // satisfies the erased bound, which the compiler cannot see through the
-    // `unknown`s. A cast on a member would be the factory lying about what it
-    // answers.
-    protected readonly results: R = featureToggleDocuments as unknown as R,
+    logger: ILogger | undefined,
+    systemContext: IAdtSystemContext | undefined,
+    lockRegistry: LockRegistry | undefined,
+    // Required: a caller naming its own R hands its results. The shipped
+    // documents are the default of the getter, typed by its overloads.
+    protected readonly results: R,
   ) {
     this.connection = connection;
     this.logger = logger;

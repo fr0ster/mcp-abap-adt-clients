@@ -7,7 +7,10 @@ import type {
 import { AdtBatchConnection } from '../../batch';
 import { innerRequest, parseBatchResponse } from '../../batch/wire';
 import { AdtClient } from '../../clients/AdtClient';
-import { AbapDebugger } from '../../runtime/debugger/AbapDebugger';
+import {
+  AbapDebugger,
+  abapDebuggerDocuments,
+} from '../../runtime/debugger/AbapDebugger';
 import { withRequestTrace } from '../../utils/requestTrace';
 import { headersOf } from '../helpers/adtHeaders';
 
@@ -182,7 +185,7 @@ test('member response is identical to direct transport', async () => {
 test('debugger records step, stack and variables', async () => {
   const { connection, send } = fixture([200, 200, 200]);
   const batch = new AdtBatchConnection(connection, { endpoint: 'debugger' });
-  const api = new AbapDebugger(batch);
+  const api = new AbapDebugger(batch, undefined, abapDebuggerDocuments);
   const pending = [
     api.step('stepOver'),
     api.getStack(),
@@ -431,7 +434,7 @@ test.each(['stateful', 'stateless'] as const)(
       { ...connection, getSessionType: () => mode } as IAbapConnection,
       { endpoint: 'debugger' },
     );
-    const api = new AbapDebugger(batch);
+    const api = new AbapDebugger(batch, undefined, abapDebuggerDocuments);
     const pending = [
       api.getStack(),
       api.getVariables(['id'], { headers: headersOf(api, 'getVariables') }),

@@ -1,5 +1,8 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { DdicActivation } from '../../../runtime/ddic/DdicActivation';
+import {
+  DdicActivation,
+  ddicActivationDocuments,
+} from '../../../runtime/ddic/DdicActivation';
 
 describe('DdicActivation', () => {
   function createConnectionMock() {
@@ -19,7 +22,11 @@ describe('DdicActivation', () => {
 
   it('getGraph() delegates to /sap/bc/adt/ddic/logs/activationgraph', async () => {
     const connection = createConnectionMock();
-    const activation = new DdicActivation(connection, createLogger());
+    const activation = new DdicActivation(
+      connection,
+      createLogger(),
+      ddicActivationDocuments,
+    );
 
     await activation.getGraph();
 
@@ -33,7 +40,11 @@ describe('DdicActivation', () => {
 
   it('getGraph() passes options as query params', async () => {
     const connection = createConnectionMock();
-    const activation = new DdicActivation(connection, createLogger());
+    const activation = new DdicActivation(
+      connection,
+      createLogger(),
+      ddicActivationDocuments,
+    );
 
     await activation.getGraph({
       objectName: 'ZTABLE',

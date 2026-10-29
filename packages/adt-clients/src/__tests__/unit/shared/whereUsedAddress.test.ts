@@ -11,6 +11,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { whereUsedObjectUri } from '../../../core/shared/whereUsed';
 import { buildObjectUri } from '../../../utils/activationUtils';
 import { headersOf } from '../../helpers/adtHeaders';
@@ -76,7 +77,7 @@ describe('whereUsedObjectUri', () => {
 describe('AdtUtils where-used members', () => {
   it('ask about the shared address', async () => {
     const { connection, urls } = recording();
-    const utils = new AdtUtils(connection, logger);
+    const utils = new AdtUtils(connection, logger, utilDocuments);
 
     await utils.getWhereUsed(
       {
@@ -101,7 +102,7 @@ describe('AdtUtils where-used members', () => {
 
   it('throw an unknown type before any request is made', async () => {
     const { connection, urls } = recording();
-    const utils = new AdtUtils(connection, logger);
+    const utils = new AdtUtils(connection, logger, utilDocuments);
 
     await expect(
       utils.getWhereUsed(

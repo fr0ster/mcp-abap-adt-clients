@@ -45,7 +45,10 @@ import {
   AbapDebugger,
   abapDebuggerDocuments,
 } from '../../../../runtime/debugger/AbapDebugger';
-import { MemorySnapshots } from '../../../../runtime/memory/MemorySnapshots';
+import {
+  MemorySnapshots,
+  memorySnapshotsDocuments,
+} from '../../../../runtime/memory/MemorySnapshots';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import {
   configuredCase,
@@ -406,6 +409,7 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
       const snapshots = new MemorySnapshots(
         triggerConnection as Connection,
         connectionLogger,
+        memorySnapshotsDocuments,
       );
       const deadline = Date.now() + LIST_WAIT_SECONDS * 1000;
       for (;;) {
@@ -437,6 +441,7 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
       const snapshots = new MemorySnapshots(
         triggerConnection as Connection,
         connectionLogger,
+        memorySnapshotsDocuments,
       );
       const before = ids.before as string;
       const after = ids.after as string;

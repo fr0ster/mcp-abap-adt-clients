@@ -13,6 +13,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtRequest } from '../../../../core/transport/AdtRequest';
+import { transportDocuments } from '../../../../core/transport/types';
 import { transportParsing } from '../../../helpers/transportParsing';
 
 const CONFIGURATIONS = (...uris: string[]) =>
@@ -58,7 +59,12 @@ describe('list runs the named search', () => {
   it('sends exactly one request, carrying the configUri it was given', async () => {
     const { connection, calls } = connectionOver(bodies(CONFIGURATIONS('/a')));
 
-    await new AdtRequest(connection).list({ configUri: '/explicit' });
+    await new AdtRequest(
+      connection,
+      undefined,
+      undefined,
+      transportDocuments,
+    ).list({ configUri: '/explicit' });
 
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toContain('configUri=%2Fexplicit');
@@ -95,7 +101,12 @@ describe('the batch guard', () => {
       deferred,
     );
 
-    await new AdtRequest(connection).list({ configUri: '/explicit' });
+    await new AdtRequest(
+      connection,
+      undefined,
+      undefined,
+      transportDocuments,
+    ).list({ configUri: '/explicit' });
 
     expect(calls).toHaveLength(1);
   });

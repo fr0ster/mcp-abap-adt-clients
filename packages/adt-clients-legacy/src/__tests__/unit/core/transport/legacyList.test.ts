@@ -5,6 +5,8 @@
  * not have it, while listTransportsLegacy() — written for exactly this — was
  * never called from anywhere.
  */
+
+import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -62,7 +64,12 @@ describe('legacy transport list', () => {
     const { connection, calls } = recordingConnection();
 
     const failure = expectFailure(
-      await new AdtRequestLegacy(connection).list({ configUri: '/x' }),
+      await new AdtRequestLegacy(
+        connection,
+        undefined,
+        undefined,
+        transportDocuments,
+      ).list({ configUri: '/x' }),
       'legacy list with configUri',
     );
 
@@ -77,9 +84,15 @@ describe('legacy transport update/delete', () => {
   it('refuses update() instead of inheriting the modern endpoint (zero requests)', async () => {
     const { connection, calls } = recordingConnection();
 
+    const request = new AdtRequestLegacy(
+      connection,
+      undefined,
+      undefined,
+      transportDocuments,
+    );
     const failure = expectFailure(
       // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
-      await new AdtRequestLegacy(connection).updateMetadata(),
+      await request.updateMetadata(),
       'legacy update',
     );
 
@@ -92,9 +105,15 @@ describe('legacy transport update/delete', () => {
   it('refuses delete() instead of inheriting the modern endpoint (zero requests)', async () => {
     const { connection, calls } = recordingConnection();
 
+    const request = new AdtRequestLegacy(
+      connection,
+      undefined,
+      undefined,
+      transportDocuments,
+    );
     const failure = expectFailure(
       // @ts-expect-error -- 7.40 does not serve this operation; the refusal is for a caller outside the type system
-      await new AdtRequestLegacy(connection).delete(),
+      await request.delete(),
       'legacy delete',
     );
 
@@ -152,9 +171,14 @@ describe('legacy transport members', () => {
     const { connection, calls } = recordingConnection();
 
     const failure = expectFailure(
-      (await call(new AdtRequestLegacy(connection))) as Parameters<
-        typeof expectFailure
-      >[0],
+      (await call(
+        new AdtRequestLegacy(
+          connection,
+          undefined,
+          undefined,
+          transportDocuments,
+        ),
+      )) as Parameters<typeof expectFailure>[0],
       'legacy transport member',
     );
 

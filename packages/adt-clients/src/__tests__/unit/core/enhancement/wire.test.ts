@@ -6,6 +6,7 @@ import type {
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 import { AdtEnhancement } from '../../../../core/enhancement/AdtEnhancement';
+import { enhancementDocuments } from '../../../../core/enhancement/types';
 import { headersOf } from '../../../helpers/adtHeaders';
 
 const parser = new XMLParser({ ignoreAttributes: false });
@@ -19,9 +20,15 @@ function setup() {
   const request = jest
     .fn()
     .mockResolvedValue({ status: 201, data: '', headers: {} });
-  const client = new AdtEnhancement({
-    makeAdtRequest: request,
-  } as unknown as IAbapConnection);
+  const client = new AdtEnhancement(
+    {
+      makeAdtRequest: request,
+    } as unknown as IAbapConnection,
+    undefined,
+    undefined,
+    undefined,
+    enhancementDocuments,
+  );
   return { client, request };
 }
 function config<T extends EnhancementType>(

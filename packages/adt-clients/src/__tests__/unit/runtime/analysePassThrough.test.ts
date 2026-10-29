@@ -7,14 +7,35 @@
  */
 import type { IAdtAnalyseOptions } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { ApplicationLog } from '../../../runtime/applicationLog/ApplicationLog';
-import { AtcLog } from '../../../runtime/atc/AtcLog';
-import { DdicActivation } from '../../../runtime/ddic/DdicActivation';
-import { RuntimeDumps } from '../../../runtime/dumps/RuntimeDumps';
-import { GatewayErrorLog } from '../../../runtime/gatewayErrorLog/GatewayErrorLog';
-import { SystemMessages } from '../../../runtime/systemMessages/SystemMessages';
-import { CrossTrace } from '../../../runtime/traces/CrossTraceDomain';
-import { St05Trace } from '../../../runtime/traces/St05Trace';
+import {
+  ApplicationLog,
+  applicationLogDocuments,
+} from '../../../runtime/applicationLog/ApplicationLog';
+import { AtcLog, atcLogDocuments } from '../../../runtime/atc/AtcLog';
+import {
+  DdicActivation,
+  ddicActivationDocuments,
+} from '../../../runtime/ddic/DdicActivation';
+import {
+  RuntimeDumps,
+  runtimeDumpsDocuments,
+} from '../../../runtime/dumps/RuntimeDumps';
+import {
+  GatewayErrorLog,
+  gatewayErrorLogDocuments,
+} from '../../../runtime/gatewayErrorLog/GatewayErrorLog';
+import {
+  SystemMessages,
+  systemMessagesDocuments,
+} from '../../../runtime/systemMessages/SystemMessages';
+import {
+  CrossTrace,
+  crossTraceDocuments,
+} from '../../../runtime/traces/CrossTraceDomain';
+import {
+  St05Trace,
+  st05TraceDocuments,
+} from '../../../runtime/traces/St05Trace';
 import { expectResult } from '../../helpers/contract';
 
 const BODY = '<doc/>';
@@ -37,73 +58,111 @@ type Member = (
 ) => Promise<{ ok: boolean; getResult?: unknown }>;
 
 const members: [string, (c: IAbapConnection) => Member][] = [
-  ['RuntimeDumps.list', (c) => (o) => new RuntimeDumps(c, logger).list(o)],
+  [
+    'RuntimeDumps.list',
+    (c) => (o) => new RuntimeDumps(c, logger, runtimeDumpsDocuments).list(o),
+  ],
   [
     'RuntimeDumps.listByUser',
-    (c) => (o) => new RuntimeDumps(c, logger).listByUser('U', o),
+    (c) => (o) =>
+      new RuntimeDumps(c, logger, runtimeDumpsDocuments).listByUser('U', o),
   ],
   [
     'RuntimeDumps.getById',
-    (c) => (o) => new RuntimeDumps(c, logger).getById('D', o),
+    (c) => (o) =>
+      new RuntimeDumps(c, logger, runtimeDumpsDocuments).getById('D', o),
   ],
   [
     'AtcLog.getCheckFailureLogs',
-    (c) => (o) => new AtcLog(c, logger).getCheckFailureLogs(o),
+    (c) => (o) => new AtcLog(c, logger, atcLogDocuments).getCheckFailureLogs(o),
   ],
   [
     'AtcLog.getExecutionLog',
-    (c) => (o) => new AtcLog(c, logger).getExecutionLog('X', o),
+    (c) => (o) =>
+      new AtcLog(c, logger, atcLogDocuments).getExecutionLog('X', o),
   ],
   [
     'ApplicationLog.getObject',
-    (c) => (o) => new ApplicationLog(c, logger).getObject('Z', o),
+    (c) => (o) =>
+      new ApplicationLog(c, logger, applicationLogDocuments).getObject('Z', o),
   ],
   [
     'ApplicationLog.getSource',
-    (c) => (o) => new ApplicationLog(c, logger).getSource('Z', o),
+    (c) => (o) =>
+      new ApplicationLog(c, logger, applicationLogDocuments).getSource('Z', o),
   ],
   [
     'ApplicationLog.validateName',
-    (c) => (o) => new ApplicationLog(c, logger).validateName('Z', o),
+    (c) => (o) =>
+      new ApplicationLog(c, logger, applicationLogDocuments).validateName(
+        'Z',
+        o,
+      ),
   ],
   [
     'DdicActivation.getGraph',
-    (c) => (o) => new DdicActivation(c, logger).getGraph(o),
+    (c) => (o) =>
+      new DdicActivation(c, logger, ddicActivationDocuments).getGraph(o),
   ],
-  ['SystemMessages.list', (c) => (o) => new SystemMessages(c, logger).list(o)],
+  [
+    'SystemMessages.list',
+    (c) => (o) =>
+      new SystemMessages(c, logger, systemMessagesDocuments).list(o),
+  ],
   [
     'SystemMessages.getById',
-    (c) => (o) => new SystemMessages(c, logger).getById('M', o),
+    (c) => (o) =>
+      new SystemMessages(c, logger, systemMessagesDocuments).getById('M', o),
   ],
   [
     'GatewayErrorLog.list',
-    (c) => (o) => new GatewayErrorLog(c, logger).list(o),
+    (c) => (o) =>
+      new GatewayErrorLog(c, logger, gatewayErrorLogDocuments).list(o),
   ],
   [
     'GatewayErrorLog.getById',
-    (c) => (o) => new GatewayErrorLog(c, logger).getById('T', 'I', o),
+    (c) => (o) =>
+      new GatewayErrorLog(c, logger, gatewayErrorLogDocuments).getById(
+        'T',
+        'I',
+        o,
+      ),
   ],
-  ['St05Trace.getState', (c) => (o) => new St05Trace(c, logger).getState(o)],
+  [
+    'St05Trace.getState',
+    (c) => (o) => new St05Trace(c, logger, st05TraceDocuments).getState(o),
+  ],
   [
     'St05Trace.getDirectory',
-    (c) => (o) => new St05Trace(c, logger).getDirectory(o),
+    (c) => (o) => new St05Trace(c, logger, st05TraceDocuments).getDirectory(o),
   ],
-  ['CrossTrace.list', (c) => (o) => new CrossTrace(c, logger).list(o)],
+  [
+    'CrossTrace.list',
+    (c) => (o) => new CrossTrace(c, logger, crossTraceDocuments).list(o),
+  ],
   [
     'CrossTrace.getById',
-    (c) => (o) => new CrossTrace(c, logger).getById('T', undefined, o),
+    (c) => (o) =>
+      new CrossTrace(c, logger, crossTraceDocuments).getById('T', undefined, o),
   ],
   [
     'CrossTrace.getRecords',
-    (c) => (o) => new CrossTrace(c, logger).getRecords('T', o),
+    (c) => (o) =>
+      new CrossTrace(c, logger, crossTraceDocuments).getRecords('T', o),
   ],
   [
     'CrossTrace.getRecordContent',
-    (c) => (o) => new CrossTrace(c, logger).getRecordContent('T', 1, o),
+    (c) => (o) =>
+      new CrossTrace(c, logger, crossTraceDocuments).getRecordContent(
+        'T',
+        1,
+        o,
+      ),
   ],
   [
     'CrossTrace.getActivations',
-    (c) => (o) => new CrossTrace(c, logger).getActivations(o),
+    (c) => (o) =>
+      new CrossTrace(c, logger, crossTraceDocuments).getActivations(o),
   ],
 ];
 

@@ -1,5 +1,5 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { AtcLog } from '../../../runtime/atc/AtcLog';
+import { AtcLog, atcLogDocuments } from '../../../runtime/atc/AtcLog';
 
 describe('AtcLog', () => {
   function createConnectionMock() {
@@ -19,7 +19,7 @@ describe('AtcLog', () => {
 
   it('getCheckFailureLogs() delegates to /sap/bc/adt/atc/checkfailures/logs', async () => {
     const connection = createConnectionMock();
-    const atcLog = new AtcLog(connection, createLogger());
+    const atcLog = new AtcLog(connection, createLogger(), atcLogDocuments);
 
     await atcLog.getCheckFailureLogs();
 
@@ -33,7 +33,7 @@ describe('AtcLog', () => {
 
   it('getCheckFailureLogs() passes options as query params', async () => {
     const connection = createConnectionMock();
-    const atcLog = new AtcLog(connection, createLogger());
+    const atcLog = new AtcLog(connection, createLogger(), atcLogDocuments);
 
     await atcLog.getCheckFailureLogs({
       displayId: 'D1',
@@ -56,7 +56,7 @@ describe('AtcLog', () => {
 
   it('getExecutionLog() delegates to /sap/bc/adt/atc/results/exec123/log', async () => {
     const connection = createConnectionMock();
-    const atcLog = new AtcLog(connection, createLogger());
+    const atcLog = new AtcLog(connection, createLogger(), atcLogDocuments);
 
     await atcLog.getExecutionLog('exec123');
 
