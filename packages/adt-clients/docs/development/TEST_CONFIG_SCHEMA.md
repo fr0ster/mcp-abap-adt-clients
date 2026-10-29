@@ -79,6 +79,7 @@ appear; anything else is refused by name. The list:
 | `create_function_module…[adt_function_module].params.function_group_route`, `create_function_include…[adt_function_include].params.function_group_route` — `"shared"` (the base: the shared function group in the shared package) or `"default_package"` (the group in the case's or the default package, for a system with no shared package); the route's failure fails the test, the other route is never a recovery | optional |
 | `atc_run…[adt_atc_run].enabled`, `.params.check_variant`, `.params.expected_message_id`, `.params.expected_priority`; `atc_object_kinds…[adt_atc_object_kinds].enabled`, `.params.check_variant` | optional |
 | `enhancement.test_cases[program_host].params.program_name`, `[function_group_host].params.function_group_name`, `[include_host].params.include_name`, `.main_program` | optional |
+| `run_abap_unit.test_cases[adt_abap_unit_class_run]`, `[adt_abap_unit_cds_run]`, `[adt_abap_unit_package_run]`: `.enabled`, `.params.package_name` — the generic ABAP Unit runner's live cases, off by default; the package is a local one (on premise a `$` package: a transportable one makes SAP generate a change-recording request) | optional |
 
 **Required** keys are those whose base line carries `# ← CHANGE` and holds only a
 placeholder: the overlay must state them (an empty string is a statement), and the
