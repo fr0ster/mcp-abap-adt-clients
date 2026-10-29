@@ -1,3 +1,8 @@
+import type {
+  IAbapConnection,
+  ICriticalSection,
+} from '@mcp-abap-adt/interfaces-adt-connection';
+
 /**
  * Run the lock window as an uninterruptible critical section.
  *
@@ -22,20 +27,17 @@
  * transport protects a window is its own implementation concern, and an RFC or
  * batch connection has no reason to offer one. So this asks the connection
  * whether it can, and proceeds either way — a transport that cannot protect the
- * window is not blocked from doing the work.
+ * window is not blocked from doing the work. The capability is the contract's
+ * `ICriticalSection` atom, and the guard reads it with `in`, as published.
  */
-interface ICriticalSectionCapable {
-  beginCriticalSection(): void;
-  endCriticalSection(): void;
-}
-
 function supportsCriticalSection(
-  connection: unknown,
-): connection is ICriticalSectionCapable {
-  const candidate = connection as Partial<ICriticalSectionCapable>;
+  connection: IAbapConnection,
+): connection is IAbapConnection & ICriticalSection {
   return (
-    typeof candidate?.beginCriticalSection === 'function' &&
-    typeof candidate?.endCriticalSection === 'function'
+    'beginCriticalSection' in connection &&
+    typeof connection.beginCriticalSection === 'function' &&
+    'endCriticalSection' in connection &&
+    typeof connection.endCriticalSection === 'function'
   );
 }
 
@@ -61,7 +63,7 @@ function supportsCriticalSection(
  * the connector counts nesting, and an unbalanced count would silently extend
  * the protection over every later request on the connection.
  */
-export function beginCriticalSection(connection: unknown): () => void {
+export function beginCriticalSection(connection: IAbapConnection): () => void {
   if (!supportsCriticalSection(connection)) {
     return () => {};
   }

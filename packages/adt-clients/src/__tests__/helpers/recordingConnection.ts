@@ -9,6 +9,7 @@ import type {
   IAbapConnection,
   IAbapRequestOptions,
   IAdtWireResponse,
+  ICriticalSection,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 
 export class RecordingConnection implements IAbapConnection {
@@ -38,13 +39,16 @@ export class RecordingConnection implements IAbapConnection {
 }
 
 /**
- * A recording connection that also offers the connector's critical section
- * (`beginCriticalSection` / `endCriticalSection`, which `AbstractAbapConnection`
- * of `@mcp-abap-adt/connection` has and `IAbapConnection` does not declare),
+ * A recording connection that also offers the critical section — the
+ * contract's optional `ICriticalSection` atom, which `AbstractAbapConnection`
+ * of `@mcp-abap-adt/connection` implements and `IAbapConnection` does not declare —
  * and answers each request with the body `bodyFor` gives — or throws what it
  * throws. Every request and every begin and end goes into `events`, in order.
  */
-export class CriticalSectionConnection extends RecordingConnection {
+export class CriticalSectionConnection
+  extends RecordingConnection
+  implements ICriticalSection
+{
   /** `begin`, `end` and `<METHOD> <url>`, in the order they happened. */
   readonly events: string[] = [];
 

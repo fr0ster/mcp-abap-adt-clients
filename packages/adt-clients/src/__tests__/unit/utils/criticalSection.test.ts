@@ -6,6 +6,7 @@
  * that uses it is `messageClassMessageCriticalSection.test.ts`.
  */
 
+import { withCallTimeout } from '../../../utils/callTimeout';
 import { beginCriticalSection } from '../../../utils/criticalSection';
 import {
   CriticalSectionConnection,
@@ -76,5 +77,14 @@ describe('beginCriticalSection', () => {
     end();
 
     expect(connection.sent.map((r) => r.url)).toEqual(['/sap/bc/adt/x']);
+  });
+
+  it('finds the section through a call-timeout wrapper, as a member passes it', () => {
+    const connection = new CriticalSectionConnection();
+
+    const end = beginCriticalSection(withCallTimeout(connection, 1000));
+    end();
+
+    expect(connection.events).toEqual(['begin', 'end']);
   });
 });
