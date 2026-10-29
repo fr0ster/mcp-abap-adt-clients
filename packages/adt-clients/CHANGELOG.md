@@ -24,6 +24,75 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [39.0.0] - 2026-10-29
+
+On `@mcp-abap-adt/interfaces-adt` `^24.0.0` and `@mcp-abap-adt/adt-strategies`
+`^0.17.0`. A major because the search filter's type is stricter: a code no
+longer compiles as the filter. [MIGRATION-39.md](docs/usage/MIGRATION-39.md)
+says what a consumer on 38.x does. No request changes for a call that
+compiles on both.
+
+### Breaking
+
+- **`getUtils().search` takes the variant's search names.** The filter is
+  `IAdtSearchObjectsParamsOf<V>` of interfaces-adt 24.0.0: a name of the
+  release's object types list (`ADT_SEARCH_TYPES_ONPREM`, 385 names;
+  `ADT_SEARCH_TYPES_CLOUD`, 372) or, on 7.40, of the eleven measured there
+  (`ADT_SEARCH_TYPES_BASIS_740`). It took the variant's codes
+  (`AdtCodeOf<V>`), and a code is no filter value: on S/4HANA 2025 and ABAP
+  cloud one that is no item's type selects as the text before its `/`
+  (`ENHO/XHH` answers as `ENHO`) and an unknown one answers nothing, silently
+  (measured 2026-10-29). `'DEVC/K'`, `'TABL/DS'` and `'NOPE'` no longer
+  compile as the filter, nor `'STRU'` on a 7.40 client; pass `'DEVC'`,
+  `'STRU'`. `AdtSearchCode<V>` is removed; the type is interfaces-adt's
+  `AdtSearchTypeOf<V>`. The request is unchanged: the name as `objectType`.
+- **`AdtUtils` no longer implements `IAdtInformationSystem`, `IAdtWhereUsed`
+  or the group members of `IAdtGroupLifecycle`.** Its where-used and group
+  members take the typed atoms' references (below), which hold `VIEW/DV` —
+  a code the 21.0.0 atoms' `IObjectReference` cannot carry. It implements
+  `IAdtObjectSearch`, `IAdtVirtualFolders`, `IAdtTypeCatalogue` and the run
+  and inactive members of `IAdtGroupLifecycle` instead; a consumer composes
+  `IAdtTypedWhereUsed<…, V>` and `IAdtTypedGroupLifecycle<…, V>`.
+- **A group reference to a parented code requires `parentName`.**
+  `activateObjectsGroup`, `checkDeletionGroup` and `deleteObjectsGroup` take
+  `IAdtCodedReference<C>[]` of interfaces-adt: `{ type: 'FUGR/FF', name }`
+  without its group does not compile (it threw before any request).
+  `IAdtGroupReference` stays exported, the shape the request builders read.
+
+### Changed
+
+- `@mcp-abap-adt/interfaces-adt` is `^24.0.0` and the
+  `@mcp-abap-adt/adt-strategies` development range `^0.17.0` (its own range
+  moves with this one).
+- **The literal scan** (`typeCodeScan.ts`) holds a main-type literal
+  (`'ENHO'`, `AdtMainType`) and a search-name literal (`'STRU'`,
+  `AdtSearchType`) to the rule a code literal is held to: in production
+  source it passes only where the compiler types it by the tables.
+- **The conformance check gains the search-name rules**
+  (`searchTypesConformance.test.ts`, spec 3.6): `ADT_SEARCH_TYPES_ONPREM` and
+  `_CLOUD` equal the recorded object types list of their release, name for
+  name, `type` for `type`, groups as groups (`HOTA` a code and a group); on
+  7.40 every name has a recorded search with a hit and every recorded name
+  the table lacks answered none; every `main` of each type table is a search
+  name of its variant; every evidence name is a recorded case. Recorded in
+  `corpus/adt/informationsystem/<release>/`: the two lists, 7.40's `404` and
+  its seventeen quick searches. Two 7.40 names, `PROG` and `FUGR`, answered no
+  hit in their recorded `maxResults=1` search and are listed as open
+  divergences with that reason (`recorded.ts`).
+
+### Fixed
+
+- **`getUtils()` satisfies interfaces-adt's typed atoms**
+  (`IAdtTypedGroupLifecycle<…, V>`, `IAdtTypedWhereUsed<…, V>`). Its code sets
+  are the contract's per variant — `VIEW/DV` in group activation, group
+  deletion and where-used, `DEVC/K` in a modern group activation — and its
+  references require `parentName` where the table names a parent (spec 2.3).
+  `AdtUtils<R, 'onprem'>`, `<R, 'cloud'>`, `<R, 'basis740'>` and the modern
+  default are each assignable to both atoms of their variant
+  (`utilsTypedAtoms.test.ts`), so a consumer's contract composed from them
+  takes `getUtils()`. `VIEW/DV` was addressed before for a caller outside the
+  type system; it is sent as then.
+
 ## [38.0.0] - 2026-10-29
 
 Two changes of contract, released once, on `@mcp-abap-adt/interfaces-adt`

@@ -16,6 +16,16 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 > **From 18.x?** Read [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md)
 > first: 19.0.0 is where members became one endpoint call each.
 >
+> **From 38.x?** 39.0.0 (on `interfaces-adt` ^24.0.0) types the search filter
+> by the release's search names: `getUtils().search({ objectType })` takes
+> `'DEVC'`, `'STRU'` or a group (`'ABAP_TEST_COCKPIT'`), not a code
+> (`'DEVC/K'`), and a 7.40 client takes only the eleven names 7.40 selects by.
+> Where-used and the group members take interfaces-adt's typed references —
+> `VIEW/DV` compiles, a function module names its group — so `getUtils()`
+> satisfies `IAdtTypedWhereUsed<…, V>` and `IAdtTypedGroupLifecycle<…, V>`.
+> See [Release variants and type codes](#release-variants-and-type-codes) and
+> [`docs/usage/MIGRATION-39.md`](docs/usage/MIGRATION-39.md).
+>
 > **From 37.x?** 38.0.0 (on `interfaces-adt` ^23.1.1) is typed by the ADT type
 > tables: a client is fixed to its release variant (`AdtClientOnPrem`,
 > `AdtClientCloud`, `createAdtClient(connection, { variant })`), every type
@@ -345,7 +355,9 @@ const utils = client.getUtils({
   whereUsed: utilWhereUsedReferences,
 });
 
-const found = await utils.search({ query: 'Z*', objectType: 'CLAS/OC' });
+// The filter is a search name of the release's object types list — `CLAS`,
+// an alias such as `STRU` (structures alone), a group — not a code.
+const found = await utils.search({ query: 'Z*', objectType: 'CLAS' });
 if (found.ok) {
   found.getResult().value;        // ISearchResult[] — the document, without utilSearchHits
 } else {
@@ -792,7 +804,13 @@ The ADT type tables of `@mcp-abap-adt/interfaces-adt` (`ADT_TYPES_ONPREM`,
 answers: its `typestructure`, its `discovery` and, per sample object, its
 `urimapper` and metadata answers. The answers are recorded in `corpus/adt/`
 (`typestructure/`, `discovery/`, `conformance/<release>/`; see
-[`corpus/README.md`](corpus/README.md)).
+[`corpus/README.md`](corpus/README.md)). The search type tables
+(`ADT_SEARCH_TYPES_ONPREM`, `_CLOUD`, `_BASIS_740`) are held to each
+release's recorded object types list, or on 7.40 its recorded quick searches
+(`informationsystem/<release>/`), by
+`src/__tests__/unit/conformance/searchTypesConformance.test.ts`: the table
+equals the list name for name and type for type, every `main` of the type
+table is a search name, every evidence name is a recorded case.
 
 - **In CI** — `src/__tests__/unit/conformance/typeTablesConformance.test.ts`
   runs the check against the recorded answers. What it finds is committed
@@ -1364,17 +1382,36 @@ them to what each release answers.
   it, and no factory serves it.
 - **An API with a parent takes it.** A function module and a function include
   are addressed under their function group: their members, a
-  `readObjectSource('FUGR/FF', name, group)` and an
-  `IObjectReference<'FUGR/FF'>` require the group.
+  `readObjectSource('FUGR/FF', name, group)`, an
+  `IObjectReference<'FUGR/FF'>` and a group reference (`IAdtCodedReference`)
+  require the group.
+- **The search filter is a search name, not a code** (39.0.0). The quick
+  search's `objectType` is read against the release's object types list
+  (`GET /repository/informationsystem/objecttypes`): most names are a main
+  type (`DEVC` selects `DEVC/K`, `TABL` both table kinds), six are aliases of
+  one code (`STRU` → `TABL/DS`, `DTAB` → `TABL/DT`, `REPO`, `INCL`, `FUNC`,
+  `BADI`), about fifty are groups (`ABAP_TEST_COCKPIT`). A code that is no
+  item's type selects as its main type and an unknown one answers nothing,
+  silently, so `search` takes `IAdtSearchObjectsParamsOf<V>`: the names of
+  `ADT_SEARCH_TYPES_ONPREM` (385) or `ADT_SEARCH_TYPES_CLOUD` (372), and on
+  7.40, which has no list and answers the aliases with no hits, the eleven of
+  `ADT_SEARCH_TYPES_BASIS_740`. A main type comes from the table entry
+  (`ADT_TYPES_ONPREM.package.codes['DEVC/K'].main`). A subtype without an
+  alias (`ENHO/XHH`) is searched by its main type, the hits filtered by you.
+- **`getUtils()` is typed per variant** (39.0.0): `AdtUtils<R, V>` is an
+  `IAdtTypedWhereUsed<…, V>` and an `IAdtTypedGroupLifecycle<…, V>` of
+  interfaces-adt — `VIEW/DV` in where-used and the group members, a parented
+  code's `parentName` required.
 - **What an answer names is `type` or `unknownType`.** A reading of
   `@mcp-abap-adt/adt-strategies` that takes a code from an answer answers an
   `IAdtAnsweredObject`: `type` for a code a table holds, `unknownType` — the
   text as ADT sent it — for any other.
 
 `src/__tests__/unit/typeCodeLiterals.test.ts` (one per package) holds the
-source to it: a code literal passes only where the compiler types it by the
-tables, and a code named in a comment or inside a longer string (a message,
-an XML template's span) is a code of the tables.
+source to it: a code literal — and, since 39.0.0, a main-type literal
+(`'ENHO'`) or a search-name literal (`'STRU'`) — passes only where the
+compiler types it by the tables, and a code named in a comment or inside a
+longer string (a message, an XML template's span) is a code of the tables.
 
 ### The contract you accept is yours
 
@@ -1455,6 +1492,7 @@ See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-a
 One document per breaking release, each written for a consumer on the contract
 before it:
 
+- **[38.x → 39.0.0](docs/usage/MIGRATION-39.md)** — the search filter takes the release's search names (`DEVC`, `STRU`), not a code; where-used and the group members take interfaces-adt's typed references (`VIEW/DV`, a function module's group), and `getUtils()` satisfies `IAdtTypedWhereUsed` / `IAdtTypedGroupLifecycle` instead of `IAdtWhereUsed` / `IAdtGroupLifecycle`.
 - **[37.x → 38.0.0](docs/usage/MIGRATION-38.md)** — the ADT type tables decide: a client is fixed to its release variant, every type code is a code of the tables, an API with a parent takes it, answered objects are `type` / `unknownType`, and `updateMetadata` covers fifteen more types; the result-set contracts are imported from `@mcp-abap-adt/interfaces-adt`, and each factory answers its class, so a consumer composes the contract it accepts from interfaces-adt.
 - **[36.x → 37.0.0](docs/usage/MIGRATION-37.md)** — `getSystemInformation` answers an `IAdtResponse` (present, absent for a `404`, or a failure, through `options.analyse`), and `IUtilResults` has the required `objectProperties` slot.
 - **[35.x → 36.0.0](docs/usage/MIGRATION-36.md)** — a request's `Accept` and `Content-Type` are the caller's: 32 members take the required `options.headers` and send exactly that pair.
