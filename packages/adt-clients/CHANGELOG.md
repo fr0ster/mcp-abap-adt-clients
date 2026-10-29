@@ -289,6 +289,14 @@ holds is no longer sent), and the new members.
   static members, which implement no contract. `requiredLogger` (and the
   legacy `AdtUtilsLegacy` case): each of the twelve classes that require a
   logger refuses options without it at compile time.
+- **The critical section** (`utils/criticalSection.test.ts`,
+  `messageClassMessageCriticalSection.test.ts`, with the recording
+  connection's `CriticalSectionConnection`): `beginCriticalSection` opens
+  before the request and closes after it, also when the body throws, and once
+  however often its closer is called; a message's write opens it after the
+  class is read and before the first lock, closes it after the last unlock —
+  once, after the unwinding unlocks, when the PUT fails — and answers the
+  PUT's answer. No test had supplied the capability before.
 - Negative compile checks (`variantGates`): a factory the variant lacks, an
   operation the API lacks, an operation one code lacks, a missing parent.
 - Request-shape tests for every `updateMetadata`, the function group's

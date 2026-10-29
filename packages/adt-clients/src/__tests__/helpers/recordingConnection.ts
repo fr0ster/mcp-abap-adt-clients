@@ -36,3 +36,39 @@ export class RecordingConnection implements IAbapConnection {
     return { status: 200, statusText: 'OK', headers: {}, data: '' as T };
   }
 }
+
+/**
+ * A recording connection that also offers the connector's critical section
+ * (`beginCriticalSection` / `endCriticalSection`, which `AbstractAbapConnection`
+ * of `@mcp-abap-adt/connection` has and `IAbapConnection` does not declare),
+ * and answers each request with the body `bodyFor` gives — or throws what it
+ * throws. Every request and every begin and end goes into `events`, in order.
+ */
+export class CriticalSectionConnection extends RecordingConnection {
+  /** `begin`, `end` and `<METHOD> <url>`, in the order they happened. */
+  readonly events: string[] = [];
+
+  constructor(
+    private readonly bodyFor: (options: IAbapRequestOptions) => string = () =>
+      '',
+  ) {
+    super();
+  }
+
+  beginCriticalSection(): void {
+    this.events.push('begin');
+  }
+
+  endCriticalSection(): void {
+    this.events.push('end');
+  }
+
+  override async makeAdtRequest<T = unknown, D = unknown>(
+    options: IAbapRequestOptions,
+  ): Promise<IAdtWireResponse<T, D>> {
+    this.events.push(`${options.method} ${options.url}`);
+    const answer = await super.makeAdtRequest<T, D>(options);
+    // As in the base: `T` is the caller's, and the body is text.
+    return { ...answer, data: this.bodyFor(options) as T };
+  }
+}
