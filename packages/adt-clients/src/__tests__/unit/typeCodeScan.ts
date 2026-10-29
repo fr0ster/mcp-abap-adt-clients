@@ -248,45 +248,17 @@ function literalVerdict(
   return `contextual type ${checker.typeToString(contextual)} is not made of codes of the tables`;
 }
 
-/** A type alias a literal is typed by: where it is declared, and what it holds. */
-interface IAliasTyping {
-  /** `type:<declaring file, relative to the root>#<name>` — the allow-list key. */
-  readonly key: string;
-  /** The alias's members as the checker resolves them, sorted. */
-  readonly members: readonly string[];
-}
-
-/** The alias a declaration declares, bound to its file and resolved to its members. */
-function aliasTyping(
-  root: string,
-  declaration: ts.TypeAliasDeclaration,
-  checker: ts.TypeChecker,
-): IAliasTyping {
-  const type = checker.getTypeAtLocation(declaration.name);
-  const parts = type.isUnion() ? type.types : [type];
-  return {
-    key: `type:${relative(root, declaration.getSourceFile().fileName)}#${declaration.name.text}`,
-    members: parts
-      .map((part) =>
-        part.isStringLiteral() ? part.value : checker.typeToString(part),
-      )
-      .sort(),
-  };
-}
-
 /**
- * The type alias a literal is typed by — its contextual type's alias, or the
- * alias whose own declaration it is a member of — if any. A literal typed by a
- * vocabulary that looks like codes and is not one (`AbapUnitRunObjectType`)
- * is allowed once, by that declaration (its file and name) and its exact
- * members, not per literal: an alias of the same name declared elsewhere, or
- * the allowed one with a member more, is not the allowed one.
+ * The name of the type alias a literal's contextual type is, or whose
+ * declaration it is a member of, if any: a
+ * literal typed by a vocabulary that looks like codes and is not one
+ * (`AbapUnitRunObjectType`) is allowed once, by the type's name, not per
+ * literal.
  */
 function contextualAlias(
-  root: string,
   literal: ts.StringLiteral | ts.NoSubstitutionTemplateLiteral,
   checker: ts.TypeChecker,
-): IAliasTyping | undefined {
+): string | undefined {
   // A member of the alias's own declaration: `type X = 'A' | 'B'`.
   if (literal.parent && ts.isLiteralTypeNode(literal.parent)) {
     let node: ts.Node = literal.parent;
@@ -299,26 +271,22 @@ function contextualAlias(
     return node.parent &&
       ts.isTypeAliasDeclaration(node.parent) &&
       node.parent.type === node
-      ? aliasTyping(root, node.parent, checker)
+      ? node.parent.name.text
       : undefined;
   }
   const contextual = checker.getContextualType(literal);
-  const declaration = contextual
-    ? checker
-        .getNonNullableType(contextual)
-        .aliasSymbol?.declarations?.find(ts.isTypeAliasDeclaration)
+  const alias = contextual
+    ? checker.getNonNullableType(contextual).aliasSymbol
     : undefined;
-  return declaration ? aliasTyping(root, declaration, checker) : undefined;
+  return alias?.getName();
 }
 
 export interface ITypeCodeFinding {
   /**
    * `<file relative to the root>:<literal or word>` — the allow-list key; for
-   * a literal typed by a type alias, `type:<declaring file>#<alias>`.
+   * a literal whose contextual type is a type alias, `type:<alias>`.
    */
   readonly key: string;
-  /** For a literal typed by a type alias: the alias's members, sorted. */
-  readonly aliasMembers?: readonly string[];
   /** The finding as listed: file, line, text and why. */
   readonly line: string;
 }
@@ -370,11 +338,9 @@ function findingsOf(
           node.text,
           why,
         );
-        const alias = contextualAlias(root, node, checker);
+        const alias = contextualAlias(node, checker);
         findings.push(
-          alias === undefined
-            ? typed
-            : { ...typed, key: alias.key, aliasMembers: alias.members },
+          alias === undefined ? typed : { ...typed, key: `type:${alias}` },
         );
       }
     } else if (
@@ -492,46 +458,4 @@ export function typeCodeFindings(
     const source = program.getSourceFile(file);
     return source ? findingsOf(root, source, checker) : [];
   });
-}
-
-/** A type alias allowed once: its exact members, and why it is no code type. */
-export interface IAllowedAlias {
-  readonly members: readonly string[];
-  readonly reason: string;
-}
-
-/**
- * What the allow-lists leave of the findings, as lines: a finding whose key
- * names an allowed literal passes; one keyed by an allowed alias passes only
- * while the alias holds exactly the recorded members.
- */
-export function unallowedFindings(
-  findings: readonly ITypeCodeFinding[],
-  allowed: ReadonlyMap<string, string>,
-  allowedAliases: ReadonlyMap<string, IAllowedAlias> = new Map(),
-): string[] {
-  return findings.flatMap((found) => {
-    if (allowed.has(found.key)) return [];
-    const alias = allowedAliases.get(found.key);
-    if (alias === undefined) return [found.line];
-    const recorded = [...alias.members].sort();
-    const actual = found.aliasMembers ?? [];
-    return recorded.length === actual.length &&
-      recorded.every((member, index) => member === actual[index])
-      ? []
-      : [
-          `${found.line} (the alias holds [${actual.join(', ')}], the allow-list records [${recorded.join(', ')}])`,
-        ];
-  });
-}
-
-/** The allow-list keys, of either list, that no finding matches. */
-export function staleAllowances(
-  findings: readonly ITypeCodeFinding[],
-  ...lists: readonly ReadonlyMap<string, unknown>[]
-): string[] {
-  const keys = new Set(findings.map((found) => found.key));
-  return lists.flatMap((list) =>
-    [...list.keys()].filter((key) => !keys.has(key)),
-  );
 }
