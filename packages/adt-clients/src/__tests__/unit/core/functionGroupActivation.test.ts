@@ -3,25 +3,14 @@
  * (`FUGR/I SAPL<group>`, the group's `source/main`), in one request. Measured
  * 2026-10-29: in a transportable package the group alone leaves both inactive.
  */
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClientOnPrem } from '../../../clients/AdtClientVariants';
+import { RecordingConnection } from '../../helpers/recordingConnection';
 import { createLibraryLogger } from '../../helpers/testLogger';
-
-interface ISent {
-  url: string;
-  method: string;
-  data: unknown;
-}
 
 describe('AdtFunctionGroup.activate', () => {
   it('sends both references, the group first, in one request', async () => {
-    const sent: ISent[] = [];
-    const connection = {
-      makeAdtRequest: async (request: ISent) => {
-        sent.push(request);
-        return { status: 200, statusText: 'OK', headers: {}, data: '' };
-      },
-    } as unknown as IAbapConnection;
+    const connection = new RecordingConnection();
+    const sent = connection.sent;
     const client = new AdtClientOnPrem(connection, createLibraryLogger());
 
     await client.getFunctionGroup().activate(

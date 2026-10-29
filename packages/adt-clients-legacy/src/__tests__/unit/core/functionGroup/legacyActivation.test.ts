@@ -4,33 +4,14 @@
  * cloud, not on 7.40.
  */
 
-import type {
-  IAbapConnection,
-  IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt-connection';
+import { RecordingConnection } from '../../../../../../adt-clients/src/__tests__/helpers/recordingConnection';
 import { createLibraryLogger } from '../../../../../../adt-clients/src/__tests__/helpers/testLogger';
 import { AdtFunctionGroupLegacy } from '../../../../core/functionGroup/AdtFunctionGroupLegacy';
 
-interface ISent {
-  url: string;
-  method: string;
-  data: unknown;
-}
-
 describe('AdtFunctionGroupLegacy.activate', () => {
   it('sends the group alone, in one request', async () => {
-    const sent: ISent[] = [];
-    const conn = {
-      makeAdtRequest: async (request: ISent) => {
-        sent.push(request);
-        return {
-          status: 200,
-          statusText: 'OK',
-          headers: {},
-          data: '',
-        } as IAdtWireResponse;
-      },
-    } as unknown as IAbapConnection;
+    const conn = new RecordingConnection();
+    const sent = conn.sent;
 
     await new AdtFunctionGroupLegacy(conn, createLibraryLogger()).activate(
       { functionGroupName: 'ZFG_ACT' },

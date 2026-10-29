@@ -6,29 +6,20 @@
  *
  * Measured on S/4HANA 2025 and ABAP cloud, 2026-10-29: both 200 `text/plain`.
  */
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { IAbapRequestOptions } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClientOnPrem } from '../../../clients/AdtClientVariants';
 import { headersFor } from '../../helpers/adtHeaders';
+import { RecordingConnection } from '../../helpers/recordingConnection';
 import { createLibraryLogger } from '../../helpers/testLogger';
 
-interface ISent {
-  url: string;
-  method: string;
-  data: unknown;
-  headers: Record<string, string>;
-}
-
-function recordingClient(): { client: AdtClientOnPrem; sent: ISent[] } {
-  const sent: ISent[] = [];
-  const connection = {
-    makeAdtRequest: async (request: ISent) => {
-      sent.push(request);
-      return { status: 200, statusText: 'OK', headers: {}, data: '' };
-    },
-  } as unknown as IAbapConnection;
+function recordingClient(): {
+  client: AdtClientOnPrem;
+  sent: IAbapRequestOptions[];
+} {
+  const connection = new RecordingConnection();
   return {
     client: new AdtClientOnPrem(connection, createLibraryLogger()),
-    sent,
+    sent: connection.sent,
   };
 }
 
