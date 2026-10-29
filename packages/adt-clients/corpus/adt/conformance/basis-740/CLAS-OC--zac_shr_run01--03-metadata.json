@@ -1,0 +1,29 @@
+{
+  "case": "CLAS-OC--zac_shr_run01",
+  "step": 3,
+  "stepTag": "metadata",
+  "capturedAt": "2026-10-29T13:02:12.086Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/oo/classes/zac_shr_run01",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/oo/classes/zac_shr_run01",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.oo.classes+xml"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded over RFC (the legacy client's connection) by a hand-run read-only client for the conformance check (C6); the RFC logon carries the credentials, none of which is recorded. An RFC call follows no redirect.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.oo.classes+xml",
+      "etag": "20260312082738001000001",
+      "last-modified": "Thu, 12 Mar 2026 08:27:38 GMT",
+      "x-sap-adt-profiling": "server-time=4448339",
+      "~server_protocol": "HTTP/1.1"
+    },
+    "bodyFile": "CLAS-OC--zac_shr_run01--03-metadata.body.xml"
+  }
+}

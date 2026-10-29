@@ -1,0 +1,1 @@
+No application class found for URI: /sap/bc/adt/vit/wb/object_type/fugrf/object_name/Z

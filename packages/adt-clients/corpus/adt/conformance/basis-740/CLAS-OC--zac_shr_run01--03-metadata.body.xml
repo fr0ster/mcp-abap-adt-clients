@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<class:abapClass class:final="true" class:abstract="false" class:visibility="public" class:category="generalObjectType" abapoo:modeled="false" adtcore:responsible="SAPUSER01" adtcore:masterLanguage="EN" adtcore:masterSystem="SYS" adtcore:name="ZAC_SHR_RUN01" adtcore:type="CLAS/OC" adtcore:changedAt="2026-03-12T08:27:38Z" adtcore:version="active" adtcore:createdAt="2026-03-11T00:00:00Z" adtcore:changedBy="SAPUSER01" adtcore:createdBy="SAPUSER01" adtcore:description="Shared runnable class (if_oo_adt_classrun) for profiler/exec" adtcore:language="EN" xmlns:class="http://www.sap.com/adt/oo/classes" xmlns:abapoo="http://www.sap.com/adt/oo" xmlns:adtcore="http://www.sap.com/adt/core">
+  <atom:link href="objectstructure" rel="http://www.sap.com/adt/relations/objectstructure" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/vit/wb/object_type/clasocx/object_name/ZAC_SHR_RUN01" rel="http://www.sap.com/adt/relations/sources/textelements" type="application/vnd.sap.sapgui" title="Text elements" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <atom:link href="/sap/bc/adt/oo/classes/zac_shr_run01/source/main?withAbapDocFromShortTexts=true" rel="http://www.sap.com/adt/relations/sources/withabapdocfromshorttexts" type="text/plain" title="Source with ABAP Doc" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/vit/wb/object_type/devck/object_name/TEST_AC_SHR_PKG" adtcore:type="DEVC/K" adtcore:name="TEST_AC_SHR_PKG"/>
+  <class:include class:includeType="definitions" abapsource:sourceUri="includes/definitions" adtcore:name="" adtcore:type="CLAS/I" adtcore:changedAt="2026-03-12T08:27:38Z" adtcore:version="active" adtcore:createdAt="2026-03-11T00:00:00Z" adtcore:changedBy="SAPUSER01" adtcore:createdBy="SAPUSER01" xmlns:abapsource="http://www.sap.com/adt/abapsource">
+    <atom:link href="includes/definitions/versions" rel="http://www.sap.com/adt/relations/versions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="includes/definitions" rel="http://www.sap.com/adt/relations/source" etag="202603120827380011" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </class:include>
+  <class:include class:includeType="implementations" abapsource:sourceUri="includes/implementations" adtcore:name="" adtcore:type="CLAS/I" adtcore:changedAt="2026-03-12T08:27:38Z" adtcore:version="active" adtcore:createdAt="2026-03-11T00:00:00Z" adtcore:changedBy="SAPUSER01" adtcore:createdBy="SAPUSER01" xmlns:abapsource="http://www.sap.com/adt/abapsource">
+    <atom:link href="includes/implementations/versions" rel="http://www.sap.com/adt/relations/versions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="includes/implementations" rel="http://www.sap.com/adt/relations/source" etag="202603120827380011" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </class:include>
+  <class:include class:includeType="macros" abapsource:sourceUri="includes/macros" adtcore:name="" adtcore:type="CLAS/I" adtcore:changedAt="2026-03-12T08:27:38Z" adtcore:version="active" adtcore:createdAt="2026-03-11T00:00:00Z" adtcore:changedBy="SAPUSER01" adtcore:createdBy="SAPUSER01" xmlns:abapsource="http://www.sap.com/adt/abapsource">
+    <atom:link href="includes/macros/versions" rel="http://www.sap.com/adt/relations/versions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="includes/macros" rel="http://www.sap.com/adt/relations/source" etag="202603120827380011" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </class:include>
+  <class:include class:includeType="testclasses" abapsource:sourceUri="includes/testclasses" adtcore:name="" adtcore:type="CLAS/I" adtcore:changedAt="2026-03-12T08:27:38Z" adtcore:version="active" adtcore:createdAt="2026-03-11T00:00:00Z" adtcore:changedBy="SAPUSER01" adtcore:createdBy="SAPUSER01" xmlns:abapsource="http://www.sap.com/adt/abapsource">
+    <atom:link href="includes/testclasses/versions" rel="http://www.sap.com/adt/relations/versions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="includes/testclasses" rel="http://www.sap.com/adt/relations/source" etag="202603120827380011" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </class:include>
+  <class:include class:includeType="main" abapsource:sourceUri="source/main" adtcore:name="" adtcore:type="CLAS/I" adtcore:changedAt="2026-03-12T08:27:38Z" adtcore:version="active" adtcore:createdAt="2026-03-11T00:00:00Z" adtcore:changedBy="SAPUSER01" adtcore:createdBy="SAPUSER01" xmlns:abapsource="http://www.sap.com/adt/abapsource">
+    <atom:link href="includes/main/versions" rel="http://www.sap.com/adt/relations/versions" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="source/main" rel="http://www.sap.com/adt/relations/source" etag="20260312082738001000001" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </class:include>
+</class:abapClass>
