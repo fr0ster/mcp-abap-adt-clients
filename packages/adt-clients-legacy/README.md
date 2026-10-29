@@ -90,6 +90,7 @@ The library passes a request's `Accept` / `Content-Type` through unchanged
 | Class `readMetadata` (`getClass()` and `getUtils().readObjectMetadata('CLAS/OC', …)`) | **only** `Accept: application/vnd.sap.adt.oo.classes+xml`. Every versioned type, a list naming one (`v4, unversioned`), and `application/xml` answer `400 ExceptionContentHandlerNotFound` — not the `406` a modern system answers |
 | Function include `create` | `application/vnd.sap.adt.functions.fincludes+xml` both ways; v2 answers `400` |
 | Message class `create` | `application/xml` both ways (`201`) |
+| Function group `update` (its source, `source/main`) | `Content-Type: text/plain; charset=utf-8`, `Accept: text/plain` (`200`); its `read` sends `Accept: text/plain` (`200 text/plain`) |
 | Every other type | the library's default pairs work (class create: `application/vnd.sap.adt.oo.classes+xml`; program, function group and module creates: the unversioned types; interface create: the v5 pair; DDL create: `application/vnd.sap.adt.ddlSource+xml`; a source write: `text/plain`) |
 
 The measured pairs are passed by the tests as a consumer would pass them
@@ -222,7 +223,7 @@ type system.
 | `activate` | sends the group alone, one reference — the modern client (adt-clients 38) adds its main program `SAPL<group>` (`FUGR/I`), measured on S/4HANA 2025 and ABAP cloud only |
 | `validate` | sends `/functions/validation` (`200`) |
 | `readMetadata` | sends (a system group) |
-| `read`, `update` (the group's source, `source/main`) | **refused** — not measured on 7.40 (7.40's table lists no `source` for `FUGR/F`) |
+| `read`, `update` (the group's source, `source/main` — the main program `SAPL<group>`) | sends, inherited from adt-clients: `read` one `GET …/source/main` (`Accept: text/plain`, the version as asked), `update` one `PUT …/source/main?lockHandle=` of your text under your lock; read → write → activate → read back measured in `$TMP` |
 | `delete` | sends one `DELETE ?lockHandle=` under your lock |
 | `readTransport` | **refused** — `404` |
 | `checkDeletion` | **refused** |

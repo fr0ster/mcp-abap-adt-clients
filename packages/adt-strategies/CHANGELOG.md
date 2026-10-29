@@ -43,10 +43,11 @@ adt-clients 38.0.0 and adt-clients-legacy 0.2.0.
 - `IInactiveObjectsResponse.objects` is `IInactiveObject[]`
   (`IAdtAnsweredObject & { name }`), no longer `IObjectReference[]`: an
   unknown code is no reference `activateObjectsGroup` takes.
-- Depends on `@mcp-abap-adt/interfaces-adt` `^23.1.0` (was `^20.1.0`): the
-  ADT type tables came with 21.0.0, and 23.1.0 (the ABAP Unit run registry)
-  is the range adt-clients 38.0.0 and adt-clients-legacy 0.2.0 take, so the
-  three install one copy.
+- Depends on `@mcp-abap-adt/interfaces-adt` `^23.1.1` (was `^20.1.0`): the
+  ADT type tables came with 21.0.0, 23.1.0 brought the ABAP Unit run
+  registry, and 23.1.1 (the function group's source on 7.40) is the range
+  adt-clients 38.0.0 and adt-clients-legacy 0.2.0 take, so the three install
+  one copy.
 
 ### Added
 

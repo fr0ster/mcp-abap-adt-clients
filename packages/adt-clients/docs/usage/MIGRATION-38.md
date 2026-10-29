@@ -1,6 +1,6 @@
 # Migrating to 38.0.0
 
-38.0.0 moves to `@mcp-abap-adt/interfaces-adt` `^23.1.0` and
+38.0.0 moves to `@mcp-abap-adt/interfaces-adt` `^23.1.1` and
 `@mcp-abap-adt/adt-strategies` `^0.16.0`, and carries two changes of contract.
 
 **A contract lives where it is accepted** (#216). Only types move or go:

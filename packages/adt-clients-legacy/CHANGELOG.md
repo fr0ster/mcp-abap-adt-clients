@@ -62,11 +62,22 @@ of a 0.x package, so a minor.
 
 ### Added
 
+- **The function group's source on 7.40**: `getFunctionGroup().read(config,
+  version?)` and `update(config, { source, lockHandle, headers })` are
+  adt-clients 38's, inherited — one `GET …/source/main` (`Accept:
+  text/plain`) and one `PUT …/source/main?lockHandle=` of the caller's text.
+  Measured on SAP_BASIS 7.40 SP04 over RFC (2026-10-29, in `$TMP`): the GET
+  answered `200 text/plain` (the main program `SAPL<group>`), the PUT with
+  `Content-Type: text/plain; charset=utf-8` `200` under the lock, the
+  one-reference activation activated the group and its main program, and the
+  source read back equalled what was written. 7.40's table lists `read`,
+  `source` and `update` for `FUGR/F` since interfaces-adt 23.1.1, so both
+  compile on `AdtClientLegacy`. The function group live cycle reads, writes,
+  activates and reads back the group's source.
 - Refusals, without a request, of the members adt-clients 38 adds and 7.40 has
   not measured: `updateMetadata` of the class, interface, program, function
-  module, DDL source and include, and `read` / `update` of the function
-  group's source. 7.40's table lists none of them, so each also does not
-  compile on `AdtClientLegacy`.
+  module, DDL source and include. 7.40's table lists none of them, so each
+  also does not compile on `AdtClientLegacy`.
 - `getUtils().getTypeStructure()` is served, inherited (7.40's answer is in
   adt-clients' corpus).
 - **The generic ABAP Unit runner on 7.40**, `AbapUnitTestRunnerLegacy`
@@ -83,7 +94,7 @@ of a 0.x package, so a minor.
   second reference, measured on S/4HANA 2025 and ABAP cloud only;
   `AdtFunctionGroupLegacy.activate()` keeps the one reference.
 - Peer and dev dependency `@mcp-abap-adt/adt-clients` `^38.0.0` (was
-  `^37.4.0`); `@mcp-abap-adt/interfaces-adt` `^23.1.0` (was `^20.1.0`);
+  `^37.4.0`); `@mcp-abap-adt/interfaces-adt` `^23.1.1` (was `^20.1.0`);
   dev `@mcp-abap-adt/adt-strategies` `^0.16.0` (was `^0.10.0`).
 - `legacyConsumerContract.test.ts` proves that a contract composed from
   interfaces-adt alone accepts `AdtClientLegacy`; `legacyVariantGates.test.ts`

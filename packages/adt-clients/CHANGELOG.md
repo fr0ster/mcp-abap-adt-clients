@@ -27,7 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ## [38.0.0] - 2026-10-29
 
 Two changes of contract, released once, on `@mcp-abap-adt/interfaces-adt`
-`^23.1.0`:
+`^23.1.1`:
 
 - **A contract lives where it is accepted** (#216). A factory accepts a result
   set, so the result-set contracts move to `@mcp-abap-adt/interfaces-adt`; a
@@ -225,7 +225,9 @@ holds is no longer sent), and the new members.
 - **A function group's source:** `getFunctionGroup().read(config, version?)`
   is one GET of `.../source/main` (`text/plain`), and `update(config,
   { source, lockHandle, headers })` one PUT of the caller's text — the
-  function pool's main program. Both modern variants.
+  function pool's main program. Every variant: 7.40's table lists them too
+  since interfaces-adt 23.1.1 (measured on SAP_BASIS 7.40 SP04,
+  2026-10-29), and `@mcp-abap-adt/adt-clients-legacy` 0.2.0 serves them.
 - **The conformance check of the type tables**: in CI against the recorded
   answers of each release (`corpus/adt/conformance/`), and live on demand —
   see the README's [conformance section](README.md#the-type-tables-conformance-check).
@@ -248,10 +250,11 @@ holds is no longer sent), and the new members.
 
 ### Changed
 
-- `@mcp-abap-adt/interfaces-adt` `^23.1.0` (was `^20.1.0`; #216 needed
+- `@mcp-abap-adt/interfaces-adt` `^23.1.1` (was `^20.1.0`; #216 needed
   `^20.2.0`, the type tables `^21.0.0`, the `metadataUpdated` slots and the
   function group's source `^23.0.1`–`^23.0.4`, the ABAP Unit run registry
-  and the generic runner's contract `^23.1.0`).
+  and the generic runner's contract `^23.1.0`, the function group's source
+  on 7.40 `^23.1.1`).
 - **The four ABAP Unit runners' `osl:object type` is typed
   `AbapUnitRunObjectType`**, the union of `ABAP_UNIT_RUN_TYPES`' keys:
   `AbapUnitRunner.startByObject`'s `type` (protected) and
