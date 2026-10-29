@@ -18,7 +18,10 @@ import type {
   ISnapshotReferencesOptions,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import type { AdtHandlerOptions } from '../../core/shared/handlerOptions';
+import type {
+  AdtHandlerOptions,
+  AdtShippedOptions,
+} from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
 import { rawDocument } from '../../utils/resultStrategy';
 import {
@@ -78,6 +81,29 @@ export class MemorySnapshots<
   readonly kind = 'memorySnapshots' as const;
 
   private readonly results: R;
+
+  /**
+   * Memory snapshots with the shipped documents, or with the caller's results.
+   * No client hands one out, so this is where the shipped documents are the
+   * default, as a getter's are.
+   */
+  static create(
+    connection: IAbapConnection,
+    options?: AdtShippedOptions<'logger'>,
+  ): MemorySnapshots<typeof memorySnapshotsDocuments>;
+  static create<R extends IMemorySnapshotsResults>(
+    connection: IAbapConnection,
+    options: AdtHandlerOptions<R, 'logger'>,
+  ): MemorySnapshots<R>;
+  static create(
+    connection: IAbapConnection,
+    options: Partial<AdtHandlerOptions<IMemorySnapshotsResults, 'logger'>> = {},
+  ): MemorySnapshots<IMemorySnapshotsResults> {
+    return new MemorySnapshots<IMemorySnapshotsResults>(connection, {
+      ...options,
+      results: options.results ?? memorySnapshotsDocuments,
+    });
+  }
 
   constructor(
     private readonly connection: IAbapConnection,

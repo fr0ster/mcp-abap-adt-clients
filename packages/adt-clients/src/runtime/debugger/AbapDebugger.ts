@@ -21,7 +21,10 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import type { AdtHandlerOptions } from '../../core/shared/handlerOptions';
+import type {
+  AdtHandlerOptions,
+  AdtShippedOptions,
+} from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
 import { nothing, rawDocument } from '../../utils/resultStrategy';
 import {
@@ -143,6 +146,29 @@ export class AbapDebugger<
 
   private readonly results: R;
   private readonly options: IAbapDebuggerOptions;
+
+  /**
+   * A debugger with the shipped documents, or with the caller's results.
+   * No client hands a debugger out (it needs a session of its own), so this
+   * is where the shipped documents are the default, as a getter's are.
+   */
+  static create(
+    connection: IAbapConnection,
+    options?: AdtShippedOptions<'logger'> & IAbapDebuggerOptions,
+  ): AbapDebugger<typeof abapDebuggerDocuments>;
+  static create<R extends IAbapDebuggerResults>(
+    connection: IAbapConnection,
+    options: AbapDebuggerConstructorOptions<R>,
+  ): AbapDebugger<R>;
+  static create(
+    connection: IAbapConnection,
+    options: Partial<AbapDebuggerConstructorOptions<IAbapDebuggerResults>> = {},
+  ): AbapDebugger<IAbapDebuggerResults> {
+    return new AbapDebugger<IAbapDebuggerResults>(connection, {
+      ...options,
+      results: options.results ?? abapDebuggerDocuments,
+    });
+  }
 
   constructor(
     private readonly connection: IAbapConnection,

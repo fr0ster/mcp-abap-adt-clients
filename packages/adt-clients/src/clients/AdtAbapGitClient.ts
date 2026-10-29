@@ -3,9 +3,10 @@
  *
  * Standalone top-level class — NOT a factory on AdtClient (which is
  * reserved for IAdtObject<Config, State> implementations only).
- * Consumers instantiate directly:
- * `new AdtAbapGitClient(connection, { logger, results })`
- * (`abapGitDocuments` for the shipped result set).
+ * Consumers build it themselves: `AdtAbapGitClient.create(connection, { logger })`
+ * answers the shipped documents, `create(connection, { logger, results })` the
+ * caller's; `new AdtAbapGitClient(connection, { logger, results })` takes its
+ * results always.
  *
  * Implements IAdtAbapGitClient. HTTP operations are delegated to
  * low-level functions in ./abapGit/*; this class owns the options,
@@ -28,14 +29,17 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import type { AdtHandlerOptions } from '../core/shared/handlerOptions';
+import type {
+  AdtHandlerOptions,
+  AdtShippedOptions,
+} from '../core/shared/handlerOptions';
 import { answering } from '../utils/adtResponse';
 import { checkExternalRepo } from './abapGit/checkExternalRepo';
 import { getErrorLog } from './abapGit/getErrorLog';
 import { linkRepo } from './abapGit/link';
 import { listRepos } from './abapGit/listRepos';
 import { pullRepo } from './abapGit/pull';
-import type { abapGitDocuments, IAbapGitResults } from './abapGit/types';
+import { abapGitDocuments, type IAbapGitResults } from './abapGit/types';
 import { unlinkRepo } from './abapGit/unlink';
 
 /**
@@ -61,6 +65,29 @@ export class AdtAbapGitClient<
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly results: R;
+
+  /**
+   * An abapGit client with the shipped documents, or with the caller's results.
+   * No client hands one out, so this is where the shipped documents are the
+   * default, as a getter's are.
+   */
+  static create(
+    connection: IAbapConnection,
+    options?: AdtShippedOptions<'logger'>,
+  ): AdtAbapGitClient<typeof abapGitDocuments>;
+  static create<R extends IAbapGitResults>(
+    connection: IAbapConnection,
+    options: AdtHandlerOptions<R, 'logger'>,
+  ): AdtAbapGitClient<R>;
+  static create(
+    connection: IAbapConnection,
+    options: Partial<AdtHandlerOptions<IAbapGitResults, 'logger'>> = {},
+  ): AdtAbapGitClient<IAbapGitResults> {
+    return new AdtAbapGitClient<IAbapGitResults>(connection, {
+      ...options,
+      results: options.results ?? abapGitDocuments,
+    });
+  }
 
   constructor(
     connection: IAbapConnection,
