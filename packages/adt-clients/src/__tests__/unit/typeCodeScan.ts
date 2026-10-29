@@ -32,8 +32,10 @@
  *   must be a code of the tables, of any variant. A bare code in prose is not
  *   checked: only a listed one is recognised as a code.
  *
- * Text inside a longer string (an error message naming `CLAS/OC`) is not
- * read: only a literal that is a code as a whole is.
+ * - **Inside a longer string.** A word of the code shape inside a string
+ *   literal, a template without substitutions or a template's text span (an
+ *   error message naming `CLAS/OC`, an XML template's `adtcore:type="FUGR/I"`)
+ *   is read like prose: it must be a code of the tables.
  *
  * What is not a code but looks like one goes into the caller's allow-list,
  * with its reason; an entry that matches no finding fails too.
