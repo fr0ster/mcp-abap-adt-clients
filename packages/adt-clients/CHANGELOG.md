@@ -67,10 +67,11 @@ holds is no longer sent), and the new members.
 
 ### Breaking
 
-- **A getter answers what it was given; a constructor takes its results.**
-  Every getter of `AdtClient` (35), `AdtRuntimeClient` (11) and
-  `AdtExecutor` (7), and every handler's, runner's and executor's
-  constructor, had `results: R = <x>Documents as unknown as R`:
+- **A getter answers what it was given; a constructor takes an options
+  object with its results.** Every getter of `AdtClient` (35),
+  `AdtRuntimeClient` (11) and `AdtExecutor` (7), and every handler's,
+  runner's and executor's constructor, had
+  `results: R = <x>Documents as unknown as R`:
   `client.getClass<MyResults>()` compiled and answered the shipped documents
   typed as `MyResults`. Each getter now has two overloads — `getX()` answers
   `X<typeof xDocuments, V>`, `getX(results)` answers `X<R, V>` — so a custom
@@ -80,17 +81,25 @@ holds is no longer sent), and the new members.
   `AmdpDebugger`, `MemorySnapshots`), `AdtAbapGitClient`, `ClassExecutor`,
   `ProgramExecutor`, `ClassTestRunner`, `ProgramTestRunner`,
   `FunctionGroupTestRunner`, `FunctionModuleTestRunner`,
-  `AbapUnitTestRunner` and `TraceScheduling` take `results` as a required
-  parameter; every optional parameter before it is now `T | undefined`. No
+  `AbapUnitTestRunner`, `TraceScheduling` and the abstract `AbapUnitRunner`
+  take `(connection, options)`: `options.results` required, every other
+  parameter they took — `logger`, `systemContext`, `contentTypes`,
+  `lockRegistry`, `AbapDebugger`'s `onConflict` — optional and by name
+  (`AdtHandlerOptions<R, K>`; a part the class does not read is refused). A
+  logger a class required stays positional: `AdtUtils` and the runtime
+  handlers but the debuggers and memory snapshots take
+  `(connection, logger, { results })`. The fields and the behaviour of each
+  class are unchanged; the legacy classes inherit the constructors. No
   `as unknown as` is left in the package's source. No request and no answer
   changes. A caller of a getter with no argument, or with its own documents,
   changes nothing; `getX<MyResults>()` passes its results; a caller
-  constructing a handler directly passes the documents
-  (`new AdtClass(connection, logger, undefined, undefined, undefined, classDocuments)`,
-  `new AbapDebugger(connection, logger, abapDebuggerDocuments)`,
-  `new ClassTestRunner(connection, logger, classTestRunnerDocuments)`) or
-  takes it from the getter. See MIGRATION-38, "A getter answers what it was
-  given; a constructor takes its results".
+  constructing a handler directly passes the options
+  (`new AdtClass(connection, { logger, results: classDocuments })`,
+  `new AdtUtils(connection, logger, { results: utilDocuments })`,
+  `new ClassTestRunner(connection, { logger, results: classTestRunnerDocuments })`),
+  takes it from the getter, or — for the four classes no client hands out —
+  from their static `create` (below). See MIGRATION-38, "A getter answers
+  what it was given; a constructor takes an options object".
 - **A client is fixed to its release variant.** `AdtClient<V extends
   AdtVariant = AdtModernVariant>`; `AdtClientOnPrem` (`'onprem'`, S/4HANA
   2025) and `AdtClientCloud` (`'cloud'`, ABAP cloud) fix it, and a plain
@@ -210,6 +219,18 @@ holds is no longer sent), and the new members.
 - **The conformance check of the type tables**: in CI against the recorded
   answers of each release (`corpus/adt/conformance/`), and live on demand —
   see the README's [conformance section](README.md#the-type-tables-conformance-check).
+- **A static `create` on the four classes no client hands out** —
+  `AdtAbapGitClient`, `AbapDebugger`, `AmdpDebugger`, `MemorySnapshots` —
+  with the getters' two overloads: `X.create(connection, options?)` answers
+  `X<typeof xDocuments>` with the shipped documents (`options` takes the
+  logger and, for `AbapDebugger`, `onConflict`, and no `results`);
+  `X.create(connection, { results, … })` answers `X<R>`. A custom `R`
+  without its results does not compile. Each builds the instance its
+  constructor builds, so what it sends is the same. `AdtAbapGitClient` stays
+  a standalone client, not a factory on `AdtClient`.
+- `AdtHandlerOptions<R, K>`, `IAdtHandlerContext` and `AdtShippedOptions<K>`
+  (what a constructor and a `create` take), and
+  `AbapDebuggerConstructorOptions<R>`.
 - `AdtClientOnPrem`, `AdtClientCloud`, `ICreateAdtClientOptions`, the gate
   types (`AdtServedBy`, `AdtPerformedBy`, `IAdtServedOn`, `AdtCodeOf`,
   `AdtCodeWith`, `AdtModernVariant`, …), `EnhancementTypeWith`,
@@ -256,6 +277,14 @@ holds is no longer sent), and the new members.
   one carries its `failedAssertion`), absent with own tests only and no
   preview, listed without an alert with the preview —, a package run —
   each in a local package, under fresh names, deleted and read back absent.
+- **The constructors' options and the static `create`**
+  (`clientResultDefaults`, `executorResultDefaults`, `handlerFactories`, and
+  the legacy `legacyClientResultDefaults`): options without `results` do not
+  compile, a part a class does not read is refused, and each `create` answers
+  the shipped documents' type with no results, the given type with them — from
+  a variable too — and refuses a custom `R` without them; `create` sends what
+  the constructor sends, `onConflict` included. The header guard's scan skips
+  static members, which implement no contract.
 - Negative compile checks (`variantGates`): a factory the variant lacks, an
   operation the API lacks, an operation one code lacks, a missing parent.
 - Request-shape tests for every `updateMetadata`, the function group's
@@ -291,6 +320,10 @@ See [MIGRATION-38.md](docs/usage/MIGRATION-38.md). In short:
   without it the view's assigned tests are listed, not executed.
 - Import the result-set contracts from interfaces-adt, and compose the client
   contract you accept from it (#216).
+- Construct a handler, runner or executor with its options:
+  `new AdtClass(connection, logger)` → `new AdtClass(connection, { logger,
+  results: classDocuments })`, or take it from the getter; a debugger, memory
+  snapshots or the abapGit client from its `create`.
 
 ## [37.4.0] - 2026-10-27
 

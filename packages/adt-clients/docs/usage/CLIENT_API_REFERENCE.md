@@ -546,12 +546,15 @@ await connection.connect();
 // The client answers every document as it arrived (`abapGitDocuments`) and
 // `unlink` answers nothing. The shapes below are readings you ask for, once,
 // when you build it.
-const abapGit = new AdtAbapGitClient(connection, undefined, {
-  ...abapGitDocuments,
-  repos: abapGitRepos,
-  errorLog: abapGitErrorLog,
-  externalRepo: abapGitExternalRepo,
+const abapGit = AdtAbapGitClient.create(connection, {
+  results: {
+    ...abapGitDocuments,
+    repos: abapGitRepos,
+    errorLog: abapGitErrorLog,
+    externalRepo: abapGitExternalRepo,
+  },
 });
+// `AdtAbapGitClient.create(connection)` answers the documents as they arrived.
 
 // Probe a remote repo before linking
 const info = await abapGit.checkExternalRepo({
@@ -2227,11 +2230,7 @@ attach names the debuggee's server (`INSTANCE_NAME` in the listener's answer),
 which this package sends as the `saplb` header.
 
 ```typescript
-import {
-  AbapDebugger,
-  AdtExecutor,
-  abapDebuggerDocuments,
-} from '@mcp-abap-adt/adt-clients';
+import { AbapDebugger, AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import { analyseDebuggeeEnd } from '@mcp-abap-adt/adt-strategies';
 
 // terminalId and ideId: 32 upper-case hex characters, kept for the session.
@@ -2239,7 +2238,7 @@ import { analyseDebuggeeEnd } from '@mcp-abap-adt/adt-strategies';
 const identity = { debuggingMode: 'user', requestUser, terminalId, ideId } as const;
 
 listenerConnection.setSessionType('stateful');
-const listener = new AbapDebugger(listenerConnection, logger, abapDebuggerDocuments);
+const listener = AbapDebugger.create(listenerConnection, { logger });
 // clientId (any kind) is the caller's tag: the server echoes it on every row of
 // the answer, placed and refused, and does not keep the request's order, so it
 // is what pairs an answer row with the request row that made it.
@@ -2258,7 +2257,7 @@ const debuggeeId = /<DEBUGGEE_ID>([^<]*)</.exec(doc)?.[1];
 const server = /<INSTANCE_NAME>([^<]*)</.exec(doc)?.[1];
 
 debugConnection.setSessionType('stateful');   // a new connection, for this debuggee
-const session = new AbapDebugger(debugConnection, logger, abapDebuggerDocuments);
+const session = AbapDebugger.create(debugConnection, { logger });
 await session.attach(identity, debuggeeId!, { server });
 await session.getStack();
 await session.getChildVariables(['@ROOT'], { headers });
@@ -2272,7 +2271,7 @@ await run;
 
 - **A listener conflict** is decided by `ideId`: the same `ideId` never
   conflicts. Another one — an Eclipse debugging the same user — refuses the
-  newcomer with `409` by default; construct with `{ onConflict: 'takeOver' }`
+  newcomer with `409` by default; create it with `{ onConflict: 'takeOver' }`
   to displace it instead. A consumer that wants both constructs two.
 - **`stepToLine` takes the line as an argument.** Without it SAP answers 400,
   and on SAP_BASIS 758 also let the program run to its end. `stepJumpToLine`

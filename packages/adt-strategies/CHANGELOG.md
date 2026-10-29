@@ -53,6 +53,13 @@ adt-clients 38.0.0 and adt-clients-legacy 0.2.0.
 - `answeredObject(text)`: the lookup the readings use, for a consumer reading
   a code from an answer itself.
 
+### Documentation
+
+- The examples in the comments of `abapGit`, `feeds` and `traces` construct
+  with adt-clients 38.0.0's options: `AdtAbapGitClient.create(connection,
+  { logger, results })`, `new FeedRepository(connection, logger, { results })`,
+  `new Profiler(connection, logger, { results })`.
+
 ### Tests
 
 - The literal scan of type codes (`typeCodeLiterals.test.ts`, the scan shared

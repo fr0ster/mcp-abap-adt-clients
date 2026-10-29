@@ -182,7 +182,7 @@ npm install @mcp-abap-adt/adt-clients
    - `createAdtExecutor(connection)` returns `AdtExecutor`, like `createAdtClient` detecting nothing. The legacy executor, `AdtExecutorLegacy` of `@mcp-abap-adt/adt-clients-legacy` (SAP_BASIS 7.40 SP04, over RFC), runs ABAP Unit through the synchronous `/abapunit/testruns` request for every runner, and refuses without a request what 7.40 does not serve — the class run (`/oo/classrun`, measured `404`), `getStatus`/`getResult` (no run id) and a function module's `run` (it names no group) — and, until a run measures them, what 7.40 SP04 does not advertise: the program run (`programrun`) and the trace type lists — see [LEGACY.md](https://github.com/fr0ster/mcp-abap-adt-clients/blob/main/packages/adt-clients-legacy/docs/LEGACY.md#abap-unit-runners-and-executors)
 
 4. **AdtAbapGitClient**
-   - Standalone: `new AdtAbapGitClient(connection, logger, results)` (`logger` may be `undefined`; `abapGitDocuments` are the shipped results) (the options argument, `contentTypeVersion`, was removed in 36.0.0)
+   - Standalone, not a factory on `AdtClient`: `AdtAbapGitClient.create(connection, { logger? })` answers the shipped documents (`abapGitDocuments`), `AdtAbapGitClient.create(connection, { logger?, results })` the caller's (since 38.0.0); `new AdtAbapGitClient(connection, { logger?, results })` takes its results always (the options argument, `contentTypeVersion`, was removed in 36.0.0)
    - `link`, `pull`, `unlink({ repositoryId })`, `listRepos`, `getErrorLog(logLink)`, `checkExternalRepo` — one request each; `pull` does not wait
 
 5. **AdtClientsWS**
@@ -190,7 +190,7 @@ npm install @mcp-abap-adt/adt-clients
    - Example: `await wsClient.request('<operation>', { … })` against a backend that speaks its envelope
 
 6. **AbapDebugger, AmdpDebugger, MemorySnapshots**
-   - Standalone, from `@mcp-abap-adt/adt-clients/runtime` or the root: `new AbapDebugger(connection, logger, results, { onConflict? })` (`results` required since 38.0.0: `abapDebuggerDocuments` for the shipped ones; likewise `amdpDebuggerDocuments`, `memorySnapshotsDocuments`)
+   - Standalone, from `@mcp-abap-adt/adt-clients/runtime` or the root: `AbapDebugger.create(connection, { logger?, onConflict? })` answers the shipped documents (`abapDebuggerDocuments`), `AbapDebugger.create(connection, { results, logger?, onConflict? })` the caller's; likewise `AmdpDebugger.create` and `MemorySnapshots.create` (`{ logger?, results? }`, since 38.0.0). `new AbapDebugger(connection, { results, logger?, onConflict? })` takes its results always
    - One member per request, contracts `IAbapDebugger`, `IAmdpDebugger`, `IMemorySnapshots` from `@mcp-abap-adt/interfaces-adt` (contract 18 pairs with clients 32)
    - **The identity states its mode.** `{ debuggingMode: 'user', requestUser, terminalId, ideId }`, or `{ debuggingMode: 'terminal', terminalId, ideId }`; `attach` takes the identity, not the user. A terminal-mode listener catches a run that carries its ids: `run(target, { debuggee: { terminalId, ideId } })` sends them in `SAP-PASSPORT` (since 29.1.0)
    - **Breakpoints are replaced, not added to.** `setBreakpoints` and `syncBreakpoints` replace the identity's set, and `stopListener` deletes it: arm the whole set in one call

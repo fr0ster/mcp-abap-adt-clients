@@ -8,9 +8,11 @@
  *
  * ```typescript
  * new Profiler(connection, logger, {
- *   ...profilerDocuments,
- *   list: profilerTraceEntries,
- *   hitlist: profilerHitList,
+ *   results: {
+ *     ...profilerDocuments,
+ *     list: profilerTraceEntries,
+ *     hitlist: profilerHitList,
+ *   },
  * });
  * ```
  *

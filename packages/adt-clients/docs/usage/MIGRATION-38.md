@@ -27,9 +27,13 @@ performs — `ADT_TYPES_ONPREM` (S/4HANA 2025), `ADT_TYPES_CLOUD` (ABAP cloud),
   (adt-strategies 0.16.0).
 - [New members](#new-members): `updateMetadata` for fifteen types, a function
   group's source, and its activation with its main program.
+- [A getter answers what it was given; a constructor takes an options object](#a-getter-answers-what-it-was-given-a-constructor-takes-an-options-object):
+  a custom result set without its results no longer compiles, a handler
+  constructed directly takes `(connection, { results, logger, … })`, and the
+  four classes no client hands out have a static `create`.
 
 Code that imports none of the moved types, builds its result sets by spreading
-the shipped `<x>Documents`, constructs `new AdtClient(connection, logger)` and
+the shipped `<x>Documents`, constructs `new AdtClient(connection, logger)` (no handler directly) and
 passes codes of the tables (`'CLAS/OC'`, `'FUGR/FF'`) compiles and behaves as
 on 37.x, but for the [function group](#new-members)'s activation and metadata
 Accept.
@@ -387,7 +391,7 @@ source and the nine others needs a `metadataUpdated` slot (interfaces-adt
 How the tables are held to what each release answers — in CI and live — is in
 the README: [The type tables' conformance check](../../README.md#the-type-tables-conformance-check).
 
-## A getter answers what it was given; a constructor takes its results
+## A getter answers what it was given; a constructor takes an options object
 
 ### What changed
 
@@ -407,10 +411,16 @@ documents typed as `MyResults`.
   `getDumps`, `getFeeds`, `getSystemMessages`, `getGatewayErrorLog`) and the
   7 of `AdtExecutor`.
 - **Constructors.** A constructor cannot choose its generic per overload, so
-  `results` is a required parameter, and every optional parameter before it is
-  now `T | undefined` (pass `undefined` for "not given"). Parameters after it
-  (`AdtInclude`'s and `AdtBehaviorImplementation`'s `systemContext`,
-  `AbapDebugger`'s options) stay optional. This covers:
+  it takes its results always. Each takes `(connection, options)`:
+  `options.results` is required, and every other parameter it took is an
+  optional field of the same name — `logger`, `systemContext`,
+  `contentTypes`, `lockRegistry`, and `AbapDebugger`'s `onConflict`. The
+  type is `AdtHandlerOptions<R, K>`, `K` naming the parts the class reads; a
+  part it does not read is a compile error. A logger a class required stays
+  positional: `AdtUtils` and the runtime handlers `Profiler`, `CrossTrace`,
+  `St05Trace`, `ApplicationLog`, `AdtAtc`, `AtcLog`, `DdicActivation`,
+  `RuntimeDumps`, `FeedRepository`, `SystemMessages`, `GatewayErrorLog` take
+  `(connection, logger, { results })`. This covers:
   - every `core/*` handler (`AdtClass`, `AdtProgram`, `AdtInclude`,
     `AdtInterface`, `AdtDomain`, `AdtDataElement`, `AdtStructure`, `AdtTable`,
     `AdtDdicTableType`, `AdtDdl`, `AdtFunctionGroup`, `AdtFunctionModule`,
@@ -429,7 +439,15 @@ documents typed as `MyResults`.
   - `AdtAbapGitClient`;
   - `ClassExecutor`, `ProgramExecutor`, `ClassTestRunner`,
     `ProgramTestRunner`, `FunctionGroupTestRunner`,
-    `FunctionModuleTestRunner`, `AbapUnitTestRunner`, `TraceScheduling`.
+    `FunctionModuleTestRunner`, `AbapUnitTestRunner`, `TraceScheduling`, and
+    the abstract `AbapUnitRunner` the four object runners extend.
+
+  The legacy classes inherit these constructors.
+- **`create` where no getter is.** No client hands out `AdtAbapGitClient`,
+  `AbapDebugger`, `AmdpDebugger` or `MemorySnapshots`, so each has a static
+  `create` with the getters' two overloads: `X.create(connection, options?)`
+  answers `X<typeof xDocuments>` (the options without `results`),
+  `X.create(connection, { results, … })` answers `X<R>`.
 
 Requests and answers do not change.
 
@@ -440,21 +458,40 @@ Requests and answers do not change.
 - `client.getClass<MyResults>()` (or any getter named with its own `R` and no
   argument): pass the results — `client.getClass(myResults)`.
 - A handler constructed directly — `new AdtClass(connection)`,
-  `new AdtClass(connection, logger)`: pass the documents, with `undefined` for
-  each parameter not given before them —
-  `new AdtClass(connection, logger, undefined, undefined, undefined, classDocuments)` —
-  or take it from the getter, `client.getClass()`.
+  `new AdtClass(connection, logger)`: pass the options, the documents
+  among them —
+
+  ```typescript
+  // 37.x
+  new AdtClass(connection, logger);
+  new AdtInclude(connection, logger, undefined, undefined, systemContext);
+  new AdtUtils(connection, logger);
+  // 38.0.0
+  new AdtClass(connection, { logger, results: classDocuments });
+  new AdtInclude(connection, { logger, systemContext, results: includeDocuments });
+  new AdtUtils(connection, logger, { results: utilDocuments });
+  ```
+
+  — or take it from the getter, `client.getClass()`.
 - A handler no getter hands out — `new AbapDebugger(connection, logger)`,
-  `new AdtAbapGitClient(connection)`: pass its documents —
-  `new AbapDebugger(connection, logger, abapDebuggerDocuments)`,
-  `new AdtAbapGitClient(connection, undefined, abapGitDocuments)`. Likewise
-  `amdpDebuggerDocuments`, `memorySnapshotsDocuments`.
-- A runner — `new ClassTestRunner(connection, logger)`: pass the documents —
-  `new ClassTestRunner(connection, logger, classTestRunnerDocuments)`.
-- A subclass's constructor passes the results to its base the same way.
+  `new AdtAbapGitClient(connection)`: use its `create` —
+  `AbapDebugger.create(connection, { logger })`,
+  `AbapDebugger.create(connection, { onConflict: 'takeOver' })`,
+  `AdtAbapGitClient.create(connection)`, and
+  `X.create(connection, { results: mine })` for results of your own; or
+  construct it with its documents —
+  `new AbapDebugger(connection, { logger, results: abapDebuggerDocuments })`.
+  Likewise `AmdpDebugger` (`amdpDebuggerDocuments`) and `MemorySnapshots`
+  (`memorySnapshotsDocuments`). `AbapDebugger`'s fourth argument,
+  `{ onConflict }`, is a field of the options now.
+- A runner — `new ClassTestRunner(connection, logger)`: pass the options —
+  `new ClassTestRunner(connection, { logger, results: classTestRunnerDocuments })`.
+- A subclass's constructor takes the options and hands them to its base:
+  `super(connection, options)`.
 
 Every `<x>Documents` is exported where its class is (the root, `/core`,
-`/runtime`, `/abapgit`, `/executors`).
+`/runtime`, `/abapgit`, `/executors`), and `AdtHandlerOptions`,
+`AdtShippedOptions` and `IAdtHandlerContext` from the root and `/core`.
 
 ## The legacy package
 

@@ -11,9 +11,9 @@ import { rawOf } from '../result';
  * passes these strategies when they construct it:
  *
  * ```typescript
- * const git = new AdtAbapGitClient(connection, logger, {
- *   ...abapGitDocuments,
- *   repos: abapGitRepos,
+ * const git = AdtAbapGitClient.create(connection, {
+ *   logger,
+ *   results: { ...abapGitDocuments, repos: abapGitRepos },
  * });
  * const repo = (await git.listRepos()).getResult().value.find((r) => r.package === 'ZPKG');
  * await git.getErrorLog(repo.logLink);

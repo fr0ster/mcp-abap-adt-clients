@@ -8,9 +8,7 @@
  *
  * ```typescript
  * new FeedRepository(connection, logger, {
- *   ...feedDocuments,
- *   feeds: feedDescriptors,
- *   entries: feedEntries,
+ *   results: { ...feedDocuments, feeds: feedDescriptors, entries: feedEntries },
  * });
  * ```
  *

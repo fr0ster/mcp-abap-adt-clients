@@ -22,10 +22,11 @@ of a 0.x package, so a minor.
   results no longer compiles. Every override of `AdtClientLegacy` (the
   sixteen served types' and the eighteen absent ones') takes them, its
   variant gate unchanged. The legacy handlers, runners and executors inherit
-  the required `results` of their base constructors:
-  `new AdtClassLegacy(connection, logger, undefined, undefined, undefined, classDocuments)`,
-  `new AdtUtilsLegacy(connection, logger, utilDocuments)`,
-  `new ClassTestRunnerLegacy(connection, logger, classTestRunnerDocuments)`;
+  their base constructors, which take an options object with a required
+  `results` (adt-clients 38.0.0):
+  `new AdtClassLegacy(connection, { logger, results: classDocuments })`,
+  `new AdtUtilsLegacy(connection, logger, { results: utilDocuments })`,
+  `new ClassTestRunnerLegacy(connection, { logger, results: classTestRunnerDocuments })`;
   or take one from the getter. No request and no answer changes.
 - **`AdtClientLegacy` is `AdtClient<'basis740'>`, typed by 7.40's table.**
   `AdtExecutorLegacy` is `AdtExecutor<'basis740'>`, and every legacy handler
