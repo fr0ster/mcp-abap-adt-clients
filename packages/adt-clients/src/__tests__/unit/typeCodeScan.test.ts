@@ -15,6 +15,12 @@ const FIXTURE = join(ROOT, 'src/__typeCodeScanFixture__/fixture.ts');
 /** A template substitution in a fixture's source, spelled without `${` in a plain string. */
 const SUBSTITUTION = `${'$'}{name}`;
 
+function keys(text: string): string[] {
+  return typeCodeFindings(ROOT, TSCONFIG, [], new Map([[FIXTURE, text]])).map(
+    (finding) => finding.key,
+  );
+}
+
 function scan(text: string): string[] {
   return typeCodeFindings(ROOT, TSCONFIG, [], new Map([[FIXTURE, text]])).map(
     (finding) => finding.line,
@@ -79,6 +85,26 @@ describe('the literal scan of type codes', () => {
     ).toEqual([
       "src/__typeCodeScanFixture__/fixture.ts:3 'FUGR/ZZ' — inside a string, not a code of the tables",
     ]);
+  });
+
+  it('keys a literal typed by a type alias by the alias, and the same literal typed string by itself', () => {
+    expect(
+      keys(
+        [
+          "type AbapUnitRunObjectType = 'CLAS' | 'PROG' | 'FUGR' | 'FUNC';",
+          'declare function start(type: AbapUnitRunObjectType): void;',
+          "start('CLAS');",
+        ].join('\n'),
+      ),
+      // The alias's own members and the call: one key for all of them.
+    ).toEqual(Array(4).fill('type:AbapUnitRunObjectType'));
+    expect(
+      keys(
+        ['declare function start(type: string): void;', "start('CLAS');"].join(
+          '\n',
+        ),
+      ),
+    ).toEqual(['src/__typeCodeScanFixture__/fixture.ts:CLAS']);
   });
 
   it('passes keys, comparisons and type arguments typed by the codes', () => {

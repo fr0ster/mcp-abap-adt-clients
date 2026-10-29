@@ -248,8 +248,44 @@ function literalVerdict(
   return `contextual type ${checker.typeToString(contextual)} is not made of codes of the tables`;
 }
 
+/**
+ * The name of the type alias a literal's contextual type is, or whose
+ * declaration it is a member of, if any: a
+ * literal typed by a vocabulary that looks like codes and is not one
+ * (`AbapUnitRunObjectType`) is allowed once, by the type's name, not per
+ * literal.
+ */
+function contextualAlias(
+  literal: ts.StringLiteral | ts.NoSubstitutionTemplateLiteral,
+  checker: ts.TypeChecker,
+): string | undefined {
+  // A member of the alias's own declaration: `type X = 'A' | 'B'`.
+  if (literal.parent && ts.isLiteralTypeNode(literal.parent)) {
+    let node: ts.Node = literal.parent;
+    while (
+      node.parent &&
+      (ts.isUnionTypeNode(node.parent) ||
+        ts.isParenthesizedTypeNode(node.parent))
+    )
+      node = node.parent;
+    return node.parent &&
+      ts.isTypeAliasDeclaration(node.parent) &&
+      node.parent.type === node
+      ? node.parent.name.text
+      : undefined;
+  }
+  const contextual = checker.getContextualType(literal);
+  const alias = contextual
+    ? checker.getNonNullableType(contextual).aliasSymbol
+    : undefined;
+  return alias?.getName();
+}
+
 export interface ITypeCodeFinding {
-  /** `<file relative to the root>:<literal or word>` — the allow-list key. */
+  /**
+   * `<file relative to the root>:<literal or word>` — the allow-list key; for
+   * a literal whose contextual type is a type alias, `type:<alias>`.
+   */
   readonly key: string;
   /** The finding as listed: file, line, text and why. */
   readonly line: string;
@@ -294,10 +330,19 @@ function findingsOf(
       !ts.isExportDeclaration(node.parent)
     ) {
       const why = literalVerdict(node, checker);
-      if (why !== undefined)
-        findings.push(
-          finding(root, source, node.getStart(source), node.text, why),
+      if (why !== undefined) {
+        const typed = finding(
+          root,
+          source,
+          node.getStart(source),
+          node.text,
+          why,
         );
+        const alias = contextualAlias(node, checker);
+        findings.push(
+          alias === undefined ? typed : { ...typed, key: `type:${alias}` },
+        );
+      }
     } else if (
       ts.isStringLiteral(node) ||
       ts.isNoSubstitutionTemplateLiteral(node) ||
