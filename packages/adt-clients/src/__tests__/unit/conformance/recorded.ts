@@ -59,17 +59,7 @@ export const DIVERGENCES: { readonly [R in RecordedRelease]: IDivergence[] } = {
       reason: MESSAGE_OWN_URI,
     },
   ],
-  'basis-740': [
-    {
-      rule: 'source',
-      api: 'functionGroup',
-      code: 'FUGR/F',
-      detail:
-        'source not listed, the metadata document links a text/plain or untyped source',
-      reason:
-        'on SAP_BASIS 7.40 the main source is not measured yet; measured on the SAP_BASIS 7.40 system next',
-    },
-  ],
+  'basis-740': [],
 };
 
 /**

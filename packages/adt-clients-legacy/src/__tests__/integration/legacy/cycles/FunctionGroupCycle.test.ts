@@ -2,7 +2,10 @@
  * The function group and function module cycle on SAP_BASIS 7.40 SP04 over
  * RFC (spec §4).
  *
- * Group: validate (name free) → create → activate → check. Module: validate
+ * Group: validate (name free) → create → activate → check → read its source
+ * (`source/main`, the main program) → lock → update (one comment line in
+ * front, the rest as read) → unlock → activate → read the active source
+ * back. Module: validate
  * (name free) → create → lock → update (a plain body) → unlock → activate →
  * read → readMetadata → check → getVersions → getVersionSource → validate →
  * lock → delete → unlock → read `404`. Then the group: lock → delete →
@@ -16,6 +19,10 @@
  *   after the module);
  * - the module's readMetadata (B2-reads-20261023-1749 s3-fm-meta read a
  *   system module: `200`).
+ * The group's source steps were measured once by a probe on 7.40 SP04
+ * (2026-10-29, task-fugr740: GET `200 text/plain`, PUT under the lock `200`,
+ * the one-reference activation activated the group and its main program, the
+ * active source equal to what was written); this cycle holds them.
  *
  * A function module's source on 7.40 is a plain `FUNCTION … ENDFUNCTION`
  * body: a parameter comment block is refused (`500`, B4 f2-update).
@@ -67,6 +74,20 @@ import { describeLegacyRfc } from '../../../helpers/legacyRfc';
 const CASE = 'legacy_cycle_function_group';
 const DESCRIPTION = 'legacy live cycle: function group';
 const VALIDATION = 'POST /sap/bc/adt/functions/validation';
+
+/** The comment line the source step adds in front of the group's main program. */
+const SOURCE_MARKER = '* legacy live cycle: function group source';
+
+/** A source as compared: LF line ends, no trailing blanks on a line or at the end. */
+function comparable(source: string): string {
+  return source
+    .split('\r\n')
+    .join('\n')
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .join('\n')
+    .trimEnd();
+}
 
 describeLegacyRfc(
   'Legacy 7.40 SP04 over RFC — function group and module cycle',
@@ -181,6 +202,75 @@ describeLegacyRfc(
           );
           // B4 g4-check.
           expectSent(recorder, mark, [['POST /sap/bc/adt/checkruns', 200]]);
+
+          // --- the group's source: read → write → activate → read back ---
+          mark = at();
+          const heldSource = String(
+            expectResult(
+              await group.handler.read(groupConfig, undefined, {
+                analyse: analyseException,
+              }),
+              'read group source',
+            ),
+          );
+          // Measured 2026-10-29 (task-fugr740): 200 text/plain, the main
+          // program SAPL<group> with its INCLUDE lines.
+          expectSent(recorder, mark, [[`GET ${groupUri}/source/main`, 200]]);
+          expect(heldSource.toUpperCase()).toContain(
+            `INCLUDE L${groupName}TOP`,
+          );
+          const written = `${SOURCE_MARKER}\n${heldSource}`;
+
+          mark = at();
+          expectResult(await group.lock(), 'lock group for the source');
+          const sourceHandle = group.handle();
+          expectResult(
+            await group.handler.update(groupConfig, {
+              headers: integrationHeadersOf(group.handler, 'update'),
+              lockHandle: sourceHandle,
+              source: written,
+              analyse: analyseException,
+            }),
+            'update group source',
+          );
+          expectResult(await group.unlock(), 'unlock group after the source');
+          // Measured 2026-10-29: LOCK 200, the PUT under the handle
+          // (text/plain; charset=utf-8) 200, UNLOCK 200.
+          const [, sourcePut] = expectSent(recorder, mark, [
+            [`POST ${groupUri} LOCK`, 200],
+            [`PUT ${groupUri}/source/main`, 200],
+            [`POST ${groupUri} UNLOCK`, 200],
+          ]);
+          expect(queryOf(sourcePut, 'lockHandle') === sourceHandle).toBe(true);
+
+          mark = at();
+          expectResult(
+            await group.handler.activate(groupConfig, {
+              headers: integrationHeadersOf(group.handler, 'activate'),
+              analyse: judged(analyseActivation),
+            }),
+            'activate group after the source',
+          );
+          // Measured 2026-10-29 in $TMP: the one-reference activation
+          // activated the group and its main program both.
+          expectSent(recorder, mark, [['POST /sap/bc/adt/activation', 200]]);
+
+          mark = at();
+          const readBack = String(
+            expectResult(
+              await group.handler.read(groupConfig, 'active', {
+                analyse: analyseException,
+              }),
+              'read group source (active)',
+            ),
+          );
+          const [sourceGet] = expectSent(recorder, mark, [
+            [`GET ${groupUri}/source/main`, 200],
+          ]);
+          expect(queryOf(sourceGet, 'version')).toBe('active');
+          // The active source is what was written: the marker line first, the
+          // rest as it was held.
+          expect(comparable(readBack)).toBe(comparable(written));
 
           // --- the module ---
           mark = at();
