@@ -114,7 +114,7 @@ if (!created.ok) throw new Error(created.getError().message);
 
 // Utility operations. The search hits are a reading you choose, once.
 const utils = client.getUtils({ ...utilDocuments, search: utilSearchHits });
-const found = await utils.search({ query: 'Z*', objectType: 'CLAS/OC' });
+const found = await utils.search({ query: 'Z*', objectType: 'CLAS' });
 if (found.ok) found.getResult().value;   // ISearchResult[]; the document without utilSearchHits
 ```
 
