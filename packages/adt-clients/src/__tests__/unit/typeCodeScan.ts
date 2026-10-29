@@ -10,13 +10,19 @@
  * Everything is read with the TypeScript compiler, never by a regular
  * expression over source:
  *
+ * - **The codes.** "The codes of the tables" are every code the ADT type
+ *   tables and utility tables list, and every `osl:object type` of the ABAP
+ *   Unit run registry (`ABAP_UNIT_RUN_TYPES`'s keys: `CLAS/OCL`, `FUNC`,
+ *   `DDLS`, … — the values a run names, some of which no type table lists).
+ *   Everything below that says "codes of the tables" means this one set.
  * - **Code literals.** A string literal, or a template without
  *   substitutions, whose whole text has the shape of a code — four upper-case
  *   letters or digits, `/`, one to three more — or is a bare code the tables
- *   list (`AUTH`, or the object type of a listed code: `CLAS`, `PROG`,
- *   `DEVC`, …) passes only where the checker's contextual type is made of
- *   codes of the tables alone: `AdtTypeCode`, or a union of some of its
- *   members (`AdtUtilityCode`'s group-only `VIEW/DV` included). A literal
+ *   list (`AUTH`, `FUNC`, or the object type of a listed code: `CLAS`,
+ *   `PROG`, `DEVC`, …) passes only where the checker's contextual type is
+ *   made of codes of the tables alone: `AdtTypeCode`, a union of some of its
+ *   members (`AdtUtilityCode`'s group-only `VIEW/DV` included), or
+ *   `AbapUnitRunObjectType`. A literal
  *   used as a property name passes where the object literal's contextual
  *   type names codes only as its keys and has no index signature
  *   (`Partial<Record<AdtTypeCode, …>>`, through `satisfies`). Where the
@@ -44,6 +50,7 @@
 import { readdirSync, statSync } from 'node:fs';
 import { dirname, relative } from 'node:path';
 import {
+  ABAP_UNIT_RUN_TYPES,
   ADT_TYPES_BASIS_740,
   ADT_TYPES_CLOUD,
   ADT_TYPES_ONPREM,
@@ -53,7 +60,10 @@ import {
 } from '@mcp-abap-adt/interfaces-adt';
 import * as ts from 'typescript';
 
-/** Every code any table of interfaces-adt lists: API tables and utility tables. */
+/**
+ * Every code any table of interfaces-adt lists: API tables, utility tables,
+ * and the ABAP Unit run registry's `osl:object` types.
+ */
 export const TABLE_CODES: ReadonlySet<string> = new Set([
   ...[ADT_TYPES_ONPREM, ADT_TYPES_CLOUD, ADT_TYPES_BASIS_740].flatMap((table) =>
     Object.values(table).flatMap((entry) =>
@@ -65,6 +75,7 @@ export const TABLE_CODES: ReadonlySet<string> = new Set([
     ADT_UTILITY_CODES_CLOUD,
     ADT_UTILITY_CODES_BASIS_740,
   ].flatMap((table) => Object.keys(table)),
+  ...Object.keys(ABAP_UNIT_RUN_TYPES),
 ]);
 
 /** The bare codes: a code without `/`, and the object type of every code. */

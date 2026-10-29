@@ -2,6 +2,11 @@ import type { AdtVariant } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
+  AbapUnitTestRunner,
+  abapUnitTestRunnerDocuments,
+  type IAbapUnitTestRunnerResults,
+} from '../executors/abapUnitTestRunner';
+import {
   ClassExecutor,
   classExecutorDocuments,
   type IClassExecutorResults,
@@ -126,5 +131,20 @@ export class AdtExecutor<V extends AdtVariant = AdtModernVariant> {
       this.logger,
       results,
     );
+  }
+
+  /**
+   * The generic ABAP Unit runner: a run of one object of any type the
+   * registry (`ABAP_UNIT_RUN_TYPES`) lists, or of a package, and a run of
+   * objects named by their ADT URIs — beside the four per-object runners,
+   * which keep the types they send. A CDS view's tests are assigned tests:
+   * they run only with `scope: { foreignTests: true }`.
+   */
+  getAbapUnitTestRunner<
+    R extends IAbapUnitTestRunnerResults = typeof abapUnitTestRunnerDocuments,
+  >(
+    results: R = abapUnitTestRunnerDocuments as unknown as R,
+  ): AbapUnitTestRunner<R, V> {
+    return new AbapUnitTestRunner<R, V>(this.connection, this.logger, results);
   }
 }

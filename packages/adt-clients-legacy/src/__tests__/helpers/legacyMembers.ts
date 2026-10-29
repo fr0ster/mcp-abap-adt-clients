@@ -616,6 +616,7 @@ const CLIENT_GETTERS = [
 ] as const;
 
 const EXECUTOR_GETTERS = [
+  'getAbapUnitTestRunner',
   'getClassExecutor',
   'getClassTestRunner',
   'getFunctionGroupTestRunner',
@@ -873,6 +874,22 @@ export const LEGACY_REFUSED: Record<string, Rows<RefusedRow>> = {
     },
   },
   getFunctionGroupTestRunner: {
+    getStatus: {
+      section: '§6.2',
+      call: calling('getStatus', () => ['GUARD']),
+    },
+    getResult: {
+      section: '§6.2',
+      call: calling('getResult', () => ['GUARD']),
+    },
+  },
+  getAbapUnitTestRunner: {
+    run: {
+      section: '§6.2',
+      call: calling('run', () => [
+        { kind: 'object', name: 'ZCL_GUARD', type: 'CLAS/OC' },
+      ]),
+    },
     getStatus: {
       section: '§6.2',
       call: calling('getStatus', () => ['GUARD']),
@@ -1271,6 +1288,14 @@ export const LEGACY_SENDS: Record<string, Rows<SendsRow>> = {
     runSync: {
       section: '§6.2 measured',
       call: calling('runSync', () => ['ZGUARD_FG']),
+      sends: testRun,
+      body: OPTIONS,
+    },
+  },
+  getAbapUnitTestRunner: {
+    runSync: {
+      section: '§6.2 measured',
+      call: calling('runSync', (h) => [[CLASS_URI], h('runSync')]),
       sends: testRun,
       body: OPTIONS,
     },

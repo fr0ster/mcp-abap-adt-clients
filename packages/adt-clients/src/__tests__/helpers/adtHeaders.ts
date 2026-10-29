@@ -39,6 +39,11 @@ export const TEST_HEADERS: IAdtHeaders = {
 
 /** Keyed `<implementing class>.<member>`. */
 const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
+  // The pair every per-object runner's runSync sends on /abapunit/testruns.
+  'AbapUnitTestRunner.runSync': {
+    accept: 'application/xml',
+    contentType: 'application/xml',
+  },
   'AbapDebugger.getChildVariables': {
     accept:
       'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.debugger.ChildVariables',

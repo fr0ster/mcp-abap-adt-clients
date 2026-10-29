@@ -91,6 +91,17 @@ async function legacyVariantGates(
     functionGroupName: 'ZFG_GATE',
     functionModuleName: 'Z_FM_GATE',
   });
+  // The generic runner: 7.40 has no /abapunit/runs, so no target run, poll
+  // or result; the URI run on /abapunit/testruns stays.
+  // @ts-expect-error -- 7.40 has no /abapunit/runs
+  await executor.getAbapUnitTestRunner().run();
+  // @ts-expect-error -- 7.40 has no run to poll
+  await executor.getAbapUnitTestRunner().getStatus();
+  // @ts-expect-error -- 7.40 has no result to fetch
+  await executor.getAbapUnitTestRunner().getResult();
+  await executor
+    .getAbapUnitTestRunner()
+    .runSync(['/sap/bc/adt/oo/classes/zcl_gate'], { headers });
 
   // A missing parent, through the legacy function module.
   await legacy

@@ -17,22 +17,6 @@ const TSCONFIG = join(ROOT, 'tsconfig.json');
 /** `<file>:<literal or word>` → why it is not a type code. */
 const ALLOWED: ReadonlyMap<string, string> = new Map([
   [
-    'src/core/class/run.ts:CLAS',
-    'An `osl:object` type of an ABAP Unit run — the short object type Eclipse sends (`CLAS`, `PROG`, `FUGR`, and `FUNC` beside them, which no table lists): the vocabulary of the run, not an ADT type code.',
-  ],
-  [
-    'src/executors/class/ClassTestRunner.ts:CLAS',
-    'An `osl:object` type of an ABAP Unit run — the short object type Eclipse sends (`CLAS`, `PROG`, `FUGR`, and `FUNC` beside them, which no table lists): the vocabulary of the run, not an ADT type code.',
-  ],
-  [
-    'src/executors/functionGroup/FunctionGroupTestRunner.ts:FUGR',
-    'An `osl:object` type of an ABAP Unit run — the short object type Eclipse sends (`CLAS`, `PROG`, `FUGR`, and `FUNC` beside them, which no table lists): the vocabulary of the run, not an ADT type code.',
-  ],
-  [
-    'src/executors/program/ProgramTestRunner.ts:PROG',
-    'An `osl:object` type of an ABAP Unit run — the short object type Eclipse sends (`CLAS`, `PROG`, `FUGR`, and `FUNC` beside them, which no table lists): the vocabulary of the run, not an ADT type code.',
-  ],
-  [
     'src/batch/wire.ts:HTTP/1',
     "The HTTP version of a batch part's request line (`HTTP/1.1`), not a type code.",
   ],

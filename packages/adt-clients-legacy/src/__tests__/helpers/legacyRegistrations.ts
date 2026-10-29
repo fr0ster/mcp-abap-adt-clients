@@ -45,6 +45,7 @@ import { AdtPackageLegacy } from '../../core/package/AdtPackageLegacy';
 import { AdtProgramLegacy } from '../../core/program/AdtProgramLegacy';
 import { AdtUtilsLegacy } from '../../core/shared/AdtUtilsLegacy';
 import { AdtRequestLegacy } from '../../core/transport/AdtRequestLegacy';
+import { AbapUnitTestRunnerLegacy } from '../../executors/abapUnit/AbapUnitTestRunnerLegacy';
 import { ClassExecutorLegacy } from '../../executors/class/ClassExecutorLegacy';
 import { ClassTestRunnerLegacy } from '../../executors/class/ClassTestRunnerLegacy';
 import { FunctionGroupTestRunnerLegacy } from '../../executors/functionGroup/FunctionGroupTestRunnerLegacy';
@@ -222,6 +223,7 @@ export const REFUSED_WITHOUT_REQUEST: [IHandlerClass, string[]][] = [
   [ProgramTestRunnerLegacy, ['getStatus', 'getResult']],
   [FunctionGroupTestRunnerLegacy, ['getStatus', 'getResult']],
   [FunctionModuleTestRunnerLegacy, ['run', 'getStatus', 'getResult']],
+  [AbapUnitTestRunnerLegacy, ['run', 'getStatus', 'getResult']],
   // The runs, the profiled runs and the trace type lists: not advertised on
   // 7.40, or no class run there at all (spec §6.3).
   [

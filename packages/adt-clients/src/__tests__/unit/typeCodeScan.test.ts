@@ -39,6 +39,57 @@ describe('the literal scan of type codes', () => {
     ]);
   });
 
+  it('passes a code literal whose contextual type is AbapUnitRunObjectType', () => {
+    // `CLAS/OCL` and `FUNC` are run types no type table lists: the registry
+    // of ABAP Unit run types is one of "the tables".
+    expect(
+      scan(
+        [
+          "import type { AbapUnitRunObjectType } from '@mcp-abap-adt/interfaces-adt';",
+          "export const include: AbapUnitRunObjectType = 'CLAS/OCL';",
+          "export const module: AbapUnitRunObjectType = 'FUNC';",
+          'export function start(type: AbapUnitRunObjectType): string {',
+          '  return type;',
+          '}',
+          "export const started = start('CLAS');",
+        ].join('\n'),
+      ),
+    ).toEqual([]);
+  });
+
+  it('fails a run type literal typed string, as any code literal', () => {
+    expect(
+      scan(
+        [
+          "export const include: string = 'CLAS/OCL';",
+          "export const module: string = 'FUNC';",
+        ].join('\n'),
+      ),
+    ).toEqual([
+      "src/__typeCodeScanFixture__/fixture.ts:1 'CLAS/OCL' — contextual type string is not made of codes of the tables",
+      "src/__typeCodeScanFixture__/fixture.ts:2 'FUNC' — contextual type string is not made of codes of the tables",
+    ]);
+  });
+
+  it('passes a comment naming an ABAP Unit run type no type table lists', () => {
+    expect(
+      scan(
+        [
+          '/** Runs a class include, `CLAS/OCL`, or a CDS view, `DDLS/DF`. */',
+          'export const x = 1;',
+        ].join('\n'),
+      ),
+    ).toEqual([]);
+  });
+
+  it('fails a comment naming a code neither the tables nor the run registry hold', () => {
+    expect(
+      scan(['export const x = 1;', '// Runs a `CLAS/OCX` include.'].join('\n')),
+    ).toEqual([
+      "src/__typeCodeScanFixture__/fixture.ts:2 'CLAS/OCX' — named in a comment, not a code of the tables",
+    ]);
+  });
+
   it('passes a comment naming a code of the tables', () => {
     expect(
       scan(
