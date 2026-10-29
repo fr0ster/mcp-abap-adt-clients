@@ -570,6 +570,13 @@ export interface IConformanceReport {
   readonly unserved: Readonly<Record<string, string>>;
   /** Samples whose sample-based rules were not run, code → reason. */
   readonly unreadable: Readonly<Record<string, string>>;
+  /**
+   * 10, listed apart: the advertised collections (`href`) that carry a code
+   * whose entry lists `updateMetadata` and that advertise no `app:accept`
+   * for it, sorted. Outside the per-collection rule, so the list is the
+   * statement: a recorded answer that loses its `app:accept` changes it.
+   */
+  readonly metadataTypeUnadvertised: readonly string[];
 }
 
 /** A conflict as one line: what the divergence list and the messages compare. */
@@ -628,6 +635,7 @@ export function checkTypeTable(
 
   const createWithoutCapability: string[] = [];
   const unreadable: [string, string][] = [];
+  const metadataTypeUnadvertised = new Set<string>();
   /** Per code, the operations of every entry that holds it. */
   const opsByCode = new Map<string, Set<AdtOperation>>();
   const sampleChecked = new Set<string>();
@@ -742,6 +750,13 @@ export function checkTypeTable(
 
       // 10: the metadata type, where the collection advertises any.
       const accepted = acceptedTypes(answers.collections, href, code);
+      if (
+        facts.operations.includes('updateMetadata') &&
+        accepted.length === 0 &&
+        answers.collections.has(href)
+      ) {
+        metadataTypeUnadvertised.add(href);
+      }
       if (facts.operations.includes('updateMetadata') && accepted.length > 0) {
         const media = updateMetadataMediaType(api, code);
         if (media === undefined) {
@@ -843,6 +858,7 @@ export function checkTypeTable(
     capabilityNotUsed,
     unserved: sortedRecord(unserved),
     unreadable: sortedRecord(unreadable),
+    metadataTypeUnadvertised: sorted([...metadataTypeUnadvertised]),
   };
 }
 

@@ -71,6 +71,7 @@ import {
 import {
   CREATE_WITHOUT_CAPABILITY,
   DIVERGENCES,
+  METADATA_TYPE_UNADVERTISED,
   NO_READABLE_SAMPLE,
   recordedCoverage,
 } from '../../unit/conformance/recorded';
@@ -473,6 +474,9 @@ describe(
         );
         expect(report.createWithoutCapability).toEqual(
           CREATE_WITHOUT_CAPABILITY[release],
+        );
+        expect(report.metadataTypeUnadvertised).toEqual(
+          METADATA_TYPE_UNADVERTISED[release],
         );
         const coverage = recordedCoverage(release);
         expect(report.notCreated).toEqual(coverage.notCreated);

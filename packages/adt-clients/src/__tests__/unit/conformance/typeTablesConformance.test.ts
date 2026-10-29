@@ -50,6 +50,7 @@ import {
 import {
   CREATE_WITHOUT_CAPABILITY,
   DIVERGENCES,
+  METADATA_TYPE_UNADVERTISED,
   NO_READABLE_SAMPLE,
   recordedCoverage,
 } from './recorded';
@@ -123,6 +124,12 @@ describe.each(RECORDED)(
       expect(report.capabilityNotUsed).toEqual(recorded.capabilityNotUsed);
     });
 
+    it('lists apart exactly the recorded collections with no app:accept for an updateMetadata', () => {
+      expect(report.metadataTypeUnadvertised).toEqual(
+        METADATA_TYPE_UNADVERTISED[release],
+      );
+    });
+
     it('names every sample with no readable answer', () => {
       expect(report.unreadable).toEqual(NO_READABLE_SAMPLE[release]);
     });
@@ -176,6 +183,27 @@ describe('a deliberate break fails the check against the recorded answers', () =
     expect(lines(report.conflicts)).toContain(
       'collection: class CLAS/OC: /sap/bc/adt/oo/classes is not advertised',
     );
+  });
+
+  it('a recorded answer: S/4HANA 2025 advertising no app:accept for the class collection', () => {
+    const recorded = recordedAnswers('s4-2025');
+    const collections = new Map(recorded.collections);
+    const classes = collections.get('/sap/bc/adt/oo/classes');
+    if (!classes) throw new Error('the recorded discovery lists no classes');
+    collections.set('/sap/bc/adt/oo/classes', {
+      ...classes,
+      accepts: [],
+      templateLinks: [],
+    });
+    const report = checkTypeTable(
+      ADT_TYPES_ONPREM,
+      { ...recorded, collections },
+      SOURCE_TYPES,
+    );
+    expect(report.metadataTypeUnadvertised).not.toEqual(
+      METADATA_TYPE_UNADVERTISED['s4-2025'],
+    );
+    expect(report.metadataTypeUnadvertised).toContain('/sap/bc/adt/oo/classes');
   });
 });
 
@@ -693,6 +721,19 @@ describe('the check bites: what is not a conflict', () => {
         }),
       ),
     ).toEqual([]);
+    // …and the collection is listed apart, for the recorded list to hold.
+    expect(
+      checkTypeTable(
+        fixtureTable(),
+        fixtureAnswers({
+          collections: [
+            { href: '/sap/bc/adt/oo/classes', accepts: [] },
+            ...BASE_COLLECTIONS.slice(1),
+          ],
+        }),
+        SOURCE_TYPES,
+      ).metadataTypeUnadvertised,
+    ).toEqual(['/sap/bc/adt/oo/classes']);
     // The same type against another advertised type is still refused.
     expect(
       conflictsOf(

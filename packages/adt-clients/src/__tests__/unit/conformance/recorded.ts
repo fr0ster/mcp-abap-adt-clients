@@ -104,6 +104,25 @@ export const CREATE_WITHOUT_CAPABILITY: {
 };
 
 /**
+ * Rule 10, listed apart: the collections whose recorded `discovery` advertises
+ * no `app:accept` for a code whose entry lists `updateMetadata` — the media
+ * type the library sends there is checked against nothing the release says.
+ * A recorded answer that loses (or gains) a collection's `app:accept` changes
+ * this list, and the check fails until it is edited here.
+ */
+export const METADATA_TYPE_UNADVERTISED: {
+  readonly [R in RecordedRelease]: readonly string[];
+} = {
+  's4-2025': ['/sap/bc/adt/messageclass', '/sap/bc/adt/sfw/featuretoggles'],
+  'abap-cloud': [
+    '/sap/bc/adt/enhancements/enhoxhh',
+    '/sap/bc/adt/messageclass',
+  ],
+  // SAP_BASIS 7.40 SP04's discovery advertises no app:accept at all.
+  'basis-740': ['/sap/bc/adt/functions/groups'],
+};
+
+/**
  * The samples with no readable answer: their metadata read answered 403, so
  * the sample-based rules (`address`, `source`) are not asserted for them.
  */
