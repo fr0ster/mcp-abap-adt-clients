@@ -21,6 +21,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { RecordedRelease } from '../../helpers/recordedConformance';
+import type { SearchTypeRule } from '../../helpers/searchTypesConformance';
 import type { ConformanceRule } from '../../helpers/typeTableConformance';
 
 /** A conflict the check reports and the reason it stands. */
@@ -221,3 +222,20 @@ export function recordedCoverage(release: RecordedRelease): IRecordedCoverage {
     capabilityNotUsed,
   };
 }
+
+/** A search-name conflict the check reports and the reason it stands. */
+export interface ISearchTypeDivergence {
+  readonly rule: SearchTypeRule;
+  readonly name: string;
+  readonly detail: string;
+  readonly reason: string;
+}
+
+/** Per release, every search-name conflict the check reports (spec 3.6). */
+export const SEARCH_TYPE_DIVERGENCES: {
+  readonly [R in RecordedRelease]: readonly ISearchTypeDivergence[];
+} = {
+  's4-2025': [],
+  'abap-cloud': [],
+  'basis-740': [],
+};

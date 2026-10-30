@@ -4,6 +4,38 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [0.3.0] - 2026-10-30
+
+On `@mcp-abap-adt/adt-clients` `^39.0.0` and `@mcp-abap-adt/interfaces-adt`
+`^24.0.1`. A breaking change of a 0.x package, so a minor.
+
+### Breaking
+
+- **`getUtils().search` takes 7.40's search names.** `AdtUtilsLegacy.search`
+  takes `IAdtSearchObjectsParamsOf<'basis740'>`: the eleven names measured to
+  select on 7.40 SP04 (`ADT_SEARCH_TYPES_BASIS_740`: `DEVC`, `CLAS`, `INTF`,
+  `PROG`, `FUGR`, `FUNC`, `DDLS`, `MSAG`, `TABL`, `ENHO`, `ENHS`). It took
+  7.40's codes, which 7.40 reads as their main type (`TABL/DS` answers both
+  table kinds). A code, an alias the newer releases select (`STRU`, `DTAB`,
+  `REPO`, `INCL`, `BADI`) and an unknown name do not compile; from a caller
+  outside the type system each is refused without a request, the refusal
+  naming `ADT_SEARCH_TYPES_BASIS_740` — 7.40 answers them `200` with no hits,
+  which a caller could not tell from an empty search. A name is sent as
+  `objectType`, as a code was.
+- **The group references are interfaces-adt's typed ones.**
+  `activateObjectsGroup`, `checkDeletionGroup` and `deleteObjectsGroup` take
+  `IAdtCodedReference<C>[]` (a function module names its group), where-used
+  `IGetWhereUsedParams<AdtWhereUsedCode<'basis740'>>` — adt-clients 39.0.0's
+  sets for 7.40, `VIEW/DV` among them.
+
+### Changed
+
+- **A group activation of `VIEW/DV` is sent.** 7.40's utility table
+  (`ADT_UTILITY_CODES_BASIS_740`) lists group activation for it, so the
+  synchronous `POST /sap/bc/adt/activation` carries it under
+  `/sap/bc/adt/ddic/views/<name>`; it was refused without a request. Not
+  measured on 7.40 SP04 (the utility table says `measured: false`).
+
 ## [0.2.0] - 2026-10-29
 
 On `@mcp-abap-adt/adt-clients` `^38.0.0`, with its two changes of contract:

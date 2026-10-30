@@ -6,6 +6,7 @@ import {
   ADT_TYPES_BASIS_740,
   ADT_TYPES_CLOUD,
   ADT_TYPES_ONPREM,
+  type AdtParentedTypeCode,
   type AdtSourceTypeCode,
   type AdtTypeCode,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -59,20 +60,33 @@ export function metadataReadCode(value: string): AdtMetadataReadCode {
   return value;
 }
 
-/** Whether `code` is one a modern group activation activates. */
-function isActivationCode(
-  code: AdtTypeCode,
-): code is AdtActivationCode<AdtModernVariant> {
+/** A code a modern group activation activates with no parent to name. */
+export type UnparentedActivationCode = Exclude<
+  Extract<AdtActivationCode<AdtModernVariant>, AdtTypeCode>,
+  AdtParentedTypeCode
+>;
+
+/**
+ * Whether `code` is one a modern group activation activates and whose
+ * reference needs no parent — a function module's names its group, which a
+ * bare code does not carry.
+ */
+function isActivationCode(code: AdtTypeCode): code is UnparentedActivationCode {
+  if (code === 'FUGR/FF' || code === 'FUGR/I') return false;
   return code === 'DEVC/K' || (code !== 'MSAG/NN' && codeHas(code, 'activate'));
 }
 
-/** `value` as a code a group activation activates; throws for any other. */
-export function activationCode(
-  value: string,
-): AdtActivationCode<AdtModernVariant> {
+/**
+ * `value` as a code a group activation activates without a parent; throws for
+ * any other — a parented one (`FUGR/FF`) included, whose reference needs its
+ * group.
+ */
+export function activationCode(value: string): UnparentedActivationCode {
   const code = adtTypeCode(value);
   if (!isActivationCode(code)) {
-    throw new Error(`a group activation activates no '${value}'`);
+    throw new Error(
+      `a group activation activates no '${value}' from a code alone`,
+    );
   }
   return code;
 }

@@ -35,7 +35,7 @@ describe('the literal scan of type codes', () => {
 
   it('fails a code literal with no code type, naming file and line', () => {
     expect(scan("export const code: string = 'CLAS/OC';")).toEqual([
-      "src/__typeCodeScanFixture__/fixture.ts:1 'CLAS/OC' — contextual type string is not made of codes of the tables",
+      "src/__typeCodeScanFixture__/fixture.ts:1 'CLAS/OC' — contextual type string is not made of codes, main types or search names of the tables",
     ]);
   });
 
@@ -57,6 +57,38 @@ describe('the literal scan of type codes', () => {
     ).toEqual([]);
   });
 
+  it('passes a main type and a search name typed by their tables', () => {
+    expect(
+      scan(
+        [
+          'import type {',
+          '  AdtMainType,',
+          '  AdtSearchTypeOf,',
+          "} from '@mcp-abap-adt/interfaces-adt';",
+          "export const main: AdtMainType = 'ENHO';",
+          "export const alias: AdtSearchTypeOf<'onprem'> = 'STRU';",
+          "export const group: AdtSearchTypeOf<'cloud'> = 'ABAP_TEST_COCKPIT';",
+        ].join('\n'),
+      ),
+    ).toEqual([]);
+  });
+
+  it('fails a main type and a search name typed string, as a code literal', () => {
+    expect(
+      scan(
+        [
+          "export const main: string = 'ENHO';",
+          "export const alias: string = 'STRU';",
+          "export const group: string = 'ABAP_TEST_COCKPIT';",
+        ].join('\n'),
+      ),
+    ).toEqual([
+      "src/__typeCodeScanFixture__/fixture.ts:1 'ENHO' — contextual type string is not made of codes, main types or search names of the tables",
+      "src/__typeCodeScanFixture__/fixture.ts:2 'STRU' — contextual type string is not made of codes, main types or search names of the tables",
+      "src/__typeCodeScanFixture__/fixture.ts:3 'ABAP_TEST_COCKPIT' — contextual type string is not made of codes, main types or search names of the tables",
+    ]);
+  });
+
   it('fails a run type literal typed string, as any code literal', () => {
     expect(
       scan(
@@ -66,8 +98,8 @@ describe('the literal scan of type codes', () => {
         ].join('\n'),
       ),
     ).toEqual([
-      "src/__typeCodeScanFixture__/fixture.ts:1 'CLAS/OCL' — contextual type string is not made of codes of the tables",
-      "src/__typeCodeScanFixture__/fixture.ts:2 'FUNC' — contextual type string is not made of codes of the tables",
+      "src/__typeCodeScanFixture__/fixture.ts:1 'CLAS/OCL' — contextual type string is not made of codes, main types or search names of the tables",
+      "src/__typeCodeScanFixture__/fixture.ts:2 'FUNC' — contextual type string is not made of codes, main types or search names of the tables",
     ]);
   });
 
@@ -163,7 +195,7 @@ describe('the literal scan of type codes', () => {
       ),
     ).toEqual([
       "src/__typeCodeScanFixture__/fixture.ts:1 'CLAS/OC' — a property name whose object is not keyed by the code types",
-      "src/__typeCodeScanFixture__/fixture.ts:2 'CLAS/OC' — compared with string, which is not made of codes of the tables",
+      "src/__typeCodeScanFixture__/fixture.ts:2 'CLAS/OC' — compared with string, which is not made of codes, main types or search names of the tables",
       "src/__typeCodeScanFixture__/fixture.ts:3 'CLAS/OC' — a literal type outside a type argument constrained to the code types",
     ]);
   });

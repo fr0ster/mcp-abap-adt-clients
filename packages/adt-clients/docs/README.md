@@ -22,6 +22,7 @@ Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 
 ## Usage Guides
 
+- [**MIGRATION-39.md**](usage/MIGRATION-39.md) — what a consumer on 38.x has to change: the search filter takes the release's search names, and where-used and the group members take interfaces-adt's typed references (`VIEW/DV`, a function module's group)
 - [**MIGRATION-38.md**](usage/MIGRATION-38.md) — what a consumer on 37.x has to change: the ADT type tables decide (release variants, codes of the tables, parents, `type` / `unknownType`, the new `updateMetadata` members); the result-set contracts come from `@mcp-abap-adt/interfaces-adt`, and each factory answers its class, so a consumer composes the contract it accepts from interfaces-adt
 - [**MIGRATION-37.md**](usage/MIGRATION-37.md) — what a consumer on 36.x has to change: `getSystemInformation` answers an `IAdtResponse`, and `IUtilResults` has the required `objectProperties` slot; and, in 37.4.0, the legacy classes live in `@mcp-abap-adt/adt-clients-legacy`
 - [**MIGRATION-36.md**](usage/MIGRATION-36.md) — what a consumer on 35.x has to change: a request's `Accept` and `Content-Type` are the caller's
@@ -113,7 +114,7 @@ if (!created.ok) throw new Error(created.getError().message);
 
 // Utility operations. The search hits are a reading you choose, once.
 const utils = client.getUtils({ ...utilDocuments, search: utilSearchHits });
-const found = await utils.search({ query: 'Z*', objectType: 'CLAS/OC' });
+const found = await utils.search({ query: 'Z*', objectType: 'CLAS' });
 if (found.ok) found.getResult().value;   // ISearchResult[]; the document without utilSearchHits
 ```
 

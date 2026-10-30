@@ -18,7 +18,7 @@
  * const utils = client.getUtils();
  *
  * // Search for objects
- * const searchResult = await utils.searchObjects({ query: 'Z*', objectType: 'CLAS/OC' });
+ * const searchResult = await utils.search({ query: 'Z*', objectType: 'CLAS' });
  *
  * // Get where-used references
  * const whereUsed = await utils.getWhereUsed({ object_name: 'ZMY_CLASS', object_type: 'CLAS/OC' });
@@ -84,17 +84,21 @@ import type {
   AdtOperation,
   AdtVariant,
   IAdtAnalyseOptions,
+  IAdtCodedReference,
   IAdtDataPreview,
   IAdtDiscovery,
   IAdtError,
   IAdtGroupLifecycle,
   IAdtHeaders,
-  IAdtInformationSystem,
   IAdtObjectAccess,
   IAdtObjectProperties,
+  IAdtObjectSearch,
   IAdtOperationOptions,
   IAdtRepositoryStructure,
   IAdtResponse,
+  IAdtSearchObjectsParamsOf,
+  IAdtTypeCatalogue,
+  IAdtVirtualFolders,
   IResultStrategy,
   IUtilResults,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -157,7 +161,6 @@ import {
   type AdtDeletionCheckCode,
   type AdtDeletionCode,
   type AdtMetadataReadCodeOf,
-  type AdtSearchCode,
   type AdtSourceReadCode,
   type AdtSourceReadCodeOf,
   type AdtStructureCode,
@@ -210,6 +213,18 @@ import type { utilDocuments } from './utilResultSet';
  * its `node` reading. The atom stays in `@mcp-abap-adt/interfaces` for whoever
  * implements it; this class no longer claims it.
  *
+ * **Where-used and the group members answer to the typed atoms (39.0.0).**
+ * They take `VIEW/DV` and require `parentName` for a parented code — the
+ * references of `IAdtTypedWhereUsed<…, V>` and `IAdtTypedGroupLifecycle<…,
+ * V>` — so the 21.0.0 atoms, whose `IObjectReference` holds only an
+ * `AdtTypeCode`, are no longer declared for them: `IAdtWhereUsed` (and with
+ * it `IAdtInformationSystem`, whose other three atoms are declared one by
+ * one) and the three group members of `IAdtGroupLifecycle`. The typed atoms
+ * are not in this list either, because the compiler cannot relate their code
+ * sets to this class's while `V` is open; per variant they are held by
+ * `utilsTypedAtoms.test.ts` — `AdtUtils<R, 'onprem'>`, `<R, 'cloud'>`
+ * and `<R, 'basis740'>` each assignable to both.
+ *
  * And it said a caller who needs another shape "passes a parser" to the sibling.
  * The parser overloads went in 30.0.0, when the reading became something
  * injected once rather than passed per call — and since 19.0.0 there is nothing
@@ -254,24 +269,23 @@ export class AdtUtils<
   R extends IUtilResults = typeof utilDocuments,
   V extends AdtVariant = AdtModernVariant,
 > implements
-    IAdtInformationSystem<
-      ReturnType<R['search']>,
-      ReturnType<R['whereUsed']>,
-      ReturnType<R['whereUsedScope']>,
-      ReturnType<R['folders']>,
-      ReturnType<R['types']>
-    >,
+    IAdtObjectSearch<ReturnType<R['search']>>,
+    IAdtVirtualFolders<ReturnType<R['folders']>>,
+    IAdtTypeCatalogue<ReturnType<R['types']>>,
     IAdtRepositoryStructure<
       ReturnType<R['node']>,
       ReturnType<R['objectStructure']>
     >,
-    IAdtGroupLifecycle<
-      ReturnType<R['inactive']>,
-      ReturnType<R['activation']>,
-      ReturnType<R['run']>,
-      ReturnType<R['results']>,
-      ReturnType<R['deletionCheck']>,
-      ReturnType<R['deletion']>
+    Pick<
+      IAdtGroupLifecycle<
+        ReturnType<R['inactive']>,
+        ReturnType<R['activation']>,
+        ReturnType<R['run']>,
+        ReturnType<R['results']>,
+        ReturnType<R['deletionCheck']>,
+        ReturnType<R['deletion']>
+      >,
+      'getInactiveObjects' | 'getActivationRun' | 'getActivationResults'
     >,
     IAdtDataPreview<
       ReturnType<R['query']>,
@@ -314,9 +328,7 @@ export class AdtUtils<
    * from `@mcp-abap-adt/adt-strategies` for `search` when constructing this.
    */
   async search<E extends IAdtError = IAdtError>(
-    criteria: Omit<ISearchObjectsParams, 'objectType'> & {
-      objectType?: AdtSearchCode<V>;
-    },
+    criteria: IAdtSearchObjectsParamsOf<V>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['search']>, E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -379,9 +391,7 @@ export class AdtUtils<
    * });
    */
   async getWhereUsedScope<E extends IAdtError = IAdtError>(
-    params: Omit<IGetWhereUsedScopeParams, 'object_type'> & {
-      object_type: AdtWhereUsedCode<V>;
-    },
+    params: IGetWhereUsedScopeParams<AdtWhereUsedCode<V>>,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['whereUsedScope']>, E>> {
     // Built before the request: a type where-used cannot address is the
@@ -473,9 +483,7 @@ export class AdtUtils<
    * });
    */
   async getWhereUsed<E extends IAdtError = IAdtError>(
-    params: Omit<IGetWhereUsedParams, 'object_type'> & {
-      object_type: AdtWhereUsedCode<V>;
-    },
+    params: IGetWhereUsedParams<AdtWhereUsedCode<V>>,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['whereUsed']>, E>> {
     // See getWhereUsedScope: an unknown type is thrown, not asked about.
@@ -515,7 +523,7 @@ export class AdtUtils<
    * exchange with `wireItself` and reads it with `extractRunId`).
    */
   async activateObjectsGroup<E extends IAdtError = IAdtError>(
-    objects: IAdtGroupReference<AdtActivationCode<V>>[],
+    objects: IAdtCodedReference<AdtActivationCode<V>>[],
     preauditRequested: boolean = false,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
@@ -583,7 +591,7 @@ export class AdtUtils<
    * @returns Check result
    */
   async checkDeletionGroup<E extends IAdtError = IAdtError>(
-    objects: IAdtGroupReference<AdtDeletionCheckCode<V>>[],
+    objects: IAdtCodedReference<AdtDeletionCheckCode<V>>[],
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     addressEvery(objects);
@@ -609,7 +617,7 @@ export class AdtUtils<
    * @param transportRequest - Optional transport request
    */
   async deleteObjectsGroup<E extends IAdtError = IAdtError>(
-    objects: IAdtGroupReference<AdtDeletionCode<V>>[],
+    objects: IAdtCodedReference<AdtDeletionCode<V>>[],
     transportRequest: string | undefined,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {

@@ -318,11 +318,17 @@ request.
 Served: `search`, `fetchNodeStructure`, `getObjectStructure`, `discovery`,
 `getInactiveObjects` (7.40 answers the older `adtcore:objectReferences`
 document), `readObjectMetadata` / `readObjectSource` for the served types,
-`getTypeStructure`. `readObjectMetadata`, `readObjectSource`, `search`,
+`getTypeStructure`. `readObjectMetadata`, `readObjectSource`,
 `fetchNodeStructure`, `getObjectStructure` and `activateObjectsGroup` take
-7.40's codes (`ADT_TYPES_BASIS_740`, and `DEVC/K` for the structure reads) and
+7.40's codes (`ADT_TYPES_BASIS_740`, and `DEVC/K` for the structure reads;
+`VIEW/DV` too for the group activation, `ADT_UTILITY_CODES_BASIS_740`) and
 refuse any other without a request — `BDEF/BDO`, `SRVD/SRV`, `DDLX/EX`,
-`DCLS/DL` and `ENHO/XHH` among them.
+`DCLS/DL` and `ENHO/XHH` among them. `search` filters by 7.40's search names
+(`ADT_SEARCH_TYPES_BASIS_740`: `DEVC`, `CLAS`, `INTF`, `PROG`, `FUGR`, `FUNC`,
+`DDLS`, `MSAG`, `TABL`, `ENHO`, `ENHS`), since 0.3.0: 7.40 has no object types
+list, reads a code as its main type, and answers an alias (`STRU`, `DTAB`,
+`REPO`, `INCL`, `BADI`) or an unknown name with no hits — so any other filter
+does not compile, and is refused without a request.
 Refused: where-used (7.40 serves it only through RIS), virtual folders, object
 types, activation runs, group deletion, data preview, and the DDIC and package
 types' reads. Member by member: LEGACY.md.

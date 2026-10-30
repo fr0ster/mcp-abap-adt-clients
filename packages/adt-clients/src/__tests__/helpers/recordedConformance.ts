@@ -1,15 +1,21 @@
 /**
  * The recorded answers the conformance check reads, from
- * `corpus/adt/{typestructure,discovery,conformance,abapunit}/` (corpus
- * README).
+ * `corpus/adt/{typestructure,discovery,conformance,abapunit,informationsystem}/`
+ * (corpus README).
  *
  * Files, so read with runtime checks: a sidecar or an index that is not the
  * recorded shape throws, naming the file.
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readAbapUnitMetadata } from './abapUnitConformance';
+import {
+  type IListedName,
+  type ISearchTypeAnswers,
+  quickSearchHits,
+  readObjectTypesList,
+} from './searchTypesConformance';
 import {
   type IReleaseAnswers,
   readDiscovery,
@@ -257,4 +263,56 @@ export function recordedAbapUnitMetadata(
     );
   }
   return readAbapUnitMetadata(exchange.body);
+}
+
+/** The step tag of a release's recorded object types list. */
+const OBJECT_TYPES_STEP = 'objecttypes';
+/** The step tag of a recorded quick search. */
+const QUICK_SEARCH_STEP = 'quick-search';
+
+/**
+ * What a release recorded for the search names
+ * (`informationsystem/<release>/`): the `<case>--<stepTag>` of every
+ * exchange — the evidence names it holds —, the object types list where it
+ * answered `200`, and each quick search's filter with its hit count. A
+ * sidecar that is not the recorded shape, a list answered with another
+ * status than `200` or `404`, or a quick search that is no `200` throws.
+ */
+export function recordedSearchTypes(
+  release: RecordedRelease,
+): ISearchTypeAnswers {
+  const dir = join(CORPUS, 'informationsystem', release);
+  const evidence = new Set<string>();
+  let listed: ReadonlyMap<string, IListedName> | undefined;
+  const searches = new Map<string, readonly string[]>();
+  for (const sidecar of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+    const what = join(dir, sidecar);
+    const parsed: unknown = JSON.parse(readFileSync(what, 'utf-8'));
+    if (
+      !isRecord(parsed) ||
+      typeof parsed.case !== 'string' ||
+      typeof parsed.stepTag !== 'string'
+    ) {
+      throw new Error(`${what}: no case or stepTag`);
+    }
+    evidence.add(`${parsed.case}--${parsed.stepTag}`);
+    const exchange = readExchange(dir, sidecar);
+    if (parsed.stepTag === OBJECT_TYPES_STEP) {
+      if (exchange.status === 200) {
+        listed = readObjectTypesList(exchange.body);
+      } else if (exchange.status !== 404) {
+        throw new Error(`${what}: answered ${exchange.status}`);
+      }
+    } else if (parsed.stepTag === QUICK_SEARCH_STEP) {
+      const name = exchange.params?.objectType;
+      if (exchange.status !== 200 || !name) {
+        throw new Error(`${what}: not a 200 with an objectType`);
+      }
+      if (searches.has(name)) throw new Error(`${what}: ${name} twice`);
+      searches.set(name, quickSearchHits(exchange.body));
+    } else {
+      throw new Error(`${what}: step ${parsed.stepTag} is no search step`);
+    }
+  }
+  return { evidence, listed, searches };
 }

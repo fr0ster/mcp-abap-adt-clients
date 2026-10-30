@@ -49,7 +49,6 @@ import {
   type AdtDeletionCheckCode,
   type AdtDeletionCode,
   type AdtMetadataReadCodeOf,
-  type AdtSearchCode,
   type AdtSourceReadCodeOf,
   type AdtStructureCode,
   AdtUtils,
@@ -73,7 +72,9 @@ import type {
   AdtSourceTypeCode,
   AdtTypeCode,
   AdtTypeCodeOf,
+  IAdtCodedReference,
   IAdtHeaders,
+  IAdtSearchObjectsParamsOf,
   IGetSqlQueryParams,
   IGetTableContentsParams,
   IGetVirtualFoldersContentsParams,
@@ -84,7 +85,9 @@ import type {
   IUtilResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import {
+  ADT_SEARCH_TYPES_BASIS_740,
   ADT_TYPES_BASIS_740,
+  ADT_UTILITY_CODES_BASIS_740,
   AdtObjectErrorCodes,
   type IAdtAnalyseOptions,
   type IAdtError,
@@ -92,7 +95,6 @@ import {
   type IAdtResponse,
   type IGetNodeContentsOptions,
   type IResultStrategy,
-  type ISearchObjectsParams,
 } from '@mcp-abap-adt/interfaces-adt';
 import {
   legacyRefusal,
@@ -187,14 +189,23 @@ const CODES_740: ReadonlySet<string> = new Set(
   ),
 );
 
-/** The codes 7.40's table lists `activate` for. */
-const ACTIVATED_740: ReadonlySet<string> = new Set(
-  Object.values(TABLE_740).flatMap((entry) =>
+/**
+ * The codes a 7.40 group activation activates: those 7.40's table lists
+ * `activate` for, and those its utility table lists `groupActivation` for
+ * (`VIEW/DV`) — `AdtActivationCode<'basis740'>`.
+ */
+const ACTIVATED_740: ReadonlySet<string> = new Set([
+  ...Object.values(TABLE_740).flatMap((entry) =>
     Object.entries(entry?.codes ?? {})
       .filter(([, facts]) => facts.operations.includes('activate'))
       .map(([code]) => code),
   ),
-);
+  ...Object.entries(ADT_UTILITY_CODES_BASIS_740)
+    .filter(([, facts]) =>
+      facts.operations.some((operation) => operation === 'groupActivation'),
+    )
+    .map(([code]) => code),
+]);
 
 /**
  * A code 7.40's table does not list, from a caller outside the type system:
@@ -230,7 +241,7 @@ export class AdtUtilsLegacy<
    * not pass that one.
    */
   override async activateObjectsGroup<E extends IAdtError = IAdtError>(
-    objects: IAdtGroupReference<AdtActivationCode<'basis740'>>[],
+    objects: IAdtCodedReference<AdtActivationCode<'basis740'>>[],
     preauditRequested: boolean = false,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
@@ -326,7 +337,7 @@ ${objectReferences}
    * `POST /sap/bc/adt/deletion/check` answers `404` (spec §5, §10.2).
    */
   override async checkDeletionGroup<E extends IAdtError = IAdtError>(
-    _objects: IAdtGroupReference<AdtDeletionCheckCode<'basis740'>>[],
+    _objects: IAdtCodedReference<AdtDeletionCheckCode<'basis740'>>[],
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
     return noDeletionCheck<ReturnType<R['deletionCheck']>, E>(
@@ -340,7 +351,7 @@ ${objectReferences}
    * serve (spec §4.3, §10.2).
    */
   override async deleteObjectsGroup<E extends IAdtError = IAdtError>(
-    _objects: IAdtGroupReference<AdtDeletionCode<'basis740'>>[],
+    _objects: IAdtCodedReference<AdtDeletionCode<'basis740'>>[],
     _transportRequest: string | undefined,
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
@@ -356,9 +367,7 @@ ${objectReferences}
    * type is not thrown here: the member itself is not offered.
    */
   override async getWhereUsed<E extends IAdtError = IAdtError>(
-    _params: Omit<IGetWhereUsedParams, 'object_type'> & {
-      object_type: AdtWhereUsedCode<'basis740'>;
-    },
+    _params: IGetWhereUsedParams<AdtWhereUsedCode<'basis740'>>,
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['whereUsed']>, E>> {
     return legacyRefusal<ReturnType<R['whereUsed']>, E>(
@@ -370,9 +379,7 @@ ${objectReferences}
 
   /** Refused without a request, like {@link getWhereUsed} (spec §10.2). */
   override async getWhereUsedScope<E extends IAdtError = IAdtError>(
-    _params: Omit<IGetWhereUsedScopeParams, 'object_type'> & {
-      object_type: AdtWhereUsedCode<'basis740'>;
-    },
+    _params: IGetWhereUsedScopeParams<AdtWhereUsedCode<'basis740'>>,
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['whereUsedScope']>, E>> {
     return legacyRefusal<ReturnType<R['whereUsedScope']>, E>(
@@ -506,20 +513,24 @@ ${objectReferences}
     return super.readObjectSource(objectType, objectName, ...rest);
   }
 
-  /** A search filtered by a code 7.40's table lacks is refused without a request. */
+  /**
+   * A search filtered by a name 7.40 is not measured to select
+   * (`ADT_SEARCH_TYPES_BASIS_740`) is refused without a request: 7.40 answers
+   * an alias (`STRU`) or an unknown name with no hits, silently, which the
+   * caller could not tell from an empty search.
+   */
   override async search<E extends IAdtError = IAdtError>(
-    criteria: Omit<ISearchObjectsParams, 'objectType'> & {
-      objectType?: AdtSearchCode<'basis740'>;
-    },
+    criteria: IAdtSearchObjectsParamsOf<'basis740'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['search']>, E>> {
     if (
       criteria.objectType !== undefined &&
-      !CODES_740.has(criteria.objectType)
+      !Object.hasOwn(ADT_SEARCH_TYPES_BASIS_740, criteria.objectType)
     )
-      return refuseCode<ReturnType<R['search']>, E>(
-        'search',
-        criteria.objectType,
+      return legacyRefusal<ReturnType<R['search']>, E>(
+        `search(${criteria.objectType})`,
+        `${criteria.objectType} in ADT_SEARCH_TYPES_BASIS_740`,
+        'Nothing is sent.',
       );
     return super.search(criteria, options);
   }

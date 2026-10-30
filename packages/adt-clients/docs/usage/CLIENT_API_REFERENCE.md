@@ -25,7 +25,9 @@ names the type of the client it accepts composes that contract from
 the result-set contracts (`IClassResults`, …) that package declares — and the
 compiler checks, where the client is taken, that `AdtClient` satisfies it. See
 [The contract you accept is yours](../../README.md#the-contract-you-accept-is-yours)
-and [MIGRATION-38.md](MIGRATION-38.md).
+and [MIGRATION-38.md](MIGRATION-38.md); since 39.0.0 the search filter takes
+search names and where-used and the group members interfaces-adt's typed
+references ([MIGRATION-39.md](MIGRATION-39.md)).
 
 **Every member issues one ADT request.** `create` is the POST, `update` is the
 write and carries `options.lockHandle` as given, `delete` is the DELETE,
@@ -1623,17 +1625,64 @@ if (!listed.ok) {
 }
 ```
 
+### AdtUtils (Search)
+
+`search(criteria, options?)` is one `GET
+/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=…&maxResults=…`
+(`maxResults` 100 when not given), `Accept: application/xml`, with
+`&objectType=<name>` when `criteria.objectType` is given. The default `search`
+slot answers the `adtcore:objectReferences` document as it came;
+`utilSearchHits` from `@mcp-abap-adt/adt-strategies` reads it into hits.
+
+**The filter is a search name of the variant** (39.0.0,
+`IAdtSearchObjectsParamsOf<V>` of interfaces-adt). The quick search reads
+`objectType` against the release's object types list
+(`GET /repository/informationsystem/objecttypes`), measured 2026-10-29:
+
+| Filter | S/4HANA 2025 and ABAP cloud | SAP_BASIS 7.40 SP04 |
+|---|---|---|
+| a main type: `DEVC`, `CLAS`, `TABL`, … | the list's item: `DEVC/K`; `TABL` both table kinds | selects, for the eleven of `ADT_SEARCH_TYPES_BASIS_740` |
+| an alias: `STRU`, `DTAB`, `REPO`, `INCL`, `FUNC`, `BADI` | its one code: `STRU` only `TABL/DS` | `FUNC` selects function modules; the others answer no hits |
+| a group: `ABAP_TEST_COCKPIT`, … (about fifty) | its members | — (no list) |
+| a code, `ENHO/XHH` | as its main type, other first hits under `maxResults` — does not compile | as its main type — does not compile |
+| an unknown name | `400` — does not compile | no hits — does not compile |
+
+`ADT_SEARCH_TYPES_ONPREM` (385 names) and `ADT_SEARCH_TYPES_CLOUD` (372) are
+the recorded lists, each name with the code it selects or `group: true`;
+`ADT_SEARCH_TYPES_BASIS_740` holds the eleven names measured to select on
+7.40. A main type comes from the table entry:
+
+```typescript
+import { ADT_TYPES_ONPREM } from '@mcp-abap-adt/interfaces-adt';
+
+const hits = await client.getUtils().search({
+  query: 'Z*',
+  objectType: ADT_TYPES_ONPREM.package.codes['DEVC/K'].main, // 'DEVC'
+  maxResults: 50,
+});
+```
+
+A subtype without an alias (`ENHO/XHH`) cannot be searched alone: search its
+main type and keep the hits of the code you want. On a legacy system
+(`AdtUtilsLegacy` of `@mcp-abap-adt/adt-clients-legacy`) a name outside
+`ADT_SEARCH_TYPES_BASIS_740` is refused without a request.
+
 ### AdtUtils (Group activation and deletion)
 
 `activateObjectsGroup`, `checkDeletionGroup` and `deleteObjectsGroup` take
-`IAdtGroupReference<C>[]`, `C` the codes of the client's variant whose API
-lists the operation (`AdtActivationCode<V>`, `AdtDeletionCheckCode<V>`,
-`AdtDeletionCode<V>`, since 38.0.0; a group activation also takes `DEVC/K` on
-the modern variants, and `VIEW/DV` is addressed for a caller outside the type
-system). Each reference names its ADT type code (`CLAS/OC`, `PROG/P`,
-`PROG/I`, `DDLS/DF`, …). Two kinds also need the object that owns them:
-`FUGR/FF` (a function module) and `FUGR/I` (a function include) need
-`parentName`, the function group.
+interfaces-adt's typed references, `IAdtCodedReference<C>[]`, `C` the codes
+of the client's variant whose API lists the operation (`AdtActivationCode<V>`,
+`AdtDeletionCheckCode<V>`, `AdtDeletionCode<V>` — equal, per variant, to
+interfaces-adt's `AdtGroupActivationCode<V>`, `AdtGroupDeletionCheckCode<V>`
+and `AdtGroupDeletionCode<V>`; since 39.0.0 `AdtUtils<R, V>` is an
+`IAdtTypedGroupLifecycle<…, V>`). A group activation also takes `DEVC/K` on
+the modern variants, and the group activation and deletion take `VIEW/DV`, a
+DDIC database view no factory serves, addressed under
+`/sap/bc/adt/ddic/views`. Each reference names its ADT type code (`CLAS/OC`,
+`PROG/P`, `PROG/I`, `DDLS/DF`, …). Two kinds also need the object that owns
+them: `FUGR/FF` (a function module) and `FUGR/I` (a function include) need
+`parentName`, the function group — a reference without it does not compile
+(39.0.0).
 
 A reference **without a type**, with a type this library has no address for, or
 a module or include without its group, **throws before any request**. It used
@@ -1689,6 +1738,11 @@ Where-used is two requests, and both are yours:
 2) `getWhereUsed` executes the search with that scope (the server's default selection if scope is omitted).
 
 `modifyWhereUsedScope` edits the scope XML locally — no ADT call.
+
+Both take `IGetWhereUsedParams<AdtWhereUsedCode<V>>`: every code of the
+variant but a function include (`FUGR/I`, whose group where-used has no field
+for — a function module is named `GROUP|FM`) and a message class message, and
+`VIEW/DV` (39.0.0; `AdtUtils<R, V>` is an `IAdtTypedWhereUsed<…, V>`).
 
 See `docs/architecture/ARCHITECTURE.md` for the architectural overview.
 
