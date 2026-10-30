@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/ddl/sources/sepm_cds_cust_rmd" adtcore:type="DDLS/DF" adtcore:name="SEPM_CDS_CUST_RMD"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/ddl/sources/sadl_v_cds_view_enh" adtcore:type="DDLS/DF" adtcore:name="SADL_V_CDS_VIEW_ENH"/>
   <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/ddl/sources/sadl_v_cds_view" adtcore:type="DDLS/DF" adtcore:name="SADL_V_CDS_VIEW"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/ddl/sources/sepm_cds_open_inv" adtcore:type="DDLS/DF" adtcore:name="SEPM_CDS_OPEN_INV"/>
 </adtcore:objectReferences>

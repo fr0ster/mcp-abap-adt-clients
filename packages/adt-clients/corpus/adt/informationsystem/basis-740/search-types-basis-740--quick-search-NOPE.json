@@ -2,17 +2,17 @@
   "case": "search-types-basis-740",
   "step": 18,
   "stepTag": "quick-search",
-  "capturedAt": "2026-10-29T18:37:10.000Z",
+  "capturedAt": "2026-10-30T16:22:43.000Z",
   "request": {
     "method": "GET",
     "url": "/sap/bc/adt/repository/informationsystem/search",
     "params": {
       "operation": "quickSearch",
       "query": "*",
-      "maxResults": "1",
+      "maxResults": "200",
       "objectType": "NOPE"
     },
-    "effectiveUrl": "/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=*&maxResults=1&objectType=NOPE",
+    "effectiveUrl": "/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=*&maxResults=200&objectType=NOPE",
     "headers": {
       "Accept": "application/xml"
     },

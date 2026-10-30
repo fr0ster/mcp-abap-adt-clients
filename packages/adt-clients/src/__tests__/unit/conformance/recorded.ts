@@ -223,17 +223,6 @@ export function recordedCoverage(release: RecordedRelease): IRecordedCoverage {
   };
 }
 
-/**
- * Why a 7.40 search name answered no hit in its recorded search, though it
- * selects: the recorded searches ask for one hit (`maxResults=1`); the
- * unrecorded run of the same day with `maxResults=200` answered 197 `PROG/P`
- * hits for `PROG` and 199 `FUGR/F` hits for `FUGR`, fewer than the 200 asked.
- * Inference: the server caps the hits before it filters them by type, and the
- * one hit the capped search took was of another type.
- */
-const CAPPED_TO_NOTHING =
-  "open: the recorded quick search (query=*, maxResults=1) answered no hit; the measurement behind ADT_SEARCH_TYPES_BASIS_740 (maxResults=200, 2026-10-29, not recorded) answered hits of the name's own type; to record the search again with more hits, or to keep the name on the unrecorded measurement (owner)";
-
 /** A search-name conflict the check reports and the reason it stands. */
 export interface ISearchTypeDivergence {
   readonly rule: SearchTypeRule;
@@ -248,18 +237,5 @@ export const SEARCH_TYPE_DIVERGENCES: {
 } = {
   's4-2025': [],
   'abap-cloud': [],
-  'basis-740': [
-    {
-      rule: 'no-hits',
-      name: 'FUGR',
-      detail: 'the recorded search for FUGR answered no hit',
-      reason: CAPPED_TO_NOTHING,
-    },
-    {
-      rule: 'no-hits',
-      name: 'PROG',
-      detail: 'the recorded search for PROG answered no hit',
-      reason: CAPPED_TO_NOTHING,
-    },
-  ],
+  'basis-740': [],
 };

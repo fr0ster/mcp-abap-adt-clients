@@ -24,7 +24,7 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [39.0.0] - 2026-10-29
+## [39.0.0] - 2026-10-30
 
 On `@mcp-abap-adt/interfaces-adt` `^24.0.0` and `@mcp-abap-adt/adt-strategies`
 `^0.17.0`. A major because the search filter's type is stricter: a code no
@@ -76,9 +76,9 @@ compiles on both.
   the table lacks answered none; every `main` of each type table is a search
   name of its variant; every evidence name is a recorded case. Recorded in
   `corpus/adt/informationsystem/<release>/`: the two lists, 7.40's `404` and
-  its seventeen quick searches. Two 7.40 names, `PROG` and `FUGR`, answered no
-  hit in their recorded `maxResults=1` search and are listed as open
-  divergences with that reason (`recorded.ts`).
+  its seventeen quick searches (`maxResults=200`; with one hit asked, `PROG`
+  and `FUGR` answered none, the server capping the hits before it filters them
+  by type — inferred). No search-name divergence is entered for any release.
 
 ### Fixed
 
