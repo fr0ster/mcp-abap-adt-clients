@@ -284,7 +284,7 @@ export function recordedSearchTypes(
   const dir = join(CORPUS, 'informationsystem', release);
   const evidence = new Set<string>();
   let listed: ReadonlyMap<string, IListedName> | undefined;
-  const searches = new Map<string, number>();
+  const searches = new Map<string, readonly string[]>();
   for (const sidecar of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
     const what = join(dir, sidecar);
     const parsed: unknown = JSON.parse(readFileSync(what, 'utf-8'));

@@ -1,6 +1,6 @@
 # Migrating to 39.0.0
 
-39.0.0 moves to `@mcp-abap-adt/interfaces-adt` `^24.0.0` and
+39.0.0 moves to `@mcp-abap-adt/interfaces-adt` `^24.0.1` and
 `@mcp-abap-adt/adt-strategies` `^0.17.0`. Two things change for a consumer:
 
 - [The search filter takes the release's search names](#the-search-filter-takes-the-releases-search-names):

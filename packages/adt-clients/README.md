@@ -16,7 +16,7 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 > **From 18.x?** Read [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md)
 > first: 19.0.0 is where members became one endpoint call each.
 >
-> **From 38.x?** 39.0.0 (on `interfaces-adt` ^24.0.0) types the search filter
+> **From 38.x?** 39.0.0 (on `interfaces-adt` ^24.0.1) types the search filter
 > by the release's search names: `getUtils().search({ objectType })` takes
 > `'DEVC'`, `'STRU'` or a group (`'ABAP_TEST_COCKPIT'`), not a code
 > (`'DEVC/K'`), and a 7.40 client takes only the eleven names 7.40 selects by.

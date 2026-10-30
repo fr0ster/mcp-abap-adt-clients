@@ -190,15 +190,15 @@ const FIXTURE_LISTED_ANSWERS: ISearchTypeAnswers = {
 
 /** A measured table (7.40's shape): one name. */
 const FIXTURE_MEASURED_TABLE: SearchTypeTable = {
-  CLAS: { evidence: SEARCHED_EVIDENCE },
+  CLAS: { answered: ['CLAS/OC'], evidence: SEARCHED_EVIDENCE },
 };
 
 const FIXTURE_MEASURED_ANSWERS: ISearchTypeAnswers = {
   evidence: new Set([SEARCHED_EVIDENCE]),
   listed: undefined,
-  searches: new Map([
-    ['CLAS', 1],
-    ['STRU', 0],
+  searches: new Map<string, readonly string[]>([
+    ['CLAS', ['CLAS/OC']],
+    ['STRU', []],
   ]),
 };
 
@@ -302,13 +302,16 @@ describe('the check bites: each rule, alone', () => {
     expect(
       only(
         checkSearchTypes(
-          { ...table, INTF: { evidence: SEARCHED_EVIDENCE } },
+          {
+            ...table,
+            INTF: { answered: ['INTF/OI'], evidence: SEARCHED_EVIDENCE },
+          },
           FIXTURE_TYPES,
           {
             ...FIXTURE_MEASURED_ANSWERS,
-            searches: new Map([
-              ['INTF', 1],
-              ['CLAS', 0],
+            searches: new Map<string, readonly string[]>([
+              ['INTF', ['INTF/OI']],
+              ['CLAS', []],
             ]),
           },
         ),
@@ -337,13 +340,41 @@ describe('the check bites: each rule, alone', () => {
       only(
         checkSearchTypes(FIXTURE_MEASURED_TABLE, FIXTURE_TYPES, {
           ...FIXTURE_MEASURED_ANSWERS,
-          searches: new Map([
-            ['CLAS', 0],
-            ['STRU', 0],
+          searches: new Map<string, readonly string[]>([
+            ['CLAS', []],
+            ['STRU', []],
           ]),
         }),
       ),
     ).toEqual(['no-hits CLAS']);
+  });
+
+  it('answered: a measured name whose hits carry another code than the table says', () => {
+    expect(
+      checkSearchTypes(FIXTURE_MEASURED_TABLE, FIXTURE_TYPES, {
+        ...FIXTURE_MEASURED_ANSWERS,
+        searches: new Map<string, readonly string[]>([
+          ['CLAS', ['PROG/P', 'PROG/P']],
+          ['STRU', []],
+        ]),
+      }).map(({ rule, name, detail }) => `${rule} ${name}: ${detail}`),
+    ).toEqual([
+      'answered CLAS: the recorded search for CLAS answered PROG/P, the table says CLAS/OC',
+    ]);
+  });
+
+  it('answered: a hit of one more code than the table says', () => {
+    expect(
+      only(
+        checkSearchTypes(FIXTURE_MEASURED_TABLE, FIXTURE_TYPES, {
+          ...FIXTURE_MEASURED_ANSWERS,
+          searches: new Map<string, readonly string[]>([
+            ['CLAS', ['CLAS/OC', 'INTF/OI']],
+            ['STRU', []],
+          ]),
+        }),
+      ),
+    ).toEqual(['answered CLAS']);
   });
 
   it('no-hits: a measured name with no recorded search', () => {
@@ -351,7 +382,7 @@ describe('the check bites: each rule, alone', () => {
       only(
         checkSearchTypes(FIXTURE_MEASURED_TABLE, FIXTURE_TYPES, {
           ...FIXTURE_MEASURED_ANSWERS,
-          searches: new Map([['STRU', 0]]),
+          searches: new Map<string, readonly string[]>([['STRU', []]]),
         }),
       ),
     ).toEqual(['no-hits CLAS']);
@@ -362,9 +393,9 @@ describe('the check bites: each rule, alone', () => {
       only(
         checkSearchTypes(FIXTURE_MEASURED_TABLE, FIXTURE_TYPES, {
           ...FIXTURE_MEASURED_ANSWERS,
-          searches: new Map([
-            ['CLAS', 1],
-            ['STRU', 3],
+          searches: new Map<string, readonly string[]>([
+            ['CLAS', ['CLAS/OC']],
+            ['STRU', ['TABL/DS', 'TABL/DS', 'TABL/DS']],
           ]),
         }),
       ),
@@ -427,7 +458,7 @@ describe('the readers refuse what is not the recorded shape', () => {
     ).toThrow('object types list: CLAS twice, as CLAS/OC and CLAS/OCX');
   });
 
-  it('a quick search answer counts its object references', () => {
+  it("a quick search answer reads each object reference's code", () => {
     expect(
       quickSearchHits(
         '<?xml version="1.0" encoding="utf-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">' +
@@ -435,7 +466,7 @@ describe('the readers refuse what is not the recorded shape', () => {
           '<adtcore:objectReference adtcore:type="CLAS/OC" adtcore:name="B"/>' +
           '</adtcore:objectReferences>',
       ),
-    ).toBe(2);
+    ).toEqual(['CLAS/OC', 'CLAS/OC']);
     expect(() => quickSearchHits('<x/>')).toThrow(
       'quick search: not one objectReferences',
     );

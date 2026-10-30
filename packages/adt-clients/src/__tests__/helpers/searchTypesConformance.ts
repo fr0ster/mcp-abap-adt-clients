@@ -4,7 +4,7 @@
  * `_CLOUD`, `_BASIS_740`) held against what each release recorded
  * (`corpus/adt/informationsystem/<release>/`).
  *
- * Seven rules:
+ * Eight rules:
  *
  * - `unlisted` — a name of the table that the release's recorded object
  *   types list does not hold;
@@ -20,6 +20,8 @@
  *   release;
  * - `no-hits` — on a release with no list (7.40), a name of the table whose
  *   recorded quick search answered no hit, or that has no recorded search;
+ * - `answered` — on such a release, a name whose recorded search's hits carry
+ *   other codes than the table's `answered` says, as a set;
  * - `hits-unentered` — on such a release, a recorded quick search that
  *   answered a hit for a name the table does not hold.
  *
@@ -39,11 +41,15 @@ import type {
   IAdtMeasuredSearchType,
 } from '@mcp-abap-adt/interfaces-adt';
 import { parseAnswer } from './typeTableConformance';
-import { elementsNamed, textOf } from './xmlTree';
+import { attributeOf, elementsNamed, textOf } from './xmlTree';
 
-/** A search type table, read as the shape its entries satisfy. */
+/**
+ * A search type table, read as the shape its entries satisfy; a listed entry
+ * states no `answered` (only a measured one carries it).
+ */
 export type SearchTypeTable = AdtSearchTypeTable<
-  AdtListedSearchType<string> | IAdtMeasuredSearchType
+  | (AdtListedSearchType<string> & { readonly answered?: undefined })
+  | IAdtMeasuredSearchType
 >;
 
 /** Which search-name rule a conflict breaks. */
@@ -54,6 +60,7 @@ export type SearchTypeRule =
   | 'main'
   | 'evidence'
   | 'no-hits'
+  | 'answered'
   | 'hits-unentered';
 
 export interface ISearchTypeConflict {
@@ -124,13 +131,22 @@ export function readObjectTypesList(
   return names;
 }
 
-/** How many objects a recorded quick search answered. */
-export function quickSearchHits(xml: string): number {
+/** The code of each object a recorded quick search answered, hit by hit. */
+export function quickSearchHits(xml: string): readonly string[] {
   const document = parseAnswer(xml, 'quick search');
   if (elementsNamed(document, 'objectReferences').length !== 1) {
     throw new Error('quick search: not one objectReferences');
   }
-  return elementsNamed(document, 'objectReference').length;
+  return elementsNamed(document, 'objectReference').map((hit) => {
+    const type = attributeOf(hit, 'type');
+    if (!type) throw new Error('quick search: a hit without a type');
+    return type;
+  });
+}
+
+/** Distinct codes, in code order, for a comparison and its words. */
+function codeSet(codes: readonly string[]): string[] {
+  return [...new Set(codes)].sort();
 }
 
 function describe(listed: IListedName): string {
@@ -218,16 +234,17 @@ export function checkSearchEvidence(
 
 /**
  * The table of a release with no list against its recorded quick searches,
- * by name and hit count: `no-hits`, `hits-unentered`.
+ * by name and by the codes the hits carry: `no-hits`, `answered`,
+ * `hits-unentered`.
  */
 export function checkMeasuredSearchTypes(
   table: SearchTypeTable,
-  searches: ReadonlyMap<string, number>,
+  searches: ReadonlyMap<string, readonly string[]>,
 ): ISearchTypeConflict[] {
   const conflicts: ISearchTypeConflict[] = [];
-  for (const name of Object.keys(table)) {
+  for (const [name, entry] of Object.entries(table)) {
     const hits = searches.get(name);
-    if (hits === undefined || hits === 0) {
+    if (hits === undefined || hits.length === 0) {
       conflicts.push({
         rule: 'no-hits',
         name,
@@ -236,14 +253,24 @@ export function checkMeasuredSearchTypes(
             ? `${name} has no recorded search`
             : `the recorded search for ${name} answered no hit`,
       });
+      continue;
+    }
+    const recorded = codeSet(hits).join(', ');
+    const stated = codeSet(entry.answered ?? []).join(', ');
+    if (recorded !== stated) {
+      conflicts.push({
+        rule: 'answered',
+        name,
+        detail: `the recorded search for ${name} answered ${recorded}, the table says ${stated || 'nothing'}`,
+      });
     }
   }
   for (const [name, hits] of searches) {
-    if (hits > 0 && !Object.hasOwn(table, name)) {
+    if (hits.length > 0 && !Object.hasOwn(table, name)) {
       conflicts.push({
         rule: 'hits-unentered',
         name,
-        detail: `the recorded search for ${name} answered ${hits} hit(s), and the table lacks it`,
+        detail: `the recorded search for ${name} answered ${hits.length} hit(s), and the table lacks it`,
       });
     }
   }
@@ -256,8 +283,8 @@ export interface ISearchTypeAnswers {
   readonly evidence: ReadonlySet<string>;
   /** The object types list, where the release answered one. */
   readonly listed: ReadonlyMap<string, IListedName> | undefined;
-  /** Each recorded quick search's filter and hit count. */
-  readonly searches: ReadonlyMap<string, number>;
+  /** Each recorded quick search's filter and its hits' codes, hit by hit. */
+  readonly searches: ReadonlyMap<string, readonly string[]>;
 }
 
 /** Every conflict of one release's tables with its answers, sorted. */

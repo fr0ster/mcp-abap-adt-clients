@@ -4,10 +4,10 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
-## [0.3.0] - 2026-10-29
+## [0.3.0] - 2026-10-30
 
 On `@mcp-abap-adt/adt-clients` `^39.0.0` and `@mcp-abap-adt/interfaces-adt`
-`^24.0.0`. A breaking change of a 0.x package, so a minor.
+`^24.0.1`. A breaking change of a 0.x package, so a minor.
 
 ### Breaking
 

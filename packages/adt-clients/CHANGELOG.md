@@ -26,7 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [39.0.0] - 2026-10-30
 
-On `@mcp-abap-adt/interfaces-adt` `^24.0.0` and `@mcp-abap-adt/adt-strategies`
+On `@mcp-abap-adt/interfaces-adt` `^24.0.1` and `@mcp-abap-adt/adt-strategies`
 `^0.17.0`. A major because the search filter's type is stricter: a code no
 longer compiles as the filter. [MIGRATION-39.md](docs/usage/MIGRATION-39.md)
 says what a consumer on 38.x does. No request changes for a call that
@@ -61,7 +61,8 @@ compiles on both.
 
 ### Changed
 
-- `@mcp-abap-adt/interfaces-adt` is `^24.0.0` and the
+- `@mcp-abap-adt/interfaces-adt` is `^24.0.1` (its 7.40 search names state
+  the codes their recorded searches answered) and the
   `@mcp-abap-adt/adt-strategies` development range `^0.17.0` (its own range
   moves with this one).
 - **The literal scan** (`typeCodeScan.ts`) holds a main-type literal
@@ -72,8 +73,9 @@ compiles on both.
   (`searchTypesConformance.test.ts`, spec 3.6): `ADT_SEARCH_TYPES_ONPREM` and
   `_CLOUD` equal the recorded object types list of their release, name for
   name, `type` for `type`, groups as groups (`HOTA` a code and a group); on
-  7.40 every name has a recorded search with a hit and every recorded name
-  the table lacks answered none; every `main` of each type table is a search
+  7.40 every name has a recorded search whose hits carry exactly the codes
+  its entry's `answered` states, and every recorded name the table lacks
+  answered none; every `main` of each type table is a search
   name of its variant; every evidence name is a recorded case. Recorded in
   `corpus/adt/informationsystem/<release>/`: the two lists, 7.40's `404` and
   its seventeen quick searches (`maxResults=200`; with one hit asked, `PROG`
