@@ -18,9 +18,9 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 >
 > **From 39.x?** 40.0.0 (on `interfaces-adt` ^25.0.0) types every read's
 > version as `AdtReadVersion` — `active`, `inactive` or `workingArea` — and
-> sends `workingArea` to `?version=` like the other two; every `readMetadata`
-> sends the version it is given. A call that compiled on 39.x sends the same
-> request. See [Name the version you mean](#adtobject-methods-with-long-polling-support)
+> sends exactly the version it is given — none dropped or rewritten. A read
+> given no version sends its 39.x request; the reads that dropped or
+> rewrote a given version send it as given now. See [Name the version you mean](#adtobject-methods-with-long-polling-support)
 > and [`docs/usage/MIGRATION-40.md`](docs/usage/MIGRATION-40.md).
 >
 > **From 38.x?** 39.0.0 (on `interfaces-adt` ^24.0.1) types the search filter
@@ -1059,11 +1059,11 @@ feature toggle's `readSource`, the application log's `getObject` /
 `@mcp-abap-adt/interfaces-adt` (`active`, `inactive` or `workingArea`) and
 sends it as `?version=<value>` (the feature toggle, the service binding and
 the application log as the `version` request parameter), beside
-`withLongPolling=true` when that is asked for too (since 40.0.0). Three
-reads keep their spelling of `inactive`: a class include (local types,
-definitions, macros, test classes) and an enhancement's source ask for it as
-`workingArea`, and a metadata extension's source sends no version for
-`active`; `workingArea` goes as itself everywhere.
+`withLongPolling=true` when that is asked for too (since 40.0.0). The
+version goes exactly as given: no read drops, defaults or rewrites a version
+its caller named (until 40.0.0 a class include's and an enhancement's
+`inactive` went as `workingArea`, and a metadata extension's `active` as no
+version — MIGRATION-40 lists every request that changed).
 
 Without a version a read sends the request it sent before: no `version` for
 most kinds, and its old default for those that always sent one. For
@@ -1544,7 +1544,7 @@ See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-a
 One document per breaking release, each written for a consumer on the contract
 before it:
 
-- **[39.x → 40.0.0](docs/usage/MIGRATION-40.md)** — every read (source, metadata, `readObjectSource`, `getObjectSourceUri`, the feature toggle's source, the application log) takes `AdtReadVersion` of interfaces-adt 25 and sends `workingArea` as the other two; every `readMetadata` sends the version it is given.
+- **[39.x → 40.0.0](docs/usage/MIGRATION-40.md)** — every read (source, metadata, `readObjectSource`, `getObjectSourceUri`, the feature toggle's source, the application log) takes `AdtReadVersion` of interfaces-adt 25 and sends exactly the version it is given; the reads that dropped or rewrote a given version (eight metadata reads, the class includes, the enhancement, the metadata extension source, the message class message) send it as given.
 - **[38.x → 39.0.0](docs/usage/MIGRATION-39.md)** — the search filter takes the release's search names (`DEVC`, `STRU`), not a code; where-used and the group members take interfaces-adt's typed references (`VIEW/DV`, a function module's group), and `getUtils()` satisfies `IAdtTypedWhereUsed` / `IAdtTypedGroupLifecycle` instead of `IAdtWhereUsed` / `IAdtGroupLifecycle`.
 - **[37.x → 38.0.0](docs/usage/MIGRATION-38.md)** — the ADT type tables decide: a client is fixed to its release variant, every type code is a code of the tables, an API with a parent takes it, answered objects are `type` / `unknownType`, and `updateMetadata` covers fifteen more types; the result-set contracts are imported from `@mcp-abap-adt/interfaces-adt`, and each factory answers its class, so a consumer composes the contract it accepts from interfaces-adt.
 - **[36.x → 37.0.0](docs/usage/MIGRATION-37.md)** — `getSystemInformation` answers an `IAdtResponse` (present, absent for a `404`, or a failure, through `options.analyse`), and `IUtilResults` has the required `objectProperties` slot.

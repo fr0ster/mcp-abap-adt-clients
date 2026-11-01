@@ -30,7 +30,9 @@ On `@mcp-abap-adt/interfaces-adt` `^25.0.0` and `@mcp-abap-adt/adt-strategies`
 `^0.18.0`. A major because it raises interfaces-adt across a major and every
 read's version parameter widens to its `AdtReadVersion`.
 [MIGRATION-40.md](docs/usage/MIGRATION-40.md) says what a consumer on 39.x
-does. A call that compiled on 39.x sends the same request.
+does. A read given no version sends the 39.x request; a read given a version
+sends exactly that version — for the reads that dropped or rewrote it on
+39.x, a changed request (listed under Added).
 
 ### Breaking
 
@@ -57,11 +59,19 @@ does. A call that compiled on 39.x sends the same request.
   element, table type, function group, include (whose options took none),
   message class (whose options took one and dropped it), metadata extension
   and enhancement. Behavior definition's reads were typed `string`.
-- **`workingArea` reaches every source read.** The class includes (local
-  types, definitions, macros, test classes) and the enhancement's source,
-  which ask for an inactive source as `workingArea`, send `workingArea` as
-  itself; the metadata extension's source, which sends no version for
-  `active`, sends `version=workingArea`.
+- **Every read sends exactly the version it is given — none is dropped or
+  rewritten.** Requests that change for a given version (a correction of
+  39.x; [MIGRATION-40.md](docs/usage/MIGRATION-40.md#requests-that-change)):
+  a class include's (local types, definitions, macros, test classes) and an
+  enhancement's `read`, and `getObjectSourceUri` / `readObjectSource` for
+  `ENHO/XHH`, send `inactive` as `version=inactive` (was `workingArea`); a
+  metadata extension's `read` and `getBehaviorImplementationImplementations`
+  send `active` as `version=active` (was no version); a message class
+  message's `read` / `readMetadata` send the version (was dropped). Measured
+  on premise (2026-11-01, read only): a class include and a metadata
+  extension source answer `200` to `active`, `inactive` and `workingArea`.
+  Migrating: a caller that relied on the rewrite passes `'workingArea'` for
+  a working area and `'active'` for what is active.
 - Why the caller names it: measured on premise (2026-11-01, read only), a
   class with an inactive version answered its inactive document and source
   to a read with no version, to `inactive` and to `workingArea`, and its
@@ -72,9 +82,9 @@ does. A call that compiled on 39.x sends the same request.
 
 ### Unchanged
 
-- **No version, or `active` / `inactive`, no change.** Every read given one
-  of those, or none, sends exactly the 39.0.0 request — the old defaults
-  included (README, "Name the version you mean"). The include's metadata read
+- **No version, no change.** Every read given no version sends exactly the
+  39.0.0 request — the old defaults included (README, "Name the version you
+  mean"). The include's metadata read
   still sends no `withLongPolling`, nor do the feature toggle's and the
   service binding's reads; the transport request and a message class message
   take no version.
