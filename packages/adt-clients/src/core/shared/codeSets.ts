@@ -30,7 +30,7 @@ import {
   ACCEPT_PROGRAM,
   ACCEPT_STRUCTURE,
   ACCEPT_TABLE,
-  ACCEPT_TABLE_TYPE,
+  CT_TABLE_TYPE,
   CT_VIEW,
 } from '../../constants/contentTypes';
 
@@ -49,7 +49,9 @@ export const METADATA_READ = {
   'DDLS/DF': CT_VIEW,
   'TABL/DT': ACCEPT_TABLE,
   'TABL/DS': ACCEPT_STRUCTURE,
-  'TTYP/DA': ACCEPT_TABLE_TYPE,
+  // The table type's own read's Accept: measured on premise (2026-11-01),
+  // `tabletypes.v2, tabletypes.v1, blues.v1` is refused 406, this one 200.
+  'TTYP/DA': CT_TABLE_TYPE,
   'DOMA/DD': ACCEPT_DOMAIN,
   'DTEL/DE': ACCEPT_DATA_ELEMENT,
   'DEVC/K': ACCEPT_PACKAGE,
