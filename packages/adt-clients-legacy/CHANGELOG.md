@@ -4,6 +4,21 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [0.3.1] - 2026-11-01
+
+On `@mcp-abap-adt/interfaces-adt` `^24.1.0`, the range `adt-clients` 39.1.0
+declares.
+
+### Changed
+
+- **A metadata read this package inherits sends the version its caller
+  names.** Of the `*Legacy` classes only the package's (refused) and the
+  transport request's (no version) override `readMetadata`, so each inherited
+  one sends `options.version` (`active`, `inactive` or
+  `workingArea`) as `?version=<value>` from adt-clients 39.1.0 on. Not
+  measured on 7.40: what 7.40 answers to a version is its own. A read
+  without a version sends what it sent.
+
 ## [0.3.0] - 2026-10-30
 
 On `@mcp-abap-adt/adt-clients` `^39.0.0` and `@mcp-abap-adt/interfaces-adt`

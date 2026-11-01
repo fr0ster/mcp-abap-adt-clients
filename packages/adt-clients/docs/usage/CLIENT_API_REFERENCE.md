@@ -1179,6 +1179,14 @@ the ADT type tables whose request they send (`AdtMetadataReadCode`,
 outside the type system is refused before any request. A function module's
 group is required (`readObjectSource('FUGR/FF', 'Z_MY_FM', 'ZMY_GROUP')`).
 
+`readObjectMetadata` sends `options.version` (`active`, `inactive` or
+`workingArea`) as `?version=<value>`, as every handler's `readMetadata` does
+(since 39.1.0; README, "Name the version you mean"); without one it sends no
+version. `TTYP/DA` is asked for `application/vnd.sap.adt.tabletype.v1+xml`,
+the Accept of `getTableType().readMetadata()` (since 39.1.0: the
+`tabletypes.v2/v1, blues.v1` list it sent before was refused `406` on
+premise).
+
 ```typescript
 import type {
   AdtMetadataReadCode,

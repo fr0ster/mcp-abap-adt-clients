@@ -24,6 +24,53 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [39.1.0] - 2026-11-01
+
+On `@mcp-abap-adt/interfaces-adt` `^24.1.0` (`AdtReadVersion`). A minor: a
+read that names no version sends the request it sent in 39.0.0.
+
+### Added
+
+- **Every metadata read sends the version its caller names.** Each handler's
+  `readMetadata` and `getUtils().readObjectMetadata` take `options.version`
+  as `AdtReadVersion` — `active`, `inactive` or `workingArea` — and send it as
+  `?version=<value>`, beside `withLongPolling=true` when that is asked for too
+  (`version=…&withLongPolling=true`, built with `URLSearchParams`). The reads
+  that dropped it until now send it: domain, data element, table type,
+  function group, include (whose options took none), message class (whose
+  options took one and dropped it), metadata extension and enhancement. The
+  reads that took only `active` / `inactive` take `workingArea` too: package,
+  function include, scalar function, scalar function implementation, append
+  structure, authorization field, feature toggle, service binding, and
+  behavior definition (typed `string` before).
+- Why the caller names it: measured on premise (2026-11-01, read only), a
+  class with an inactive version answered its inactive document to a read
+  with no version, to `inactive` and to `workingArea`, and its active one only
+  to `active` — a read without a version is not "the active version". The
+  README's "Name the version you mean" has the measurement per endpoint
+  family (which refuse an unknown value `400`, which answer it `200`).
+
+### Unchanged
+
+- **No version, no change.** A read without `options.version` sends exactly
+  the 39.0.0 request: no `version` for most kinds; the old default for the
+  reads that always sent one (`active`: package, function include, service
+  definition, access control, behavior definition, transformation, scalar
+  function, authorization field, feature toggle; `inactive`: scalar function
+  implementation, append structure). The include's metadata read still sends
+  no `withLongPolling`, the feature toggle's and the service binding's none
+  either; the transport request and a message class message take no version.
+- The source reads (`read(config, version)`) keep `'active' | 'inactive'`,
+  as `IAdtReadable` types them.
+
+### Fixed
+
+- **`getUtils().readObjectMetadata('TTYP/DA', …)` asks for
+  `application/vnd.sap.adt.tabletype.v1+xml`**, the Accept of
+  `getTableType().readMetadata()`. The list it sent
+  (`tabletypes.v2+xml, tabletypes.v1+xml, blues.v1+xml`) was refused `406`
+  on premise (2026-11-01, read only) while this one answered `200`.
+
 ## [39.0.0] - 2026-10-30
 
 On `@mcp-abap-adt/interfaces-adt` `^24.0.1` and `@mcp-abap-adt/adt-strategies`

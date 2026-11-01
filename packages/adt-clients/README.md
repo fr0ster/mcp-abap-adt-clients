@@ -1032,12 +1032,45 @@ await adtObject.read(config, 'active', { withLongPolling: true });
 // Read metadata with long polling
 await adtObject.readMetadata(config, { withLongPolling: true });
 
-// Read metadata with explicit version
+// Read metadata with explicit version: 'active', 'inactive' or 'workingArea'
 await adtObject.readMetadata(config, { version: 'active' });
+
+// Both: ?version=inactive&withLongPolling=true
+await adtObject.readMetadata(config, {
+  version: 'inactive',
+  withLongPolling: true,
+});
 
 // Read transport info with long polling
 await adtObject.readTransport(config, { withLongPolling: true });
 ```
+
+**Name the version you mean.** Every `readMetadata` — and
+`getUtils().readObjectMetadata` — sends `options.version` (`AdtReadVersion`
+of `@mcp-abap-adt/interfaces-adt`: `active`, `inactive` or `workingArea`) as
+`?version=<value>`, beside `withLongPolling=true` when that is asked for too
+(since 39.1.0). Without a version a read sends the request it sent before: no
+`version` for most kinds, and its old default for the few that always sent
+one — `active` for package, function include, service definition, access
+control, behavior definition, transformation, scalar function, authorization
+field and feature toggle; `inactive` for scalar function implementation and
+append structure.
+
+A read without a version is not "the active version". Measured on premise
+(2026-11-01, read only): a class with an inactive version answered its
+inactive document to a read with no version, to `inactive` and to
+`workingArea`, and its active one only to `active`. In the same run:
+
+| Endpoint family | An unknown `version` value |
+|---|---|
+| domain, data element, table, structure, table type, function module, package, message class, DDL source, service definition, metadata extension, access control, behavior definition, scalar function, authorization field | refused `400` ("The value of query parameter version is invalid …") |
+| class, interface, program, function group, include, function include, transformation | answered `200` — not checked; a class honours `active` |
+
+On delivered (active-only) objects all three values answered the active
+document. The feature toggle's and the service binding's reads pass the
+version as a request parameter, as before, and send no `withLongPolling`; the
+include's metadata read sends the version and, as before, no
+`withLongPolling`.
 
 **When to use long polling:**
 - After `create()` operations - wait for object to be available
