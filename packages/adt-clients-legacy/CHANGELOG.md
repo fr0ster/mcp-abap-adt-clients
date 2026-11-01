@@ -30,7 +30,8 @@ On `@mcp-abap-adt/adt-clients` `^40.0.0`, `@mcp-abap-adt/adt-strategies`
   package's (refused) and the transport request's (no version) override
   `readMetadata`. **Not measured on 7.40:** what 7.40 answers to a version, to
   `workingArea` and to the changed requests above all, is its own. A read
-  given no version sends what it sent.
+  given no version sends no version (adt-clients 40.0.0 removed every
+  default). Migrating: pass the version you mean.
 
 ## [0.3.0] - 2026-10-30
 

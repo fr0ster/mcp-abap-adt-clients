@@ -30,9 +30,9 @@ On `@mcp-abap-adt/interfaces-adt` `^25.0.0` and `@mcp-abap-adt/adt-strategies`
 `^0.18.0`. A major because it raises interfaces-adt across a major and every
 read's version parameter widens to its `AdtReadVersion`.
 [MIGRATION-40.md](docs/usage/MIGRATION-40.md) says what a consumer on 39.x
-does. A read given no version sends the 39.x request; a read given a version
-sends exactly that version — for the reads that dropped or rewrote it on
-39.x, a changed request (listed under Added).
+does. A read sends exactly the version its caller gives, and none when the caller
+gives none — for the reads that dropped, rewrote or defaulted it on 39.x, a
+changed request (listed under Breaking and Added).
 
 ### Breaking
 
@@ -49,6 +49,18 @@ sends exactly that version — for the reads that dropped or rewrote it on
   Migrating: install `@mcp-abap-adt/interfaces-adt@^25.0.0`; a class that
   extends a handler and overrides a read widens its version parameter to
   `AdtReadVersion`.
+- **A read given no version sends no version — no default.** Until now
+  these sent one when the caller named none: `readMetadata` of package,
+  function include, service definition, access control, behavior definition,
+  transformation, scalar function, authorization field and feature toggle
+  (`active`), of scalar function implementation and append structure
+  (`inactive`); `read` of the class includes, enhancement, function include,
+  service definition, access control, behavior definition, transformation,
+  scalar function and feature toggle (`read` and `readSource`) (`active`),
+  of scalar function implementation and append structure (`inactive`). What
+  ADT answers without a version is ADT's — measured on premise
+  (2026-11-01): the inactive version where one exists.
+  Migrating: pass the version you mean — `'active'` for what is active.
 
 ### Added
 
@@ -82,9 +94,8 @@ sends exactly that version — for the reads that dropped or rewrote it on
 
 ### Unchanged
 
-- **No version, no change.** Every read given no version sends exactly the
-  39.0.0 request — the old defaults included (README, "Name the version you
-  mean"). The include's metadata read
+- **No version, no `version`.** The reads that sent none without a version
+  still send none; those that defaulted one no longer do (Breaking). The include's metadata read
   still sends no `withLongPolling`, nor do the feature toggle's and the
   service binding's reads; the transport request and a message class message
   take no version.
