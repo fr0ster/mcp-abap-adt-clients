@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/adt-clients-legacy",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Clients for legacy SAP ABAP systems (7.40), built on @mcp-abap-adt/adt-clients",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
