@@ -4,20 +4,31 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
-## [0.3.1] - 2026-11-01
+## [0.4.0] - 2026-11-01
 
-On `@mcp-abap-adt/interfaces-adt` `^24.1.0`, the range `adt-clients` 39.1.0
-declares.
+On `@mcp-abap-adt/adt-clients` `^40.0.0`, `@mcp-abap-adt/adt-strategies`
+`^0.18.0` and `@mcp-abap-adt/interfaces-adt` `^25.0.0`. A breaking change of a
+0.x package, so a minor.
+
+### Breaking
+
+- **Every read takes `AdtReadVersion`** — `active`, `inactive` or
+  `workingArea` — as interfaces-adt 25.0.0 and adt-clients 40.0.0 type it:
+  `AdtUtilsLegacy.readObjectSource` and every read the `*Legacy` classes
+  inherit. Migrating: install `@mcp-abap-adt/adt-clients@^40.0.0` and
+  `@mcp-abap-adt/interfaces-adt@^25.0.0`; an override of a read widens its
+  version parameter.
 
 ### Changed
 
-- **A metadata read this package inherits sends the version its caller
-  names.** Of the `*Legacy` classes only the package's (refused) and the
-  transport request's (no version) override `readMetadata`, so each inherited
-  one sends `options.version` (`active`, `inactive` or
-  `workingArea`) as `?version=<value>` from adt-clients 39.1.0 on. Not
-  measured on 7.40: what 7.40 answers to a version is its own. A read
-  without a version sends what it sent.
+- **An inherited read sends the version its caller names**, `workingArea`
+  included, as `?version=<value>`: every metadata read sends
+  `options.version` (adt-clients 40.0.0), and every source read sends
+  `workingArea` as the other two. Of the `*Legacy` classes only the
+  package's (refused) and the transport request's (no version) override
+  `readMetadata`. **Not measured on 7.40:** what 7.40 answers to a version, to
+  `workingArea` above all, is its own. A read given `active`, `inactive` or
+  nothing sends what it sent.
 
 ## [0.3.0] - 2026-10-30
 
