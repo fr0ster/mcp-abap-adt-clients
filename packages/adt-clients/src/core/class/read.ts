@@ -10,11 +10,9 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { ACCEPT_SOURCE, ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { CLASS, CLASS_INCLUDE, transportUri } from '../../endpoints/objects';
-import {
-  encodeSapObjectName,
-  longPollingQuery,
-} from '../../utils/internalUtils';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 import { objectMetadataWire, objectSourceWire } from '../shared/objectWire';
+import { readQuery } from '../shared/readQuery';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -93,14 +91,11 @@ export async function getClassTransport(
 export async function getClassDefinitionsInclude(
   connection: IAbapConnection,
   className: string,
-  version: AdtReadVersion = 'active',
+  version?: AdtReadVersion,
   logger?: ILogger,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const url = longPollingQuery(
-    `${CLASS_INCLUDE.uri(className, 'definitions')}?version=${version}`,
-    options?.withLongPolling,
-  );
+  const url = `${CLASS_INCLUDE.uri(className, 'definitions')}${readQuery(version, options?.withLongPolling)}`;
 
   return connection.makeAdtRequest({
     url,
@@ -121,14 +116,11 @@ export async function getClassDefinitionsInclude(
 export async function getClassMacrosInclude(
   connection: IAbapConnection,
   className: string,
-  version: AdtReadVersion = 'active',
+  version?: AdtReadVersion,
   logger?: ILogger,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const url = longPollingQuery(
-    `${CLASS_INCLUDE.uri(className, 'macros')}?version=${version}`,
-    options?.withLongPolling,
-  );
+  const url = `${CLASS_INCLUDE.uri(className, 'macros')}${readQuery(version, options?.withLongPolling)}`;
 
   return connection.makeAdtRequest({
     url,
@@ -149,14 +141,11 @@ export async function getClassMacrosInclude(
 export async function getClassTestClassesInclude(
   connection: IAbapConnection,
   className: string,
-  version: AdtReadVersion = 'active',
+  version?: AdtReadVersion,
   logger?: ILogger,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const url = longPollingQuery(
-    `${CLASS_INCLUDE.uri(className, 'testclasses')}?version=${version}`,
-    options?.withLongPolling,
-  );
+  const url = `${CLASS_INCLUDE.uri(className, 'testclasses')}${readQuery(version, options?.withLongPolling)}`;
 
   return connection.makeAdtRequest({
     url,
@@ -177,14 +166,11 @@ export async function getClassTestClassesInclude(
 export async function getClassImplementationsInclude(
   connection: IAbapConnection,
   className: string,
-  version: AdtReadVersion = 'active',
+  version?: AdtReadVersion,
   logger?: ILogger,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const url = longPollingQuery(
-    `${CLASS_INCLUDE.uri(className, 'implementations')}?version=${version}`,
-    options?.withLongPolling,
-  );
+  const url = `${CLASS_INCLUDE.uri(className, 'implementations')}${readQuery(version, options?.withLongPolling)}`;
 
   return connection.makeAdtRequest({
     url,

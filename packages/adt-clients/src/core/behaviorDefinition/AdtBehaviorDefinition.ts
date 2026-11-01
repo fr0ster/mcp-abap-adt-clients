@@ -224,7 +224,7 @@ export class AdtBehaviorDefinition<
         readBehaviorDefinitionSource(
           connection,
           name,
-          version ?? 'active',
+          version,
           options,
           this.logger,
         ),
@@ -249,7 +249,7 @@ export class AdtBehaviorDefinition<
           connection,
           name,
           '',
-          options?.version ?? 'active',
+          options?.version,
           options,
           this.logger,
         ),

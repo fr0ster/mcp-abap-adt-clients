@@ -9,6 +9,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_SOURCE } from '../../constants/contentTypes';
 import { FUNCTION_INCLUDE, sourceUri } from '../../endpoints/objects';
+import { readQuery } from '../shared/readQuery';
 
 /**
  * Read function include source code.
@@ -17,9 +18,9 @@ export async function readFunctionIncludeSource(
   connection: IAbapConnection,
   groupName: string,
   includeName: string,
-  version: AdtReadVersion = 'active',
+  version?: AdtReadVersion,
 ): Promise<IAdtWireResponse> {
-  const url = `${sourceUri(FUNCTION_INCLUDE.uri(groupName, includeName))}?version=${encodeURIComponent(version)}`;
+  const url = `${sourceUri(FUNCTION_INCLUDE.uri(groupName, includeName))}${readQuery(version, undefined)}`;
 
   return connection.makeAdtRequest({
     url,

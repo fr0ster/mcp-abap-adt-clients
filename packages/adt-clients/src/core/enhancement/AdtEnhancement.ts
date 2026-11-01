@@ -278,7 +278,7 @@ export class AdtEnhancement<
           connection,
           this.enhancementType(config),
           name,
-          version ?? 'active',
+          version,
           options,
         ),
       this.results.source as IResultStrategy<ReturnType<R['source']>>,

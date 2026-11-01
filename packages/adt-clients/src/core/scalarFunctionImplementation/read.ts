@@ -20,7 +20,7 @@ import type { IReadOptions } from '../shared/types';
 export async function getScalarFunctionImplementation(
   connection: IAbapConnection,
   name: string,
-  version: AdtReadVersion = 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
@@ -36,7 +36,7 @@ export async function getScalarFunctionImplementation(
 export async function getScalarFunctionImplementationSource(
   connection: IAbapConnection,
   name: string,
-  version: AdtReadVersion = 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {

@@ -64,7 +64,7 @@ export async function getEnhancementSource(
   connection: IAbapConnection,
   enhancementType: EnhancementType,
   enhancementName: string,
-  version: AdtReadVersion = 'active',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
@@ -74,11 +74,7 @@ export async function getEnhancementSource(
     );
   }
 
-  let url = `${getEnhancementUri(enhancementType, enhancementName)}/source/main?version=${version}`;
-
-  if (options?.withLongPolling) {
-    url += '&withLongPolling=true';
-  }
+  const url = `${getEnhancementUri(enhancementType, enhancementName)}/source/main${readQuery(version, options?.withLongPolling)}`;
 
   return connection.makeAdtRequest({
     url,

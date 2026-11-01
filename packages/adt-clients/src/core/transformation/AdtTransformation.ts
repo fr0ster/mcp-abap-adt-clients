@@ -210,8 +210,7 @@ export class AdtTransformation<
     // an empty body, so absence was never a status to branch on — and whether
     // an empty body *is* absence is the caller's reading, through `analyse`.
     return answering(
-      () =>
-        getTransformationSource(connection, name, version ?? 'active', options),
+      () => getTransformationSource(connection, name, version, options),
       this.results.source as IResultStrategy<ReturnType<R['source']>>,
       options?.analyse,
     );
@@ -228,13 +227,7 @@ export class AdtTransformation<
     const name = this.name(config);
 
     return answering(
-      () =>
-        getTransformation(
-          connection,
-          name,
-          options?.version ?? 'active',
-          options,
-        ),
+      () => getTransformation(connection, name, options?.version, options),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
       options?.analyse,
     );

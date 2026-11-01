@@ -256,7 +256,7 @@ export class AdtScalarFunctionImplementation<
         getScalarFunctionImplementation(
           connection,
           name,
-          options?.version ?? 'inactive',
+          options?.version,
           options,
           this.logger,
         ),

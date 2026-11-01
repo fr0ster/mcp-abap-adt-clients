@@ -16,7 +16,7 @@ import type { IReadOptions } from '../shared/types';
 export async function getAppendStructure(
   connection: IAbapConnection,
   name: string,
-  version: AdtReadVersion = 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
@@ -32,7 +32,7 @@ export async function getAppendStructure(
 export async function getAppendStructureSource(
   connection: IAbapConnection,
   name: string,
-  version: AdtReadVersion = 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {

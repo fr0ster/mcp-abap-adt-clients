@@ -27,7 +27,7 @@ import type { IReadOptions } from '../shared/types';
 export async function getServiceDefinition(
   connection: IAbapConnection,
   serviceDefinitionName: string,
-  version: AdtReadVersion = 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
@@ -49,7 +49,7 @@ export async function getServiceDefinition(
 export async function getServiceDefinitionSource(
   connection: IAbapConnection,
   serviceDefinitionName: string,
-  version: AdtReadVersion = 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {

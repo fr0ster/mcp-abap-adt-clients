@@ -548,7 +548,7 @@ export class AdtFeatureToggle<
    */
   async readSource<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
-    version: AdtReadVersion = 'active',
+    version?: AdtReadVersion,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['sourceDocument']>, E>> {
     const name = this.name(config);

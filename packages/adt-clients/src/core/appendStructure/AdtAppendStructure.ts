@@ -220,7 +220,7 @@ export class AdtAppendStructure<
         getAppendStructure(
           connection,
           name,
-          options?.version ?? 'inactive',
+          options?.version,
           options,
           this.logger,
         ),

@@ -23,7 +23,7 @@ import type { IReadOptions } from '../shared/types';
 export async function getTransformation(
   connection: IAbapConnection,
   transformationName: string,
-  version: AdtReadVersion = 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
@@ -45,7 +45,7 @@ export async function getTransformation(
 export async function getTransformationSource(
   connection: IAbapConnection,
   transformationName: string,
-  version: AdtReadVersion = 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {

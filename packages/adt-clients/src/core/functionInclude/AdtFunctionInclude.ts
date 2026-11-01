@@ -253,13 +253,7 @@ export class AdtFunctionInclude<
     const { group, include } = this.names(config);
 
     return answering(
-      () =>
-        readFunctionIncludeSource(
-          connection,
-          group,
-          include,
-          version ?? 'active',
-        ),
+      () => readFunctionIncludeSource(connection, group, include, version),
       this.results.source as IResultStrategy<ReturnType<R['source']>>,
       options?.analyse,
     );
@@ -287,7 +281,7 @@ export class AdtFunctionInclude<
           connection,
           group,
           include,
-          options?.version ?? 'active',
+          options?.version,
           options,
         ),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,

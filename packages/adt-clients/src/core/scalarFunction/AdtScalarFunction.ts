@@ -203,8 +203,7 @@ export class AdtScalarFunction<
     // an empty body, so absence was never a status to branch on — and whether
     // an empty body *is* absence is the caller's reading, through `analyse`.
     return answering(
-      () =>
-        getScalarFunctionSource(connection, name, version ?? 'active', options),
+      () => getScalarFunctionSource(connection, name, version, options),
       this.results.source as IResultStrategy<ReturnType<R['source']>>,
       options?.analyse,
     );
@@ -221,13 +220,7 @@ export class AdtScalarFunction<
     const name = this.name(config);
 
     return answering(
-      () =>
-        getScalarFunction(
-          connection,
-          name,
-          options?.version ?? 'active',
-          options,
-        ),
+      () => getScalarFunction(connection, name, options?.version, options),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
       options?.analyse,
     );

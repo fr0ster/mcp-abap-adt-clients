@@ -42,7 +42,7 @@ export async function read(
   connection: IAbapConnection,
   name: string,
   _sessionId: string,
-  version: AdtReadVersion = 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
@@ -80,12 +80,11 @@ export async function read(
 export async function readSource(
   connection: IAbapConnection,
   name: string,
-  version: AdtReadVersion = 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const query = options?.withLongPolling ? `&withLongPolling=true` : '';
-  const url = `${sourceUri(BEHAVIOR_DEFINITION.uri(name))}?version=${version}${query}`;
+  const url = `${sourceUri(BEHAVIOR_DEFINITION.uri(name))}${readQuery(version, options?.withLongPolling)}`;
 
   const headers = {
     Accept: options?.accept ?? ACCEPT_SOURCE,

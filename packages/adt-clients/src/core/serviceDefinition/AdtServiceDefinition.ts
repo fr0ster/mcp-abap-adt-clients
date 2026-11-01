@@ -208,13 +208,7 @@ export class AdtServiceDefinition<
     // an empty body, so absence was never a status to branch on — and whether
     // an empty body *is* absence is the caller's reading, through `analyse`.
     return answering(
-      () =>
-        getServiceDefinitionSource(
-          connection,
-          name,
-          version ?? 'active',
-          options,
-        ),
+      () => getServiceDefinitionSource(connection, name, version, options),
       this.results.source as IResultStrategy<ReturnType<R['source']>>,
       options?.analyse,
     );
@@ -231,13 +225,7 @@ export class AdtServiceDefinition<
     const name = this.name(config);
 
     return answering(
-      () =>
-        getServiceDefinition(
-          connection,
-          name,
-          options?.version ?? 'active',
-          options,
-        ),
+      () => getServiceDefinition(connection, name, options?.version, options),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
       options?.analyse,
     );

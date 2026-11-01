@@ -19,7 +19,7 @@ import type { IReadOptions } from '../shared/types';
 export async function getPackage(
   connection: IAbapConnection,
   packageName: string,
-  version: AdtReadVersion = 'active',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {

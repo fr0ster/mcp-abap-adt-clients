@@ -23,7 +23,7 @@ import type { IReadOptions } from '../shared/types';
 export async function getAccessControl(
   connection: IAbapConnection,
   accessControlName: string,
-  version: AdtReadVersion = 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
@@ -45,7 +45,7 @@ export async function getAccessControl(
 export async function getAccessControlSource(
   connection: IAbapConnection,
   accessControlName: string,
-  version: AdtReadVersion = 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
