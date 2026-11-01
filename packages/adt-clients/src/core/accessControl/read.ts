@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -13,6 +14,7 @@ import {
   sourceUri,
   transportUri,
 } from '../../endpoints/objects';
+import { readQuery } from '../shared/readQuery';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -21,19 +23,11 @@ import type { IReadOptions } from '../shared/types';
 export async function getAccessControl(
   connection: IAbapConnection,
   accessControlName: string,
-  version: 'active' | 'inactive' | 'workingArea' = 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const queryParams: string[] = [];
-  if (version) {
-    queryParams.push(`version=${version}`);
-  }
-  if (options?.withLongPolling) {
-    queryParams.push('withLongPolling=true');
-  }
-  const query = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
-  const url = `${ACCESS_CONTROL.uri(accessControlName)}${query}`;
+  const url = `${ACCESS_CONTROL.uri(accessControlName)}${readQuery(version, options?.withLongPolling)}`;
 
   return connection.makeAdtRequest({
     url,
@@ -51,7 +45,7 @@ export async function getAccessControl(
 export async function getAccessControlSource(
   connection: IAbapConnection,
   accessControlName: string,
-  version: 'active' | 'inactive' | 'workingArea' = 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {

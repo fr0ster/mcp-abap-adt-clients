@@ -141,9 +141,9 @@ it.each(['active', 'inactive'] as const)(
     const { client, request } = setup();
     await client.read(config('enhoxhh'), version);
     expect(request.mock.calls[0][0].headers.Accept).toBe('text/plain');
-    expect(request.mock.calls[0][0].url).toContain(
-      `version=${version === 'inactive' ? 'workingArea' : 'active'}`,
-    );
+    // The version as the caller named it (40.0.0); `inactive` is no longer
+    // rewritten to `workingArea`.
+    expect(request.mock.calls[0][0].url).toContain(`version=${version}`);
   },
 );
 it.each(['enhoxhb', 'enhoxhh'] as const)(

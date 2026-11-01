@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -12,13 +13,13 @@ import { FEATURE_TOGGLE } from '../../endpoints/objects';
 export async function readFeatureToggle(
   connection: IAbapConnection,
   name: string,
-  version: 'active' | 'inactive' = 'active',
+  version?: AdtReadVersion,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
     method: 'GET',
     url: `${FEATURE_TOGGLE.uri(name)}`,
     timeout: 0,
-    params: { version },
+    params: version ? { version } : undefined,
     headers: { Accept: ACCEPT_FEATURE_TOGGLE_METADATA },
   });
 }

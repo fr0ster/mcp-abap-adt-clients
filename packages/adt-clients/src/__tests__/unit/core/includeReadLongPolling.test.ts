@@ -92,9 +92,14 @@ describe('the behaviour implementation include read', () => {
 
   it('uses ? when the base carries no query at all', async () => {
     const { conn, calls } = fakeConn();
-    await getBehaviorImplementationImplementations(conn, 'ZTEST_BP', 'active', {
-      withLongPolling: true,
-    });
+    await getBehaviorImplementationImplementations(
+      conn,
+      'ZTEST_BP',
+      undefined,
+      {
+        withLongPolling: true,
+      },
+    );
 
     expect(calls[0].url).toBe(
       '/sap/bc/adt/oo/classes/ztest_bp/includes/implementations?withLongPolling=true',

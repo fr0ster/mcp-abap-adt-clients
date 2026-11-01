@@ -2,13 +2,17 @@
  * FunctionInclude (FUGR/I) read operations
  */
 
-import type { IReadOptions } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtReadVersion,
+  IReadOptions,
+} from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_FUNCTION_INCLUDE } from '../../constants/contentTypes';
 import { FUNCTION_INCLUDE } from '../../endpoints/objects';
+import { readQuery } from '../shared/readQuery';
 
 // Declared once, in the contract. The copy here carried only
 // `withLongPolling`, while `accept` is read in 54 places and `version` in 16 —
@@ -22,15 +26,10 @@ export async function readFunctionInclude(
   connection: IAbapConnection,
   groupName: string,
   includeName: string,
-  version: 'active' | 'inactive' = 'active',
+  version?: AdtReadVersion,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const params = new URLSearchParams();
-  params.append('version', version);
-  if (options?.withLongPolling) {
-    params.append('withLongPolling', 'true');
-  }
-  const url = `${FUNCTION_INCLUDE.uri(groupName, includeName)}?${params.toString()}`;
+  const url = `${FUNCTION_INCLUDE.uri(groupName, includeName)}${readQuery(version, options?.withLongPolling)}`;
 
   return connection.makeAdtRequest({
     url,

@@ -9,6 +9,7 @@
  */
 
 import type {
+  AdtReadVersion,
   AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
@@ -240,7 +241,7 @@ export class AdtInclude<
   /** Read the include's source. */
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
-    version?: 'active' | 'inactive',
+    version?: AdtReadVersion,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -257,14 +258,17 @@ export class AdtInclude<
   /** Read the include's metadata. */
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
+    options?: {
+      withLongPolling?: boolean;
+      version?: AdtReadVersion;
+    } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const includeName = requireName(config);
     return answering(
-      () => getIncludeMetadata(connection, includeName),
+      () => getIncludeMetadata(connection, includeName, options?.version),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
       options?.analyse,
     );

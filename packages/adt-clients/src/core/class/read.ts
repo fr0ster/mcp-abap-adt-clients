@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * Class read operations
  */
@@ -9,11 +10,9 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { ACCEPT_SOURCE, ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { CLASS, CLASS_INCLUDE, transportUri } from '../../endpoints/objects';
-import {
-  encodeSapObjectName,
-  longPollingQuery,
-} from '../../utils/internalUtils';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 import { objectMetadataWire, objectSourceWire } from '../shared/objectWire';
+import { readQuery } from '../shared/readQuery';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -44,7 +43,7 @@ export async function getClassMetadata(
 export async function getClassSource(
   connection: IAbapConnection,
   className: string,
-  version?: 'active' | 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
   return objectSourceWire(
@@ -92,15 +91,11 @@ export async function getClassTransport(
 export async function getClassDefinitionsInclude(
   connection: IAbapConnection,
   className: string,
-  version: 'active' | 'inactive' = 'active',
+  version?: AdtReadVersion,
   logger?: ILogger,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const versionParam = version === 'inactive' ? 'workingArea' : 'active';
-  const url = longPollingQuery(
-    `${CLASS_INCLUDE.uri(className, 'definitions')}?version=${versionParam}`,
-    options?.withLongPolling,
-  );
+  const url = `${CLASS_INCLUDE.uri(className, 'definitions')}${readQuery(version, options?.withLongPolling)}`;
 
   return connection.makeAdtRequest({
     url,
@@ -121,15 +116,11 @@ export async function getClassDefinitionsInclude(
 export async function getClassMacrosInclude(
   connection: IAbapConnection,
   className: string,
-  version: 'active' | 'inactive' = 'active',
+  version?: AdtReadVersion,
   logger?: ILogger,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const versionParam = version === 'inactive' ? 'workingArea' : 'active';
-  const url = longPollingQuery(
-    `${CLASS_INCLUDE.uri(className, 'macros')}?version=${versionParam}`,
-    options?.withLongPolling,
-  );
+  const url = `${CLASS_INCLUDE.uri(className, 'macros')}${readQuery(version, options?.withLongPolling)}`;
 
   return connection.makeAdtRequest({
     url,
@@ -150,15 +141,11 @@ export async function getClassMacrosInclude(
 export async function getClassTestClassesInclude(
   connection: IAbapConnection,
   className: string,
-  version: 'active' | 'inactive' = 'active',
+  version?: AdtReadVersion,
   logger?: ILogger,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const versionParam = version === 'inactive' ? 'workingArea' : 'active';
-  const url = longPollingQuery(
-    `${CLASS_INCLUDE.uri(className, 'testclasses')}?version=${versionParam}`,
-    options?.withLongPolling,
-  );
+  const url = `${CLASS_INCLUDE.uri(className, 'testclasses')}${readQuery(version, options?.withLongPolling)}`;
 
   return connection.makeAdtRequest({
     url,
@@ -179,15 +166,11 @@ export async function getClassTestClassesInclude(
 export async function getClassImplementationsInclude(
   connection: IAbapConnection,
   className: string,
-  version: 'active' | 'inactive' = 'active',
+  version?: AdtReadVersion,
   logger?: ILogger,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const versionParam = version === 'inactive' ? 'workingArea' : 'active';
-  const url = longPollingQuery(
-    `${CLASS_INCLUDE.uri(className, 'implementations')}?version=${versionParam}`,
-    options?.withLongPolling,
-  );
+  const url = `${CLASS_INCLUDE.uri(className, 'implementations')}${readQuery(version, options?.withLongPolling)}`;
 
   return connection.makeAdtRequest({
     url,

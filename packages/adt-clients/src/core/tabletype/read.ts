@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * TableType read operations
  */
@@ -14,6 +15,7 @@ import {
   CT_TABLE_TYPE,
 } from '../../constants/contentTypes';
 import { sourceUri, TABLE_TYPE, transportUri } from '../../endpoints/objects';
+import { readQuery } from '../shared/readQuery';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -25,8 +27,7 @@ export async function getTableTypeMetadata(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const query = options?.withLongPolling ? '?withLongPolling=true' : '';
-  const url = `${TABLE_TYPE.uri(tableTypeName)}${query}`;
+  const url = `${TABLE_TYPE.uri(tableTypeName)}${readQuery(options?.version, options?.withLongPolling)}`;
   const acceptHeader = options?.accept ?? CT_TABLE_TYPE;
 
   try {
@@ -69,7 +70,7 @@ Request Headers: ${JSON.stringify({ Accept: acceptHeader }, null, 2)}`;
 export async function getTableTypeSource(
   connection: IAbapConnection,
   tableTypeName: string,
-  version?: 'active' | 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {

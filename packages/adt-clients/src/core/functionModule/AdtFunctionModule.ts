@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * AdtFunctionModule - CRUD for `FUGR/FF` function modules.
  *
@@ -214,7 +215,7 @@ export class AdtFunctionModule<
   /** Read the module's source. */
   async read<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
-    version?: 'active' | 'inactive',
+    version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     // The caller's deadline, if they set one, on every request below.

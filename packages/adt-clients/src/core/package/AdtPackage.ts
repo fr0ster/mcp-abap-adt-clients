@@ -200,13 +200,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
 
     return answering(
       () =>
-        getPackage(
-          connection,
-          name,
-          options?.version ?? 'active',
-          options,
-          this.logger,
-        ),
+        getPackage(connection, name, options?.version, options, this.logger),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
       options?.analyse,
     );

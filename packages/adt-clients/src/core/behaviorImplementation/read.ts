@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * Behavior Implementation read operations
  */
@@ -10,6 +11,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { ACCEPT_SOURCE } from '../../constants/contentTypes';
 import { CLASS_INCLUDE } from '../../endpoints/objects';
 import { objectMetadataWire, objectSourceWire } from '../shared/objectWire';
+import { readQuery } from '../shared/readQuery';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -42,7 +44,7 @@ export async function getBehaviorImplementationMetadata(
 export async function getBehaviorImplementationSource(
   connection: IAbapConnection,
   className: string,
-  version?: 'active' | 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
@@ -66,20 +68,12 @@ export async function getBehaviorImplementationSource(
 export async function getBehaviorImplementationImplementations(
   connection: IAbapConnection,
   className: string,
-  version: 'active' | 'inactive' | 'workingArea' = 'active',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const { encodeSapObjectName, longPollingQuery } = await import(
-    '../../utils/internalUtils'
-  );
-
-  // The version query is conditional here, so the base arrives both with and
-  // without a `?` — which is why appending is the helper's job, not a literal.
-  const url = longPollingQuery(
-    `${CLASS_INCLUDE.uri(className, 'implementations')}${version !== 'active' ? `?version=${version}` : ''}`,
-    options?.withLongPolling,
-  );
+  // The version the caller names, as named; none without one.
+  const url = `${CLASS_INCLUDE.uri(className, 'implementations')}${readQuery(version, options?.withLongPolling)}`;
 
   return connection.makeAdtRequest({
     url,

@@ -8,6 +8,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_DOMAIN, ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { DOMAIN, transportUri } from '../../endpoints/objects';
+import { readQuery } from '../shared/readQuery';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -23,8 +24,7 @@ export async function getDomain(
   domainName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const query = options?.withLongPolling ? '?withLongPolling=true' : '';
-  const url = `${DOMAIN.uri(domainName)}${query}`;
+  const url = `${DOMAIN.uri(domainName)}${readQuery(options?.version, options?.withLongPolling)}`;
 
   return connection.makeAdtRequest({
     url,

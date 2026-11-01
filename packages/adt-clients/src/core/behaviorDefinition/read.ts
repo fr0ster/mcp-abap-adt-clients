@@ -2,6 +2,7 @@
  * Behavior Definition read operations
  */
 
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -17,6 +18,7 @@ import {
   sourceUri,
   transportUri,
 } from '../../endpoints/objects';
+import { readQuery } from '../shared/readQuery';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -40,12 +42,11 @@ export async function read(
   connection: IAbapConnection,
   name: string,
   _sessionId: string,
-  version: string = 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const query = options?.withLongPolling ? `&withLongPolling=true` : '';
-  const url = `${BEHAVIOR_DEFINITION.uri(name)}?version=${version}${query}`;
+  const url = `${BEHAVIOR_DEFINITION.uri(name)}${readQuery(version, options?.withLongPolling)}`;
 
   const headers = {
     Accept: options?.accept ?? CT_BEHAVIOR_DEFINITION,
@@ -79,12 +80,11 @@ export async function read(
 export async function readSource(
   connection: IAbapConnection,
   name: string,
-  version: string = 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const query = options?.withLongPolling ? `&withLongPolling=true` : '';
-  const url = `${sourceUri(BEHAVIOR_DEFINITION.uri(name))}?version=${version}${query}`;
+  const url = `${sourceUri(BEHAVIOR_DEFINITION.uri(name))}${readQuery(version, options?.withLongPolling)}`;
 
   const headers = {
     Accept: options?.accept ?? ACCEPT_SOURCE,

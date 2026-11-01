@@ -5,6 +5,7 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
+  AdtReadVersion,
   AdtVariant,
   IAccessControlResults,
   IAdtActivatable,
@@ -196,7 +197,7 @@ export class AdtAccessControl<
   /** Read the object. */
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IAccessControlConfig>,
-    version?: 'active' | 'inactive',
+    version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -208,8 +209,7 @@ export class AdtAccessControl<
     // an empty body, so absence was never a status to branch on — and whether
     // an empty body *is* absence is the caller's reading, through `analyse`.
     return answering(
-      () =>
-        getAccessControlSource(connection, name, version ?? 'active', options),
+      () => getAccessControlSource(connection, name, version, options),
       this.results.source as IResultStrategy<ReturnType<R['source']>>,
       options?.analyse,
     );
@@ -226,13 +226,7 @@ export class AdtAccessControl<
     const name = this.name(config);
 
     return answering(
-      () =>
-        getAccessControl(
-          connection,
-          name,
-          options?.version ?? 'active',
-          options,
-        ),
+      () => getAccessControl(connection, name, options?.version, options),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
       options?.analyse,
     );

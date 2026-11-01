@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * AdtUtils - Utility Functions Wrapper
  *
@@ -709,10 +710,7 @@ export class AdtUtils<
     objectName: string,
     ...[functionGroup, version, options]: ParentedArguments<
       C,
-      [
-        version?: 'active' | 'inactive',
-        options?: IReadOptions & IAdtAnalyseOptions<E>,
-      ]
+      [version?: AdtReadVersion, options?: IReadOptions & IAdtAnalyseOptions<E>]
     >
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     // Raised before anything is asked, rather than dressed as a verdict about
@@ -770,7 +768,7 @@ export class AdtUtils<
     objectName: string,
     ...[functionGroup, version]: ParentedArguments<
       C,
-      [version?: 'active' | 'inactive']
+      [version?: AdtReadVersion]
     >
   ): string {
     const code: AdtSourceTypeCode = objectType;

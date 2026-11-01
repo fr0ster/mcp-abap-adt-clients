@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * ServiceDefinition read operations
  */
@@ -17,6 +18,7 @@ import {
   sourceUri,
   transportUri,
 } from '../../endpoints/objects';
+import { readQuery } from '../shared/readQuery';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -25,19 +27,11 @@ import type { IReadOptions } from '../shared/types';
 export async function getServiceDefinition(
   connection: IAbapConnection,
   serviceDefinitionName: string,
-  version: 'active' | 'inactive' | 'workingArea' = 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const queryParams: string[] = [];
-  if (version) {
-    queryParams.push(`version=${version}`);
-  }
-  if (options?.withLongPolling) {
-    queryParams.push('withLongPolling=true');
-  }
-  const query = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
-  const url = `${SERVICE_DEFINITION.uri(serviceDefinitionName)}${query}`;
+  const url = `${SERVICE_DEFINITION.uri(serviceDefinitionName)}${readQuery(version, options?.withLongPolling)}`;
 
   return connection.makeAdtRequest({
     url,
@@ -55,7 +49,7 @@ export async function getServiceDefinition(
 export async function getServiceDefinitionSource(
   connection: IAbapConnection,
   serviceDefinitionName: string,
-  version: 'active' | 'inactive' | 'workingArea' = 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {

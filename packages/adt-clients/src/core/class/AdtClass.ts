@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 import { withCallTimeout } from '../../utils/callTimeout';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import {
@@ -237,7 +238,7 @@ export class AdtClass<
    */
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    version?: 'active' | 'inactive',
+    version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     // The caller's deadline, if they set one, on every request below.

@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * Enhancement read operations
  */
@@ -12,6 +13,7 @@ import {
   ACCEPT_TRANSPORT,
   ENHANCEMENT_CONTENT_TYPES,
 } from '../../constants/contentTypes';
+import { readQuery } from '../shared/readQuery';
 import type { IReadOptions } from '../shared/types';
 import {
   type EnhancementType,
@@ -35,11 +37,7 @@ export async function getEnhancementMetadata(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  let url = getEnhancementUri(enhancementType, enhancementName);
-
-  if (options?.withLongPolling) {
-    url += '?withLongPolling=true';
-  }
+  const url = `${getEnhancementUri(enhancementType, enhancementName)}${readQuery(options?.version, options?.withLongPolling)}`;
 
   return connection.makeAdtRequest({
     url,
@@ -62,22 +60,11 @@ export async function getEnhancementMetadata(
  * @param options - Optional parameters including withLongPolling
  * @returns Axios response with source code as text/plain
  */
-/**
- * The `version` an enhancement's source is asked for: ADT reads an
- * enhancement's inactive source as `workingArea`, not `inactive`. The one
- * translation, shared by this builder and the generic source address.
- */
-export function enhancementVersionToken(
-  version: 'active' | 'inactive',
-): 'active' | 'workingArea' {
-  return version === 'inactive' ? 'workingArea' : 'active';
-}
-
 export async function getEnhancementSource(
   connection: IAbapConnection,
   enhancementType: EnhancementType,
   enhancementName: string,
-  version: 'active' | 'inactive' = 'active',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
@@ -87,12 +74,7 @@ export async function getEnhancementSource(
     );
   }
 
-  const versionParam = enhancementVersionToken(version);
-  let url = `${getEnhancementUri(enhancementType, enhancementName)}/source/main?version=${versionParam}`;
-
-  if (options?.withLongPolling) {
-    url += '&withLongPolling=true';
-  }
+  const url = `${getEnhancementUri(enhancementType, enhancementName)}/source/main${readQuery(version, options?.withLongPolling)}`;
 
   return connection.makeAdtRequest({
     url,

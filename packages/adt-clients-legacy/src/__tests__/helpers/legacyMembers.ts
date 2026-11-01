@@ -355,7 +355,9 @@ function localInclude(getter: string, kind: ClassIncludeKind): Rows<SendsRow> {
   const cls = CLASS.uri('ZCL_GUARD');
   const include = CLASS_INCLUDE.uri('ZCL_GUARD', kind);
   return Object.fromEntries([
-    sends('read', '§10.3 measured', [get(include, { version: 'active' })]),
+    // Called with no version, the read sends none (adt-clients 40.0.0: no
+    // default); adt-clients' sourceReadVersion.test.ts pins the absence.
+    sends('read', '§10.3 measured', [get(include)]),
     sends('update', '§10.3: measured for the test classes, kept for the rest', [
       writeWith(include),
     ]),

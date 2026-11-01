@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * Table read operations
  */
@@ -34,7 +35,7 @@ export async function getTableMetadata(
 export async function getTableSource(
   connection: IAbapConnection,
   tableName: string,
-  version?: 'active' | 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
   return objectSourceWire(

@@ -24,6 +24,109 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [40.0.0] - 2026-11-01
+
+On `@mcp-abap-adt/interfaces-adt` `^25.0.0` and `@mcp-abap-adt/adt-strategies`
+`^0.18.0`. A major because it raises interfaces-adt across a major and every
+read's version parameter widens to its `AdtReadVersion`.
+[MIGRATION-40.md](docs/usage/MIGRATION-40.md) says what a consumer on 39.x
+does. A read sends exactly the version its caller gives, and none when the caller
+gives none — for the reads that dropped, rewrote or defaulted it on 39.x, a
+changed request (listed under Breaking and Added).
+
+### Breaking
+
+- **Every read takes `AdtReadVersion` — `active`, `inactive` or
+  `workingArea` — as interfaces-adt 25.0.0 types every read contract:**
+  `read(config, version)` of every handler, `readMetadata(config,
+  { version })`, `getUtils().readObjectSource` / `readObjectMetadata` /
+  `getObjectSourceUri`, the feature toggle's `readSource`, the service
+  binding's `read`, and the application log's `getObject` / `getSource`
+  (their options typed `string` before). `workingArea` is sent to
+  `?version=` (or the `version` request parameter) as the other two. Measured
+  on S/4HANA 2025 (2026-11-01) for the application log object and its source:
+  `200` for the three values, `400` for any other.
+  Migrating: install `@mcp-abap-adt/interfaces-adt@^25.0.0`; a class that
+  extends a handler and overrides a read widens its version parameter to
+  `AdtReadVersion`.
+- **A read given no version sends no version — no default.** Until now
+  these sent one when the caller named none: `readMetadata` of package,
+  function include, service definition, access control, behavior definition,
+  transformation, scalar function, authorization field and feature toggle
+  (`active`), of scalar function implementation and append structure
+  (`inactive`); `read` of the class includes, enhancement, function include,
+  service definition, access control, behavior definition, transformation,
+  scalar function and feature toggle (`read` and `readSource`) (`active`),
+  of scalar function implementation and append structure (`inactive`). What
+  ADT answers without a version is ADT's — measured on premise
+  (2026-11-01): the inactive version where one exists.
+  Migrating: pass the version you mean — `'active'` for what is active.
+
+### Added
+
+- **Every metadata read sends the version its caller names**, beside
+  `withLongPolling=true` when that is asked for too
+  (`version=…&withLongPolling=true`, built with `URLSearchParams` by one
+  helper). The reads that dropped it until now send it: domain, data
+  element, table type, function group, include (whose options took none),
+  message class (whose options took one and dropped it), metadata extension
+  and enhancement. Behavior definition's reads were typed `string`.
+- **Every read sends exactly the version it is given — none is dropped or
+  rewritten.** Requests that change for a given version (a correction of
+  39.x; [MIGRATION-40.md](docs/usage/MIGRATION-40.md#requests-that-change)):
+  a class include's (local types, definitions, macros, test classes) and an
+  enhancement's `read`, and the address `getObjectSourceUri('ENHO/XHH', …)`
+  builds, carry `inactive` as `version=inactive` (was `workingArea`;
+  `readObjectSource` reads no `ENHO/XHH`, unchanged); a
+  metadata extension's `read` and `getBehaviorImplementationImplementations`
+  send `active` as `version=active` (was no version); a message class
+  message's `read` / `readMetadata` send the version (was dropped). Measured
+  on premise (2026-11-01, read only): a class include and a metadata
+  extension source answer `200` to `active`, `inactive` and `workingArea`.
+  Migrating: a caller that relied on the rewrite passes `'workingArea'` for
+  a working area and `'active'` for what is active.
+- Why the caller names it: measured on premise (2026-11-01, read only), a
+  class with an inactive version answered its inactive document and source
+  to a read with no version, to `inactive` and to `workingArea`, and its
+  active ones only to `active` — a read without a version is not "the active
+  version". The README's "Name the version you mean" has the measurement per
+  endpoint family (which refuse an unknown value `400`, which answer it
+  `200`).
+
+### Unchanged
+
+- **No version, no `version`.** The reads that sent none without a version
+  still send none; those that defaulted one no longer do (Breaking). The include's metadata read
+  still sends no `withLongPolling`, nor do the feature toggle's and the
+  service binding's reads; the transport request takes no version (a message
+  class message's `read` / `readMetadata` send the version they are given —
+  Added).
+
+### Fixed
+
+- **`getUtils().readObjectMetadata('TTYP/DA', …)` asks for
+  `application/vnd.sap.adt.tabletype.v1+xml`**, the Accept of
+  `getTableType().readMetadata()`. The list it sent
+  (`tabletypes.v2+xml, tabletypes.v1+xml, blues.v1+xml`) was refused `406`
+  on premise (2026-11-01, read only) while this one answered `200`.
+
+### Security
+
+- **`overrides` for three dev-only advisories with no fix inside the
+  ranges jest declares**, so `npm audit --audit-level=moderate` passes again
+  (all three reached only through jest 30's dependencies; nothing is
+  published with them):
+  - `deepmerge` `4.1.1` — GHSA-gcqx-w48m-w2h4 (prototype poisoning,
+    `>=4.2.0 <=4.3.1`, no fixed release). 4.1.1 is the last release outside
+    the range; jest-config uses only `deepmerge.all`, which 4.1.1 has.
+  - `glob` `^14.0.2` — GHSA-3g3m-2fjr-6pw4 (`>=9.0.0 <=14.0.1`); jest-config,
+    jest-runtime, `@jest/reporters` and test-exclude declare `^10` / `^13`.
+  - `minimatch` `^11.0.1` — GHSA-g3hv-75wg-m249 (`<11.0.1`); glob and
+    test-exclude declare `^9` / `^10`.
+  The whole suite (and a coverage run, test-exclude's path) passes with them.
+  `follow-redirects` (GHSA-mrwp-f3q8-3g9p, axios) is 1.16.2 in the lockfile,
+  inside axios's range — no override.
+
 ## [39.0.0] - 2026-10-30
 
 On `@mcp-abap-adt/interfaces-adt` `^24.0.1` and `@mcp-abap-adt/adt-strategies`

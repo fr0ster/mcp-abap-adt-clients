@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * AdtInterface - CRUD for `INTF/OI` interfaces.
  *
@@ -198,7 +199,7 @@ export class AdtInterface<
   /** Read the interface's source. */
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
-    version?: 'active' | 'inactive',
+    version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     // The caller's deadline, if they set one, on every request below.

@@ -14,6 +14,15 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.18.0] - 2026-11-01
+
+### Changed
+
+- **`@mcp-abap-adt/interfaces-adt` is `^25.0.0`**, as `adt-clients` 40.0.0
+  declares it (the shared-range rule). A 0.x minor because the range crosses
+  a major of interfaces-adt. Nothing else in this package changed: no
+  strategy and no exported type.
+
 ## [0.17.0] - 2026-10-30
 
 ### Changed

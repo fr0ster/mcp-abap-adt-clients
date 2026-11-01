@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * AdtFunctionInclude - CRUD for `FUGR/I` function-group includes.
  *
@@ -243,7 +244,7 @@ export class AdtFunctionInclude<
    */
   async read<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
-    version?: 'active' | 'inactive',
+    version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -252,13 +253,7 @@ export class AdtFunctionInclude<
     const { group, include } = this.names(config);
 
     return answering(
-      () =>
-        readFunctionIncludeSource(
-          connection,
-          group,
-          include,
-          version ?? 'active',
-        ),
+      () => readFunctionIncludeSource(connection, group, include, version),
       this.results.source as IResultStrategy<ReturnType<R['source']>>,
       options?.analyse,
     );
@@ -273,9 +268,7 @@ export class AdtFunctionInclude<
    */
   async readMetadata<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
-    options?: IReadOptions & {
-      version?: 'active' | 'inactive';
-    } & IAdtOperationOptions<E>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -288,7 +281,7 @@ export class AdtFunctionInclude<
           connection,
           group,
           include,
-          options?.version ?? 'active',
+          options?.version,
           options,
         ),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,

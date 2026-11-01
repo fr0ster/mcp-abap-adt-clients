@@ -193,13 +193,7 @@ export class AdtAuthorizationField<
     const name = this.name(config);
 
     return answering(
-      () =>
-        readAuthorizationField(
-          connection,
-          name,
-          options?.version ?? 'active',
-          options,
-        ),
+      () => readAuthorizationField(connection, name, options?.version, options),
       this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
       options?.analyse,
     );

@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * The testclasses include of a class.
  *
@@ -113,7 +114,7 @@ export class AdtLocalTestClass<
   /** Read the include's source. */
   async read<E extends IAdtError = IAdtError>(
     config: Partial<ILocalTestClassConfig>,
-    version: 'active' | 'inactive' = 'active',
+    version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     // The caller's deadline, if they set one, on every request below.

@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * AdtProgram - CRUD for `PROG/P` programs.
  *
@@ -257,7 +258,7 @@ export class AdtProgram<
   /** Read the program's source. */
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-    version?: 'active' | 'inactive',
+    version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     // The caller's deadline, if they set one, on every request below.

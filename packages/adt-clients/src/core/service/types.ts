@@ -1,4 +1,7 @@
-import type { IServiceResults } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtReadVersion,
+  IServiceResults,
+} from '@mcp-abap-adt/interfaces-adt';
 import {
   type DesiredPublicationState,
   type GeneratedServiceType,
@@ -138,7 +141,7 @@ export interface IActivateServiceBindingParams {
 
 export interface ICheckServiceBindingParams {
   bindingName: string;
-  version?: 'active' | 'inactive';
+  version?: AdtReadVersion;
 }
 
 export interface IDeleteServiceBindingParams {
@@ -160,7 +163,7 @@ export interface IPublishODataV2Params {
 
 export interface IReadServiceBindingParams {
   bindingName: string;
-  version?: 'active' | 'inactive';
+  version?: AdtReadVersion;
 }
 
 export interface ITransportCheckServiceBindingParams {

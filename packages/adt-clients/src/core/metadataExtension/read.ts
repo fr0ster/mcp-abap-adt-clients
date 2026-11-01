@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * Read Metadata Extension (DDLX)
  *
@@ -20,6 +21,7 @@ import {
   sourceUri,
   transportUri,
 } from '../../endpoints/objects';
+import { readQuery } from '../shared/readQuery';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -40,8 +42,7 @@ export async function readMetadataExtension(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const query = options?.withLongPolling ? '?withLongPolling=true' : '';
-  const url = `${METADATA_EXTENSION.uri(name)}${query}`;
+  const url = `${METADATA_EXTENSION.uri(name)}${readQuery(options?.version, options?.withLongPolling)}`;
 
   const headers = {
     Accept: options?.accept ?? CT_METADATA_EXTENSION,
@@ -72,17 +73,11 @@ export async function readMetadataExtension(
 export async function readMetadataExtensionSource(
   connection: IAbapConnection,
   name: string,
-  version: 'active' | 'inactive' = 'active',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const versionQuery = version === 'inactive' ? '?version=inactive' : '';
-  const longPollingQuery = options?.withLongPolling
-    ? versionQuery
-      ? '&withLongPolling=true'
-      : '?withLongPolling=true'
-    : '';
-  const url = `${sourceUri(METADATA_EXTENSION.uri(name))}${versionQuery}${longPollingQuery}`;
+  const url = `${sourceUri(METADATA_EXTENSION.uri(name))}${readQuery(version, options?.withLongPolling)}`;
 
   const headers = {
     Accept: options?.accept ?? ACCEPT_SOURCE,

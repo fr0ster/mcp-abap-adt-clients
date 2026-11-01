@@ -171,8 +171,6 @@ export const ACCEPT_TABLE =
 export const CT_TABLE = 'application/vnd.sap.adt.tables.v2+xml';
 
 // Table Types
-export const ACCEPT_TABLE_TYPE =
-  'application/vnd.sap.adt.tabletypes.v2+xml, application/vnd.sap.adt.tabletypes.v1+xml, application/vnd.sap.adt.blues.v1+xml';
 export const CT_TABLE_TYPE = 'application/vnd.sap.adt.tabletype.v1+xml';
 
 // Domains

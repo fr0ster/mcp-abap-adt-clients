@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * AdtUtilsLegacy - Utility operations for legacy SAP systems (7.40 SP04)
  *
@@ -493,10 +494,7 @@ ${objectReferences}
     objectName: string,
     ...rest: ParentedArguments<
       C,
-      [
-        version?: 'active' | 'inactive',
-        options?: IReadOptions & IAdtAnalyseOptions<E>,
-      ]
+      [version?: AdtReadVersion, options?: IReadOptions & IAdtAnalyseOptions<E>]
     >
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     const endpoint = refusedFor(SOURCE_REFUSED, objectType);

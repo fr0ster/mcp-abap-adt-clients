@@ -14,6 +14,7 @@
  */
 import type {
   AdtParentedTypeCode,
+  AdtReadVersion,
   AdtSourceTypeCode,
   IReadOptions,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -24,20 +25,20 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { sourceUri } from '../../endpoints/objects';
 import { buildObjectUri } from '../../utils/activationUtils';
-import { enhancementVersionToken } from '../enhancement/read';
 import {
   type AdtMetadataReadCode,
   type AdtSourceReadCode,
   isSourceReadCode,
   METADATA_READ,
 } from './codeSets';
+import { readQuery } from './readQuery';
 
 export async function objectSourceWire(
   connection: IAbapConnection,
   objectType: AdtSourceReadCode,
   objectName: string,
   functionGroup?: string,
-  version?: 'active' | 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
@@ -81,17 +82,7 @@ export async function objectMetadataWire(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  let uri = getObjectMetadataUri(objectType, objectName, functionGroup);
-  const params = [];
-  if (options?.version) {
-    params.push(`version=${options.version}`);
-  }
-  if (options?.withLongPolling) {
-    params.push('withLongPolling=true');
-  }
-  if (params.length > 0) {
-    uri += `?${params.join('&')}`;
-  }
+  const uri = `${getObjectMetadataUri(objectType, objectName, functionGroup)}${readQuery(options?.version, options?.withLongPolling)}`;
   const acceptHeader = options?.accept ?? getMetadataAcceptHeader(objectType);
   return connection.makeAdtRequest({
     url: uri,
@@ -124,18 +115,8 @@ export function getMetadataAcceptHeader(
 }
 
 /**
- * The `version` each code's source is asked for, where it is not the word
- * itself: an enhancement's inactive source is its `workingArea`.
- */
-const VERSION_TOKEN: Readonly<
-  Partial<Record<AdtSourceTypeCode, (version: 'active' | 'inactive') => string>>
-> = {
-  'ENHO/XHH': enhancementVersionToken,
-};
-
-/**
  * An object's main source address: its address from the tables, then
- * `/source/main`, and the version as the code's own resource spells it. A
+ * `/source/main`, and the version as the caller named it. A
  * pure address — it sends nothing — so it is built for every code with a
  * source, the parent required for a parented one.
  */
@@ -143,13 +124,10 @@ export function getObjectSourceUri<C extends AdtSourceTypeCode>(
   objectType: C,
   objectName: string,
   ...[functionGroup, version]: [C] extends [AdtParentedTypeCode]
-    ? [functionGroup: string, version?: 'active' | 'inactive']
-    : [functionGroup?: string, version?: 'active' | 'inactive']
+    ? [functionGroup: string, version?: AdtReadVersion]
+    : [functionGroup?: string, version?: AdtReadVersion]
 ): string {
-  const token = version
-    ? (VERSION_TOKEN[objectType]?.(version) ?? version)
-    : undefined;
-  const versionParam = token ? `?version=${token}` : '';
+  const versionParam = version ? `?version=${version}` : '';
   const code: AdtSourceTypeCode = objectType;
   return `${sourceUri(buildObjectUri(objectName, code, functionGroup))}${versionParam}`;
 }

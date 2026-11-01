@@ -27,7 +27,8 @@ compiler checks, where the client is taken, that `AdtClient` satisfies it. See
 [The contract you accept is yours](../../README.md#the-contract-you-accept-is-yours)
 and [MIGRATION-38.md](MIGRATION-38.md); since 39.0.0 the search filter takes
 search names and where-used and the group members interfaces-adt's typed
-references ([MIGRATION-39.md](MIGRATION-39.md)).
+references ([MIGRATION-39.md](MIGRATION-39.md)); since 40.0.0 every read
+takes `AdtReadVersion` ([MIGRATION-40.md](MIGRATION-40.md)).
 
 **Every member issues one ADT request.** `create` is the POST, `update` is the
 write and carries `options.lockHandle` as given, `delete` is the DELETE,
@@ -1178,6 +1179,15 @@ the ADT type tables whose request they send (`AdtMetadataReadCode`,
 (`'DDLS'`) or a code outside the set does not compile, and from a caller
 outside the type system is refused before any request. A function module's
 group is required (`readObjectSource('FUGR/FF', 'Z_MY_FM', 'ZMY_GROUP')`).
+
+`readObjectMetadata` sends `options.version` and `readObjectSource` its
+`version` (`active`, `inactive` or `workingArea`) as `?version=<value>`, as
+every handler's `readMetadata` and `read` do
+(since 40.0.0; README, "Name the version you mean"); without one it sends no
+version. `TTYP/DA` is asked for `application/vnd.sap.adt.tabletype.v1+xml`,
+the Accept of `getTableType().readMetadata()` (since 40.0.0: the
+`tabletypes.v2/v1, blues.v1` list it sent before was refused `406` on
+premise).
 
 ```typescript
 import type {
