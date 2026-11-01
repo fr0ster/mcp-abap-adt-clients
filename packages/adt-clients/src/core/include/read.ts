@@ -7,19 +7,22 @@
  * told by content, not by status.
  */
 
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import { readQuery } from '../shared/readQuery';
 import { CT_INCLUDE } from './create';
 import { includeUrl } from './lock';
 
 export async function getIncludeMetadata(
   connection: IAbapConnection,
   includeName: string,
+  version?: AdtReadVersion,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
-    url: includeUrl(includeName),
+    url: `${includeUrl(includeName)}${readQuery(version, undefined)}`,
     method: 'GET',
     timeout: 0,
     headers: { Accept: CT_INCLUDE },

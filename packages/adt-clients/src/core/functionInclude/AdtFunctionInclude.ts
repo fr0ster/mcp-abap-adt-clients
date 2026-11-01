@@ -273,9 +273,7 @@ export class AdtFunctionInclude<
    */
   async readMetadata<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
-    options?: IReadOptions & {
-      version?: 'active' | 'inactive';
-    } & IAdtOperationOptions<E>,
+    options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);

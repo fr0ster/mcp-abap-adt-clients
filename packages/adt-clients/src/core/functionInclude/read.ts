@@ -2,7 +2,10 @@
  * FunctionInclude (FUGR/I) read operations
  */
 
-import type { IReadOptions } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtReadVersion,
+  IReadOptions,
+} from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -22,7 +25,7 @@ export async function readFunctionInclude(
   connection: IAbapConnection,
   groupName: string,
   includeName: string,
-  version: 'active' | 'inactive' = 'active',
+  version: AdtReadVersion = 'active',
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
   const params = new URLSearchParams();

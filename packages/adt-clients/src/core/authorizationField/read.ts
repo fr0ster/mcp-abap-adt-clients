@@ -2,7 +2,10 @@
  * AuthorizationField (SUSO / AUTH) read operations
  */
 
-import type { IReadOptions } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtReadVersion,
+  IReadOptions,
+} from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -19,7 +22,7 @@ export type { IReadOptions } from '@mcp-abap-adt/interfaces-adt';
 export async function readAuthorizationField(
   connection: IAbapConnection,
   name: string,
-  version: 'active' | 'inactive' = 'active',
+  version: AdtReadVersion = 'active',
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
   const params = new URLSearchParams();

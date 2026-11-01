@@ -2,6 +2,7 @@
  * Package read operations
  */
 
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -9,6 +10,7 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { ACCEPT_PACKAGE, ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { PACKAGE, transportUri } from '../../endpoints/objects';
+import { readQuery } from '../shared/readQuery';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -17,14 +19,11 @@ import type { IReadOptions } from '../shared/types';
 export async function getPackage(
   connection: IAbapConnection,
   packageName: string,
-  version: 'active' | 'inactive' = 'active',
+  version: AdtReadVersion = 'active',
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const longPollingQuery = options?.withLongPolling
-    ? '&withLongPolling=true'
-    : '';
-  const url = `${PACKAGE.uri(packageName)}?version=${version}${longPollingQuery}`;
+  const url = `${PACKAGE.uri(packageName)}${readQuery(version, options?.withLongPolling)}`;
 
   return connection.makeAdtRequest({
     url,

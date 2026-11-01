@@ -12,6 +12,7 @@ import {
   ACCEPT_TRANSPORT,
   ENHANCEMENT_CONTENT_TYPES,
 } from '../../constants/contentTypes';
+import { readQuery } from '../shared/readQuery';
 import type { IReadOptions } from '../shared/types';
 import {
   type EnhancementType,
@@ -35,11 +36,7 @@ export async function getEnhancementMetadata(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  let url = getEnhancementUri(enhancementType, enhancementName);
-
-  if (options?.withLongPolling) {
-    url += '?withLongPolling=true';
-  }
+  const url = `${getEnhancementUri(enhancementType, enhancementName)}${readQuery(options?.version, options?.withLongPolling)}`;
 
   return connection.makeAdtRequest({
     url,

@@ -20,6 +20,7 @@ import {
   sourceUri,
   transportUri,
 } from '../../endpoints/objects';
+import { readQuery } from '../shared/readQuery';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -40,8 +41,7 @@ export async function readMetadataExtension(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const query = options?.withLongPolling ? '?withLongPolling=true' : '';
-  const url = `${METADATA_EXTENSION.uri(name)}${query}`;
+  const url = `${METADATA_EXTENSION.uri(name)}${readQuery(options?.version, options?.withLongPolling)}`;
 
   const headers = {
     Accept: options?.accept ?? CT_METADATA_EXTENSION,

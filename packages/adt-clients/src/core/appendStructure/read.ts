@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -9,23 +10,17 @@ import {
   ACCEPT_TRANSPORT,
 } from '../../constants/contentTypes';
 import { STRUCTURE, sourceUri, transportUri } from '../../endpoints/objects';
+import { readQuery } from '../shared/readQuery';
 import type { IReadOptions } from '../shared/types';
-
-function buildQuery(version?: string, options?: IReadOptions): string {
-  const q: string[] = [];
-  if (version) q.push(`version=${version}`);
-  if (options?.withLongPolling) q.push('withLongPolling=true');
-  return q.length ? `?${q.join('&')}` : '';
-}
 
 export async function getAppendStructure(
   connection: IAbapConnection,
   name: string,
-  version: 'active' | 'inactive' = 'inactive',
+  version: AdtReadVersion = 'inactive',
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const url = `${STRUCTURE.uri(name)}${buildQuery(version, options)}`;
+  const url = `${STRUCTURE.uri(name)}${readQuery(version, options?.withLongPolling)}`;
   return connection.makeAdtRequest({
     url,
     method: 'GET',
@@ -41,7 +36,7 @@ export async function getAppendStructureSource(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const url = `${sourceUri(STRUCTURE.uri(name))}${buildQuery(version, options)}`;
+  const url = `${sourceUri(STRUCTURE.uri(name))}${readQuery(version, options?.withLongPolling)}`;
   return connection.makeAdtRequest({
     url,
     method: 'GET',

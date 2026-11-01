@@ -9,6 +9,7 @@ import type {
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { FUNCTION_GROUP, transportUri } from '../../endpoints/objects';
 import { getObjectSourceUri } from '../shared/objectWire';
+import { readQuery } from '../shared/readQuery';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -19,8 +20,7 @@ export async function getFunctionGroup(
   functionGroupName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const query = options?.withLongPolling ? '?withLongPolling=true' : '';
-  const url = `${FUNCTION_GROUP.uri(functionGroupName)}${query}`;
+  const url = `${FUNCTION_GROUP.uri(functionGroupName)}${readQuery(options?.version, options?.withLongPolling)}`;
 
   return connection.makeAdtRequest({
     url,

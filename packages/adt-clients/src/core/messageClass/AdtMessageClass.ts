@@ -10,6 +10,7 @@
  */
 
 import type {
+  AdtReadVersion,
   AdtVariant,
   IAdtAnalyseOptions,
   IAdtCreatable,
@@ -191,7 +192,7 @@ export class AdtMessageClass<
     config: Partial<IMessageClassConfig>,
     options?: {
       withLongPolling?: boolean;
-      version?: 'active' | 'inactive';
+      version?: AdtReadVersion;
     } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
     // The caller's deadline, if they set one, on every request below.

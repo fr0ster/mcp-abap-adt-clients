@@ -11,6 +11,7 @@ import {
   ACCEPT_TRANSPORT,
 } from '../../constants/contentTypes';
 import { DATA_ELEMENT, transportUri } from '../../endpoints/objects';
+import { readQuery } from '../shared/readQuery';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -21,8 +22,7 @@ export async function getDataElement(
   dataElementName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const query = options?.withLongPolling ? '?withLongPolling=true' : '';
-  const url = `${DATA_ELEMENT.uri(dataElementName)}${query}`;
+  const url = `${DATA_ELEMENT.uri(dataElementName)}${readQuery(options?.version, options?.withLongPolling)}`;
 
   return connection.makeAdtRequest({
     url,

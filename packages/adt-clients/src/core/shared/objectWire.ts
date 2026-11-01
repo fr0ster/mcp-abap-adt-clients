@@ -31,6 +31,7 @@ import {
   isSourceReadCode,
   METADATA_READ,
 } from './codeSets';
+import { readQuery } from './readQuery';
 
 export async function objectSourceWire(
   connection: IAbapConnection,
@@ -81,17 +82,7 @@ export async function objectMetadataWire(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  let uri = getObjectMetadataUri(objectType, objectName, functionGroup);
-  const params = [];
-  if (options?.version) {
-    params.push(`version=${options.version}`);
-  }
-  if (options?.withLongPolling) {
-    params.push('withLongPolling=true');
-  }
-  if (params.length > 0) {
-    uri += `?${params.join('&')}`;
-  }
+  const uri = `${getObjectMetadataUri(objectType, objectName, functionGroup)}${readQuery(options?.version, options?.withLongPolling)}`;
   const acceptHeader = options?.accept ?? getMetadataAcceptHeader(objectType);
   return connection.makeAdtRequest({
     url: uri,

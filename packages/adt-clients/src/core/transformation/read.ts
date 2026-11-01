@@ -13,6 +13,7 @@ import {
   TRANSFORMATION,
   transportUri,
 } from '../../endpoints/objects';
+import { readQuery } from '../shared/readQuery';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -25,15 +26,7 @@ export async function getTransformation(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const queryParams: string[] = [];
-  if (version) {
-    queryParams.push(`version=${version}`);
-  }
-  if (options?.withLongPolling) {
-    queryParams.push('withLongPolling=true');
-  }
-  const query = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
-  const url = `${TRANSFORMATION.uri(transformationName)}${query}`;
+  const url = `${TRANSFORMATION.uri(transformationName)}${readQuery(version, options?.withLongPolling)}`;
 
   return connection.makeAdtRequest({
     url,

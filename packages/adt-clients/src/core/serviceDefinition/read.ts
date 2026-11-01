@@ -17,6 +17,7 @@ import {
   sourceUri,
   transportUri,
 } from '../../endpoints/objects';
+import { readQuery } from '../shared/readQuery';
 import type { IReadOptions } from '../shared/types';
 
 /**
@@ -29,15 +30,7 @@ export async function getServiceDefinition(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const queryParams: string[] = [];
-  if (version) {
-    queryParams.push(`version=${version}`);
-  }
-  if (options?.withLongPolling) {
-    queryParams.push('withLongPolling=true');
-  }
-  const query = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
-  const url = `${SERVICE_DEFINITION.uri(serviceDefinitionName)}${query}`;
+  const url = `${SERVICE_DEFINITION.uri(serviceDefinitionName)}${readQuery(version, options?.withLongPolling)}`;
 
   return connection.makeAdtRequest({
     url,
