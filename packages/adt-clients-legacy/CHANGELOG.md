@@ -24,9 +24,10 @@ On `@mcp-abap-adt/adt-clients` `^40.0.0`, `@mcp-abap-adt/adt-strategies`
 - **An inherited read sends the version its caller names**, `workingArea`
   included, as `?version=<value>`: every metadata read sends
   `options.version` (adt-clients 40.0.0), and every source read sends
-  exactly the version it is given — a class include's or an enhancement's
-  `inactive` as `inactive` (was `workingArea`), a metadata extension's
-  `active` as `active` (was none). Of the `*Legacy` classes only the
+  exactly the version it is given — a class include's `inactive` as
+  `inactive` (was `workingArea`). The enhancement and the metadata extension
+  are refused on 7.40 with no request, so their changes do not reach this
+  package. Of the `*Legacy` classes only the
   package's (refused) and the transport request's (no version) override
   `readMetadata`. **Not measured on 7.40:** what 7.40 answers to a version, to
   `workingArea` and to the changed requests above all, is its own. A read

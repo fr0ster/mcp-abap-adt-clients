@@ -75,8 +75,9 @@ changed request (listed under Breaking and Added).
   rewritten.** Requests that change for a given version (a correction of
   39.x; [MIGRATION-40.md](docs/usage/MIGRATION-40.md#requests-that-change)):
   a class include's (local types, definitions, macros, test classes) and an
-  enhancement's `read`, and `getObjectSourceUri` / `readObjectSource` for
-  `ENHO/XHH`, send `inactive` as `version=inactive` (was `workingArea`); a
+  enhancement's `read`, and the address `getObjectSourceUri('ENHO/XHH', …)`
+  builds, carry `inactive` as `version=inactive` (was `workingArea`;
+  `readObjectSource` reads no `ENHO/XHH`, unchanged); a
   metadata extension's `read` and `getBehaviorImplementationImplementations`
   send `active` as `version=active` (was no version); a message class
   message's `read` / `readMetadata` send the version (was dropped). Measured
@@ -97,8 +98,9 @@ changed request (listed under Breaking and Added).
 - **No version, no `version`.** The reads that sent none without a version
   still send none; those that defaulted one no longer do (Breaking). The include's metadata read
   still sends no `withLongPolling`, nor do the feature toggle's and the
-  service binding's reads; the transport request and a message class message
-  take no version.
+  service binding's reads; the transport request takes no version (a message
+  class message's `read` / `readMetadata` send the version they are given —
+  Added).
 
 ### Fixed
 

@@ -51,7 +51,7 @@ A correction of what 39.x sent:
 |---|---|---|
 | `readMetadata` of domain, data element, table type, function group, include, message class, metadata extension, enhancement | no `version` at all | `?version=<given>` |
 | `read` of a class include (local types, definitions, macros, test classes) | `inactive` sent as `version=workingArea` | `version=inactive` |
-| `read` of an enhancement, and `getObjectSourceUri('ENHO/XHH', …)` / `readObjectSource('ENHO/XHH', …)` | `inactive` sent as `version=workingArea` | `version=inactive` |
+| `read` of an enhancement, and the address `getObjectSourceUri('ENHO/XHH', …)` builds (`readObjectSource` reads no `ENHO/XHH`) | `inactive` sent as `version=workingArea` | `version=inactive` |
 | `read` of a metadata extension | `active` sent as no `version` | `version=active` |
 | `getBehaviorImplementationImplementations(…, 'active')` | `active` sent as no `version` | `version=active` |
 | `read` / `readMetadata` of a message class message | version dropped | `?version=<given>` |
