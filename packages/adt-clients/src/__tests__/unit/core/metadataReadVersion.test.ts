@@ -2,7 +2,7 @@
  * Every metadata read sends the version its caller names — `active`,
  * `inactive` or `workingArea` — as `version=<value>`, beside
  * `withLongPolling=true` when that is asked for too; and a read that names no
- * version sends exactly the request it sent before this rule.
+ * version sends none — the library substitutes no default (40.0.0).
  *
  * Why the caller names it: measured on premise (2026-11-01, read only),
  * a class with an inactive version answered its inactive document to a read
@@ -31,8 +31,6 @@ interface MetadataRead {
   ) => Promise<unknown>;
   /** The object's address, no query. */
   readonly url: string;
-  /** The version the read sent before when none is named; none for most. */
-  readonly unnamed?: AdtReadVersion;
   /** Whether the read sends `withLongPolling` when it is asked for. */
   readonly longPolling: boolean;
 }
@@ -105,7 +103,6 @@ const READS: readonly MetadataRead[] = [
           o,
         ),
     url: '/sap/bc/adt/functions/groups/zfg_v/includes/lzfg_vf01',
-    unnamed: 'active',
     longPolling: true,
   },
   {
@@ -132,7 +129,6 @@ const READS: readonly MetadataRead[] = [
     read: (c, o) =>
       c.getAppendStructure().readMetadata({ appendStructureName: 'ZAPP_V' }, o),
     url: '/sap/bc/adt/ddic/structures/zapp_v',
-    unnamed: 'inactive',
     longPolling: true,
   },
   {
@@ -159,7 +155,6 @@ const READS: readonly MetadataRead[] = [
     kind: 'package',
     read: (c, o) => c.getPackage().readMetadata({ packageName: 'ZPKG_V' }, o),
     url: '/sap/bc/adt/packages/zpkg_v',
-    unnamed: 'active',
     longPolling: true,
   },
   {
@@ -175,7 +170,6 @@ const READS: readonly MetadataRead[] = [
         .getServiceDefinition()
         .readMetadata({ serviceDefinitionName: 'ZSD_V' }, o),
     url: '/sap/bc/adt/ddic/srvd/sources/zsd_v',
-    unnamed: 'active',
     longPolling: true,
   },
   {
@@ -190,7 +184,6 @@ const READS: readonly MetadataRead[] = [
     read: (c, o) =>
       c.getAccessControl().readMetadata({ accessControlName: 'ZDCL_V' }, o),
     url: '/sap/bc/adt/acm/dcl/sources/zdcl_v',
-    unnamed: 'active',
     longPolling: true,
   },
   {
@@ -198,7 +191,6 @@ const READS: readonly MetadataRead[] = [
     read: (c, o) =>
       c.getBehaviorDefinition().readMetadata({ name: 'ZBDEF_V' }, o),
     url: '/sap/bc/adt/bo/behaviordefinitions/zbdef_v',
-    unnamed: 'active',
     longPolling: true,
   },
   {
@@ -206,7 +198,6 @@ const READS: readonly MetadataRead[] = [
     read: (c, o) =>
       c.getTransformation().readMetadata({ transformationName: 'ZXSLT_V' }, o),
     url: '/sap/bc/adt/xslt/transformations/zxslt_v',
-    unnamed: 'active',
     longPolling: true,
   },
   {
@@ -214,7 +205,6 @@ const READS: readonly MetadataRead[] = [
     read: (c, o) =>
       c.getScalarFunction().readMetadata({ scalarFunctionName: 'ZSF_V' }, o),
     url: '/sap/bc/adt/ddic/dsfd/sources/zsf_v',
-    unnamed: 'active',
     longPolling: true,
   },
   {
@@ -224,7 +214,6 @@ const READS: readonly MetadataRead[] = [
         .getScalarFunctionImplementation()
         .readMetadata({ implementationName: 'ZSFI_V' }, o),
     url: '/sap/bc/adt/ddic/dsfi/zsfi_v',
-    unnamed: 'inactive',
     longPolling: true,
   },
   {
@@ -234,7 +223,6 @@ const READS: readonly MetadataRead[] = [
         .getAuthorizationField()
         .readMetadata({ authorizationFieldName: 'ZAUTHF_V' }, o),
     url: '/sap/bc/adt/aps/iam/auth/zauthf_v',
-    unnamed: 'active',
     longPolling: true,
   },
   {
@@ -288,22 +276,14 @@ describe.each(READS)('$kind metadata read', (read) => {
     );
   });
 
-  it('sends the request it sent before when no version is named', async () => {
-    const before = read.unnamed ? `?version=${read.unnamed}` : '';
-    expect(await sentUrl(read, {})).toBe(`${read.url}${before}`);
+  it('sends no version when none is named', async () => {
+    expect(await sentUrl(read, {})).toBe(read.url);
   });
 
-  it('…and with long polling, the request it sent before', async () => {
-    const params: string[] = [];
-    if (read.unnamed) {
-      params.push(`version=${read.unnamed}`);
-    }
-    if (read.longPolling) {
-      params.push('withLongPolling=true');
-    }
-    const query = params.length > 0 ? `?${params.join('&')}` : '';
+  it('…and with long polling, still no version', async () => {
+    const longPolling = read.longPolling ? '?withLongPolling=true' : '';
     expect(await sentUrl(read, { withLongPolling: true })).toBe(
-      `${read.url}${query}`,
+      `${read.url}${longPolling}`,
     );
   });
 });
@@ -336,14 +316,14 @@ describe('reads that pass the version as request params', () => {
     });
   });
 
-  it('feature toggle sends what it sent before when no version is named', async () => {
+  it('feature toggle sends no version when none is named', async () => {
     expect(
       await sent((c) =>
         c.getFeatureToggle().readMetadata({ featureToggleName: 'ZFT_V' }),
       ),
     ).toEqual({
       url: '/sap/bc/adt/sfw/featuretoggles/zft_v',
-      params: { version: 'active' },
+      params: undefined,
     });
   });
 
@@ -360,7 +340,7 @@ describe('reads that pass the version as request params', () => {
     });
   });
 
-  it('service binding sends what it sent before when no version is named', async () => {
+  it('service binding sends no version when none is named', async () => {
     expect(
       await sent((c) =>
         c.getServiceBinding().readMetadata({ bindingName: 'ZSB_V' }),

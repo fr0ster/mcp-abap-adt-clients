@@ -3,8 +3,8 @@
  * `AdtReadVersion`: `active`, `inactive` or `workingArea` — and sends exactly
  * the version it is given: none is dropped, defaulted or rewritten (a class
  * include's or an enhancement's `inactive` is sent as `inactive`, a metadata
- * extension's `active` as `active`). A read given no version sends the
- * request it sent before, its old default included.
+ * extension's `active` as `active`). A read given no version sends none:
+ * the library substitutes no default (40.0.0).
  *
  * Each case asserts the whole URL (or the request params, for the reads that
  * pass the version that way), so a second `?` or a dropped parameter fails.
@@ -42,12 +42,6 @@ const AS_GIVEN: Queries = {
   workingArea: '?version=workingArea',
 };
 
-/** A read that defaults a missing version to `active`. */
-const ACTIVE_BY_DEFAULT: Queries = { ...AS_GIVEN, none: '?version=active' };
-
-/** A read that defaults a missing version to `inactive`. */
-const INACTIVE_BY_DEFAULT: Queries = { ...AS_GIVEN, none: '?version=inactive' };
-
 const READS: readonly SourceRead[] = [
   {
     kind: 'class',
@@ -59,25 +53,25 @@ const READS: readonly SourceRead[] = [
     kind: 'class local types',
     read: (c, v) => c.getLocalTypes().read({ className: 'ZCL_V' }, v),
     url: '/sap/bc/adt/oo/classes/zcl_v/includes/implementations',
-    queries: ACTIVE_BY_DEFAULT,
+    queries: AS_GIVEN,
   },
   {
     kind: 'class local definitions',
     read: (c, v) => c.getLocalDefinitions().read({ className: 'ZCL_V' }, v),
     url: '/sap/bc/adt/oo/classes/zcl_v/includes/definitions',
-    queries: ACTIVE_BY_DEFAULT,
+    queries: AS_GIVEN,
   },
   {
     kind: 'class local macros',
     read: (c, v) => c.getLocalMacros().read({ className: 'ZCL_V' }, v),
     url: '/sap/bc/adt/oo/classes/zcl_v/includes/macros',
-    queries: ACTIVE_BY_DEFAULT,
+    queries: AS_GIVEN,
   },
   {
     kind: 'class local test classes',
     read: (c, v) => c.getLocalTestClass().read({ className: 'ZCL_V' }, v),
     url: '/sap/bc/adt/oo/classes/zcl_v/includes/testclasses',
-    queries: ACTIVE_BY_DEFAULT,
+    queries: AS_GIVEN,
   },
   {
     kind: 'behavior implementation',
@@ -127,7 +121,7 @@ const READS: readonly SourceRead[] = [
         .getFunctionInclude()
         .read({ functionGroupName: 'ZFG_V', includeName: 'LZFG_VF01' }, v),
     url: '/sap/bc/adt/functions/groups/zfg_v/includes/lzfg_vf01/source/main',
-    queries: ACTIVE_BY_DEFAULT,
+    queries: AS_GIVEN,
   },
   {
     kind: 'DDL source',
@@ -152,14 +146,14 @@ const READS: readonly SourceRead[] = [
     read: (c, v) =>
       c.getAppendStructure().read({ appendStructureName: 'ZAPP_V' }, v),
     url: '/sap/bc/adt/ddic/structures/zapp_v/source/main',
-    queries: INACTIVE_BY_DEFAULT,
+    queries: AS_GIVEN,
   },
   {
     kind: 'service definition',
     read: (c, v) =>
       c.getServiceDefinition().read({ serviceDefinitionName: 'ZSD_V' }, v),
     url: '/sap/bc/adt/ddic/srvd/sources/zsd_v/source/main',
-    queries: ACTIVE_BY_DEFAULT,
+    queries: AS_GIVEN,
   },
   {
     kind: 'metadata extension',
@@ -172,27 +166,27 @@ const READS: readonly SourceRead[] = [
     read: (c, v) =>
       c.getAccessControl().read({ accessControlName: 'ZDCL_V' }, v),
     url: '/sap/bc/adt/acm/dcl/sources/zdcl_v/source/main',
-    queries: ACTIVE_BY_DEFAULT,
+    queries: AS_GIVEN,
   },
   {
     kind: 'behavior definition',
     read: (c, v) => c.getBehaviorDefinition().read({ name: 'ZBDEF_V' }, v),
     url: '/sap/bc/adt/bo/behaviordefinitions/zbdef_v/source/main',
-    queries: ACTIVE_BY_DEFAULT,
+    queries: AS_GIVEN,
   },
   {
     kind: 'transformation',
     read: (c, v) =>
       c.getTransformation().read({ transformationName: 'ZXSLT_V' }, v),
     url: '/sap/bc/adt/xslt/transformations/zxslt_v/source/main',
-    queries: ACTIVE_BY_DEFAULT,
+    queries: AS_GIVEN,
   },
   {
     kind: 'scalar function',
     read: (c, v) =>
       c.getScalarFunction().read({ scalarFunctionName: 'ZSF_V' }, v),
     url: '/sap/bc/adt/ddic/dsfd/sources/zsf_v/source/main',
-    queries: ACTIVE_BY_DEFAULT,
+    queries: AS_GIVEN,
   },
   {
     kind: 'scalar function implementation',
@@ -201,7 +195,7 @@ const READS: readonly SourceRead[] = [
         .getScalarFunctionImplementation()
         .read({ implementationName: 'ZSFI_V' }, v),
     url: '/sap/bc/adt/ddic/dsfi/zsfi_v/source/main',
-    queries: INACTIVE_BY_DEFAULT,
+    queries: AS_GIVEN,
   },
   {
     kind: 'enhancement',
@@ -210,7 +204,7 @@ const READS: readonly SourceRead[] = [
         .getEnhancement()
         .read({ enhancementName: 'ZENH_V', enhancementType: 'enhoxhh' }, v),
     url: '/sap/bc/adt/enhancements/enhoxhh/zenh_v/source/main',
-    queries: ACTIVE_BY_DEFAULT,
+    queries: AS_GIVEN,
   },
   {
     kind: 'generic source read (getUtils)',
@@ -408,5 +402,23 @@ describe('a message class message read sends the version it is given', () => {
       .getMessageClassMessage()
       .read({ className: 'ZMC_V', msgno: '001' });
     expect(connection.sent[0]?.url).toBe('/sap/bc/adt/messageclass/zmc_v');
+  });
+});
+
+describe('the feature toggle sends no version when none is named', () => {
+  it('read', async () => {
+    const connection = new RecordingConnection();
+    await new AdtClientOnPrem(connection, noopLogger)
+      .getFeatureToggle()
+      .read({ featureToggleName: 'ZFT_V' });
+    expect(connection.sent[0]?.params).toBeUndefined();
+  });
+
+  it('readSource', async () => {
+    const connection = new RecordingConnection();
+    await new AdtClientOnPrem(connection, noopLogger)
+      .getFeatureToggle()
+      .readSource({ featureToggleName: 'ZFT_V' });
+    expect(connection.sent[0]?.params).toBeUndefined();
   });
 });
