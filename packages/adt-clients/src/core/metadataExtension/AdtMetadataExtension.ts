@@ -213,13 +213,7 @@ export class AdtMetadataExtension<
     // an empty body, so absence was never a status to branch on — and whether
     // an empty body *is* absence is the caller's reading, through `analyse`.
     return answering(
-      () =>
-        readMetadataExtensionSource(
-          connection,
-          name,
-          version ?? 'active',
-          options,
-        ),
+      () => readMetadataExtensionSource(connection, name, version, options),
       this.results.source as IResultStrategy<ReturnType<R['source']>>,
       options?.analyse,
     );

@@ -60,17 +60,6 @@ export async function getEnhancementMetadata(
  * @param options - Optional parameters including withLongPolling
  * @returns Axios response with source code as text/plain
  */
-/**
- * The `version` an enhancement's source is asked for: ADT reads an
- * enhancement's inactive source as `workingArea`, not `inactive`. The one
- * translation, shared by this builder and the generic source address.
- */
-export function enhancementVersionToken(
-  version: AdtReadVersion,
-): 'active' | 'workingArea' {
-  return version === 'inactive' ? 'workingArea' : version;
-}
-
 export async function getEnhancementSource(
   connection: IAbapConnection,
   enhancementType: EnhancementType,
@@ -85,8 +74,7 @@ export async function getEnhancementSource(
     );
   }
 
-  const versionParam = enhancementVersionToken(version);
-  let url = `${getEnhancementUri(enhancementType, enhancementName)}/source/main?version=${versionParam}`;
+  let url = `${getEnhancementUri(enhancementType, enhancementName)}/source/main?version=${version}`;
 
   if (options?.withLongPolling) {
     url += '&withLongPolling=true';

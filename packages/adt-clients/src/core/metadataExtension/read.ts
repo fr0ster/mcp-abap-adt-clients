@@ -73,12 +73,11 @@ export async function readMetadataExtension(
 export async function readMetadataExtensionSource(
   connection: IAbapConnection,
   name: string,
-  version: AdtReadVersion = 'active',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  // `active` is the plain resource here and sends no version, as before.
-  const url = `${sourceUri(METADATA_EXTENSION.uri(name))}${readQuery(version === 'active' ? undefined : version, options?.withLongPolling)}`;
+  const url = `${sourceUri(METADATA_EXTENSION.uri(name))}${readQuery(version, options?.withLongPolling)}`;
 
   const headers = {
     Accept: options?.accept ?? ACCEPT_SOURCE,

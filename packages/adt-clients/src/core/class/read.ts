@@ -85,17 +85,6 @@ export async function getClassTransport(
 }
 
 /**
- * The `version` a class include is asked for: its inactive version is the
- * include's `workingArea`, so `inactive` is sent as `workingArea`; `active`
- * and `workingArea` go as they are.
- */
-function classIncludeVersion(
-  version: AdtReadVersion,
-): 'active' | 'workingArea' {
-  return version === 'inactive' ? 'workingArea' : version;
-}
-
-/**
  * Get ABAP class definitions include (local types in private section)
  * @param connection - SAP connection
  * @param className - Class name
@@ -108,9 +97,8 @@ export async function getClassDefinitionsInclude(
   logger?: ILogger,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const versionParam = classIncludeVersion(version);
   const url = longPollingQuery(
-    `${CLASS_INCLUDE.uri(className, 'definitions')}?version=${versionParam}`,
+    `${CLASS_INCLUDE.uri(className, 'definitions')}?version=${version}`,
     options?.withLongPolling,
   );
 
@@ -137,9 +125,8 @@ export async function getClassMacrosInclude(
   logger?: ILogger,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const versionParam = classIncludeVersion(version);
   const url = longPollingQuery(
-    `${CLASS_INCLUDE.uri(className, 'macros')}?version=${versionParam}`,
+    `${CLASS_INCLUDE.uri(className, 'macros')}?version=${version}`,
     options?.withLongPolling,
   );
 
@@ -166,9 +153,8 @@ export async function getClassTestClassesInclude(
   logger?: ILogger,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const versionParam = classIncludeVersion(version);
   const url = longPollingQuery(
-    `${CLASS_INCLUDE.uri(className, 'testclasses')}?version=${versionParam}`,
+    `${CLASS_INCLUDE.uri(className, 'testclasses')}?version=${version}`,
     options?.withLongPolling,
   );
 
@@ -195,9 +181,8 @@ export async function getClassImplementationsInclude(
   logger?: ILogger,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const versionParam = classIncludeVersion(version);
   const url = longPollingQuery(
-    `${CLASS_INCLUDE.uri(className, 'implementations')}?version=${versionParam}`,
+    `${CLASS_INCLUDE.uri(className, 'implementations')}?version=${version}`,
     options?.withLongPolling,
   );
 

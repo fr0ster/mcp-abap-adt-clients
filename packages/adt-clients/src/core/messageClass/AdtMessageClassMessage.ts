@@ -119,7 +119,7 @@ export class AdtMessageClassMessage<
    */
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassMessageConfig>,
-    _version?: AdtReadVersion,
+    version?: AdtReadVersion,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -128,7 +128,7 @@ export class AdtMessageClassMessage<
     const { name, no } = this.names(config);
 
     return answering(
-      () => getMessageClassSource(connection, name),
+      () => getMessageClassSource(connection, name, { version }),
       this.results.read as IResultStrategy<ReturnType<R['read']>>,
       // The class answering is not the message existing; a caller who wants
       // an absent message read as a failure passes
@@ -140,9 +140,12 @@ export class AdtMessageClassMessage<
   /** The same class document `read` fetches. */
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassMessageConfig>,
-    options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
+    options?: {
+      withLongPolling?: boolean;
+      version?: AdtReadVersion;
+    } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
-    return this.read(config, undefined, options);
+    return this.read(config, options?.version, options);
   }
 
   // ── create / update (upsert) ───────────────────────────────────────────────

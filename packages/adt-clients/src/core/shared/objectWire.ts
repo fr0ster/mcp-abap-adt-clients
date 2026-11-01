@@ -25,7 +25,6 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { sourceUri } from '../../endpoints/objects';
 import { buildObjectUri } from '../../utils/activationUtils';
-import { enhancementVersionToken } from '../enhancement/read';
 import {
   type AdtMetadataReadCode,
   type AdtSourceReadCode,
@@ -116,18 +115,8 @@ export function getMetadataAcceptHeader(
 }
 
 /**
- * The `version` each code's source is asked for, where it is not the word
- * itself: an enhancement's inactive source is its `workingArea`.
- */
-const VERSION_TOKEN: Readonly<
-  Partial<Record<AdtSourceTypeCode, (version: AdtReadVersion) => string>>
-> = {
-  'ENHO/XHH': enhancementVersionToken,
-};
-
-/**
  * An object's main source address: its address from the tables, then
- * `/source/main`, and the version as the code's own resource spells it. A
+ * `/source/main`, and the version as the caller named it. A
  * pure address — it sends nothing — so it is built for every code with a
  * source, the parent required for a parented one.
  */
@@ -138,10 +127,7 @@ export function getObjectSourceUri<C extends AdtSourceTypeCode>(
     ? [functionGroup: string, version?: AdtReadVersion]
     : [functionGroup?: string, version?: AdtReadVersion]
 ): string {
-  const token = version
-    ? (VERSION_TOKEN[objectType]?.(version) ?? version)
-    : undefined;
-  const versionParam = token ? `?version=${token}` : '';
+  const versionParam = version ? `?version=${version}` : '';
   const code: AdtSourceTypeCode = objectType;
   return `${sourceUri(buildObjectUri(objectName, code, functionGroup))}${versionParam}`;
 }
