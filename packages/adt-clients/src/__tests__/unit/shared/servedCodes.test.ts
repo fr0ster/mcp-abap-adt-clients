@@ -154,8 +154,8 @@ describe('where-used names a parent it can address', () => {
   });
 });
 
-describe('the generic source address spells an enhancement version as its builder does', () => {
-  it('inactive is workingArea, through both', async () => {
+describe('the generic source address carries an enhancement version as its builder does', () => {
+  it("inactive is inactive, through both — the caller's word, not rewritten", async () => {
     const { utils } = recording();
     const sent: Sent[] = [];
     const connection = {
@@ -172,11 +172,11 @@ describe('the generic source address spells an enhancement version as its builde
       'inactive',
     );
     expect(generic).toBe(sent[0]?.url);
-    expect(generic).toContain('version=workingArea');
+    expect(generic).toContain('version=inactive');
     expect(
       utils.getObjectSourceUri('ENHO/XHH', 'ZENH', undefined, 'active'),
     ).toContain('version=active');
-    // Every other code keeps the word.
+    // Every code keeps the word.
     expect(
       utils.getObjectSourceUri('CLAS/OC', 'ZCL_X', undefined, 'inactive'),
     ).toContain('version=inactive');

@@ -1,11 +1,10 @@
 /**
  * Every source read takes the version as interfaces-adt 25 types it —
- * `AdtReadVersion`: `active`, `inactive` or `workingArea` — and sends
- * `workingArea` to `?version=` as it sends the other two. A read given
- * `active`, `inactive` or nothing sends exactly the request it sent before:
- * the class includes and the enhancement still ask for an `inactive` source
- * as `workingArea`, the metadata extension still sends no version for
- * `active`, and the reads that default a missing version still default it.
+ * `AdtReadVersion`: `active`, `inactive` or `workingArea` — and sends exactly
+ * the version it is given: none is dropped, defaulted or rewritten (a class
+ * include's or an enhancement's `inactive` is sent as `inactive`, a metadata
+ * extension's `active` as `active`). A read given no version sends the
+ * request it sent before, its old default included.
  *
  * Each case asserts the whole URL (or the request params, for the reads that
  * pass the version that way), so a second `?` or a dropped parameter fails.
@@ -13,6 +12,7 @@
 import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 import { AdtClientOnPrem } from '../../../clients/AdtClientVariants';
 import { AdtRuntimeClient } from '../../../clients/AdtRuntimeClient';
+import { getBehaviorImplementationImplementations } from '../../../core/behaviorImplementation/read';
 import { noopLogger } from '../../../utils/noopLogger';
 import { RecordingConnection } from '../../helpers/recordingConnection';
 
@@ -48,14 +48,6 @@ const ACTIVE_BY_DEFAULT: Queries = { ...AS_GIVEN, none: '?version=active' };
 /** A read that defaults a missing version to `inactive`. */
 const INACTIVE_BY_DEFAULT: Queries = { ...AS_GIVEN, none: '?version=inactive' };
 
-/** A read whose resource names its inactive version `workingArea`. */
-const INACTIVE_IS_WORKING_AREA: Queries = {
-  none: '?version=active',
-  active: '?version=active',
-  inactive: '?version=workingArea',
-  workingArea: '?version=workingArea',
-};
-
 const READS: readonly SourceRead[] = [
   {
     kind: 'class',
@@ -67,25 +59,25 @@ const READS: readonly SourceRead[] = [
     kind: 'class local types',
     read: (c, v) => c.getLocalTypes().read({ className: 'ZCL_V' }, v),
     url: '/sap/bc/adt/oo/classes/zcl_v/includes/implementations',
-    queries: INACTIVE_IS_WORKING_AREA,
+    queries: ACTIVE_BY_DEFAULT,
   },
   {
     kind: 'class local definitions',
     read: (c, v) => c.getLocalDefinitions().read({ className: 'ZCL_V' }, v),
     url: '/sap/bc/adt/oo/classes/zcl_v/includes/definitions',
-    queries: INACTIVE_IS_WORKING_AREA,
+    queries: ACTIVE_BY_DEFAULT,
   },
   {
     kind: 'class local macros',
     read: (c, v) => c.getLocalMacros().read({ className: 'ZCL_V' }, v),
     url: '/sap/bc/adt/oo/classes/zcl_v/includes/macros',
-    queries: INACTIVE_IS_WORKING_AREA,
+    queries: ACTIVE_BY_DEFAULT,
   },
   {
     kind: 'class local test classes',
     read: (c, v) => c.getLocalTestClass().read({ className: 'ZCL_V' }, v),
     url: '/sap/bc/adt/oo/classes/zcl_v/includes/testclasses',
-    queries: INACTIVE_IS_WORKING_AREA,
+    queries: ACTIVE_BY_DEFAULT,
   },
   {
     kind: 'behavior implementation',
@@ -173,7 +165,7 @@ const READS: readonly SourceRead[] = [
     kind: 'metadata extension',
     read: (c, v) => c.getMetadataExtension().read({ name: 'ZMDE_V' }, v),
     url: '/sap/bc/adt/ddic/ddlx/sources/zmde_v/source/main',
-    queries: { ...AS_GIVEN, active: '' },
+    queries: AS_GIVEN,
   },
   {
     kind: 'access control',
@@ -218,7 +210,7 @@ const READS: readonly SourceRead[] = [
         .getEnhancement()
         .read({ enhancementName: 'ZENH_V', enhancementType: 'enhoxhh' }, v),
     url: '/sap/bc/adt/enhancements/enhoxhh/zenh_v/source/main',
-    queries: INACTIVE_IS_WORKING_AREA,
+    queries: ACTIVE_BY_DEFAULT,
   },
   {
     kind: 'generic source read (getUtils)',
@@ -260,6 +252,21 @@ describe.each(READS)('$kind source read', (read) => {
 });
 
 describe('the generic source address', () => {
+  it.each(VERSIONS)(
+    'an enhancement source address carries %s as given',
+    (version) => {
+      const utils = new AdtClientOnPrem(
+        new RecordingConnection(),
+        noopLogger,
+      ).getUtils();
+      expect(
+        utils.getObjectSourceUri('ENHO/XHH', 'ZENH_V', undefined, version),
+      ).toBe(
+        `/sap/bc/adt/enhancements/enhoxhh/zenh_v/source/main?version=${version}`,
+      );
+    },
+  );
+
   it.each(VERSIONS)('getObjectSourceUri builds version %s', (version) => {
     const utils = new AdtClientOnPrem(
       new RecordingConnection(),
@@ -349,5 +356,57 @@ describe('the application log passes the version as request params', () => {
       url: '/sap/bc/adt/applicationlog/objects/ZLOG_V/source/main',
       params: { version },
     });
+  });
+});
+
+describe('the behaviour implementation include sends the version it is given', () => {
+  it.each(VERSIONS)('%s', async (version) => {
+    const connection = new RecordingConnection();
+    await getBehaviorImplementationImplementations(
+      connection,
+      'ZBP_V',
+      version,
+    );
+    expect(connection.sent[0]?.url).toBe(
+      `/sap/bc/adt/oo/classes/zbp_v/includes/implementations?version=${version}`,
+    );
+  });
+
+  it('none: no version, as before', async () => {
+    const connection = new RecordingConnection();
+    await getBehaviorImplementationImplementations(connection, 'ZBP_V');
+    expect(connection.sent[0]?.url).toBe(
+      '/sap/bc/adt/oo/classes/zbp_v/includes/implementations',
+    );
+  });
+});
+
+describe('a message class message read sends the version it is given', () => {
+  it.each(VERSIONS)('read %s', async (version) => {
+    const connection = new RecordingConnection();
+    await new AdtClientOnPrem(connection, noopLogger)
+      .getMessageClassMessage()
+      .read({ className: 'ZMC_V', msgno: '001' }, version);
+    expect(connection.sent[0]?.url).toBe(
+      `/sap/bc/adt/messageclass/zmc_v?version=${version}`,
+    );
+  });
+
+  it.each(VERSIONS)('readMetadata %s', async (version) => {
+    const connection = new RecordingConnection();
+    await new AdtClientOnPrem(connection, noopLogger)
+      .getMessageClassMessage()
+      .readMetadata({ className: 'ZMC_V', msgno: '001' }, { version });
+    expect(connection.sent[0]?.url).toBe(
+      `/sap/bc/adt/messageclass/zmc_v?version=${version}`,
+    );
+  });
+
+  it('none: no version, as before', async () => {
+    const connection = new RecordingConnection();
+    await new AdtClientOnPrem(connection, noopLogger)
+      .getMessageClassMessage()
+      .read({ className: 'ZMC_V', msgno: '001' });
+    expect(connection.sent[0]?.url).toBe('/sap/bc/adt/messageclass/zmc_v');
   });
 });
