@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * Interface read operations
  */
@@ -35,7 +36,7 @@ export async function getInterfaceMetadata(
 export async function getInterfaceSource(
   connection: IAbapConnection,
   interfaceName: string,
-  version?: 'active' | 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
   return objectSourceWire(

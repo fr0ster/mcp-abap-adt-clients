@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * ServiceDefinition read operations
  */
@@ -26,7 +27,7 @@ import type { IReadOptions } from '../shared/types';
 export async function getServiceDefinition(
   connection: IAbapConnection,
   serviceDefinitionName: string,
-  version: 'active' | 'inactive' | 'workingArea' = 'inactive',
+  version: AdtReadVersion = 'inactive',
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
@@ -48,7 +49,7 @@ export async function getServiceDefinition(
 export async function getServiceDefinitionSource(
   connection: IAbapConnection,
   serviceDefinitionName: string,
-  version: 'active' | 'inactive' | 'workingArea' = 'inactive',
+  version: AdtReadVersion = 'inactive',
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {

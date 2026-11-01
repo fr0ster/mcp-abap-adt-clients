@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * View read operations
  */
@@ -28,7 +29,7 @@ export async function getDdlMetadata(
 export async function getDdlSource(
   connection: IAbapConnection,
   ddlName: string,
-  version?: 'active' | 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
   return objectSourceWire(

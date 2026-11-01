@@ -8,6 +8,7 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
+  AdtReadVersion,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
@@ -180,7 +181,7 @@ export class AdtAppendStructure<
   /** Read the DDL source. */
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
-    version?: 'active' | 'inactive',
+    version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     // The caller's deadline, if they set one, on every request below.

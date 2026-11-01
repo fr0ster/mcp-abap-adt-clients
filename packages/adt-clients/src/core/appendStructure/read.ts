@@ -32,7 +32,7 @@ export async function getAppendStructure(
 export async function getAppendStructureSource(
   connection: IAbapConnection,
   name: string,
-  version: 'active' | 'inactive' = 'inactive',
+  version: AdtReadVersion = 'inactive',
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {

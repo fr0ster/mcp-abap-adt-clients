@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * FunctionModule read operations
  */
@@ -40,7 +41,7 @@ export async function getFunctionSource(
   connection: IAbapConnection,
   functionName: string,
   functionGroup: string,
-  version?: 'active' | 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
   return objectSourceWire(

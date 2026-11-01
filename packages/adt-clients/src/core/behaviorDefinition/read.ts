@@ -80,7 +80,7 @@ export async function read(
 export async function readSource(
   connection: IAbapConnection,
   name: string,
-  version: string = 'inactive',
+  version: AdtReadVersion = 'inactive',
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {

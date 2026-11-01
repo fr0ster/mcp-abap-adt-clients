@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * The definitions include of a class — where its local class and interface
  * declarations live.
@@ -114,7 +115,7 @@ export class AdtLocalDefinitions<
   /** Read the include's source. */
   async read<E extends IAdtError = IAdtError>(
     config: Partial<ILocalDefinitionsConfig>,
-    version: 'active' | 'inactive' = 'active',
+    version: AdtReadVersion = 'active',
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     // The caller's deadline, if they set one, on every request below.

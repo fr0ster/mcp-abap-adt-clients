@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * Enhancement read operations
  */
@@ -65,16 +66,16 @@ export async function getEnhancementMetadata(
  * translation, shared by this builder and the generic source address.
  */
 export function enhancementVersionToken(
-  version: 'active' | 'inactive',
+  version: AdtReadVersion,
 ): 'active' | 'workingArea' {
-  return version === 'inactive' ? 'workingArea' : 'active';
+  return version === 'inactive' ? 'workingArea' : version;
 }
 
 export async function getEnhancementSource(
   connection: IAbapConnection,
   enhancementType: EnhancementType,
   enhancementName: string,
-  version: 'active' | 'inactive' = 'active',
+  version: AdtReadVersion = 'active',
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {

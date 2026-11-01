@@ -14,6 +14,7 @@
  */
 import type {
   AdtParentedTypeCode,
+  AdtReadVersion,
   AdtSourceTypeCode,
   IReadOptions,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -38,7 +39,7 @@ export async function objectSourceWire(
   objectType: AdtSourceReadCode,
   objectName: string,
   functionGroup?: string,
-  version?: 'active' | 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
@@ -119,7 +120,7 @@ export function getMetadataAcceptHeader(
  * itself: an enhancement's inactive source is its `workingArea`.
  */
 const VERSION_TOKEN: Readonly<
-  Partial<Record<AdtSourceTypeCode, (version: 'active' | 'inactive') => string>>
+  Partial<Record<AdtSourceTypeCode, (version: AdtReadVersion) => string>>
 > = {
   'ENHO/XHH': enhancementVersionToken,
 };
@@ -134,8 +135,8 @@ export function getObjectSourceUri<C extends AdtSourceTypeCode>(
   objectType: C,
   objectName: string,
   ...[functionGroup, version]: [C] extends [AdtParentedTypeCode]
-    ? [functionGroup: string, version?: 'active' | 'inactive']
-    : [functionGroup?: string, version?: 'active' | 'inactive']
+    ? [functionGroup: string, version?: AdtReadVersion]
+    : [functionGroup?: string, version?: AdtReadVersion]
 ): string {
   const token = version
     ? (VERSION_TOKEN[objectType]?.(version) ?? version)

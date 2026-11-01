@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -22,7 +23,7 @@ import type { IReadOptions } from '../shared/types';
 export async function getTransformation(
   connection: IAbapConnection,
   transformationName: string,
-  version: 'active' | 'inactive' | 'workingArea' = 'inactive',
+  version: AdtReadVersion = 'inactive',
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
@@ -44,7 +45,7 @@ export async function getTransformation(
 export async function getTransformationSource(
   connection: IAbapConnection,
   transformationName: string,
-  version: 'active' | 'inactive' | 'workingArea' = 'inactive',
+  version: AdtReadVersion = 'inactive',
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {

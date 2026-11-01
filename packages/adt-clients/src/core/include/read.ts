@@ -32,7 +32,7 @@ export async function getIncludeMetadata(
 export async function getIncludeSource(
   connection: IAbapConnection,
   includeName: string,
-  version?: 'active' | 'inactive',
+  version?: AdtReadVersion,
 ): Promise<IAdtWireResponse> {
   const query = version ? `?version=${version}` : '';
   return connection.makeAdtRequest({

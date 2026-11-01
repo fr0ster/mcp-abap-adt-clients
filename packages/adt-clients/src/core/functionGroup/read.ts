@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * FunctionGroup read operations
  */
@@ -36,7 +37,7 @@ export async function getFunctionGroup(
 export async function getFunctionGroupSource(
   connection: IAbapConnection,
   functionGroupName: string,
-  version?: 'active' | 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
   let url = getObjectSourceUri('FUGR/F', functionGroupName, undefined, version);

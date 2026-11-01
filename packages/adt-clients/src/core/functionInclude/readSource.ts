@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * FunctionInclude (FUGR/I) source read operations
  */
@@ -16,7 +17,7 @@ export async function readFunctionIncludeSource(
   connection: IAbapConnection,
   groupName: string,
   includeName: string,
-  version: 'active' | 'inactive' = 'active',
+  version: AdtReadVersion = 'active',
 ): Promise<IAdtWireResponse> {
   const url = `${sourceUri(FUNCTION_INCLUDE.uri(groupName, includeName))}?version=${encodeURIComponent(version)}`;
 

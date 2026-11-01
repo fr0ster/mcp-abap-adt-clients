@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * Class read operations
  */
@@ -44,7 +45,7 @@ export async function getClassMetadata(
 export async function getClassSource(
   connection: IAbapConnection,
   className: string,
-  version?: 'active' | 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
   return objectSourceWire(
@@ -84,6 +85,17 @@ export async function getClassTransport(
 }
 
 /**
+ * The `version` a class include is asked for: its inactive version is the
+ * include's `workingArea`, so `inactive` is sent as `workingArea`; `active`
+ * and `workingArea` go as they are.
+ */
+function classIncludeVersion(
+  version: AdtReadVersion,
+): 'active' | 'workingArea' {
+  return version === 'inactive' ? 'workingArea' : version;
+}
+
+/**
  * Get ABAP class definitions include (local types in private section)
  * @param connection - SAP connection
  * @param className - Class name
@@ -92,11 +104,11 @@ export async function getClassTransport(
 export async function getClassDefinitionsInclude(
   connection: IAbapConnection,
   className: string,
-  version: 'active' | 'inactive' = 'active',
+  version: AdtReadVersion = 'active',
   logger?: ILogger,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const versionParam = version === 'inactive' ? 'workingArea' : 'active';
+  const versionParam = classIncludeVersion(version);
   const url = longPollingQuery(
     `${CLASS_INCLUDE.uri(className, 'definitions')}?version=${versionParam}`,
     options?.withLongPolling,
@@ -121,11 +133,11 @@ export async function getClassDefinitionsInclude(
 export async function getClassMacrosInclude(
   connection: IAbapConnection,
   className: string,
-  version: 'active' | 'inactive' = 'active',
+  version: AdtReadVersion = 'active',
   logger?: ILogger,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const versionParam = version === 'inactive' ? 'workingArea' : 'active';
+  const versionParam = classIncludeVersion(version);
   const url = longPollingQuery(
     `${CLASS_INCLUDE.uri(className, 'macros')}?version=${versionParam}`,
     options?.withLongPolling,
@@ -150,11 +162,11 @@ export async function getClassMacrosInclude(
 export async function getClassTestClassesInclude(
   connection: IAbapConnection,
   className: string,
-  version: 'active' | 'inactive' = 'active',
+  version: AdtReadVersion = 'active',
   logger?: ILogger,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const versionParam = version === 'inactive' ? 'workingArea' : 'active';
+  const versionParam = classIncludeVersion(version);
   const url = longPollingQuery(
     `${CLASS_INCLUDE.uri(className, 'testclasses')}?version=${versionParam}`,
     options?.withLongPolling,
@@ -179,11 +191,11 @@ export async function getClassTestClassesInclude(
 export async function getClassImplementationsInclude(
   connection: IAbapConnection,
   className: string,
-  version: 'active' | 'inactive' = 'active',
+  version: AdtReadVersion = 'active',
   logger?: ILogger,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
-  const versionParam = version === 'inactive' ? 'workingArea' : 'active';
+  const versionParam = classIncludeVersion(version);
   const url = longPollingQuery(
     `${CLASS_INCLUDE.uri(className, 'implementations')}?version=${versionParam}`,
     options?.withLongPolling,

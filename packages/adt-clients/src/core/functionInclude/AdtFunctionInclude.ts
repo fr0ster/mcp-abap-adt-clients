@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * AdtFunctionInclude - CRUD for `FUGR/I` function-group includes.
  *
@@ -243,7 +244,7 @@ export class AdtFunctionInclude<
    */
   async read<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
-    version?: 'active' | 'inactive',
+    version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     // The caller's deadline, if they set one, on every request below.

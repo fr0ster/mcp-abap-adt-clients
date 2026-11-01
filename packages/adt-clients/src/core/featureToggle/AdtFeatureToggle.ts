@@ -7,6 +7,7 @@
  * what the result set given at construction makes of that endpoint's answer.
  */
 import type {
+  AdtReadVersion,
   IAdtActivatable,
   IAdtAnalyseOptions,
   IAdtCheckable,
@@ -207,7 +208,7 @@ export class AdtFeatureToggle<
   /** Read the object. */
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
-    version?: 'active' | 'inactive',
+    version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -547,7 +548,7 @@ export class AdtFeatureToggle<
    */
   async readSource<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
-    version: 'active' | 'inactive' = 'active',
+    version: AdtReadVersion = 'active',
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['sourceDocument']>, E>> {
     const name = this.name(config);

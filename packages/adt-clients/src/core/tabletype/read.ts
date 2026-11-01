@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * TableType read operations
  */
@@ -69,7 +70,7 @@ Request Headers: ${JSON.stringify({ Accept: acceptHeader }, null, 2)}`;
 export async function getTableTypeSource(
   connection: IAbapConnection,
   tableTypeName: string,
-  version?: 'active' | 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {

@@ -36,7 +36,7 @@ export async function getScalarFunctionImplementation(
 export async function getScalarFunctionImplementationSource(
   connection: IAbapConnection,
   name: string,
-  version: 'active' | 'inactive' = 'inactive',
+  version: AdtReadVersion = 'inactive',
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {

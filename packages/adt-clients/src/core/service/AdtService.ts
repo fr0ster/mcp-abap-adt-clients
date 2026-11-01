@@ -369,7 +369,7 @@ export class AdtServiceBinding<
   /** Read the binding document. */
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
-    version?: 'active' | 'inactive',
+    version?: AdtReadVersion,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     // The caller's deadline, if they set one, on every request below.

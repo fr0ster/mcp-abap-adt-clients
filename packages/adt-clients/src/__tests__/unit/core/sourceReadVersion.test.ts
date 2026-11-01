@@ -160,7 +160,7 @@ const READS: readonly SourceRead[] = [
     read: (c, v) =>
       c.getAppendStructure().read({ appendStructureName: 'ZAPP_V' }, v),
     url: '/sap/bc/adt/ddic/structures/zapp_v/source/main',
-    queries: ACTIVE_BY_DEFAULT,
+    queries: INACTIVE_BY_DEFAULT,
   },
   {
     kind: 'service definition',
@@ -265,9 +265,9 @@ describe('the generic source address', () => {
       new RecordingConnection(),
       noopLogger,
     ).getUtils();
-    expect(utils.getObjectSourceUri('CLAS/OC', 'ZCL_V', undefined, version)).toBe(
-      `/sap/bc/adt/oo/classes/zcl_v/source/main?version=${version}`,
-    );
+    expect(
+      utils.getObjectSourceUri('CLAS/OC', 'ZCL_V', undefined, version),
+    ).toBe(`/sap/bc/adt/oo/classes/zcl_v/source/main?version=${version}`);
   });
 });
 

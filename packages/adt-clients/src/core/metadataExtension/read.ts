@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * Read Metadata Extension (DDLX)
  *
@@ -72,17 +73,12 @@ export async function readMetadataExtension(
 export async function readMetadataExtensionSource(
   connection: IAbapConnection,
   name: string,
-  version: 'active' | 'inactive' = 'active',
+  version: AdtReadVersion = 'active',
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
-  const versionQuery = version === 'inactive' ? '?version=inactive' : '';
-  const longPollingQuery = options?.withLongPolling
-    ? versionQuery
-      ? '&withLongPolling=true'
-      : '?withLongPolling=true'
-    : '';
-  const url = `${sourceUri(METADATA_EXTENSION.uri(name))}${versionQuery}${longPollingQuery}`;
+  // `active` is the plain resource here and sends no version, as before.
+  const url = `${sourceUri(METADATA_EXTENSION.uri(name))}${readQuery(version === 'active' ? undefined : version, options?.withLongPolling)}`;
 
   const headers = {
     Accept: options?.accept ?? ACCEPT_SOURCE,

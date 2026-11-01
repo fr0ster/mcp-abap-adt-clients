@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * Structure read operations
  */
@@ -34,7 +35,7 @@ export async function getStructureMetadata(
 export async function getStructureSource(
   connection: IAbapConnection,
   structureName: string,
-  version?: 'active' | 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {
   return objectSourceWire(

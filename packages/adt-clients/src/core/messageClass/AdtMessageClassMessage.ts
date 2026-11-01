@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * AdtMessageClassMessage — read-modify-write operations for a single message
  * within a Message Class (MSAG/N).
@@ -118,7 +119,7 @@ export class AdtMessageClassMessage<
    */
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassMessageConfig>,
-    _version?: 'active' | 'inactive',
+    _version?: AdtReadVersion,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
     // The caller's deadline, if they set one, on every request below.

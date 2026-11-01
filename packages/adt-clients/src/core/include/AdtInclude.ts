@@ -241,7 +241,7 @@ export class AdtInclude<
   /** Read the include's source. */
   async read<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
-    version?: 'active' | 'inactive',
+    version?: AdtReadVersion,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     // The caller's deadline, if they set one, on every request below.

@@ -1,3 +1,4 @@
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 /**
  * Behavior Implementation read operations
  */
@@ -42,7 +43,7 @@ export async function getBehaviorImplementationMetadata(
 export async function getBehaviorImplementationSource(
   connection: IAbapConnection,
   className: string,
-  version?: 'active' | 'inactive',
+  version?: AdtReadVersion,
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
@@ -66,7 +67,7 @@ export async function getBehaviorImplementationSource(
 export async function getBehaviorImplementationImplementations(
   connection: IAbapConnection,
   className: string,
-  version: 'active' | 'inactive' | 'workingArea' = 'active',
+  version: AdtReadVersion = 'active',
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {

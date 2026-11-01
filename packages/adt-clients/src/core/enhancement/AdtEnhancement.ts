@@ -10,6 +10,7 @@
  */
 import type {
   AdtOperation,
+  AdtReadVersion,
   AdtTypeCodeWith,
   AdtVariant,
   IAdtActivatable,
@@ -260,7 +261,7 @@ export class AdtEnhancement<
     config: Partial<IEnhancementConfig> & {
       enhancementType: EnhancementTypeWith<V, 'read'>;
     },
-    version?: 'active' | 'inactive',
+    version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
     // The caller's deadline, if they set one, on every request below.
