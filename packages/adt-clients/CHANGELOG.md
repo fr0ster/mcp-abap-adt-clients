@@ -24,6 +24,19 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [40.0.1] - 2026-11-02
+
+### Fixed
+
+- `AdtMessageClassMessage.create`, `update` and `delete` read the parent class
+  with no version before building the class PUT. Since 40.0.0 every read sends
+  exactly the version it is given, and the library's own reads state theirs: a
+  message write edits the working area, so that read now asks
+  `version=workingArea`. Measured on premise (2026-11-01): a read with no
+  version answers the working area, the same document, so the answer is
+  unchanged; the request now names it. It was the only internal read of the
+  library that sent no version. Found by Codex review of mcp-abap-adt #336.
+
 ## [40.0.0] - 2026-11-01
 
 On `@mcp-abap-adt/interfaces-adt` `^25.0.0` and `@mcp-abap-adt/adt-strategies`
