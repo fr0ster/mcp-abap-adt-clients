@@ -26,6 +26,7 @@ export const ATOM_METHODS = {
   metadataReadable: ['readMetadata'],
   enhancementHost: ['readEnhancementElements', 'readEnhancementOptions'],
   includeEnhancementHost: ['readEnhancementElements', 'readEnhancementOptions'],
+  mainProgramsReadable: ['readMainPrograms'],
   updatable: ['update'],
   metadataUpdatable: ['updateMetadata'],
   deletable: ['delete', 'checkDeletion'],
@@ -206,6 +207,7 @@ export const HANDLERS = {
         '/sap/bc/adt/programs/includes/zguard_inc/source/main/enhancements/elements',
       readEnhancementOptions:
         '/sap/bc/adt/programs/includes/zguard_inc/enhancements/options',
+      readMainPrograms: '/sap/bc/adt/programs/includes/zguard_inc/mainprograms',
       create: '/sap/bc/adt/programs/includes',
       read: '/sap/bc/adt/programs/includes/zguard_inc/source/main',
       readMetadata: '/sap/bc/adt/programs/includes/zguard_inc',
@@ -236,6 +238,7 @@ export const HANDLERS = {
       'appears in it. Additive the moment one is measured.',
     capabilities: [
       'includeEnhancementHost',
+      'mainProgramsReadable',
       'creatable',
       'readable',
       'metadataReadable',

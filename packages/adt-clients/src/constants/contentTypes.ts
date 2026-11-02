@@ -340,3 +340,7 @@ export const ACCEPT_ENHANCEMENT_ELEMENTS =
   'application/vnd.sap.adt.enhancements.v3+xml';
 export const ACCEPT_ENHANCEMENT_OPTIONS =
   'application/vnd.sap.adt.enhancementoptions.v2+xml';
+
+// An include's main programs (measured on premise, 2026-11-02)
+export const ACCEPT_INCLUDE_MAIN_PROGRAMS =
+  'application/vnd.sap.adt.programs.includes.mainprograms+xml';

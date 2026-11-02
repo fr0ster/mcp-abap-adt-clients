@@ -14,6 +14,14 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.18.1] - 2026-11-02
+
+### Changed
+
+- `@mcp-abap-adt/interfaces-adt` `^25.0.2`, the range `adt-clients` 40.1.0
+  declares (the two packages share their ranges). Nothing in this package
+  changes.
+
 ## [0.18.0] - 2026-11-01
 
 ### Changed

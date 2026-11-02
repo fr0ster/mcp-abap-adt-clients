@@ -15,6 +15,7 @@ import type { IEnhancementConfig } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 import type { AdtClient } from '../../../../clients/AdtClient';
+import { AdtClientOnPrem } from '../../../../clients/AdtClientVariants';
 import { INTERFACE, PROGRAM } from '../../../../endpoints/objects';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { escapeXmlAttr } from '../../../../utils/xml';
@@ -767,6 +768,35 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
         ),
         'enho:enhancementOption',
       );
+    },
+    getTimeout('test'),
+  );
+
+  gate('enhancement', 'include_host')(
+    "the include's main programs",
+    async () => {
+      const resolver = configured('include_host');
+      const host = { includeName: required(resolver, 'include_name') };
+      // Measured on premise (2026-11-02): one adtcore:objectReference per main
+      // program — for a function group's include, its group (FUGR/F).
+      // On premise only (the case's available_in): the on-premise client is the
+      // one whose table lists the read.
+      const onprem = new AdtClientOnPrem(connection, createLibraryLogger());
+      const references = root(
+        expectResult(
+          await onprem.getInclude().readMainPrograms(host, analyse),
+          'include main programs',
+        ),
+        'adtcore:objectReferences',
+      );
+      const listed = references['adtcore:objectReference'];
+      const each = Array.isArray(listed) ? listed : [listed];
+      expect(each.length).toBeGreaterThan(0);
+      for (const reference of each) {
+        expect(typeof reference['@_adtcore:name']).toBe('string');
+        expect(typeof reference['@_adtcore:type']).toBe('string');
+        expect(typeof reference['@_adtcore:uri']).toBe('string');
+      }
     },
     getTimeout('test'),
   );

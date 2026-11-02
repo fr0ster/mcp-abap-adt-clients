@@ -696,6 +696,7 @@ export const LEGACY_REFUSED: Record<string, Rows<RefusedRow>> = {
   getInclude: Object.fromEntries([
     incl.refused('checkDeletion', '§5'),
     incl.refused('updateMetadata', 'not measured on 7.40'),
+    incl.refused('readMainPrograms', 'not measured on 7.40'),
   ]),
   getMessageClass: Object.fromEntries([
     msag.refused('checkDeletion', '§5'),

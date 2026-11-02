@@ -24,6 +24,24 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [40.1.0] - 2026-11-02
+
+### Added
+
+- **An include's main programs.** An on-premise client's `getInclude()` has
+  `readMainPrograms` (`IAdtMainProgramsReadable`, interfaces-adt 25.0.2): one
+  `GET …/programs/includes/{name}/mainprograms` with Accept
+  `application/vnd.sap.adt.programs.includes.mainprograms+xml`, answered
+  through the result slot `mainPrograms` (the shipped set: the document as it
+  came). SAP answers `adtcore:objectReferences`, one reference per main
+  program — a program (`PROG/P`), or a function group (`FUGR/F`) for its
+  includes (`LSVIMTOP` answered `SVIM`) — and none for an include no program
+  includes directly; a name that is no include answered `404` (measured on
+  premise, 2026-11-02). Only the on-premise table lists it, so on an ABAP cloud
+  or the default modern client the call does not compile. A results set of
+  your own for `getInclude()` adds `mainPrograms` (interfaces-adt 25.0.2
+  requires it). `@mcp-abap-adt/interfaces-adt` `^25.0.2`.
+
 ## [40.0.1] - 2026-11-02
 
 ### Fixed

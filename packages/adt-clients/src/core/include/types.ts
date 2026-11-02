@@ -35,6 +35,14 @@ export type IncludeSource = string;
 export type IncludeMetadata = string;
 
 /**
+ * The main programs of this include, from `…/mainprograms`:
+ * `adtcore:objectReferences`, one `adtcore:objectReference` each — a program
+ * (`PROG/P`), or a function group (`FUGR/F`) for its includes — empty when no
+ * program includes it directly.
+ */
+export type IncludeMainPrograms = string;
+
+/**
  * What activation answers: `chkl:messages`.
  *
  * `activationExecuted="false"` means no work was done, not that work failed.
@@ -76,6 +84,7 @@ export const includeDocuments = {
   metadata: rawDocument,
   enhancementElements: rawDocument,
   enhancementOptions: rawDocument,
+  mainPrograms: rawDocument,
   activation: rawDocument,
   validation: rawDocument,
   deletion: rawDocument,

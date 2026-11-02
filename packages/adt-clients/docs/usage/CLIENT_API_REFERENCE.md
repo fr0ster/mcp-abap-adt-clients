@@ -108,6 +108,7 @@ alone does not prove access.
 | `getProgram()` | `IAdtEnhancementHost` | `readEnhancementElements`, `readEnhancementOptions` | `enhancementElements`, `enhancementOptions` |
 | `getFunctionGroup()` | `IAdtEnhancementHost` | `readEnhancementElements`, `readEnhancementOptions` | `enhancementElements`, `enhancementOptions` |
 | `getInclude()` | `IAdtIncludeEnhancementHost` | `readEnhancementElements`, `readEnhancementOptions` | `enhancementElements`, `enhancementOptions` |
+| `getInclude()` (on premise) | `IAdtMainProgramsReadable` | `readMainPrograms` | `mainPrograms` |
 
 Each read is one GET: `{host}/source/main/enhancements/elements` lists existing
 implementations, while `{host}/enhancements/options` lists places that can be
@@ -139,6 +140,19 @@ For an include, `context` on **both** reads is the main program's name, not a
 URI. The library builds `/sap/bc/adt/programs/programs/saplsvim` and encodes it
 in the query. Omitting context for LSVIMTOP answered 400 `ED/258`, "No main
 program for include LSVIMTOP found".
+
+An on-premise client also reads an include's main programs — one GET of
+`…/programs/includes/{name}/mainprograms`, Accept
+`application/vnd.sap.adt.programs.includes.mainprograms+xml`. For LSVIMTOP it
+answered the function group `SVIM` (`FUGR/F`); for an include of a program, the
+program (`PROG/P`); for an include no program includes directly, an empty
+`<adtcore:objectReferences/>` (measured on premise, 2026-11-02).
+
+```typescript
+const mainPrograms = await new AdtClientOnPrem(connection)
+  .getInclude()
+  .readMainPrograms({ includeName: 'LSVIMTOP' });
+```
 
 Create an XHH from an option returned by the program. This example uses
 `fast-xml-parser` to read the default XML result; choose an option suitable for

@@ -5,6 +5,7 @@
  * Overrides:
  * - checkDeletion() — refused without a request: 7.40 has no deletion API.
  * - updateMetadata() — refused without a request: not measured on 7.40.
+ * - readMainPrograms() — refused without a request: not measured on 7.40.
  * - delete() — `DELETE <URI>?lockHandle=…` under the lock handle the caller
  *   holds (measured on 7.40 SP04: `200`, a read afterwards answers `404`;
  *   record B4-cycles-20261026-2019).
@@ -58,6 +59,22 @@ export class AdtIncludeLegacy<
     return legacyNotMeasuredRefusal<ReturnType<R['metadataUpdated']>, E>(
       'updateMetadata',
       'PUT /sap/bc/adt/programs/includes/{name}',
+    );
+  }
+
+  /**
+   * Refused without a request until measured: 7.40 SP04's type table lists no
+   * `mainPrograms` for the include, and no run there has sent the GET of its
+   * main programs.
+   */
+  override async readMainPrograms<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'include', 'mainPrograms'>,
+    _config: Partial<IIncludeConfig>,
+    _options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['mainPrograms']>, E>> {
+    return legacyNotMeasuredRefusal<ReturnType<R['mainPrograms']>, E>(
+      'readMainPrograms',
+      'GET /sap/bc/adt/programs/includes/{name}/mainprograms',
     );
   }
 
