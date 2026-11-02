@@ -24,6 +24,20 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [41.0.1] - 2026-11-02
+
+### Fixed
+
+- **The last result-strategy cast is gone.** `Profiler.read` read its view's
+  strategy through `this.results[view] as IResultStrategy<ViewResult<…>>`:
+  interfaces-adt's `ViewResult` is a conditional type the compiler cannot
+  resolve for a generic view name. `IProfilerViews<T>` is now a mapped type
+  over the view names, `{ [K in …]: ITraceView<T[K], …> }`, and `read`
+  answers `IProfilerViews<T>[K]['result']` — `T[K]`, what the view's strategy
+  answers — with no cast, still satisfying `ITraceReading`. For every `T` the
+  types are the same; `IProfilerViews` is a type alias now, not an interface.
+  No request or answer changes.
+
 ## [41.0.0] - 2026-11-02
 
 Types only: no request, header, URL or answer changes.
