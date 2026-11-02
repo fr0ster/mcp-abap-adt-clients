@@ -31,7 +31,8 @@ name validation without one; any other validation without a package sends an
 empty `packagename`, never the text `undefined`. What SAP does with an empty
 package was read in its handlers on an on-premise system (2026-11-02).
 [MIGRATION-42.md](docs/usage/MIGRATION-42.md) says what a consumer on 41.x
-does.
+does. 41.0.1 was tagged but not published to npm: its change (the profiler's
+view read without a cast) ships with this release.
 
 ### Breaking
 
