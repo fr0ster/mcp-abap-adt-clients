@@ -1,7 +1,7 @@
 # Migrating to 41.0.0
 
-41.0.0 stays on `@mcp-abap-adt/interfaces-adt` `^25.0.0` and
-`@mcp-abap-adt/adt-strategies` `^0.18.0`. One thing changes for a consumer:
+41.0.0 stays on `@mcp-abap-adt/interfaces-adt` `^25.0.2` and
+`@mcp-abap-adt/adt-strategies` `^0.18.0`, as 40.1.0. One thing changes for a consumer:
 
 - [A handler class is typed by the values its slots answer](#a-handler-class-is-typed-by-the-values-its-slots-answer):
   `AdtClass<T>`, `AdtAtc<T>`, `ClassExecutor<T, V>` and every other handler
