@@ -282,4 +282,38 @@ describe('the message contract', () => {
     );
     expect(calls.some((c) => c.method === 'PUT')).toBe(true);
   });
+  describe('the class read behind a write names its version', () => {
+    // A write edits the working area, so the read it builds the PUT from asks
+    // for that version explicitly (40.0.0: every read sends the version given).
+    const CLASS_URL = '/sap/bc/adt/messageclass/zt?version=workingArea';
+    const writes = {
+      create: (m: AdtMessageClassMessage) =>
+        m.create(
+          { className: 'ZT', msgno: '003', msgtext: 'N' },
+          { headers: headersOf(m, 'create') },
+        ),
+      update: (m: AdtMessageClassMessage) =>
+        m.update(
+          { className: 'ZT', msgno: '001', msgtext: 'NEW' },
+          { headers: headersOf(m, 'update') },
+        ),
+      delete: (m: AdtMessageClassMessage) =>
+        m.delete(
+          { className: 'ZT', msgno: '001' },
+          { headers: headersOf(m, 'delete') },
+        ),
+    };
+    for (const [name, write] of Object.entries(writes)) {
+      it(`${name} reads the class with version=workingArea`, async () => {
+        const { conn, calls } = recorder();
+        const m = new AdtMessageClassMessage(conn, {
+          logger: noopLogger,
+          results: messageDocuments,
+        });
+        await write(m);
+        const gets = calls.filter((c) => c.method === 'GET');
+        expect(gets.map((c) => c.url)).toEqual([CLASS_URL]);
+      });
+    }
+  });
 });

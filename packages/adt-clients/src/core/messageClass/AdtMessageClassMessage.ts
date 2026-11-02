@@ -208,8 +208,12 @@ export class AdtMessageClassMessage<
     const { name, no } = this.names(config);
     const label = deleting ? 'deleteMessage' : 'upsertMessage';
 
-    // Read the current class so every other message survives the PUT.
-    const current = await getMessageClassSource(connection, name);
+    // Read the current class so every other message survives the PUT. The
+    // write edits the working area, so the read asks for exactly that version
+    // (every read sends the version it is given; none is assumed).
+    const current = await getMessageClassSource(connection, name, {
+      version: 'workingArea',
+    });
     const cls = parseMessageClass(String(current.data));
 
     if (!deleting) {
