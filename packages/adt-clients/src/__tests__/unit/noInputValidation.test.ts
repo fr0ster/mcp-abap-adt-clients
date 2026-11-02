@@ -29,14 +29,14 @@ describe('production code', () => {
   /**
    * The one exception, and it is named rather than pattern-matched.
    *
-   * A create that reaches SAP without a package makes an object nothing can
-   * remove through ADT: the deletion check resolves through the package, so it
-   * answers "Object does not exist" while the name stays taken for good. Every
-   * other missing field produces a request the server answers — a reading a
-   * strategy can take, and a state a caller can recover from.
+   * A create without a package: SAP creates nothing — most creates are refused
+   * by the transport system (CTS_WBO_API 018), a message class is answered
+   * 201 Created with nothing created — and the type cannot rule out an empty
+   * string. Every other missing field produces a request the server answers —
+   * a reading a strategy can take.
    */
   const PACKAGE_ON_CREATE =
-    /packageName is required for create: an object created without one cannot be deleted through ADT/;
+    /packageName is required for create: SAP creates nothing without one/;
 
   it.each(files)('%s validates no input', (file) => {
     const source = readFileSync(file, 'utf8').replace(PACKAGE_ON_CREATE, '');

@@ -24,6 +24,79 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [42.0.0] - 2026-11-02
+
+A create without a package no longer compiles, nor does a program or include
+name validation without one; any other validation without a package sends an
+empty `packagename`, never the text `undefined`. What SAP does with an empty
+package was read in its handlers on an on-premise system (2026-11-02).
+[MIGRATION-42.md](docs/usage/MIGRATION-42.md) says what a consumer on 41.x
+does.
+
+### Breaking
+
+- **`create` takes `packageName: string`, required, in its config type**, on
+  every handler whose create request needs a package: `AdtAccessControl`,
+  `AdtAppendStructure`, `AdtAuthorizationField`, `AdtBehaviorDefinition`,
+  `AdtBehaviorImplementation`, `AdtClass`, `AdtDataElement`, `AdtDdl`,
+  `AdtDdicTableType`, `AdtDomain`, `AdtEnhancement`, `AdtFeatureToggle`,
+  `AdtFunctionGroup`, `AdtInclude`, `AdtInterface`, `AdtMessageClass`,
+  `AdtMetadataExtension`, `AdtProgram`, `AdtScalarFunction`,
+  `AdtScalarFunctionImplementation`, `AdtServiceBinding`,
+  `AdtServiceDefinition`, `AdtStructure`, `AdtTable`, `AdtTransformation`
+  (and the getters that answer them). Each config was
+  `Omit<IXConfig, 'source'> & { source?: never }`, in which `packageName` is
+  optional, and twenty-two of them read it through `config.packageName as
+  string`; it is now `Omit<IXConfig, 'source'> & { source?: never;
+  packageName: string }`, read without a cast. SAP creates nothing without a
+  package: the class, interface and function group handlers refuse it
+  (`cx_adt_res_wrong_data`), every other create is refused by the transport
+  system (CTS_WBO_API 018, "Object cannot be created without a package"), and
+  a message class is answered `201 Created` with nothing created (its TADIR
+  insert fails and the handler returns quietly). The string `undefined` is
+  refused `403 Package UNDEFINED does not exist`. The runtime guard against an
+  empty package stays — the type cannot rule out `''` — and its message now
+  says why: `packageName is required for create: SAP creates nothing without
+  one` (it said an object made without one could not be deleted through ADT,
+  which SAP's code does not bear out). Objects created inside another
+  (function module, function include, class local includes, message class
+  messages), packages and transport requests are unchanged.
+- **`AdtProgram.validate` and `AdtInclude.validate` take `packageName: string`,
+  required** (`Partial<IXConfig> & { packageName: string }`): SAP's program
+  validation, which also serves includes, refuses an empty package (SEDI_ADT
+  003) and an absent one with `400`.
+
+  **Migrating:** pass `packageName` to `create` of the handlers listed above
+  and to `AdtProgram.validate` / `AdtInclude.validate`; a config typed
+  `IXConfig` (with `packageName?`) is typed `IXConfig & { packageName: string }`
+  where it reaches them. A call that already passes a package sends the same
+  request. Code matching the empty-package guard's message matches the new
+  words.
+
+### Fixed
+
+- **`validate` without a package sends `packagename=` empty**, not
+  `packagename=undefined`: `AdtAccessControl`, `AdtBehaviorDefinition`
+  (`package=`), `AdtBehaviorImplementation`, `AdtClass`, `AdtDdl`,
+  `AdtInterface`, `AdtMetadataExtension`. SAP's handlers accept an empty value
+  — a parameter declared mandatory is refused only when absent — and use the
+  package only for a namespace check or, when given, an existence check;
+  measured for a class name: an empty `packagename` is answered as a real one
+  (free name `CHECK_RESULT X`, taken name `400 … already exists`), no
+  parameter `400 Parameter packagename could not be found`.
+  `AdtServiceBinding.validate` threw a `TypeError` (`toUpperCase` of
+  `undefined`) before any request; it now sends the empty value. The config
+  type stays `Partial<IXConfig>`, and a validate given a package sends the same
+  request as before. `AdtFunctionGroup.validate` already sent its documented
+  optional `packagename` empty.
+- **`AdtServiceBinding.readTransport` without a package sends an empty
+  `DEVCLASS`**, not the text `undefined`: SAP's transport check in check mode
+  refuses no binding for a missing package and falls back to the package TADIR
+  records. Its config type stays `Partial<IServiceBindingConfig>`.
+- `AdtDomain.updateMetadata` no longer builds a `package_name` field its
+  update request never read (it took `config.packageName as string` through a
+  cast of the whole parameter object). Nothing on the wire changes.
+
 ## [41.0.1] - 2026-11-02
 
 ### Fixed

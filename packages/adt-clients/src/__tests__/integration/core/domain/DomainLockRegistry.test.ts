@@ -70,7 +70,7 @@ describe('Domain lock registry (using AdtClient)', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let isCloudSystem = false;
-  let config: IDomainConfig | undefined;
+  let config: (IDomainConfig & { packageName: string }) | undefined;
   let domainType: { datatype?: string; length?: number; decimals?: number } =
     {};
 

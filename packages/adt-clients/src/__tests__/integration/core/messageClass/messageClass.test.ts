@@ -62,6 +62,9 @@ import {
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
 
+/** What a message class create takes: its config with the package it goes into. */
+type MessageClassCreateConfig = IMessageClassConfig & { packageName: string };
+
 const {
   resolvePackageName,
   resolveTransportRequest,
@@ -110,7 +113,7 @@ describe('MessageClass (using AdtClient)', () => {
   let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
-  let tester: BaseTester<IMessageClassConfig>;
+  let tester: BaseTester<MessageClassCreateConfig>;
   // Transport resolved by buildConfig; reused by ensureObjectReady's cleanup
   // delete so a pre-existing object in a transportable package is deleted
   // with the same corrNr as the rest of the lifecycle.
@@ -132,7 +135,7 @@ describe('MessageClass (using AdtClient)', () => {
       client = resolvedClient;
       hasConfig = true;
 
-      tester = new BaseTester(
+      tester = new BaseTester<MessageClassCreateConfig>(
         // Narrowed to what a message class has — no activate, no check, no
         // transport, no versions. `BaseTester` guards on `activate` before
         // calling it, so the narrow handler goes in as it is.

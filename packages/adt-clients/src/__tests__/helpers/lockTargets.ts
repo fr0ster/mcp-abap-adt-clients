@@ -114,7 +114,7 @@ export async function removeLeftoverDataElement(
 /** A fresh, typed, active domain. */
 export async function recreateActiveDomain(
   client: AdtClient,
-  config: IDomainConfig,
+  config: IDomainConfig & { packageName: string },
   params: { datatype?: string; length?: number; decimals?: number },
 ): Promise<void> {
   const domain = client.getDomain();
@@ -160,7 +160,7 @@ export async function recreateActiveDomain(
 /** A fresh, active data element typed by `domainName`. */
 export async function recreateActiveDataElement(
   client: AdtClient,
-  config: IDataElementConfig,
+  config: IDataElementConfig & { packageName: string },
   domainName: string,
 ): Promise<void> {
   const element = client.getDataElement();
@@ -174,8 +174,7 @@ export async function recreateActiveDataElement(
       {
         ...config,
         typeKind: 'domain',
-        typeName: domainName,
-      } as IDataElementConfig,
+      },
       {
         analyse: analyseException,
         headers: integrationHeadersOf(element, 'create'),

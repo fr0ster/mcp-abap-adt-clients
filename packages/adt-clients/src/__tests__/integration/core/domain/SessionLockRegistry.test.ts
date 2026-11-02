@@ -70,8 +70,10 @@ describe('Session lock registry (using AdtClient)', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let isCloudSystem = false;
-  let domainConfig: IDomainConfig | undefined;
-  let dataElementConfig: IDataElementConfig | undefined;
+  let domainConfig: (IDomainConfig & { packageName: string }) | undefined;
+  let dataElementConfig:
+    | (IDataElementConfig & { packageName: string })
+    | undefined;
   let domainType: { datatype?: string; length?: number; decimals?: number } =
     {};
 
@@ -132,7 +134,7 @@ describe('Session lock registry (using AdtClient)', () => {
           packageName: dePackage,
           transportRequest: deResolver.getTransportRequest(),
           description: ep.description,
-        } as IDataElementConfig;
+        };
       }
     } catch (error) {
       // Skips only when there is no SAP here; anything else fails

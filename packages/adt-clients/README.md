@@ -16,6 +16,14 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 > **From 18.x?** Read [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md)
 > first: 19.0.0 is where members became one endpoint call each.
 >
+> **From 41.x?** 42.0.0 requires `packageName` in the config type of every
+> `create` whose request needs a package (`AdtClass`, `AdtProgram`,
+> `AdtDomain`, … — the list is in the migration note) and of
+> `AdtProgram.validate` / `AdtInclude.validate`; a call without one no longer
+> compiles. Any other `validate` without a package sends `packagename` empty
+> instead of the text `undefined`. A call that passes a package sends the same request. See
+> [`docs/usage/MIGRATION-42.md`](docs/usage/MIGRATION-42.md).
+>
 > **From 40.x?** 41.0.0 types every handler class by the values its result
 > slots answer, not by the strategies: code that names a class's type
 > parameter (`AdtClass<typeof classDocuments>`) names the values
@@ -1553,6 +1561,7 @@ See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-a
 One document per breaking release, each written for a consumer on the contract
 before it:
 
+- **[41.x → 42.0.0](docs/usage/MIGRATION-42.md)** — `create` of every handler whose request needs a package, and `validate` of `AdtProgram` / `AdtInclude`, take `packageName: string`, required, in the config type (SAP creates nothing without a package; program validation refuses an empty one); any other `validate` without a package sends `packagename` empty, never `undefined`; a call that passes a package sends the same request.
 - **[40.x → 41.0.0](docs/usage/MIGRATION-41.md)** — every handler class is generic over the values its result slots answer (`AdtClass<ResultValuesOf<typeof classDocuments>>`), not over the strategies (`AdtClass<typeof classDocuments>`); code that names a class's type parameter wraps it in `ResultValuesOf<…>`, and `getX()` / `getX(results)` calls and every request are unchanged.
 - **[39.x → 40.0.0](docs/usage/MIGRATION-40.md)** — every read (source, metadata, `readObjectSource`, `getObjectSourceUri`, the feature toggle's source, the application log) takes `AdtReadVersion` of interfaces-adt 25 and sends exactly the version it is given, and none without one; the reads that dropped, rewrote or defaulted it on 39.x send a changed request (MIGRATION-40 lists them).
 - **[38.x → 39.0.0](docs/usage/MIGRATION-39.md)** — the search filter takes the release's search names (`DEVC`, `STRU`), not a code; where-used and the group members take interfaces-adt's typed references (`VIEW/DV`, a function module's group), and `getUtils()` satisfies `IAdtTypedWhereUsed` / `IAdtTypedGroupLifecycle` instead of `IAdtWhereUsed` / `IAdtGroupLifecycle`.

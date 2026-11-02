@@ -32,6 +32,7 @@ function config<T extends EnhancementType>(
   enhancementType: T,
 ): Omit<IEnhancementConfig, 'source' | 'enhancementType'> & {
   enhancementType: T;
+  packageName: string;
 } {
   return {
     enhancementType,

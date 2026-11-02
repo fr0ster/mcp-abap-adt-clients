@@ -299,7 +299,7 @@ export class AdtServiceBinding<
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    const packageName = config.packageName as string;
+    const packageName = config.packageName ?? '';
     return answering(
       () =>
         this.transportCheckRequest(connection, {
@@ -323,20 +323,23 @@ export class AdtServiceBinding<
    * already gone, and a consumer built on that reading.)
    */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IServiceBindingConfig, 'source'> & { source?: never },
+    config: Omit<IServiceBindingConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+    },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<T['created'], E>> {
     // **The one guard this package keeps, and only on a create.**
     //
-    // An object created without a package is the single thing `delete()` cannot
-    // undo: the deletion check resolves through the package, so it answers
-    // "Object does not exist" while the name stays taken for good, and clearing
-    // it is SAP GUI territory. Everywhere else a missing field produces a
-    // request the server answers, which is a reading a strategy can take. Here
-    // it produces a state with no way out through ADT at all.
+    // The type requires a package; this refuses an empty one, which the type
+    // cannot rule out. SAP creates nothing without a package: most creates are
+    // refused (CTS_WBO_API 018, "Object cannot be created without a package"),
+    // and a message class is answered 201 Created with nothing created (read on
+    // premise, 2026-11-02). Refused here, before any request, in words that say
+    // why.
     if (!config.packageName) {
       throw new Error(
-        'packageName is required for create: an object created without one cannot be deleted through ADT',
+        'packageName is required for create: SAP creates nothing without one',
       );
     }
 
@@ -344,7 +347,7 @@ export class AdtServiceBinding<
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    const packageName = config.packageName as string;
+    const packageName = config.packageName;
     const description = config.description;
     const serviceName = config.serviceName as string;
     const serviceVersion = config.serviceVersion;
@@ -714,7 +717,7 @@ export class AdtServiceBinding<
    * The transport check for the binding.
    *
    * A binding has no `objectstates` resource: what stands in for it is the CTS
-   * transport check, which is why this needs the package as well as the name.
+   * transport check, sent with the name and, when given, the package.
    */
   async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
@@ -724,7 +727,11 @@ export class AdtServiceBinding<
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    const packageName = config.packageName as string;
+    // Optional: SAP's transport check in check mode refuses no binding for a
+    // missing package, and falls back to the package TADIR records for it
+    // (read on premise, 2026-11-02: CL_CTS_ADT_OBJ_RECORD.check_objects →
+    // TRINT_WBO_IMPL_CHECK_OBJECTS). None given sends an empty DEVCLASS.
+    const packageName = config.packageName ?? '';
 
     return answering(
       () =>
