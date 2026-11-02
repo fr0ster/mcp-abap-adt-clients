@@ -19,7 +19,11 @@ import { runProgram } from '../../core/program/run';
 import type { AdtHandlerOptions } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { rawDocument } from '../../utils/resultStrategy';
+import {
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+  rawDocument,
+} from '../../utils/resultStrategy';
 import {
   type ITraceSchedulingResults,
   TraceScheduling,
@@ -45,6 +49,11 @@ export const programExecutorDocuments = {
   run: rawDocument,
 } satisfies IProgramExecutorResults;
 
+/** What each slot of the result set answers. */
+export type ProgramExecutorValues = {
+  readonly [K in keyof IProgramExecutorResults]: unknown;
+};
+
 /**
  * **Not `IProgramExecutor` since 19.0.0.** That composite includes
  * `IRunnableWithProfiling`, whose `runWithProfiling` scheduled a trace, ran the
@@ -55,20 +64,18 @@ export const programExecutorDocuments = {
  * that joins them.
  */
 export class ProgramExecutor<
-  R extends IProgramExecutorResults = typeof programExecutorDocuments,
+  T extends ProgramExecutorValues = ResultValuesOf<
+    typeof programExecutorDocuments
+  >,
   V extends AdtVariant = AdtModernVariant,
 > implements
-    IAdtRunnable<IProgramExecutionTarget, ReturnType<R['run']>>,
+    IAdtRunnable<IProgramExecutionTarget, T['run']>,
     IRunnableWithProfiler<
       IProgramExecutionTarget,
-      ReturnType<R['run']>,
+      T['run'],
       IProgramExecuteWithProfilerOptions
     >,
-    ITraceScheduling<
-      ReturnType<R['types']>,
-      ReturnType<R['requests']>,
-      ReturnType<R['scheduled']>
-    >
+    ITraceScheduling<T['types'], T['requests'], T['scheduled']>
 {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -76,12 +83,12 @@ export class ProgramExecutor<
    */
   declare readonly variant?: V;
   private readonly connection: IAbapConnection;
-  private readonly results: R;
-  private readonly scheduling: TraceScheduling<R>;
+  private readonly results: ResultStrategiesOf<T>;
+  private readonly scheduling: TraceScheduling<T>;
 
   constructor(
     connection: IAbapConnection,
-    options: AdtHandlerOptions<R, 'logger'>,
+    options: AdtHandlerOptions<ResultStrategiesOf<T>, 'logger'>,
   ) {
     const { results } = options;
     this.connection = connection;
@@ -95,33 +102,33 @@ export class ProgramExecutor<
 
   listObjectTypes<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['types']>, E>> {
+  ): Promise<IAdtResponse<T['types'], E>> {
     return this.scheduling.listObjectTypes(options);
   }
 
   listProcessTypes<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['types']>, E>> {
+  ): Promise<IAdtResponse<T['types'], E>> {
     return this.scheduling.listProcessTypes(options);
   }
 
   listRequests<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['requests']>, E>> {
+  ): Promise<IAdtResponse<T['requests'], E>> {
     return this.scheduling.listRequests(options);
   }
 
   getRequestsByUri<E extends IAdtError = IAdtError>(
     uri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['requests']>, E>> {
+  ): Promise<IAdtResponse<T['requests'], E>> {
     return this.scheduling.getRequestsByUri(uri, options);
   }
 
   scheduleTrace<E extends IAdtError = IAdtError>(
     options: { headers: IAdtHeaders } & IProfilerTraceParameters &
       IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['scheduled']>, E>> {
+  ): Promise<IAdtResponse<T['scheduled'], E>> {
     return this.scheduling.scheduleTrace(options);
   }
 
@@ -129,7 +136,7 @@ export class ProgramExecutor<
     this: this & AdtPerformedBy<'program', 'run'>,
     target: IProgramExecutionTarget,
     options?: IProgramExecuteOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
+  ): Promise<IAdtResponse<T['run'], E>> {
     return answering(
       () =>
         runProgram(
@@ -138,7 +145,7 @@ export class ProgramExecutor<
           undefined,
           options?.debuggee,
         ),
-      this.results.run as IResultStrategy<ReturnType<R['run']>>,
+      this.results.run,
       options?.analyse,
     );
   }
@@ -147,7 +154,7 @@ export class ProgramExecutor<
     this: this & AdtPerformedBy<'program', 'profile'>,
     target: IProgramExecutionTarget,
     options: IProgramExecuteWithProfilerOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
+  ): Promise<IAdtResponse<T['run'], E>> {
     const normalizedProgramName = encodeSapObjectName(
       target.programName,
     ).toUpperCase();
@@ -163,7 +170,7 @@ export class ProgramExecutor<
             'X-sap-adt-profiling': 'server-time',
           },
         }),
-      this.results.run as IResultStrategy<ReturnType<R['run']>>,
+      this.results.run,
       options.analyse,
     );
   }

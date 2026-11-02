@@ -1,6 +1,7 @@
 export {
   type IProgramExecutorResults,
   ProgramExecutor,
+  type ProgramExecutorValues,
   programExecutorDocuments,
 } from './ProgramExecutor';
 export {

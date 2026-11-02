@@ -2,5 +2,8 @@
  * View operations - exports
  */
 
-export { AdtDdl } from './AdtDdl';
+export {
+  AdtDdl,
+  type DdlValues,
+} from './AdtDdl';
 export * from './types';

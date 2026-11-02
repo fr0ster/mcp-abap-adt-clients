@@ -2,5 +2,8 @@
  * DataElement operations - exports
  */
 
-export { AdtDataElement } from './AdtDataElement';
+export {
+  AdtDataElement,
+  type DataElementValues,
+} from './AdtDataElement';
 export * from './types';

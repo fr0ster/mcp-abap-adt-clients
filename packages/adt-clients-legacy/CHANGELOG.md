@@ -4,6 +4,23 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [0.5.0] - 2026-11-02
+
+On `@mcp-abap-adt/adt-clients` `^41.0.0`. A breaking change of a 0.x package,
+so a minor. Types only: no request changes.
+
+### Breaking
+
+- **Every `*Legacy` class is typed by the values its result slots answer**,
+  as its base is in adt-clients 41.0.0: `AdtClassLegacy<T extends ClassValues
+  = ResultValuesOf<typeof classDocuments>>` and so on for every class and
+  executor here, with no cast left in reading a slot. The legacy clients'
+  getters answer `XLegacy<ResultValuesOf<R>>`. **Migrating:** install
+  `@mcp-abap-adt/adt-clients@^41.0.0`; code that names a class's type
+  parameter (`AdtClassLegacy<typeof classDocuments>`, a subclass) now names the
+  values (`AdtClassLegacy<ResultValuesOf<typeof classDocuments>>`);
+  `getX()` / `getX(results)` calls are unchanged.
+
 ## [0.4.1] - 2026-11-02
 
 ### Added

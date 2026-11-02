@@ -12,6 +12,7 @@ export { createAdtExecutor } from './clients/createAdtExecutor';
  * runner classes, and the helper a class runner's override reads its
  * containers with. The set is the compiler's, and nothing more.
  */
+export type { AbapUnitRunnerValues } from './executors/abapUnitRunner';
 export {
   AbapUnitTestRunner,
   abapUnitTestRunnerDocuments,
@@ -19,6 +20,7 @@ export {
 } from './executors/abapUnitTestRunner';
 export {
   ClassExecutor,
+  type ClassExecutorValues,
   classExecutorDocuments,
   type IClassExecutorResults,
 } from './executors/class/ClassExecutor';
@@ -43,6 +45,7 @@ export {
 export {
   type IProgramExecutorResults,
   ProgramExecutor,
+  type ProgramExecutorValues,
   programExecutorDocuments,
 } from './executors/program/ProgramExecutor';
 export {
@@ -52,5 +55,6 @@ export {
 } from './executors/program/ProgramTestRunner';
 export {
   type ITraceSchedulingResults,
+  type TraceSchedulingValues,
   traceSchedulingDocuments,
 } from './executors/traceScheduling';

@@ -13,7 +13,9 @@ import {
   type AdtPerformedBy,
   answering,
   FUNCTION_MODULE,
+  type FunctionModuleValues,
   type functionModuleDocuments,
+  type ResultValuesOf,
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
 import type {
@@ -23,8 +25,6 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IFunctionModuleConfig,
-  IFunctionModuleResults,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import {
@@ -34,8 +34,10 @@ import {
 } from '../shared/refusalLegacy';
 
 export class AdtFunctionModuleLegacy<
-  R extends IFunctionModuleResults = typeof functionModuleDocuments,
-> extends AdtFunctionModule<R, 'basis740'> {
+  T extends FunctionModuleValues = ResultValuesOf<
+    typeof functionModuleDocuments
+  >,
+> extends AdtFunctionModule<T, 'basis740'> {
   /**
    * Delete function module — legacy override.
    *
@@ -51,7 +53,7 @@ export class AdtFunctionModuleLegacy<
   override async delete<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     const group = config.functionGroupName as string;
     const module = config.functionModuleName;
 
@@ -65,7 +67,7 @@ export class AdtFunctionModuleLegacy<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }
@@ -79,8 +81,8 @@ export class AdtFunctionModuleLegacy<
     this: this & AdtPerformedBy<'functionModule', 'deletionCheck'>,
     _config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
-    return noDeletionCheck<ReturnType<R['deletionCheck']>, E>();
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+    return noDeletionCheck<T['deletionCheck'], E>();
   }
 
   /**
@@ -92,8 +94,8 @@ export class AdtFunctionModuleLegacy<
     this: this & AdtPerformedBy<'functionModule', 'updateMetadata'>,
     _config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
-    return legacyNotMeasuredRefusal<ReturnType<R['metadataUpdated']>, E>(
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+    return legacyNotMeasuredRefusal<T['metadataUpdated'], E>(
       'updateMetadata',
       'PUT /sap/bc/adt/functions/groups/{group}/fmodules/{name}',
     );
@@ -107,8 +109,8 @@ export class AdtFunctionModuleLegacy<
     this: this & AdtPerformedBy<'functionModule', 'transport'>,
     config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
-    return noTransportResource<ReturnType<R['transport']>, E>(
+  ): Promise<IAdtResponse<T['transport'], E>> {
+    return noTransportResource<T['transport'], E>(
       FUNCTION_MODULE.uri(
         config.functionGroupName as string,
         config.functionModuleName as string,

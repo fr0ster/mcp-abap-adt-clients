@@ -26,7 +26,6 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
-  IResultStrategy,
   IServiceDefinitionResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -36,7 +35,11 @@ import { SERVICE_DEFINITION } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
-import { nothing } from '../../utils/resultStrategy';
+import {
+  nothing,
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+} from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { writeObjectDocument } from '../shared/documentWrite';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
@@ -64,33 +67,32 @@ import {
   getServiceDefinitionVersions,
 } from './versions';
 
+/** What each slot of the result set answers. */
+export type ServiceDefinitionValues = {
+  readonly [K in keyof IServiceDefinitionResults]: unknown;
+};
+
 export class AdtServiceDefinition<
-  R extends IServiceDefinitionResults = typeof serviceDefinitionDocuments,
+  T extends ServiceDefinitionValues = ResultValuesOf<
+    typeof serviceDefinitionDocuments
+  >,
   V extends AdtVariant = AdtModernVariant,
 > implements
-    IAdtCreatable<IServiceDefinitionConfig, ReturnType<R['created']>>,
-    IAdtReadable<IServiceDefinitionConfig, ReturnType<R['source']>>,
-    IAdtMetadataReadable<IServiceDefinitionConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<Partial<IServiceDefinitionConfig>, ReturnType<R['updated']>>,
+    IAdtCreatable<IServiceDefinitionConfig, T['created']>,
+    IAdtReadable<IServiceDefinitionConfig, T['source']>,
+    IAdtMetadataReadable<IServiceDefinitionConfig, T['metadata']>,
+    IAdtUpdatable<Partial<IServiceDefinitionConfig>, T['updated']>,
     IAdtMetadataUpdatable<
       Partial<IServiceDefinitionConfig>,
-      ReturnType<R['metadataUpdated']>
+      T['metadataUpdated']
     >,
-    IAdtDeletable<
-      IServiceDefinitionConfig,
-      ReturnType<R['deletion']>,
-      ReturnType<R['deletionCheck']>
-    >,
-    IAdtValidatable<IServiceDefinitionConfig, ReturnType<R['validation']>>,
-    IAdtCheckable<IServiceDefinitionConfig, ReturnType<R['check']>>,
-    IAdtActivatable<IServiceDefinitionConfig, ReturnType<R['activation']>>,
+    IAdtDeletable<IServiceDefinitionConfig, T['deletion'], T['deletionCheck']>,
+    IAdtValidatable<IServiceDefinitionConfig, T['validation']>,
+    IAdtCheckable<IServiceDefinitionConfig, T['check']>,
+    IAdtActivatable<IServiceDefinitionConfig, T['activation']>,
     IAdtLockable<IServiceDefinitionConfig>,
-    IAdtTransportAware<IServiceDefinitionConfig, ReturnType<R['transport']>>,
-    IAdtVersionable<
-      IServiceDefinitionConfig,
-      ReturnType<R['versions']>,
-      ReturnType<R['versionSource']>
-    >
+    IAdtTransportAware<IServiceDefinitionConfig, T['transport']>,
+    IAdtVersionable<IServiceDefinitionConfig, T['versions'], T['versionSource']>
 {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -103,11 +105,14 @@ export class AdtServiceDefinition<
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'ServiceDefinition';
 
-  protected readonly results: R;
+  protected readonly results: ResultStrategiesOf<T>;
 
   constructor(
     connection: IAbapConnection,
-    options: AdtHandlerOptions<R, 'logger' | 'systemContext' | 'lockRegistry'>,
+    options: AdtHandlerOptions<
+      ResultStrategiesOf<T>,
+      'logger' | 'systemContext' | 'lockRegistry'
+    >,
   ) {
     const { logger, systemContext, lockRegistry } = options;
     this.results = options.results;
@@ -138,7 +143,7 @@ export class AdtServiceDefinition<
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IServiceDefinitionConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+  ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -146,7 +151,7 @@ export class AdtServiceDefinition<
 
     return answering(
       () => validateServiceDefinitionName(connection, name, config.description),
-      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      this.results.validation,
       options?.analyse,
     );
   }
@@ -157,7 +162,7 @@ export class AdtServiceDefinition<
       source?: never;
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+  ): Promise<IAdtResponse<T['created'], E>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // An object created without a package is the single thing `delete()` cannot
@@ -188,7 +193,7 @@ export class AdtServiceDefinition<
           masterLanguage:
             config.masterLanguage ?? this.systemContext.masterLanguage,
         }),
-      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      this.results.created,
       options?.analyse,
     );
   }
@@ -198,7 +203,7 @@ export class AdtServiceDefinition<
     config: Partial<IServiceDefinitionConfig>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+  ): Promise<IAdtResponse<T['source'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -209,7 +214,7 @@ export class AdtServiceDefinition<
     // an empty body *is* absence is the caller's reading, through `analyse`.
     return answering(
       () => getServiceDefinitionSource(connection, name, version, options),
-      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      this.results.source,
       options?.analyse,
     );
   }
@@ -218,7 +223,7 @@ export class AdtServiceDefinition<
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IServiceDefinitionConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+  ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -226,7 +231,7 @@ export class AdtServiceDefinition<
 
     return answering(
       () => getServiceDefinition(connection, name, options?.version, options),
-      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      this.results.metadata,
       options?.analyse,
     );
   }
@@ -235,7 +240,7 @@ export class AdtServiceDefinition<
   async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IServiceDefinitionConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+  ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -243,7 +248,7 @@ export class AdtServiceDefinition<
 
     return answering(
       () => getServiceDefinitionTransport(connection, name, options),
-      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      this.results.transport,
       options?.analyse,
     );
   }
@@ -262,7 +267,7 @@ export class AdtServiceDefinition<
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IServiceDefinitionConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -286,7 +291,7 @@ export class AdtServiceDefinition<
           },
           options?.lockHandle,
         ),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.updated,
       options?.analyse,
     );
   }
@@ -305,7 +310,7 @@ export class AdtServiceDefinition<
     this: this & AdtPerformedBy<'serviceDefinition', 'updateMetadata'>,
     config: Partial<IServiceDefinitionConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -319,9 +324,7 @@ export class AdtServiceDefinition<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.metadataUpdated as IResultStrategy<
-        ReturnType<R['metadataUpdated']>
-      >,
+      this.results.metadataUpdated,
       options?.analyse,
     );
   }
@@ -336,7 +339,7 @@ export class AdtServiceDefinition<
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IServiceDefinitionConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -347,9 +350,7 @@ export class AdtServiceDefinition<
           service_definition_name: name,
           transport_request: config.transportRequest,
         }),
-      this.results.deletionCheck as IResultStrategy<
-        ReturnType<R['deletionCheck']>
-      >,
+      this.results.deletionCheck,
       options?.analyse,
     );
   }
@@ -366,7 +367,7 @@ export class AdtServiceDefinition<
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IServiceDefinitionConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -377,7 +378,7 @@ export class AdtServiceDefinition<
           service_definition_name: name,
           transport_request: config.transportRequest,
         }),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }
@@ -386,7 +387,7 @@ export class AdtServiceDefinition<
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IServiceDefinitionConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+  ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -394,7 +395,7 @@ export class AdtServiceDefinition<
 
     return answering(
       () => activateServiceDefinition(connection, options.headers, name),
-      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      this.results.activation,
       options?.analyse,
     );
   }
@@ -404,7 +405,7 @@ export class AdtServiceDefinition<
     config: Partial<IServiceDefinitionConfig>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+  ): Promise<IAdtResponse<T['check'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -421,7 +422,7 @@ export class AdtServiceDefinition<
           version,
           config.source,
         ),
-      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      this.results.check,
       options?.analyse,
     );
   }
@@ -481,10 +482,10 @@ export class AdtServiceDefinition<
   async getVersions<E extends IAdtError = IAdtError>(
     config: Partial<IServiceDefinitionConfig>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
+  ): Promise<IAdtResponse<T['versions'], E>> {
     return answering(
       () => getServiceDefinitionVersions(this.connection, config),
-      this.results.versions as IResultStrategy<ReturnType<R['versions']>>,
+      this.results.versions,
       options?.analyse,
     );
   }
@@ -493,12 +494,10 @@ export class AdtServiceDefinition<
   async getVersionSource<E extends IAdtError = IAdtError>(
     contentUri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versionSource']>, E>> {
+  ): Promise<IAdtResponse<T['versionSource'], E>> {
     return answering(
       () => getServiceDefinitionVersionSource(this.connection, contentUri),
-      this.results.versionSource as IResultStrategy<
-        ReturnType<R['versionSource']>
-      >,
+      this.results.versionSource,
       options?.analyse,
     );
   }

@@ -13,8 +13,9 @@
 import {
   type AdtPerformedBy,
   ClassExecutor,
+  type ClassExecutorValues,
   type classExecutorDocuments,
-  type IClassExecutorResults,
+  type ResultValuesOf,
 } from '@mcp-abap-adt/adt-clients';
 import type {
   IAdtAnalyseOptions,
@@ -34,15 +35,15 @@ const OBJECT_TYPES = '/sap/bc/adt/runtime/traces/abaptraces/objecttypes';
 const PROCESS_TYPES = '/sap/bc/adt/runtime/traces/abaptraces/processtypes';
 
 export class ClassExecutorLegacy<
-  R extends IClassExecutorResults = typeof classExecutorDocuments,
-> extends ClassExecutor<R, 'basis740'> {
+  T extends ClassExecutorValues = ResultValuesOf<typeof classExecutorDocuments>,
+> extends ClassExecutor<T, 'basis740'> {
   /** Refused without a request: 7.40 has no `IF_OO_ADT_CLASSRUN` and no classrun endpoint. */
   override async run<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'class', 'run'>,
     _target: IClassExecutionTarget,
     _options?: IClassExecuteOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
-    return legacyRefusal<ReturnType<R['run']>, E>('run', CLASSRUN);
+  ): Promise<IAdtResponse<T['run'], E>> {
+    return legacyRefusal<T['run'], E>('run', CLASSRUN);
   }
 
   /** Refused without a request, for the same reason as `run`. */
@@ -50,15 +51,15 @@ export class ClassExecutorLegacy<
     this: this & AdtPerformedBy<'class', 'profile'>,
     _target: IClassExecutionTarget,
     _options: IClassExecuteWithProfilerOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
-    return legacyRefusal<ReturnType<R['run']>, E>('runWithProfiler', CLASSRUN);
+  ): Promise<IAdtResponse<T['run'], E>> {
+    return legacyRefusal<T['run'], E>('runWithProfiler', CLASSRUN);
   }
 
   /** Refused until measured: 7.40 does not advertise the catalogue. */
   override async listObjectTypes<E extends IAdtError = IAdtError>(
     _options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['types']>, E>> {
-    return legacyUnmeasuredRefusal<ReturnType<R['types']>, E>(
+  ): Promise<IAdtResponse<T['types'], E>> {
+    return legacyUnmeasuredRefusal<T['types'], E>(
       'listObjectTypes',
       OBJECT_TYPES,
     );
@@ -67,8 +68,8 @@ export class ClassExecutorLegacy<
   /** Refused until measured: 7.40 does not advertise the catalogue. */
   override async listProcessTypes<E extends IAdtError = IAdtError>(
     _options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['types']>, E>> {
-    return legacyUnmeasuredRefusal<ReturnType<R['types']>, E>(
+  ): Promise<IAdtResponse<T['types'], E>> {
+    return legacyUnmeasuredRefusal<T['types'], E>(
       'listProcessTypes',
       PROCESS_TYPES,
     );

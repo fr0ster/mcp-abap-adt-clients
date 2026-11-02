@@ -5,6 +5,7 @@
 export {
   type IMemorySnapshotsResults,
   MemorySnapshots,
+  type MemorySnapshotsValues,
   memorySnapshotsDocuments,
 } from './MemorySnapshots';
 export {

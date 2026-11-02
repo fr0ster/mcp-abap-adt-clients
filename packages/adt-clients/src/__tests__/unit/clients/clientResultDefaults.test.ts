@@ -15,6 +15,7 @@
  * two overloads (`unit/clients/handlerFactories.test.ts`).
  */
 
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { AdtClient } from '../../../clients/AdtClient';
 import { AdtRuntimeClient } from '../../../clients/AdtRuntimeClient';
 import type { AdtModernVariant } from '../../../clients/variant';
@@ -30,6 +31,7 @@ import {
   runtimeDumpsDocuments,
 } from '../../../runtime/dumps/RuntimeDumps';
 import { noopLogger } from '../../../utils/noopLogger';
+import type { ResultValuesOf } from '../../../utils/resultStrategy';
 import { RecordingConnection } from '../../helpers/recordingConnection';
 
 /** `true` only when `A` and `B` are the same type. */
@@ -39,10 +41,11 @@ type Equal<A, B> =
     : false;
 
 /** A result set of its own: the shipped one, and a marker the default lacks. */
-type Marked<D> = D & { readonly marker: true };
+type Marked<D> = D & { readonly marker: IResultStrategy<true> };
+const marker: IResultStrategy<true> = () => true;
 const marked = <D extends object>(documents: D): Marked<D> => ({
   ...documents,
-  marker: true,
+  marker,
 });
 
 function clientGetterTypes(client: AdtClient): void {
@@ -50,7 +53,7 @@ function clientGetterTypes(client: AdtClient): void {
   const classes = client.getClass();
   const isDefault: Equal<
     typeof classes,
-    AdtClass<typeof classDocuments, AdtModernVariant>
+    AdtClass<ResultValuesOf<typeof classDocuments>, AdtModernVariant>
   > = true;
   void isDefault;
 
@@ -58,7 +61,7 @@ function clientGetterTypes(client: AdtClient): void {
   const own = client.getClass(marked(classDocuments));
   const isOwn: Equal<
     typeof own,
-    AdtClass<Marked<typeof classDocuments>, AdtModernVariant>
+    AdtClass<ResultValuesOf<Marked<typeof classDocuments>>, AdtModernVariant>
   > = true;
   void isOwn;
 
@@ -72,12 +75,18 @@ function clientGetterTypes(client: AdtClient): void {
 function runtimeGetterTypes(runtime: AdtRuntimeClient): void {
   // No argument: the shipped documents' type, inferred.
   const atc = runtime.getAtc();
-  const isDefault: Equal<typeof atc, AdtAtc<typeof atcDocuments>> = true;
+  const isDefault: Equal<
+    typeof atc,
+    AdtAtc<ResultValuesOf<typeof atcDocuments>>
+  > = true;
   void isDefault;
 
   // Given results: their type.
   const own = runtime.getAtc(marked(atcDocuments));
-  const isOwn: Equal<typeof own, AdtAtc<Marked<typeof atcDocuments>>> = true;
+  const isOwn: Equal<
+    typeof own,
+    AdtAtc<ResultValuesOf<Marked<typeof atcDocuments>>>
+  > = true;
   void isOwn;
 
   // @ts-expect-error -- R without results
@@ -91,7 +100,7 @@ function constructorTypes(): void {
   const own = new AdtClass(connection, { results: marked(classDocuments) });
   const isOwn: Equal<
     typeof own,
-    AdtClass<Marked<typeof classDocuments>, AdtModernVariant>
+    AdtClass<ResultValuesOf<Marked<typeof classDocuments>>, AdtModernVariant>
   > = true;
   void isOwn;
 
@@ -104,7 +113,7 @@ function constructorTypes(): void {
     systemContext: {},
   });
   // @ts-expect-error -- results are required
-  new AdtClass<Marked<typeof classDocuments>>(connection, {
+  new AdtClass<ResultValuesOf<Marked<typeof classDocuments>>>(connection, {
     logger: noopLogger,
   });
   // @ts-expect-error -- results are required (beside a required logger)

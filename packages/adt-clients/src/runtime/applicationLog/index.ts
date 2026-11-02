@@ -4,6 +4,7 @@
 
 export {
   ApplicationLog,
+  type ApplicationLogValues,
   applicationLogDocuments,
   type IApplicationLogResults,
 } from './ApplicationLog';

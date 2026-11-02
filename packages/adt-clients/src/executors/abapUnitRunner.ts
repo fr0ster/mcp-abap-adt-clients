@@ -31,7 +31,7 @@ import {
 } from '../core/shared/abapUnit';
 import type { AdtHandlerOptions } from '../core/shared/handlerOptions';
 import { answering } from '../utils/adtResponse';
-import { rawDocument } from '../utils/resultStrategy';
+import { type ResultStrategiesOf, rawDocument } from '../utils/resultStrategy';
 
 /** One strategy per distinct answer: starting a run, polling it, its result. */
 export interface IAbapUnitRunnerResults {
@@ -63,12 +63,16 @@ export type AbapUnitApi =
   | 'functionGroup'
   | 'functionModule';
 
+/** What each slot of the result set answers. */
+export type AbapUnitRunnerValues = {
+  readonly [K in keyof IAbapUnitRunnerResults]: unknown;
+};
+
 export abstract class AbapUnitRunner<
-  R extends IAbapUnitRunnerResults,
+  T extends AbapUnitRunnerValues,
   V extends AdtVariant = AdtModernVariant,
   A extends AbapUnitApi = AbapUnitApi,
-> implements
-    ITestRunInformation<ReturnType<R['status']>, ReturnType<R['result']>>
+> implements ITestRunInformation<T['status'], T['result']>
 {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -77,11 +81,11 @@ export abstract class AbapUnitRunner<
   declare readonly variant?: V;
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
-  protected readonly results: R;
+  protected readonly results: ResultStrategiesOf<T>;
 
   constructor(
     connection: IAbapConnection,
-    options: AdtHandlerOptions<R, 'logger'>,
+    options: AdtHandlerOptions<ResultStrategiesOf<T>, 'logger'>,
   ) {
     const { logger, results } = options;
     this.connection = connection;
@@ -94,10 +98,10 @@ export abstract class AbapUnitRunner<
     name: string,
     type: AbapUnitRunObjectType,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
+  ): Promise<IAdtResponse<T['run'], E>> {
     return answering(
       () => startUnitTestRunByObject(this.connection, { name, type }, options),
-      this.results.run as IResultStrategy<ReturnType<R['run']>>,
+      this.results.run,
       options?.analyse,
     );
   }
@@ -113,13 +117,13 @@ export abstract class AbapUnitRunner<
   protected startSync<E extends IAdtError>(
     objectUris: string[],
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {
+  ): Promise<IAdtResponse<T['result'], E>> {
     // `runOptions` is an object even when the caller gave none, so the
     // `<options>` element is always sent.
     const { analyse, ...runOptions } = options ?? {};
     return answering(
       () => startUnitTestRunSync(this.connection, objectUris, runOptions),
-      this.results.result as IResultStrategy<ReturnType<R['result']>>,
+      this.results.result,
       analyse,
     );
   }
@@ -133,11 +137,11 @@ export abstract class AbapUnitRunner<
     runId: string,
     withLongPolling: boolean | undefined = true,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['status']>, E>> {
+  ): Promise<IAdtResponse<T['status'], E>> {
     return answering(
       () =>
         getUnitTestRunStatus(this.connection, runId, withLongPolling ?? true),
-      this.results.status as IResultStrategy<ReturnType<R['status']>>,
+      this.results.status,
       options?.analyse,
     );
   }
@@ -147,10 +151,10 @@ export abstract class AbapUnitRunner<
     this: this & AdtPerformedBy<A, 'unitTestResult'>,
     runId: string,
     options?: IUnitTestResultOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {
+  ): Promise<IAdtResponse<T['result'], E>> {
     return answering(
       () => getUnitTestRunResult(this.connection, runId, options),
-      this.results.result as IResultStrategy<ReturnType<R['result']>>,
+      this.results.result,
       options?.analyse,
     );
   }

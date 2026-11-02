@@ -1,2 +1,5 @@
-export { AdtAppendStructure } from './AdtAppendStructure';
+export {
+  AdtAppendStructure,
+  type AppendStructureValues,
+} from './AdtAppendStructure';
 export * from './types';

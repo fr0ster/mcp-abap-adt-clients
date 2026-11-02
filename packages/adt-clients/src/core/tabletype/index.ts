@@ -2,5 +2,8 @@
  * TableType operations - exports
  */
 
-export { AdtDdicTableType } from './AdtDdicTableType';
+export {
+  AdtDdicTableType,
+  type TableTypeValues,
+} from './AdtDdicTableType';
 export * from './types';

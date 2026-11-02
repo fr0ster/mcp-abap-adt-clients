@@ -1,2 +1,5 @@
-export { AdtFeatureToggle } from './AdtFeatureToggle';
+export {
+  AdtFeatureToggle,
+  type FeatureToggleValues,
+} from './AdtFeatureToggle';
 export * from './types';

@@ -19,7 +19,11 @@ import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { runClass } from '../../core/class/run';
 import type { AdtHandlerOptions } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
-import { rawDocument } from '../../utils/resultStrategy';
+import {
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+  rawDocument,
+} from '../../utils/resultStrategy';
 import {
   type ITraceSchedulingResults,
   TraceScheduling,
@@ -45,6 +49,11 @@ export const classExecutorDocuments = {
   run: rawDocument,
 } satisfies IClassExecutorResults;
 
+/** What each slot of the result set answers. */
+export type ClassExecutorValues = {
+  readonly [K in keyof IClassExecutorResults]: unknown;
+};
+
 /**
  * **Not `IClassExecutor` since 19.0.0.** That composite includes
  * `IRunnableWithProfiling`, whose `runWithProfiling` scheduled a trace, ran the
@@ -55,20 +64,16 @@ export const classExecutorDocuments = {
  * that joins them.
  */
 export class ClassExecutor<
-  R extends IClassExecutorResults = typeof classExecutorDocuments,
+  T extends ClassExecutorValues = ResultValuesOf<typeof classExecutorDocuments>,
   V extends AdtVariant = AdtModernVariant,
 > implements
-    IAdtRunnable<IClassExecutionTarget, ReturnType<R['run']>>,
+    IAdtRunnable<IClassExecutionTarget, T['run']>,
     IRunnableWithProfiler<
       IClassExecutionTarget,
-      ReturnType<R['run']>,
+      T['run'],
       IClassExecuteWithProfilerOptions
     >,
-    ITraceScheduling<
-      ReturnType<R['types']>,
-      ReturnType<R['requests']>,
-      ReturnType<R['scheduled']>
-    >
+    ITraceScheduling<T['types'], T['requests'], T['scheduled']>
 {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -77,12 +82,12 @@ export class ClassExecutor<
   declare readonly variant?: V;
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
-  private readonly results: R;
-  private readonly scheduling: TraceScheduling<R>;
+  private readonly results: ResultStrategiesOf<T>;
+  private readonly scheduling: TraceScheduling<T>;
 
   constructor(
     connection: IAbapConnection,
-    options: AdtHandlerOptions<R, 'logger'>,
+    options: AdtHandlerOptions<ResultStrategiesOf<T>, 'logger'>,
   ) {
     const { logger, results } = options;
     this.connection = connection;
@@ -97,33 +102,33 @@ export class ClassExecutor<
 
   listObjectTypes<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['types']>, E>> {
+  ): Promise<IAdtResponse<T['types'], E>> {
     return this.scheduling.listObjectTypes(options);
   }
 
   listProcessTypes<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['types']>, E>> {
+  ): Promise<IAdtResponse<T['types'], E>> {
     return this.scheduling.listProcessTypes(options);
   }
 
   listRequests<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['requests']>, E>> {
+  ): Promise<IAdtResponse<T['requests'], E>> {
     return this.scheduling.listRequests(options);
   }
 
   getRequestsByUri<E extends IAdtError = IAdtError>(
     uri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['requests']>, E>> {
+  ): Promise<IAdtResponse<T['requests'], E>> {
     return this.scheduling.getRequestsByUri(uri, options);
   }
 
   scheduleTrace<E extends IAdtError = IAdtError>(
     options: { headers: IAdtHeaders } & IProfilerTraceParameters &
       IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['scheduled']>, E>> {
+  ): Promise<IAdtResponse<T['scheduled'], E>> {
     return this.scheduling.scheduleTrace(options);
   }
 
@@ -131,7 +136,7 @@ export class ClassExecutor<
     this: this & AdtPerformedBy<'class', 'run'>,
     target: IClassExecutionTarget,
     options?: IClassExecuteOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
+  ): Promise<IAdtResponse<T['run'], E>> {
     return answering(
       () =>
         runClass(
@@ -141,7 +146,7 @@ export class ClassExecutor<
           undefined,
           options?.debuggee,
         ),
-      this.results.run as IResultStrategy<ReturnType<R['run']>>,
+      this.results.run,
       options?.analyse,
     );
   }
@@ -150,7 +155,7 @@ export class ClassExecutor<
     this: this & AdtPerformedBy<'class', 'profile'>,
     target: IClassExecutionTarget,
     options: IClassExecuteWithProfilerOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
+  ): Promise<IAdtResponse<T['run'], E>> {
     const encodedProfilerId = encodeURIComponent(options.profilerId);
     return answering(
       () =>
@@ -163,7 +168,7 @@ export class ClassExecutor<
             'X-sap-adt-profiling': 'server-time',
           },
         }),
-      this.results.run as IResultStrategy<ReturnType<R['run']>>,
+      this.results.run,
       options.analyse,
     );
   }

@@ -16,6 +16,13 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 > **From 18.x?** Read [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md)
 > first: 19.0.0 is where members became one endpoint call each.
 >
+> **From 40.x?** 41.0.0 types every handler class by the values its result
+> slots answer, not by the strategies: code that names a class's type
+> parameter (`AdtClass<typeof classDocuments>`) names the values
+> (`AdtClass<ResultValuesOf<typeof classDocuments>>`). `getX()` /
+> `getX(results)` calls, and every request, are unchanged. See
+> [`docs/usage/MIGRATION-41.md`](docs/usage/MIGRATION-41.md).
+>
 > **From 39.x?** 40.0.0 (on `interfaces-adt` ^25.0.0) types every read's
 > version as `AdtReadVersion` — `active`, `inactive` or `workingArea` — and
 > sends exactly the version it is given — none dropped, rewritten or
@@ -1032,7 +1039,7 @@ await client.getClass().read(
 ```
 
 - Factory accessors for ADT objects: `client.getClass()`, `client.getProgram()`, `client.getDdl()` (DDL sources — CDS views, AMDP table functions; formerly `getView()`), `client.getTable()`, `client.getScalarFunction()`, `client.getScalarFunctionImplementation()`, `client.getAppendStructure()`, `client.getRequest()`, `client.getUtils()`, etc.
-- Each accessor returns its `Adt*` class, typed to its **honest capability set** (since 8.0.0, completed in 12.0.0): the class implements only the capability atoms that object actually supports, written positively — there is no composite at all, and none named for what an object lacks. Since 38.0.0 the accessor answers the class itself (`AdtClass<R>`, …), not a composition of its atoms. Calling a capability a handler lacks — e.g. `client.getDomain().getVersions(...)` — is a **compile error** rather than a runtime throw. See the [Type System](#type-system) section.
+- Each accessor returns its `Adt*` class, typed to its **honest capability set** (since 8.0.0, completed in 12.0.0): the class implements only the capability atoms that object actually supports, written positively — there is no composite at all, and none named for what an object lacks. Since 38.0.0 the accessor answers the class itself (`AdtClass<T>`, …), not a composition of its atoms; since 41.0.0 `T` is what its result slots answer (`ResultValuesOf<typeof results>`). Calling a capability a handler lacks — e.g. `client.getDomain().getVersions(...)` — is a **compile error** rather than a runtime throw. See the [Type System](#type-system) section.
 - See `src/index.ts` for the full type exports and object configs.
 
 ### AdtObject Methods (with Long Polling Support)
@@ -1452,7 +1459,7 @@ them to what each release answers.
   `ADT_SEARCH_TYPES_BASIS_740`. A main type comes from the table entry
   (`ADT_TYPES_ONPREM.package.codes['DEVC/K'].main`). A subtype without an
   alias (`ENHO/XHH`) is searched by its main type, the hits filtered by you.
-- **`getUtils()` is typed per variant** (39.0.0): `AdtUtils<R, V>` is an
+- **`getUtils()` is typed per variant** (39.0.0): `AdtUtils<T, V>` is an
   `IAdtTypedWhereUsed<…, V>` and an `IAdtTypedGroupLifecycle<…, V>` of
   interfaces-adt — `VIEW/DV` in where-used and the group members, a parented
   code's `parentName` required.
@@ -1546,6 +1553,7 @@ See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-a
 One document per breaking release, each written for a consumer on the contract
 before it:
 
+- **[40.x → 41.0.0](docs/usage/MIGRATION-41.md)** — every handler class is generic over the values its result slots answer (`AdtClass<ResultValuesOf<typeof classDocuments>>`), not over the strategies (`AdtClass<typeof classDocuments>`); code that names a class's type parameter wraps it in `ResultValuesOf<…>`, and `getX()` / `getX(results)` calls and every request are unchanged.
 - **[39.x → 40.0.0](docs/usage/MIGRATION-40.md)** — every read (source, metadata, `readObjectSource`, `getObjectSourceUri`, the feature toggle's source, the application log) takes `AdtReadVersion` of interfaces-adt 25 and sends exactly the version it is given, and none without one; the reads that dropped, rewrote or defaulted it on 39.x send a changed request (MIGRATION-40 lists them).
 - **[38.x → 39.0.0](docs/usage/MIGRATION-39.md)** — the search filter takes the release's search names (`DEVC`, `STRU`), not a code; where-used and the group members take interfaces-adt's typed references (`VIEW/DV`, a function module's group), and `getUtils()` satisfies `IAdtTypedWhereUsed` / `IAdtTypedGroupLifecycle` instead of `IAdtWhereUsed` / `IAdtGroupLifecycle`.
 - **[37.x → 38.0.0](docs/usage/MIGRATION-38.md)** — the ADT type tables decide: a client is fixed to its release variant, every type code is a code of the tables, an API with a parent takes it, answered objects are `type` / `unknownType`, and `updateMetadata` covers fifteen more types; the result-set contracts are imported from `@mcp-abap-adt/interfaces-adt`, and each factory answers its class, so a consumer composes the contract it accepts from interfaces-adt.

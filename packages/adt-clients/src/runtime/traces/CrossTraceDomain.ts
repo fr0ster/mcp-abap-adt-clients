@@ -10,7 +10,11 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtLoggedOptions } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
-import { rawDocument } from '../../utils/resultStrategy';
+import {
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+  rawDocument,
+} from '../../utils/resultStrategy';
 import {
   getCrossTrace,
   getCrossTraceActivations,
@@ -44,24 +48,29 @@ export const crossTraceDocuments = {
   activations: rawDocument,
 } satisfies ICrossTraceResultSet;
 
+/** What each slot of the result set answers. */
+export type CrossTraceValues = {
+  readonly [K in keyof ICrossTraceResultSet]: unknown;
+};
+
 export class CrossTrace<
-  R extends ICrossTraceResultSet = typeof crossTraceDocuments,
+  T extends CrossTraceValues = ResultValuesOf<typeof crossTraceDocuments>,
 > implements
     ICrossTrace<{
-      list: ReturnType<R['list']>;
-      trace: ReturnType<R['trace']>;
-      records: ReturnType<R['records']>;
-      recordContent: ReturnType<R['recordContent']>;
-      activations: ReturnType<R['activations']>;
+      list: T['list'];
+      trace: T['trace'];
+      records: T['records'];
+      recordContent: T['recordContent'];
+      activations: T['activations'];
     }>
 {
   readonly kind = 'crossTrace' as const;
-  private readonly results: R;
+  private readonly results: ResultStrategiesOf<T>;
   private readonly logger: ILogger;
 
   constructor(
     private readonly connection: IAbapConnection,
-    options: AdtLoggedOptions<R>,
+    options: AdtLoggedOptions<ResultStrategiesOf<T>>,
   ) {
     this.logger = options.logger;
     this.results = options.results;
@@ -69,10 +78,10 @@ export class CrossTrace<
 
   async list<E extends IAdtError = IAdtError>(
     options?: IListCrossTracesOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['list']>, E>> {
+  ): Promise<IAdtResponse<T['list'], E>> {
     return answering(
       () => listCrossTraces(this.connection, options),
-      this.results.list as IResultStrategy<ReturnType<R['list']>>,
+      this.results.list,
       options?.analyse,
     );
   }
@@ -81,10 +90,10 @@ export class CrossTrace<
     traceId: string,
     includeSensitiveData?: boolean,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['trace']>, E>> {
+  ): Promise<IAdtResponse<T['trace'], E>> {
     return answering(
       () => getCrossTrace(this.connection, traceId, includeSensitiveData),
-      this.results.trace as IResultStrategy<ReturnType<R['trace']>>,
+      this.results.trace,
       options?.analyse,
     );
   }
@@ -92,10 +101,10 @@ export class CrossTrace<
   async getRecords<E extends IAdtError = IAdtError>(
     traceId: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['records']>, E>> {
+  ): Promise<IAdtResponse<T['records'], E>> {
     return answering(
       () => getCrossTraceRecords(this.connection, traceId),
-      this.results.records as IResultStrategy<ReturnType<R['records']>>,
+      this.results.records,
       options?.analyse,
     );
   }
@@ -104,22 +113,20 @@ export class CrossTrace<
     traceId: string,
     recordNumber: number,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['recordContent']>, E>> {
+  ): Promise<IAdtResponse<T['recordContent'], E>> {
     return answering(
       () => getCrossTraceRecordContent(this.connection, traceId, recordNumber),
-      this.results.recordContent as IResultStrategy<
-        ReturnType<R['recordContent']>
-      >,
+      this.results.recordContent,
       options?.analyse,
     );
   }
 
   async getActivations<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['activations']>, E>> {
+  ): Promise<IAdtResponse<T['activations'], E>> {
     return answering(
       () => getCrossTraceActivations(this.connection),
-      this.results.activations as IResultStrategy<ReturnType<R['activations']>>,
+      this.results.activations,
       options?.analyse,
     );
   }

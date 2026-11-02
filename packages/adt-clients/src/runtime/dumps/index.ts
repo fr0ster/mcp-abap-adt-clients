@@ -5,6 +5,7 @@
 export {
   type IRuntimeDumpsResults,
   RuntimeDumps,
+  type RuntimeDumpsValues,
   runtimeDumpsDocuments,
 } from './RuntimeDumps';
 export {

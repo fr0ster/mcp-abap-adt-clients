@@ -2,5 +2,8 @@
  * Interface operations - exports
  */
 
-export { AdtInterface } from './AdtInterface';
+export {
+  AdtInterface,
+  type InterfaceValues,
+} from './AdtInterface';
 export * from './types';

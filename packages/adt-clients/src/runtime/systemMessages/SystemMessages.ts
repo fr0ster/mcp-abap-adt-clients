@@ -16,7 +16,11 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtLoggedOptions } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
-import { rawDocument } from '../../utils/resultStrategy';
+import {
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+  rawDocument,
+} from '../../utils/resultStrategy';
 import { getSystemMessage, listSystemMessages } from './read';
 
 /** One strategy per member of the system messages. */
@@ -35,18 +39,25 @@ export const systemMessagesDocuments = {
   message: rawDocument,
 } satisfies ISystemMessagesResults;
 
+/** What each slot of the result set answers. */
+export type SystemMessagesValues = {
+  readonly [K in keyof ISystemMessagesResults]: unknown;
+};
+
 /** The messages this system is showing. */
 export class SystemMessages<
-  R extends ISystemMessagesResults = typeof systemMessagesDocuments,
-> implements ISystemMessages<ReturnType<R['list']>, ReturnType<R['message']>>
+  T extends SystemMessagesValues = ResultValuesOf<
+    typeof systemMessagesDocuments
+  >,
+> implements ISystemMessages<T['list'], T['message']>
 {
   readonly kind = 'systemMessages' as const;
-  private readonly results: R;
+  private readonly results: ResultStrategiesOf<T>;
   private readonly logger: ILogger;
 
   constructor(
     private readonly connection: IAbapConnection,
-    options: AdtLoggedOptions<R>,
+    options: AdtLoggedOptions<ResultStrategiesOf<T>>,
   ) {
     this.logger = options.logger;
     this.results = options.results;
@@ -54,10 +65,10 @@ export class SystemMessages<
 
   async list<E extends IAdtError = IAdtError>(
     options?: IFeedQueryOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['list']>, E>> {
+  ): Promise<IAdtResponse<T['list'], E>> {
     return answering(
       () => listSystemMessages(this.connection, options),
-      this.results.list as IResultStrategy<ReturnType<R['list']>>,
+      this.results.list,
       options?.analyse,
     );
   }
@@ -65,10 +76,10 @@ export class SystemMessages<
   async getById<E extends IAdtError = IAdtError>(
     messageId: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['message']>, E>> {
+  ): Promise<IAdtResponse<T['message'], E>> {
     return answering(
       () => getSystemMessage(this.connection, messageId),
-      this.results.message as IResultStrategy<ReturnType<R['message']>>,
+      this.results.message,
       options?.analyse,
     );
   }

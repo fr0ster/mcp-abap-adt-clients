@@ -23,7 +23,6 @@ import type {
   IAdtResponse,
   IAdtSystemContext,
   IClassResults,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -31,7 +30,11 @@ import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
-import { nothing } from '../../utils/resultStrategy';
+import {
+  nothing,
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+} from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import {
   createLockTracker,
@@ -61,8 +64,13 @@ export type ClassFamilyApi =
   | 'localDefinitions'
   | 'localMacros';
 
+/** What each slot of the result set answers. */
+export type ClassValues = {
+  readonly [K in keyof IClassResults]: unknown;
+};
+
 export abstract class AdtClassMemberBase<
-  R extends IClassResults = typeof classDocuments,
+  T extends ClassValues = ResultValuesOf<typeof classDocuments>,
   V extends AdtVariant = AdtModernVariant,
   A extends ClassFamilyApi = 'class',
 > {
@@ -75,12 +83,12 @@ export abstract class AdtClassMemberBase<
    * The readings this implementation performs, given when it was constructed.
    *
    * Declared here and abstract, so every concrete subclass carries it: `activate`
-   * and `readMetadata` below answer `ReturnType<R[…]>`, and a base fixed to the
+   * and `readMetadata` below answer `T[…]`, and a base fixed to the
    * defaults would bind them to those while the subclass's `implements` clause
    * promises the caller's — the class would not satisfy the atoms it claims, for
    * exactly the members a consumer is least likely to test.
    */
-  protected abstract readonly results: R;
+  protected abstract readonly results: ResultStrategiesOf<T>;
 
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
@@ -173,7 +181,7 @@ export abstract class AdtClassMemberBase<
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+  ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -183,7 +191,7 @@ export abstract class AdtClassMemberBase<
     return answering(
       () =>
         activateClass(connection, options.headers, config.className as string),
-      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      this.results.activation,
       options?.analyse,
     );
   }
@@ -198,7 +206,7 @@ export abstract class AdtClassMemberBase<
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+  ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -213,7 +221,7 @@ export abstract class AdtClassMemberBase<
     return answering(
       () =>
         getClassMetadata(connection, config.className as string, readOptions),
-      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      this.results.metadata,
       options?.analyse,
     );
   }
@@ -228,13 +236,13 @@ export abstract class AdtClassMemberBase<
     this: this & AdtPerformedBy<A, 'transport'>,
     config: Partial<IClassConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+  ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     return answering(
       () => getClassTransport(connection, config.className as string, options),
-      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      this.results.transport,
       options?.analyse,
     );
   }
@@ -243,12 +251,10 @@ export abstract class AdtClassMemberBase<
   async getVersionSource<E extends IAdtError = IAdtError>(
     contentUri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versionSource']>, E>> {
+  ): Promise<IAdtResponse<T['versionSource'], E>> {
     return answering(
       () => getClassVersionSource(this.connection, contentUri),
-      this.results.versionSource as IResultStrategy<
-        ReturnType<R['versionSource']>
-      >,
+      this.results.versionSource,
       options?.analyse,
     );
   }
@@ -261,10 +267,10 @@ export abstract class AdtClassMemberBase<
     className: string,
     includeType: ClassIncludeType,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
+  ): Promise<IAdtResponse<T['versions'], E>> {
     return answering(
       () => getClassIncludeVersions(this.connection, className, includeType),
-      this.results.versions as IResultStrategy<ReturnType<R['versions']>>,
+      this.results.versions,
       options?.analyse,
     );
   }
@@ -273,5 +279,5 @@ export abstract class AdtClassMemberBase<
   abstract getVersions<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>>;
+  ): Promise<IAdtResponse<T['versions'], E>>;
 }

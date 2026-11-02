@@ -30,7 +30,11 @@ import {
   listTraceRequests,
 } from '../runtime/traces/profiler';
 import { answering } from '../utils/adtResponse';
-import { rawDocument } from '../utils/resultStrategy';
+import {
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+  rawDocument,
+} from '../utils/resultStrategy';
 
 /** One strategy per distinct answer of trace scheduling. */
 export interface ITraceSchedulingResults {
@@ -63,40 +67,42 @@ export const traceSchedulingDocuments = {
   scheduled: rawDocument,
 } satisfies ITraceSchedulingResults;
 
+/** What each slot of the result set answers. */
+export type TraceSchedulingValues = {
+  readonly [K in keyof ITraceSchedulingResults]: unknown;
+};
+
 export class TraceScheduling<
-  R extends ITraceSchedulingResults = typeof traceSchedulingDocuments,
-> implements
-    ITraceScheduling<
-      ReturnType<R['types']>,
-      ReturnType<R['requests']>,
-      ReturnType<R['scheduled']>
-    >
+  T extends TraceSchedulingValues = ResultValuesOf<
+    typeof traceSchedulingDocuments
+  >,
+> implements ITraceScheduling<T['types'], T['requests'], T['scheduled']>
 {
-  private readonly results: R;
+  private readonly results: ResultStrategiesOf<T>;
 
   constructor(
     private readonly connection: IAbapConnection,
-    options: AdtHandlerOptions<R>,
+    options: AdtHandlerOptions<ResultStrategiesOf<T>>,
   ) {
     this.results = options.results;
   }
 
   async listObjectTypes<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['types']>, E>> {
+  ): Promise<IAdtResponse<T['types'], E>> {
     return answering(
       () => listObjectTypes(this.connection),
-      this.results.types as IResultStrategy<ReturnType<R['types']>>,
+      this.results.types,
       options?.analyse,
     );
   }
 
   async listProcessTypes<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['types']>, E>> {
+  ): Promise<IAdtResponse<T['types'], E>> {
     return answering(
       () => listProcessTypes(this.connection),
-      this.results.types as IResultStrategy<ReturnType<R['types']>>,
+      this.results.types,
       options?.analyse,
     );
   }
@@ -109,10 +115,10 @@ export class TraceScheduling<
    */
   async listRequests<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['requests']>, E>> {
+  ): Promise<IAdtResponse<T['requests'], E>> {
     return answering(
       () => listTraceRequests(this.connection),
-      this.results.requests as IResultStrategy<ReturnType<R['requests']>>,
+      this.results.requests,
       options?.analyse,
     );
   }
@@ -120,10 +126,10 @@ export class TraceScheduling<
   async getRequestsByUri<E extends IAdtError = IAdtError>(
     uri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['requests']>, E>> {
+  ): Promise<IAdtResponse<T['requests'], E>> {
     return answering(
       () => getTraceRequestsByUri(this.connection, uri),
-      this.results.requests as IResultStrategy<ReturnType<R['requests']>>,
+      this.results.requests,
       options?.analyse,
     );
   }
@@ -140,10 +146,10 @@ export class TraceScheduling<
   async scheduleTrace<E extends IAdtError = IAdtError>(
     options: { headers: IAdtHeaders } & IProfilerTraceParameters &
       IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['scheduled']>, E>> {
+  ): Promise<IAdtResponse<T['scheduled'], E>> {
     return answering(
       () => createTraceParameters(this.connection, options.headers, options),
-      this.results.scheduled as IResultStrategy<ReturnType<R['scheduled']>>,
+      this.results.scheduled,
       options?.analyse,
     );
   }

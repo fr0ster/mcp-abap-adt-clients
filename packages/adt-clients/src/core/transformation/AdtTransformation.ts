@@ -26,7 +26,6 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
-  IResultStrategy,
   ITransformationResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -36,7 +35,11 @@ import { TRANSFORMATION } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
-import { nothing } from '../../utils/resultStrategy';
+import {
+  nothing,
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+} from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { writeObjectDocument } from '../shared/documentWrite';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
@@ -61,33 +64,29 @@ import {
   getTransformationVersions,
 } from './versions';
 
+/** What each slot of the result set answers. */
+export type TransformationValues = {
+  readonly [K in keyof ITransformationResults]: unknown;
+};
+
 export class AdtTransformation<
-  R extends ITransformationResults = typeof transformationDocuments,
+  T extends TransformationValues = ResultValuesOf<
+    typeof transformationDocuments
+  >,
   V extends AdtVariant = AdtModernVariant,
 > implements
-    IAdtCreatable<ITransformationConfig, ReturnType<R['created']>>,
-    IAdtReadable<ITransformationConfig, ReturnType<R['source']>>,
-    IAdtMetadataReadable<ITransformationConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<Partial<ITransformationConfig>, ReturnType<R['updated']>>,
-    IAdtMetadataUpdatable<
-      Partial<ITransformationConfig>,
-      ReturnType<R['metadataUpdated']>
-    >,
-    IAdtDeletable<
-      ITransformationConfig,
-      ReturnType<R['deletion']>,
-      ReturnType<R['deletionCheck']>
-    >,
-    IAdtValidatable<ITransformationConfig, ReturnType<R['validation']>>,
-    IAdtCheckable<ITransformationConfig, ReturnType<R['check']>>,
-    IAdtActivatable<ITransformationConfig, ReturnType<R['activation']>>,
+    IAdtCreatable<ITransformationConfig, T['created']>,
+    IAdtReadable<ITransformationConfig, T['source']>,
+    IAdtMetadataReadable<ITransformationConfig, T['metadata']>,
+    IAdtUpdatable<Partial<ITransformationConfig>, T['updated']>,
+    IAdtMetadataUpdatable<Partial<ITransformationConfig>, T['metadataUpdated']>,
+    IAdtDeletable<ITransformationConfig, T['deletion'], T['deletionCheck']>,
+    IAdtValidatable<ITransformationConfig, T['validation']>,
+    IAdtCheckable<ITransformationConfig, T['check']>,
+    IAdtActivatable<ITransformationConfig, T['activation']>,
     IAdtLockable<ITransformationConfig>,
-    IAdtTransportAware<ITransformationConfig, ReturnType<R['transport']>>,
-    IAdtVersionable<
-      ITransformationConfig,
-      ReturnType<R['versions']>,
-      ReturnType<R['versionSource']>
-    >
+    IAdtTransportAware<ITransformationConfig, T['transport']>,
+    IAdtVersionable<ITransformationConfig, T['versions'], T['versionSource']>
 {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -100,11 +99,14 @@ export class AdtTransformation<
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Transformation';
 
-  protected readonly results: R;
+  protected readonly results: ResultStrategiesOf<T>;
 
   constructor(
     connection: IAbapConnection,
-    options: AdtHandlerOptions<R, 'logger' | 'systemContext' | 'lockRegistry'>,
+    options: AdtHandlerOptions<
+      ResultStrategiesOf<T>,
+      'logger' | 'systemContext' | 'lockRegistry'
+    >,
   ) {
     const { logger, systemContext, lockRegistry } = options;
     this.results = options.results;
@@ -135,7 +137,7 @@ export class AdtTransformation<
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<ITransformationConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+  ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -149,7 +151,7 @@ export class AdtTransformation<
           config.packageName,
           config.description,
         ),
-      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      this.results.validation,
       options?.analyse,
     );
   }
@@ -158,7 +160,7 @@ export class AdtTransformation<
   async create<E extends IAdtError = IAdtError>(
     config: Omit<ITransformationConfig, 'source'> & { source?: never },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+  ): Promise<IAdtResponse<T['created'], E>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // An object created without a package is the single thing `delete()` cannot
@@ -190,7 +192,7 @@ export class AdtTransformation<
           masterLanguage:
             config.masterLanguage ?? this.systemContext.masterLanguage,
         }),
-      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      this.results.created,
       options?.analyse,
     );
   }
@@ -200,7 +202,7 @@ export class AdtTransformation<
     config: Partial<ITransformationConfig>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+  ): Promise<IAdtResponse<T['source'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -211,7 +213,7 @@ export class AdtTransformation<
     // an empty body *is* absence is the caller's reading, through `analyse`.
     return answering(
       () => getTransformationSource(connection, name, version, options),
-      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      this.results.source,
       options?.analyse,
     );
   }
@@ -220,7 +222,7 @@ export class AdtTransformation<
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<ITransformationConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+  ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -228,7 +230,7 @@ export class AdtTransformation<
 
     return answering(
       () => getTransformation(connection, name, options?.version, options),
-      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      this.results.metadata,
       options?.analyse,
     );
   }
@@ -237,7 +239,7 @@ export class AdtTransformation<
   async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<ITransformationConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+  ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -252,7 +254,7 @@ export class AdtTransformation<
             ? { withLongPolling: options.withLongPolling }
             : undefined,
         ),
-      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      this.results.transport,
       options?.analyse,
     );
   }
@@ -271,7 +273,7 @@ export class AdtTransformation<
   async update<E extends IAdtError = IAdtError>(
     config: Partial<ITransformationConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -295,7 +297,7 @@ export class AdtTransformation<
           },
           options?.lockHandle,
         ),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.updated,
       options?.analyse,
     );
   }
@@ -314,7 +316,7 @@ export class AdtTransformation<
     this: this & AdtPerformedBy<'transformation', 'updateMetadata'>,
     config: Partial<ITransformationConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -328,9 +330,7 @@ export class AdtTransformation<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.metadataUpdated as IResultStrategy<
-        ReturnType<R['metadataUpdated']>
-      >,
+      this.results.metadataUpdated,
       options?.analyse,
     );
   }
@@ -345,7 +345,7 @@ export class AdtTransformation<
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<ITransformationConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -356,9 +356,7 @@ export class AdtTransformation<
           transformation_name: name,
           transport_request: config.transportRequest,
         }),
-      this.results.deletionCheck as IResultStrategy<
-        ReturnType<R['deletionCheck']>
-      >,
+      this.results.deletionCheck,
       options?.analyse,
     );
   }
@@ -375,7 +373,7 @@ export class AdtTransformation<
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<ITransformationConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -386,7 +384,7 @@ export class AdtTransformation<
           transformation_name: name,
           transport_request: config.transportRequest,
         }),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }
@@ -395,7 +393,7 @@ export class AdtTransformation<
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<ITransformationConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+  ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -403,7 +401,7 @@ export class AdtTransformation<
 
     return answering(
       () => activateTransformation(connection, options.headers, name),
-      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      this.results.activation,
       options?.analyse,
     );
   }
@@ -413,7 +411,7 @@ export class AdtTransformation<
     config: Partial<ITransformationConfig>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+  ): Promise<IAdtResponse<T['check'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -430,7 +428,7 @@ export class AdtTransformation<
           version,
           config.source,
         ),
-      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      this.results.check,
       options?.analyse,
     );
   }
@@ -486,10 +484,10 @@ export class AdtTransformation<
   async getVersions<E extends IAdtError = IAdtError>(
     config: Partial<ITransformationConfig>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
+  ): Promise<IAdtResponse<T['versions'], E>> {
     return answering(
       () => getTransformationVersions(this.connection, config),
-      this.results.versions as IResultStrategy<ReturnType<R['versions']>>,
+      this.results.versions,
       options?.analyse,
     );
   }
@@ -498,12 +496,10 @@ export class AdtTransformation<
   async getVersionSource<E extends IAdtError = IAdtError>(
     contentUri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versionSource']>, E>> {
+  ): Promise<IAdtResponse<T['versionSource'], E>> {
     return answering(
       () => getTransformationVersionSource(this.connection, contentUri),
-      this.results.versionSource as IResultStrategy<
-        ReturnType<R['versionSource']>
-      >,
+      this.results.versionSource,
       options?.analyse,
     );
   }

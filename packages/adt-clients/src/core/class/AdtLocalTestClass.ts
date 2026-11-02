@@ -23,18 +23,20 @@ import type {
   IAdtResponse,
   IAdtUpdatable,
   IAdtValidatable,
-  IClassResults,
   ILocalTestClassConfig,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { AdtModernVariant } from '../../clients/variant';
 import { CHECK_RUN_HEADERS } from '../../constants/contentTypes';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
+import type {
+  ResultStrategiesOf,
+  ResultValuesOf,
+} from '../../utils/resultStrategy';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import type { IReadOptions } from '../shared/types';
-import { AdtClassMemberBase } from './AdtClassMemberBase';
+import { AdtClassMemberBase, type ClassValues } from './AdtClassMemberBase';
 import { checkClassLocalTestClass } from './check';
 import { getClassTestClassesInclude } from './read';
 import { updateClassTestInclude } from './testclasses';
@@ -57,26 +59,26 @@ export type { ILocalTestClassConfig } from '@mcp-abap-adt/interfaces-adt';
  * emptiness — rather than a claim that this is a deletable object.
  */
 export class AdtLocalTestClass<
-    R extends IClassResults = typeof classDocuments,
+    T extends ClassValues = ResultValuesOf<typeof classDocuments>,
     V extends AdtVariant = AdtModernVariant,
   >
-  extends AdtClassMemberBase<R, V, 'localTestClass'>
+  extends AdtClassMemberBase<T, V, 'localTestClass'>
   implements
-    IAdtReadable<ILocalTestClassConfig, ReturnType<R['source']>>,
-    IAdtMetadataReadable<ILocalTestClassConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<Partial<ILocalTestClassConfig>, ReturnType<R['updated']>>,
-    IAdtValidatable<ILocalTestClassConfig, ReturnType<R['validation']>>,
-    IAdtCheckable<ILocalTestClassConfig, ReturnType<R['check']>>,
-    IAdtActivatable<ILocalTestClassConfig, ReturnType<R['activation']>>
+    IAdtReadable<ILocalTestClassConfig, T['source']>,
+    IAdtMetadataReadable<ILocalTestClassConfig, T['metadata']>,
+    IAdtUpdatable<Partial<ILocalTestClassConfig>, T['updated']>,
+    IAdtValidatable<ILocalTestClassConfig, T['validation']>,
+    IAdtCheckable<ILocalTestClassConfig, T['check']>,
+    IAdtActivatable<ILocalTestClassConfig, T['activation']>
 {
   public readonly objectType: string = 'LocalTestClass';
 
-  protected readonly results: R;
+  protected readonly results: ResultStrategiesOf<T>;
 
   constructor(
     connection: IAbapConnection,
     options: AdtHandlerOptions<
-      R,
+      ResultStrategiesOf<T>,
       'logger' | 'systemContext' | 'contentTypes' | 'lockRegistry'
     >,
   ) {
@@ -89,7 +91,7 @@ export class AdtLocalTestClass<
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<ILocalTestClassConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+  ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -106,7 +108,7 @@ export class AdtLocalTestClass<
           'inactive',
           this.contentTypes?.sourceArtifactContentType(),
         ),
-      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      this.results.validation,
       options?.analyse,
     );
   }
@@ -116,7 +118,7 @@ export class AdtLocalTestClass<
     config: Partial<ILocalTestClassConfig>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+  ): Promise<IAdtResponse<T['source'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -133,7 +135,7 @@ export class AdtLocalTestClass<
           this.logger,
           options,
         ),
-      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      this.results.source,
       options?.analyse,
     );
   }
@@ -159,7 +161,7 @@ export class AdtLocalTestClass<
   async update<E extends IAdtError = IAdtError>(
     config: Partial<ILocalTestClassConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -182,7 +184,7 @@ export class AdtLocalTestClass<
           options?.lockHandle as string,
           config.transportRequest,
         ),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.updated,
       options?.analyse,
     );
   }
@@ -196,7 +198,7 @@ export class AdtLocalTestClass<
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<ILocalTestClassConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<T['updated'], E>> {
     return await this.update({ ...config, source: '' }, options);
   }
 
@@ -205,7 +207,7 @@ export class AdtLocalTestClass<
     config: Partial<ILocalTestClassConfig>,
     status: string = 'inactive',
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+  ): Promise<IAdtResponse<T['check'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -219,7 +221,7 @@ export class AdtLocalTestClass<
           status === 'active' ? 'active' : 'inactive',
           this.contentTypes?.sourceArtifactContentType(),
         ),
-      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      this.results.check,
       options?.analyse,
     );
   }
@@ -228,7 +230,7 @@ export class AdtLocalTestClass<
   async getVersions<E extends IAdtError = IAdtError>(
     config: Partial<ILocalTestClassConfig>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
+  ): Promise<IAdtResponse<T['versions'], E>> {
     return this.includeVersions(
       config.className as string,
       'testclasses',

@@ -4,6 +4,7 @@
 
 export {
   CrossTrace,
+  type CrossTraceValues,
   crossTraceDocuments,
   type ICrossTraceResultSet,
 } from './CrossTraceDomain';
@@ -19,6 +20,7 @@ export {
   type IProfilerResults,
   type IProfilerViews,
   Profiler,
+  type ProfilerValues,
   profilerDocuments,
 } from './ProfilerDomain';
 export {
@@ -45,6 +47,7 @@ export {
 export {
   type ISt05TraceResults,
   St05Trace,
+  type St05TraceValues,
   st05TraceDocuments,
 } from './St05Trace';
 export {

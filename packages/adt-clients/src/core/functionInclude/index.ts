@@ -1,2 +1,5 @@
-export { AdtFunctionInclude } from './AdtFunctionInclude';
+export {
+  AdtFunctionInclude,
+  type FunctionIncludeValues,
+} from './AdtFunctionInclude';
 export * from './types';

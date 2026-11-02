@@ -10,7 +10,11 @@
  */
 
 // High-level AdtObject implementation
-export { AdtEnhancement, type EnhancementTypeWith } from './AdtEnhancement';
+export {
+  AdtEnhancement,
+  type EnhancementTypeWith,
+  type EnhancementValues,
+} from './AdtEnhancement';
 export { activateEnhancement } from './activation';
 export { check, checkEnhancement } from './check';
 

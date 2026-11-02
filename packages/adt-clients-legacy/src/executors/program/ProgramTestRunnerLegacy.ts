@@ -9,18 +9,18 @@
  */
 
 import {
+  type AbapUnitRunnerValues,
   type AdtPerformedBy,
-  type IProgramTestRunnerResults,
   PROGRAM,
   ProgramTestRunner,
   type programTestRunnerDocuments,
+  type ResultValuesOf,
 } from '@mcp-abap-adt/adt-clients';
 import type {
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
   IClassUnitTestRunOptions,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import {
   noResultToFetch,
@@ -29,31 +29,33 @@ import {
 } from '../abapUnitRunLegacy';
 
 export class ProgramTestRunnerLegacy<
-  R extends IProgramTestRunnerResults = typeof programTestRunnerDocuments,
-> extends ProgramTestRunner<R, 'basis740'> {
+  T extends AbapUnitRunnerValues = ResultValuesOf<
+    typeof programTestRunnerDocuments
+  >,
+> extends ProgramTestRunner<T, 'basis740'> {
   /** Run every test class of the report: the `runSync` request, read by `run`. */
   override async run<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'program', 'unitTestRun'>,
     programName: string,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
+  ): Promise<IAdtResponse<T['run'], E>> {
     return runSyncLegacy(
       this.connection,
       [PROGRAM.uri(programName)],
-      this.results.run as IResultStrategy<ReturnType<R['run']>>,
+      this.results.run,
       options,
     );
   }
 
   override async getStatus<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'program', 'unitTestStatus'>,
-  ): Promise<IAdtResponse<ReturnType<R['status']>, E>> {
-    return noRunToPoll<ReturnType<R['status']>, E>();
+  ): Promise<IAdtResponse<T['status'], E>> {
+    return noRunToPoll<T['status'], E>();
   }
 
   override async getResult<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'program', 'unitTestResult'>,
-  ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {
-    return noResultToFetch<ReturnType<R['result']>, E>();
+  ): Promise<IAdtResponse<T['result'], E>> {
+    return noResultToFetch<T['result'], E>();
   }
 }

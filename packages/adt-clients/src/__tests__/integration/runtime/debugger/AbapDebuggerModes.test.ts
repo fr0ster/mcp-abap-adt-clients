@@ -55,7 +55,10 @@ import {
   type IAbapDebuggerResults,
 } from '../../../../runtime/debugger/AbapDebugger';
 import { readListenerConflict } from '../../../../runtime/debugger/abap';
-import { rawDocument } from '../../../../utils/resultStrategy';
+import {
+  type ResultValuesOf,
+  rawDocument,
+} from '../../../../utils/resultStrategy';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import {
   configuredCase,
@@ -304,7 +307,7 @@ const readings = {
   ...abapDebuggerDocuments,
   done: rawDocument,
 } satisfies IAbapDebuggerResults;
-type Debugger = AbapDebugger<typeof readings>;
+type Debugger = AbapDebugger<ResultValuesOf<typeof readings>>;
 
 const debuggerOn = (
   connection: Connection,

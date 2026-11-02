@@ -12,7 +12,9 @@ import {
   type AdtPerformedBy,
   answering,
   INTERFACE,
+  type InterfaceValues,
   type interfaceDocuments,
+  type ResultValuesOf,
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
 import type {
@@ -21,8 +23,6 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IInterfaceConfig,
-  IInterfaceResults,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import {
@@ -32,8 +32,8 @@ import {
 } from '../shared/refusalLegacy';
 
 export class AdtInterfaceLegacy<
-  R extends IInterfaceResults = typeof interfaceDocuments,
-> extends AdtInterface<R, 'basis740'> {
+  T extends InterfaceValues = ResultValuesOf<typeof interfaceDocuments>,
+> extends AdtInterface<T, 'basis740'> {
   /**
    * Delete interface — legacy override.
    *
@@ -50,7 +50,7 @@ export class AdtInterfaceLegacy<
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     const name = config.interfaceName as string;
 
     const objectUrl = `${INTERFACE.uri(name)}`;
@@ -63,7 +63,7 @@ export class AdtInterfaceLegacy<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }
@@ -77,8 +77,8 @@ export class AdtInterfaceLegacy<
     this: this & AdtPerformedBy<'interface', 'deletionCheck'>,
     _config: Partial<IInterfaceConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
-    return noDeletionCheck<ReturnType<R['deletionCheck']>, E>();
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+    return noDeletionCheck<T['deletionCheck'], E>();
   }
 
   /**
@@ -90,8 +90,8 @@ export class AdtInterfaceLegacy<
     this: this & AdtPerformedBy<'interface', 'updateMetadata'>,
     _config: Partial<IInterfaceConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
-    return legacyNotMeasuredRefusal<ReturnType<R['metadataUpdated']>, E>(
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+    return legacyNotMeasuredRefusal<T['metadataUpdated'], E>(
       'updateMetadata',
       'PUT /sap/bc/adt/oo/interfaces/{name}',
     );
@@ -105,8 +105,8 @@ export class AdtInterfaceLegacy<
     this: this & AdtPerformedBy<'interface', 'transport'>,
     config: Partial<IInterfaceConfig>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
-    return noTransportResource<ReturnType<R['transport']>, E>(
+  ): Promise<IAdtResponse<T['transport'], E>> {
+    return noTransportResource<T['transport'], E>(
       INTERFACE.uri(config.interfaceName as string),
     );
   }

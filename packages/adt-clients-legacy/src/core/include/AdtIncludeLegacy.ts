@@ -15,8 +15,10 @@ import {
   AdtInclude,
   type AdtPerformedBy,
   answering,
+  type IncludeValues,
   type includeDocuments,
   PROGRAM_INCLUDE,
+  type ResultValuesOf,
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
 import type {
@@ -35,15 +37,15 @@ import {
 } from '../shared/refusalLegacy';
 
 export class AdtIncludeLegacy<
-  R extends IIncludeResults = typeof includeDocuments,
-> extends AdtInclude<R, 'basis740'> {
+  T extends IncludeValues = ResultValuesOf<typeof includeDocuments>,
+> extends AdtInclude<T, 'basis740'> {
   /** Refused without a request: 7.40 has no `/sap/bc/adt/deletion/check` (§5). */
   override async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'include', 'deletionCheck'>,
     _config: Partial<IIncludeConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
-    return noDeletionCheck<ReturnType<R['deletionCheck']>, E>();
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+    return noDeletionCheck<T['deletionCheck'], E>();
   }
 
   /**
@@ -55,8 +57,8 @@ export class AdtIncludeLegacy<
     this: this & AdtPerformedBy<'include', 'updateMetadata'>,
     _config: Partial<IIncludeConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
-    return legacyNotMeasuredRefusal<ReturnType<R['metadataUpdated']>, E>(
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+    return legacyNotMeasuredRefusal<T['metadataUpdated'], E>(
       'updateMetadata',
       'PUT /sap/bc/adt/programs/includes/{name}',
     );
@@ -71,8 +73,8 @@ export class AdtIncludeLegacy<
     this: this & AdtPerformedBy<'include', 'mainPrograms'>,
     _config: Partial<IIncludeConfig>,
     _options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['mainPrograms']>, E>> {
-    return legacyNotMeasuredRefusal<ReturnType<R['mainPrograms']>, E>(
+  ): Promise<IAdtResponse<T['mainPrograms'], E>> {
+    return legacyNotMeasuredRefusal<T['mainPrograms'], E>(
       'readMainPrograms',
       'GET /sap/bc/adt/programs/includes/{name}/mainprograms',
     );
@@ -90,7 +92,7 @@ export class AdtIncludeLegacy<
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     const objectUrl = PROGRAM_INCLUDE.uri(config.includeName as string);
     return answering(
       () =>
@@ -101,7 +103,7 @@ export class AdtIncludeLegacy<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }

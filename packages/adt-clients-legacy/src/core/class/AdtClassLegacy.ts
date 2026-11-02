@@ -14,7 +14,9 @@ import {
   type AdtPerformedBy,
   answering,
   CLASS,
+  type ClassValues,
   type classDocuments,
+  type ResultValuesOf,
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
 import type {
@@ -23,8 +25,6 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IClassConfig,
-  IClassResults,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import {
@@ -34,8 +34,8 @@ import {
 } from '../shared/refusalLegacy';
 
 export class AdtClassLegacy<
-  R extends IClassResults = typeof classDocuments,
-> extends AdtClass<R, 'basis740'> {
+  T extends ClassValues = ResultValuesOf<typeof classDocuments>,
+> extends AdtClass<T, 'basis740'> {
   /**
    * Delete class — legacy override.
    *
@@ -52,7 +52,7 @@ export class AdtClassLegacy<
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     const name = config.className as string;
 
     const objectUrl = `${CLASS.uri(name)}`;
@@ -65,7 +65,7 @@ export class AdtClassLegacy<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }
@@ -79,8 +79,8 @@ export class AdtClassLegacy<
     this: this & AdtPerformedBy<'class', 'deletionCheck'>,
     _config: Partial<IClassConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
-    return noDeletionCheck<ReturnType<R['deletionCheck']>, E>();
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+    return noDeletionCheck<T['deletionCheck'], E>();
   }
 
   /**
@@ -92,8 +92,8 @@ export class AdtClassLegacy<
     this: this & AdtPerformedBy<'class', 'updateMetadata'>,
     _config: Partial<IClassConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
-    return legacyNotMeasuredRefusal<ReturnType<R['metadataUpdated']>, E>(
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+    return legacyNotMeasuredRefusal<T['metadataUpdated'], E>(
       'updateMetadata',
       'PUT /sap/bc/adt/oo/classes/{name}',
     );
@@ -107,8 +107,8 @@ export class AdtClassLegacy<
     this: this & AdtPerformedBy<'class', 'transport'>,
     config: Partial<IClassConfig>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
-    return noTransportResource<ReturnType<R['transport']>, E>(
+  ): Promise<IAdtResponse<T['transport'], E>> {
+    return noTransportResource<T['transport'], E>(
       CLASS.uri(config.className as string),
     );
   }

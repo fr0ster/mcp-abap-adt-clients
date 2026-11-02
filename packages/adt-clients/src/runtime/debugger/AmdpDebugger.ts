@@ -25,7 +25,12 @@ import type {
   AdtShippedOptions,
 } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
-import { rawDocument, wireItself } from '../../utils/resultStrategy';
+import {
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+  rawDocument,
+  wireItself,
+} from '../../utils/resultStrategy';
 import {
   deleteAmdpDebuggee,
   getAmdpEvents,
@@ -60,24 +65,19 @@ export const amdpDebuggerDocuments = {
   preview: rawDocument,
 } satisfies IAmdpDebuggerResults;
 
-type Of<
-  R extends IAmdpDebuggerResults,
-  K extends keyof IAmdpDebuggerResults,
-> = ReturnType<R[K]>;
+/** What each slot of the result set answers. */
+export type AmdpDebuggerValues = {
+  readonly [K in keyof IAmdpDebuggerResults]: unknown;
+};
 
 export class AmdpDebugger<
-  R extends IAmdpDebuggerResults = typeof amdpDebuggerDocuments,
+  T extends AmdpDebuggerValues = ResultValuesOf<typeof amdpDebuggerDocuments>,
 > implements
-    IAmdpDebugger<
-      Of<R, 'started'>,
-      Of<R, 'events'>,
-      Of<R, 'command'>,
-      Of<R, 'preview'>
-    >
+    IAmdpDebugger<T['started'], T['events'], T['command'], T['preview']>
 {
   readonly kind = 'amdpDebugger' as const;
 
-  private readonly results: R;
+  private readonly results: ResultStrategiesOf<T>;
 
   /**
    * An AMDP debugger with the shipped documents, or with the caller's results.
@@ -87,16 +87,16 @@ export class AmdpDebugger<
   static create(
     connection: IAbapConnection,
     options?: AdtShippedOptions<'logger'>,
-  ): AmdpDebugger<typeof amdpDebuggerDocuments>;
+  ): AmdpDebugger<ResultValuesOf<typeof amdpDebuggerDocuments>>;
   static create<R extends IAmdpDebuggerResults>(
     connection: IAbapConnection,
     options: AdtHandlerOptions<R, 'logger'>,
-  ): AmdpDebugger<R>;
+  ): AmdpDebugger<ResultValuesOf<R>>;
   static create(
     connection: IAbapConnection,
     options: Partial<AdtHandlerOptions<IAmdpDebuggerResults, 'logger'>> = {},
-  ): AmdpDebugger<IAmdpDebuggerResults> {
-    return new AmdpDebugger<IAmdpDebuggerResults>(connection, {
+  ): AmdpDebugger<AmdpDebuggerValues> {
+    return new AmdpDebugger<AmdpDebuggerValues>(connection, {
       ...options,
       results: options.results ?? amdpDebuggerDocuments,
     });
@@ -104,21 +104,19 @@ export class AmdpDebugger<
 
   constructor(
     private readonly connection: IAbapConnection,
-    options: AdtHandlerOptions<R, 'logger'>,
+    options: AdtHandlerOptions<ResultStrategiesOf<T>, 'logger'>,
   ) {
     this.results = options.results;
   }
 
-  private reading<K extends keyof IAmdpDebuggerResults>(
-    key: K,
-  ): IResultStrategy<Of<R, K>> {
-    return this.results[key] as IResultStrategy<Of<R, K>>;
+  private reading<K extends keyof T>(key: K): IResultStrategy<T[K]> {
+    return this.results[key];
   }
 
   async start<E extends IAdtError = IAdtError>(
     requestUser: string,
     options?: IStartAmdpDebuggerOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'started'>, E>> {
+  ): Promise<IAdtResponse<T['started'], E>> {
     return answering(
       () => startAmdpDebugger(this.connection, requestUser, options),
       this.reading('started'),
@@ -130,7 +128,7 @@ export class AmdpDebugger<
     mainId: string,
     breakpoints: readonly IAmdpBreakpoint[],
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'command'>, E>> {
+  ): Promise<IAdtResponse<T['command'], E>> {
     return answering(
       () => syncAmdpBreakpoints(this.connection, mainId, breakpoints),
       this.reading('command'),
@@ -141,7 +139,7 @@ export class AmdpDebugger<
   async getEvents<E extends IAdtError = IAdtError>(
     mainId: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'events'>, E>> {
+  ): Promise<IAdtResponse<T['events'], E>> {
     return answering(
       () => getAmdpEvents(this.connection, mainId),
       this.reading('events'),
@@ -154,7 +152,7 @@ export class AmdpDebugger<
     debuggeeId: string,
     step: IAmdpStepMethod,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'command'>, E>> {
+  ): Promise<IAdtResponse<T['command'], E>> {
     return answering(
       () => stepAmdpDebuggee(this.connection, mainId, debuggeeId, step),
       this.reading('command'),
@@ -166,7 +164,7 @@ export class AmdpDebugger<
     mainId: string,
     debuggeeId: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'command'>, E>> {
+  ): Promise<IAdtResponse<T['command'], E>> {
     return answering(
       () => deleteAmdpDebuggee(this.connection, mainId, debuggeeId),
       this.reading('command'),
@@ -177,7 +175,7 @@ export class AmdpDebugger<
   async stop<E extends IAdtError = IAdtError>(
     mainId: string,
     options?: { hardStop?: boolean } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'command'>, E>> {
+  ): Promise<IAdtResponse<T['command'], E>> {
     return answering(
       () => stopAmdpDebugger(this.connection, mainId, options?.hardStop),
       this.reading('command'),
@@ -188,7 +186,7 @@ export class AmdpDebugger<
   async getDataPreview<E extends IAdtError = IAdtError>(
     options: { headers: IAdtHeaders } & IGetAmdpDataPreviewOptions &
       IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'preview'>, E>> {
+  ): Promise<IAdtResponse<T['preview'], E>> {
     return answering(
       () => getAmdpDataPreview(this.connection, options.headers, options),
       this.reading('preview'),

@@ -33,7 +33,6 @@ import type {
   IAdtValidatable,
   IAdtVersionable,
   IFunctionIncludeResults,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -41,7 +40,11 @@ import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
-import { nothing } from '../../utils/resultStrategy';
+import {
+  nothing,
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+} from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import type { LockRegistry } from '../shared/LockRegistry';
@@ -71,28 +74,27 @@ import {
   getFunctionIncludeVersions,
 } from './versions';
 
+/** What each slot of the result set answers. */
+export type FunctionIncludeValues = {
+  readonly [K in keyof IFunctionIncludeResults]: unknown;
+};
+
 export class AdtFunctionInclude<
-  R extends IFunctionIncludeResults = typeof functionIncludeDocuments,
+  T extends FunctionIncludeValues = ResultValuesOf<
+    typeof functionIncludeDocuments
+  >,
   V extends AdtVariant = AdtModernVariant,
 > implements
-    IAdtCreatable<IFunctionIncludeConfig, ReturnType<R['created']>>,
-    IAdtReadable<IFunctionIncludeConfig, ReturnType<R['source']>>,
-    IAdtMetadataReadable<IFunctionIncludeConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<Partial<IFunctionIncludeConfig>, ReturnType<R['updated']>>,
-    IAdtDeletable<
-      IFunctionIncludeConfig,
-      ReturnType<R['deletion']>,
-      ReturnType<R['deletionCheck']>
-    >,
-    IAdtValidatable<IFunctionIncludeConfig, ReturnType<R['validation']>>,
-    IAdtCheckable<IFunctionIncludeConfig, ReturnType<R['check']>>,
-    IAdtActivatable<IFunctionIncludeConfig, ReturnType<R['activation']>>,
+    IAdtCreatable<IFunctionIncludeConfig, T['created']>,
+    IAdtReadable<IFunctionIncludeConfig, T['source']>,
+    IAdtMetadataReadable<IFunctionIncludeConfig, T['metadata']>,
+    IAdtUpdatable<Partial<IFunctionIncludeConfig>, T['updated']>,
+    IAdtDeletable<IFunctionIncludeConfig, T['deletion'], T['deletionCheck']>,
+    IAdtValidatable<IFunctionIncludeConfig, T['validation']>,
+    IAdtCheckable<IFunctionIncludeConfig, T['check']>,
+    IAdtActivatable<IFunctionIncludeConfig, T['activation']>,
     IAdtLockable<IFunctionIncludeConfig>,
-    IAdtVersionable<
-      IFunctionIncludeConfig,
-      ReturnType<R['versions']>,
-      ReturnType<R['versionSource']>
-    >
+    IAdtVersionable<IFunctionIncludeConfig, T['versions'], T['versionSource']>
 {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -106,12 +108,12 @@ export class AdtFunctionInclude<
   private readonly lockRegistry?: LockRegistry;
   public readonly objectType: string = 'FunctionInclude';
 
-  protected readonly results: R;
+  protected readonly results: ResultStrategiesOf<T>;
 
   constructor(
     connection: IAbapConnection,
     options: AdtHandlerOptions<
-      R,
+      ResultStrategiesOf<T>,
       'logger' | 'systemContext' | 'contentTypes' | 'lockRegistry'
     >,
   ) {
@@ -199,7 +201,7 @@ export class AdtFunctionInclude<
   async validate<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+  ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -207,7 +209,7 @@ export class AdtFunctionInclude<
 
     return answering(
       () => validateFunctionIncludeName(connection, group, include),
-      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      this.results.validation,
       options?.analyse,
     );
   }
@@ -216,7 +218,7 @@ export class AdtFunctionInclude<
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IFunctionIncludeConfig, 'source'> & { source?: never },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+  ): Promise<IAdtResponse<T['created'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -230,7 +232,7 @@ export class AdtFunctionInclude<
           options.headers,
           this.buildCreateParams(config),
         ),
-      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      this.results.created,
       options?.analyse,
     );
   }
@@ -246,7 +248,7 @@ export class AdtFunctionInclude<
     config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+  ): Promise<IAdtResponse<T['source'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -254,7 +256,7 @@ export class AdtFunctionInclude<
 
     return answering(
       () => readFunctionIncludeSource(connection, group, include, version),
-      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      this.results.source,
       options?.analyse,
     );
   }
@@ -269,7 +271,7 @@ export class AdtFunctionInclude<
   async readMetadata<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+  ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -284,7 +286,7 @@ export class AdtFunctionInclude<
           options?.version,
           options,
         ),
-      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      this.results.metadata,
       options?.analyse,
     );
   }
@@ -301,7 +303,7 @@ export class AdtFunctionInclude<
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -318,9 +320,7 @@ export class AdtFunctionInclude<
           options?.lockHandle,
           this.logger,
         ),
-      this.results.metadataUpdated as IResultStrategy<
-        ReturnType<R['metadataUpdated']>
-      >,
+      this.results.metadataUpdated,
       options?.analyse,
     );
   }
@@ -339,7 +339,7 @@ export class AdtFunctionInclude<
   async update<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -362,7 +362,7 @@ export class AdtFunctionInclude<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.updated,
       options?.analyse,
     );
   }
@@ -378,7 +378,7 @@ export class AdtFunctionInclude<
     this: this & AdtPerformedBy<'functionInclude', 'deletionCheck'>,
     config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -390,9 +390,7 @@ export class AdtFunctionInclude<
           options.headers,
           this.buildDeleteParams(config),
         ),
-      this.results.deletionCheck as IResultStrategy<
-        ReturnType<R['deletionCheck']>
-      >,
+      this.results.deletionCheck,
       options?.analyse,
     );
   }
@@ -406,7 +404,7 @@ export class AdtFunctionInclude<
     this: this & AdtPerformedBy<'functionInclude', 'delete'>,
     config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -418,7 +416,7 @@ export class AdtFunctionInclude<
           options.headers,
           this.buildDeleteParams(config),
         ),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }
@@ -427,7 +425,7 @@ export class AdtFunctionInclude<
   async activate<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+  ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -436,7 +434,7 @@ export class AdtFunctionInclude<
     return answering(
       () =>
         activateFunctionInclude(connection, options.headers, group, include),
-      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      this.results.activation,
       options?.analyse,
     );
   }
@@ -446,7 +444,7 @@ export class AdtFunctionInclude<
     config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+  ): Promise<IAdtResponse<T['check'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -465,7 +463,7 @@ export class AdtFunctionInclude<
           config.source,
           this.sourceArtifactContentType(),
         ),
-      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      this.results.check,
       options?.analyse,
     );
   }
@@ -520,10 +518,10 @@ export class AdtFunctionInclude<
   async getVersions<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
+  ): Promise<IAdtResponse<T['versions'], E>> {
     return answering(
       () => getFunctionIncludeVersions(this.connection, config),
-      this.results.versions as IResultStrategy<ReturnType<R['versions']>>,
+      this.results.versions,
       options?.analyse,
     );
   }
@@ -532,12 +530,10 @@ export class AdtFunctionInclude<
   async getVersionSource<E extends IAdtError = IAdtError>(
     contentUri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versionSource']>, E>> {
+  ): Promise<IAdtResponse<T['versionSource'], E>> {
     return answering(
       () => getFunctionIncludeVersionSource(this.connection, contentUri),
-      this.results.versionSource as IResultStrategy<
-        ReturnType<R['versionSource']>
-      >,
+      this.results.versionSource,
       options?.analyse,
     );
   }

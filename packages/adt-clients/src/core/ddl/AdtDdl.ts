@@ -33,7 +33,6 @@ import type {
   IAdtVersionable,
   ICdsTestDoubleCheckable,
   IDdlResults,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -42,7 +41,11 @@ import { DDL_SOURCE } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
-import { nothing } from '../../utils/resultStrategy';
+import {
+  nothing,
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+} from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { writeObjectDocument } from '../shared/documentWrite';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
@@ -61,34 +64,28 @@ import { updateDdl } from './update';
 import { validateDdlName } from './validation';
 import { getDdlVersionSource, getDdlVersions } from './versions';
 
+/** What each slot of the result set answers. */
+export type DdlValues = {
+  readonly [K in keyof IDdlResults]: unknown;
+};
+
 export class AdtDdl<
-  R extends IDdlResults = typeof ddlDocuments,
+  T extends DdlValues = ResultValuesOf<typeof ddlDocuments>,
   V extends AdtVariant = AdtModernVariant,
 > implements
-    IAdtCreatable<IDdlConfig, ReturnType<R['created']>>,
-    IAdtReadable<IDdlConfig, ReturnType<R['source']>>,
-    IAdtMetadataReadable<IDdlConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<Partial<IDdlConfig>, ReturnType<R['updated']>>,
-    IAdtMetadataUpdatable<
-      Partial<IDdlConfig>,
-      ReturnType<R['metadataUpdated']>
-    >,
-    IAdtDeletable<
-      IDdlConfig,
-      ReturnType<R['deletion']>,
-      ReturnType<R['deletionCheck']>
-    >,
-    IAdtValidatable<IDdlConfig, ReturnType<R['validation']>>,
-    IAdtCheckable<IDdlConfig, ReturnType<R['check']>>,
-    IAdtActivatable<IDdlConfig, ReturnType<R['activation']>>,
+    IAdtCreatable<IDdlConfig, T['created']>,
+    IAdtReadable<IDdlConfig, T['source']>,
+    IAdtMetadataReadable<IDdlConfig, T['metadata']>,
+    IAdtUpdatable<Partial<IDdlConfig>, T['updated']>,
+    IAdtMetadataUpdatable<Partial<IDdlConfig>, T['metadataUpdated']>,
+    IAdtDeletable<IDdlConfig, T['deletion'], T['deletionCheck']>,
+    IAdtValidatable<IDdlConfig, T['validation']>,
+    IAdtCheckable<IDdlConfig, T['check']>,
+    IAdtActivatable<IDdlConfig, T['activation']>,
     IAdtLockable<IDdlConfig>,
-    IAdtTransportAware<IDdlConfig, ReturnType<R['transport']>>,
-    IAdtVersionable<
-      IDdlConfig,
-      ReturnType<R['versions']>,
-      ReturnType<R['versionSource']>
-    >,
-    ICdsTestDoubleCheckable<ReturnType<R['testDoubles']>>
+    IAdtTransportAware<IDdlConfig, T['transport']>,
+    IAdtVersionable<IDdlConfig, T['versions'], T['versionSource']>,
+    ICdsTestDoubleCheckable<T['testDoubles']>
 {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -101,11 +98,14 @@ export class AdtDdl<
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Ddl';
 
-  protected readonly results: R;
+  protected readonly results: ResultStrategiesOf<T>;
 
   constructor(
     connection: IAbapConnection,
-    options: AdtHandlerOptions<R, 'logger' | 'systemContext' | 'lockRegistry'>,
+    options: AdtHandlerOptions<
+      ResultStrategiesOf<T>,
+      'logger' | 'systemContext' | 'lockRegistry'
+    >,
   ) {
     const { logger, systemContext, lockRegistry } = options;
     this.results = options.results;
@@ -135,7 +135,7 @@ export class AdtDdl<
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IDdlConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+  ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -149,7 +149,7 @@ export class AdtDdl<
           config.packageName as string,
           config.description,
         ),
-      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      this.results.validation,
       options?.analyse,
     );
   }
@@ -158,7 +158,7 @@ export class AdtDdl<
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IDdlConfig, 'source'> & { source?: never },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+  ): Promise<IAdtResponse<T['created'], E>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // An object created without a package is the single thing `delete()` cannot
@@ -192,7 +192,7 @@ export class AdtDdl<
           masterLanguage:
             config.masterLanguage ?? this.systemContext.masterLanguage,
         }),
-      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      this.results.created,
       options?.analyse,
     );
   }
@@ -202,7 +202,7 @@ export class AdtDdl<
     config: Partial<IDdlConfig>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+  ): Promise<IAdtResponse<T['source'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -213,7 +213,7 @@ export class AdtDdl<
     // an empty body *is* absence is the caller's reading, through `analyse`.
     return answering(
       () => getDdlSource(connection, name, version, options),
-      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      this.results.source,
       options?.analyse,
     );
   }
@@ -222,7 +222,7 @@ export class AdtDdl<
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IDdlConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+  ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -230,7 +230,7 @@ export class AdtDdl<
 
     return answering(
       () => getDdlMetadata(connection, name, options),
-      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      this.results.metadata,
       options?.analyse,
     );
   }
@@ -240,7 +240,7 @@ export class AdtDdl<
     this: this & AdtPerformedBy<'ddl', 'transport'>,
     config: Partial<IDdlConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+  ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -248,7 +248,7 @@ export class AdtDdl<
 
     return answering(
       () => getDdlTransport(connection, name, options),
-      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      this.results.transport,
       options?.analyse,
     );
   }
@@ -267,7 +267,7 @@ export class AdtDdl<
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IDdlConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -284,7 +284,7 @@ export class AdtDdl<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.updated,
       options?.analyse,
     );
   }
@@ -304,7 +304,7 @@ export class AdtDdl<
     this: this & AdtPerformedBy<'ddl', 'updateMetadata'>,
     config: Partial<IDdlConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -318,9 +318,7 @@ export class AdtDdl<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.metadataUpdated as IResultStrategy<
-        ReturnType<R['metadataUpdated']>
-      >,
+      this.results.metadataUpdated,
       options?.analyse,
     );
   }
@@ -336,7 +334,7 @@ export class AdtDdl<
     this: this & AdtPerformedBy<'ddl', 'deletionCheck'>,
     config: Partial<IDdlConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -347,9 +345,7 @@ export class AdtDdl<
           ddl_name: name,
           transport_request: config.transportRequest,
         }),
-      this.results.deletionCheck as IResultStrategy<
-        ReturnType<R['deletionCheck']>
-      >,
+      this.results.deletionCheck,
       options?.analyse,
     );
   }
@@ -366,7 +362,7 @@ export class AdtDdl<
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IDdlConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -377,7 +373,7 @@ export class AdtDdl<
           ddl_name: name,
           transport_request: config.transportRequest,
         }),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }
@@ -386,7 +382,7 @@ export class AdtDdl<
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IDdlConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+  ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -394,7 +390,7 @@ export class AdtDdl<
 
     return answering(
       () => activateDDLS(connection, options.headers, name),
-      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      this.results.activation,
       options?.analyse,
     );
   }
@@ -404,7 +400,7 @@ export class AdtDdl<
     config: Partial<IDdlConfig>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+  ): Promise<IAdtResponse<T['check'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -414,7 +410,7 @@ export class AdtDdl<
 
     return answering(
       () => checkDdl(connection, options.headers, name, version, config.source),
-      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      this.results.check,
       options?.analyse,
     );
   }
@@ -470,10 +466,10 @@ export class AdtDdl<
     this: this & AdtPerformedBy<'ddl', 'versions'>,
     config: Partial<IDdlConfig>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
+  ): Promise<IAdtResponse<T['versions'], E>> {
     return answering(
       () => getDdlVersions(this.connection, config),
-      this.results.versions as IResultStrategy<ReturnType<R['versions']>>,
+      this.results.versions,
       options?.analyse,
     );
   }
@@ -483,12 +479,10 @@ export class AdtDdl<
     this: this & AdtPerformedBy<'ddl', 'versions'>,
     contentUri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versionSource']>, E>> {
+  ): Promise<IAdtResponse<T['versionSource'], E>> {
     return answering(
       () => getDdlVersionSource(this.connection, contentUri),
-      this.results.versionSource as IResultStrategy<
-        ReturnType<R['versionSource']>
-      >,
+      this.results.versionSource,
       options?.analyse,
     );
   }
@@ -506,10 +500,10 @@ export class AdtDdl<
     this: this & AdtPerformedBy<'ddl', 'checkCdsTestDoubles'>,
     cdsViewName: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['testDoubles']>, E>> {
+  ): Promise<IAdtResponse<T['testDoubles'], E>> {
     return answering(
       () => checkCdsTestDoublesAvailability(this.connection, cdsViewName),
-      this.results.testDoubles as IResultStrategy<ReturnType<R['testDoubles']>>,
+      this.results.testDoubles,
       options?.analyse,
     );
   }

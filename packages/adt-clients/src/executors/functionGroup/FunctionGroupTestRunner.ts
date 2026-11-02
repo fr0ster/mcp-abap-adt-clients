@@ -28,8 +28,13 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import type { AdtHandlerOptions } from '../../core/shared/handlerOptions';
 import { FUNCTION_GROUP } from '../../endpoints/objects';
+import type {
+  ResultStrategiesOf,
+  ResultValuesOf,
+} from '../../utils/resultStrategy';
 import {
   AbapUnitRunner,
+  type AbapUnitRunnerValues,
   abapUnitRunnerDocuments,
   type IAbapUnitRunnerResults,
 } from '../abapUnitRunner';
@@ -38,17 +43,17 @@ export type IFunctionGroupTestRunnerResults = IAbapUnitRunnerResults;
 export const functionGroupTestRunnerDocuments = abapUnitRunnerDocuments;
 
 export class FunctionGroupTestRunner<
-    R extends
-      IFunctionGroupTestRunnerResults = typeof functionGroupTestRunnerDocuments,
+    T extends AbapUnitRunnerValues = ResultValuesOf<
+      typeof functionGroupTestRunnerDocuments
+    >,
     V extends AdtVariant = AdtModernVariant,
   >
-  extends AbapUnitRunner<R, V, 'functionGroup'>
-  implements
-    IAdtRunnable<string, ReturnType<R['run']>, IClassUnitTestRunOptions>
+  extends AbapUnitRunner<T, V, 'functionGroup'>
+  implements IAdtRunnable<string, T['run'], IClassUnitTestRunOptions>
 {
   constructor(
     connection: IAbapConnection,
-    options: AdtHandlerOptions<R, 'logger'>,
+    options: AdtHandlerOptions<ResultStrategiesOf<T>, 'logger'>,
   ) {
     super(connection, options);
   }
@@ -58,7 +63,7 @@ export class FunctionGroupTestRunner<
     this: this & AdtPerformedBy<'functionGroup', 'unitTestRun'>,
     functionGroupName: string,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
+  ): Promise<IAdtResponse<T['run'], E>> {
     return this.startByObject(functionGroupName, 'FUGR', options);
   }
 
@@ -82,7 +87,7 @@ export class FunctionGroupTestRunner<
     this: this & AdtPerformedBy<'functionGroup', 'unitTestRunSync'>,
     functionGroupName: string,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {
+  ): Promise<IAdtResponse<T['result'], E>> {
     return this.startSync([FUNCTION_GROUP.uri(functionGroupName)], options);
   }
 }

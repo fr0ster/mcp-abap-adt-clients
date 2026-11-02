@@ -26,7 +26,6 @@ import type {
   IAdtTransportAware,
   IAdtValidatable,
   IAdtVersionable,
-  IResultStrategy,
   ITableTypeResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -34,7 +33,11 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
-import { nothing } from '../../utils/resultStrategy';
+import {
+  nothing,
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+} from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
@@ -51,30 +54,24 @@ import { updateTableType } from './update';
 import { validateTableTypeName } from './validation';
 import { getTableTypeVersionSource, getTableTypeVersions } from './versions';
 
+/** What each slot of the result set answers. */
+export type TableTypeValues = {
+  readonly [K in keyof ITableTypeResults]: unknown;
+};
+
 export class AdtDdicTableType<
-  R extends ITableTypeResults = typeof tableTypeDocuments,
+  T extends TableTypeValues = ResultValuesOf<typeof tableTypeDocuments>,
 > implements
-    IAdtCreatable<ITableTypeConfig, ReturnType<R['created']>>,
-    IAdtMetadataReadable<ITableTypeConfig, ReturnType<R['metadata']>>,
-    IAdtMetadataUpdatable<
-      Partial<ITableTypeConfig>,
-      ReturnType<R['metadataUpdated']>
-    >,
-    IAdtDeletable<
-      ITableTypeConfig,
-      ReturnType<R['deletion']>,
-      ReturnType<R['deletionCheck']>
-    >,
-    IAdtValidatable<ITableTypeConfig, ReturnType<R['validation']>>,
-    IAdtCheckable<ITableTypeConfig, ReturnType<R['check']>>,
-    IAdtActivatable<ITableTypeConfig, ReturnType<R['activation']>>,
+    IAdtCreatable<ITableTypeConfig, T['created']>,
+    IAdtMetadataReadable<ITableTypeConfig, T['metadata']>,
+    IAdtMetadataUpdatable<Partial<ITableTypeConfig>, T['metadataUpdated']>,
+    IAdtDeletable<ITableTypeConfig, T['deletion'], T['deletionCheck']>,
+    IAdtValidatable<ITableTypeConfig, T['validation']>,
+    IAdtCheckable<ITableTypeConfig, T['check']>,
+    IAdtActivatable<ITableTypeConfig, T['activation']>,
     IAdtLockable<ITableTypeConfig>,
-    IAdtTransportAware<ITableTypeConfig, ReturnType<R['transport']>>,
-    IAdtVersionable<
-      ITableTypeConfig,
-      ReturnType<R['versions']>,
-      ReturnType<R['versionSource']>
-    >
+    IAdtTransportAware<ITableTypeConfig, T['transport']>,
+    IAdtVersionable<ITableTypeConfig, T['versions'], T['versionSource']>
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
@@ -82,11 +79,14 @@ export class AdtDdicTableType<
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'TableType';
 
-  protected readonly results: R;
+  protected readonly results: ResultStrategiesOf<T>;
 
   constructor(
     connection: IAbapConnection,
-    options: AdtHandlerOptions<R, 'logger' | 'systemContext' | 'lockRegistry'>,
+    options: AdtHandlerOptions<
+      ResultStrategiesOf<T>,
+      'logger' | 'systemContext' | 'lockRegistry'
+    >,
   ) {
     const { logger, systemContext, lockRegistry } = options;
     this.results = options.results;
@@ -116,7 +116,7 @@ export class AdtDdicTableType<
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<ITableTypeConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+  ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -124,7 +124,7 @@ export class AdtDdicTableType<
 
     return answering(
       () => validateTableTypeName(connection, name, config.description),
-      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      this.results.validation,
       options?.analyse,
     );
   }
@@ -133,7 +133,7 @@ export class AdtDdicTableType<
   async create<E extends IAdtError = IAdtError>(
     config: Omit<ITableTypeConfig, 'source'> & { source?: never },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+  ): Promise<IAdtResponse<T['created'], E>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // An object created without a package is the single thing `delete()` cannot
@@ -164,7 +164,7 @@ export class AdtDdicTableType<
           masterLanguage:
             config.masterLanguage ?? this.systemContext.masterLanguage,
         }),
-      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      this.results.created,
       options?.analyse,
     );
   }
@@ -173,7 +173,7 @@ export class AdtDdicTableType<
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<ITableTypeConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+  ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -181,7 +181,7 @@ export class AdtDdicTableType<
 
     return answering(
       () => getTableTypeMetadata(connection, name, options, this.logger),
-      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      this.results.metadata,
       options?.analyse,
     );
   }
@@ -190,7 +190,7 @@ export class AdtDdicTableType<
   async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<ITableTypeConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+  ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -198,7 +198,7 @@ export class AdtDdicTableType<
 
     return answering(
       () => getTableTypeTransport(connection, name, options),
-      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      this.results.transport,
       options?.analyse,
     );
   }
@@ -217,7 +217,7 @@ export class AdtDdicTableType<
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<ITableTypeConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -241,9 +241,7 @@ export class AdtDdicTableType<
           options?.source as string,
           options?.lockHandle,
         ),
-      this.results.metadataUpdated as IResultStrategy<
-        ReturnType<R['metadataUpdated']>
-      >,
+      this.results.metadataUpdated,
       options?.analyse,
     );
   }
@@ -258,7 +256,7 @@ export class AdtDdicTableType<
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<ITableTypeConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -269,9 +267,7 @@ export class AdtDdicTableType<
           tabletype_name: name,
           transport_request: config.transportRequest,
         }),
-      this.results.deletionCheck as IResultStrategy<
-        ReturnType<R['deletionCheck']>
-      >,
+      this.results.deletionCheck,
       options?.analyse,
     );
   }
@@ -288,7 +284,7 @@ export class AdtDdicTableType<
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<ITableTypeConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -299,7 +295,7 @@ export class AdtDdicTableType<
           tabletype_name: name,
           transport_request: config.transportRequest,
         }),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }
@@ -308,7 +304,7 @@ export class AdtDdicTableType<
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<ITableTypeConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+  ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -316,7 +312,7 @@ export class AdtDdicTableType<
 
     return answering(
       () => activateTableType(connection, options.headers, name),
-      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      this.results.activation,
       options?.analyse,
     );
   }
@@ -326,7 +322,7 @@ export class AdtDdicTableType<
     config: Partial<ITableTypeConfig>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+  ): Promise<IAdtResponse<T['check'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -344,7 +340,7 @@ export class AdtDdicTableType<
           undefined,
           version,
         ),
-      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      this.results.check,
       options?.analyse,
     );
   }
@@ -400,10 +396,10 @@ export class AdtDdicTableType<
   async getVersions<E extends IAdtError = IAdtError>(
     config: Partial<ITableTypeConfig>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
+  ): Promise<IAdtResponse<T['versions'], E>> {
     return answering(
       () => getTableTypeVersions(this.connection, config),
-      this.results.versions as IResultStrategy<ReturnType<R['versions']>>,
+      this.results.versions,
       options?.analyse,
     );
   }
@@ -412,12 +408,10 @@ export class AdtDdicTableType<
   async getVersionSource<E extends IAdtError = IAdtError>(
     contentUri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versionSource']>, E>> {
+  ): Promise<IAdtResponse<T['versionSource'], E>> {
     return answering(
       () => getTableTypeVersionSource(this.connection, contentUri),
-      this.results.versionSource as IResultStrategy<
-        ReturnType<R['versionSource']>
-      >,
+      this.results.versionSource,
       options?.analyse,
     );
   }

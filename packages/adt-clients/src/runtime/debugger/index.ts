@@ -6,12 +6,14 @@ export type * from '@mcp-abap-adt/interfaces-adt';
 export {
   AbapDebugger,
   type AbapDebuggerConstructorOptions,
+  type AbapDebuggerValues,
   abapDebuggerDocuments,
   type IAbapDebuggerOptions,
   type IAbapDebuggerResults,
 } from './AbapDebugger';
 export {
   AmdpDebugger,
+  type AmdpDebuggerValues,
   amdpDebuggerDocuments,
   type IAmdpDebuggerResults,
 } from './AmdpDebugger';

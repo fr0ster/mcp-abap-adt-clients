@@ -1,2 +1,5 @@
-export { AdtScalarFunction } from './AdtScalarFunction';
+export {
+  AdtScalarFunction,
+  type ScalarFunctionValues,
+} from './AdtScalarFunction';
 export * from './types';

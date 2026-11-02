@@ -24,6 +24,42 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [41.0.0] - 2026-11-02
+
+Types only: no request, header, URL or answer changes.
+[MIGRATION-41.md](docs/usage/MIGRATION-41.md) says what a consumer on 40.x
+does.
+
+### Breaking
+
+- **A handler class is typed by the values its result slots answer**, not by
+  its result strategies. Every handler class — the `Adt*` object classes, the
+  executors and ABAP Unit runners, `TraceScheduling`, the runtime classes
+  (`AdtAtc`, `AtcLog`, `ApplicationLog`, `DdicActivation`, `RuntimeDumps`,
+  `FeedRepository`, `SystemMessages`, `GatewayErrorLog`, `Profiler`,
+  `CrossTrace`, `St05Trace`), `AbapDebugger`, `AmdpDebugger`,
+  `MemorySnapshots` and `AdtAbapGitClient` — was
+  `X<R extends IXResults = typeof xDocuments>` and read each slot through a
+  cast (`this.results.slot as IResultStrategy<ReturnType<R['slot']>>`); it is
+  now `X<T extends XValues = ResultValuesOf<typeof xDocuments>>`,
+  holds `results: ResultStrategiesOf<T>` and answers `T['slot']`, with no cast.
+  The getters and `create` factories answer `X<ResultValuesOf<R>>` for the
+  results they are given, which is the type they answered before, so
+  `getX()` / `getX(results)` calls are unchanged. `IProfilerViews<T>` takes the
+  profiler's values. **Migrating:** code that names a class's type parameter
+  (`AdtClass<typeof classDocuments>`, a subclass's `extends AdtClass<R>`) now
+  names the values (`AdtClass<ResultValuesOf<typeof classDocuments>>`, a
+  subclass `T extends ClassValues` passing `AdtClass<T>`); `getX()` /
+  `getX(results)` calls are unchanged.
+
+### Added
+
+- `ResultValuesOf<R>` and `ResultStrategiesOf<T>` (from
+  `utils/resultStrategy`), and one `<X>Values` per result-set contract —
+  `ClassValues`, `ProgramValues`, `IncludeValues`, …, `AtcValues`,
+  `ProfilerValues`, `AbapDebuggerValues`, `AbapGitValues`,
+  `AbapUnitRunnerValues` — exported from the package root.
+
 ## [40.1.0] - 2026-11-02
 
 ### Added

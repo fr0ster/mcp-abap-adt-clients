@@ -21,7 +21,6 @@ import type {
   IAdtTransportAware,
   IAdtUpdatable,
   IAdtValidatable,
-  IResultStrategy,
   IServiceBindingPublicationConfig,
   IServiceGroupParams,
   IServiceResults,
@@ -44,7 +43,11 @@ import { withCallTimeout } from '../../utils/callTimeout';
 import { buildQueryString } from '../../utils/internalUtils';
 import { lockHandleOf } from '../../utils/lockHandle';
 import { requestHeaders } from '../../utils/requestHeaders';
-import { nothing } from '../../utils/resultStrategy';
+import {
+  nothing,
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+} from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { writeObjectDocument } from '../shared/documentWrite';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
@@ -61,30 +64,28 @@ import type {
 } from './types';
 import { resolveBindingVariant, type serviceDocuments } from './types';
 
+/** What each slot of the result set answers. */
+export type ServiceValues = {
+  readonly [K in keyof IServiceResults]: unknown;
+};
+
 export class AdtServiceBinding<
-  R extends IServiceResults = typeof serviceDocuments,
+  T extends ServiceValues = ResultValuesOf<typeof serviceDocuments>,
   V extends AdtVariant = AdtModernVariant,
 > implements
-    IAdtCreatable<IServiceBindingConfig, ReturnType<R['created']>>,
-    IAdtReadable<IServiceBindingConfig, ReturnType<R['source']>>,
-    IAdtMetadataReadable<IServiceBindingConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<IServiceBindingPublicationConfig, ReturnType<R['updated']>>,
-    IAdtMetadataUpdatable<
-      Partial<IServiceBindingConfig>,
-      ReturnType<R['metadataUpdated']>
-    >,
-    IAdtDeletable<
-      IServiceBindingConfig,
-      ReturnType<R['deletion']>,
-      ReturnType<R['deletionCheck']>
-    >,
-    IAdtValidatable<IServiceBindingConfig, ReturnType<R['validation']>>,
-    IAdtCheckable<IServiceBindingConfig, ReturnType<R['check']>>,
-    IAdtActivatable<IServiceBindingConfig, ReturnType<R['activation']>>,
-    IAdtTransportAware<IServiceBindingConfig, ReturnType<R['transport']>>,
+    IAdtCreatable<IServiceBindingConfig, T['created']>,
+    IAdtReadable<IServiceBindingConfig, T['source']>,
+    IAdtMetadataReadable<IServiceBindingConfig, T['metadata']>,
+    IAdtUpdatable<IServiceBindingPublicationConfig, T['updated']>,
+    IAdtMetadataUpdatable<Partial<IServiceBindingConfig>, T['metadataUpdated']>,
+    IAdtDeletable<IServiceBindingConfig, T['deletion'], T['deletionCheck']>,
+    IAdtValidatable<IServiceBindingConfig, T['validation']>,
+    IAdtCheckable<IServiceBindingConfig, T['check']>,
+    IAdtActivatable<IServiceBindingConfig, T['activation']>,
+    IAdtTransportAware<IServiceBindingConfig, T['transport']>,
     IAdtLockable<IServiceBindingConfig>,
-    IAdtServiceBindingTypes<ReturnType<R['bindingTypes']>>,
-    IAdtServiceGroupReadable<ReturnType<R['odata']>>
+    IAdtServiceBindingTypes<T['bindingTypes']>,
+    IAdtServiceGroupReadable<T['odata']>
 {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -105,11 +106,14 @@ export class AdtServiceBinding<
 
   public readonly objectType: string = 'ServiceBinding';
 
-  private readonly results: R;
+  private readonly results: ResultStrategiesOf<T>;
 
   constructor(
     connection: IAbapConnection,
-    options: AdtHandlerOptions<R, 'logger' | 'systemContext'>,
+    options: AdtHandlerOptions<
+      ResultStrategiesOf<T>,
+      'logger' | 'systemContext'
+    >,
   ) {
     const { logger, systemContext } = options;
     this.results = options.results;
@@ -290,7 +294,7 @@ export class AdtServiceBinding<
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+  ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -304,7 +308,7 @@ export class AdtServiceBinding<
           description: config.description,
           operation: 'I',
         }),
-      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      this.results.validation,
       options?.analyse,
     );
   }
@@ -321,7 +325,7 @@ export class AdtServiceBinding<
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IServiceBindingConfig, 'source'> & { source?: never },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+  ): Promise<IAdtResponse<T['created'], E>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // An object created without a package is the single thing `delete()` cannot
@@ -361,7 +365,7 @@ export class AdtServiceBinding<
           responsible: config.responsible,
           transportRequest: config.transportRequest,
         }),
-      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      this.results.created,
       options?.analyse,
     );
   }
@@ -371,7 +375,7 @@ export class AdtServiceBinding<
     config: Partial<IServiceBindingConfig>,
     version?: AdtReadVersion,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+  ): Promise<IAdtResponse<T['source'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -381,7 +385,7 @@ export class AdtServiceBinding<
     // the caller's reading, supplied through `analyse`.
     return answering(
       () => this.readRequest(connection, { bindingName: name, version }),
-      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      this.results.source,
       options?.analyse,
     );
   }
@@ -398,7 +402,7 @@ export class AdtServiceBinding<
       withLongPolling?: boolean;
       version?: AdtReadVersion;
     } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+  ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -410,7 +414,7 @@ export class AdtServiceBinding<
           bindingName: name,
           version: options?.version,
         }),
-      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      this.results.metadata,
       options?.analyse,
     );
   }
@@ -442,7 +446,7 @@ export class AdtServiceBinding<
     // still satisfies `IAdtUpdatable`.
     config: IServiceBindingPublicationConfig,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -494,7 +498,7 @@ export class AdtServiceBinding<
 
     return answering(
       () => this.updateRequest(connection, options.headers, publication),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.updated,
       // A publication change IS this member's write, and the job reports its
       // outcome as `SEVERITY` inside a 200. Reading it is the caller's:
       // `analysePublication` in @mcp-abap-adt/adt-strategies does.
@@ -594,7 +598,7 @@ export class AdtServiceBinding<
     this: this & AdtPerformedBy<'serviceBinding', 'updateMetadata'>,
     config: Partial<IServiceBindingConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -608,9 +612,7 @@ export class AdtServiceBinding<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.metadataUpdated as IResultStrategy<
-        ReturnType<R['metadataUpdated']>
-      >,
+      this.results.metadataUpdated,
       options?.analyse,
     );
   }
@@ -626,7 +628,7 @@ export class AdtServiceBinding<
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -634,9 +636,7 @@ export class AdtServiceBinding<
 
     return answering(
       () => this.deletionCheckRequest(connection, options.headers, name),
-      this.results.deletionCheck as IResultStrategy<
-        ReturnType<R['deletionCheck']>
-      >,
+      this.results.deletionCheck,
       options?.analyse,
     );
   }
@@ -644,7 +644,7 @@ export class AdtServiceBinding<
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -656,7 +656,7 @@ export class AdtServiceBinding<
           bindingName: name,
           transportRequest: config.transportRequest,
         }),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }
@@ -670,7 +670,7 @@ export class AdtServiceBinding<
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+  ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -682,7 +682,7 @@ export class AdtServiceBinding<
           bindingName: name,
           preauditRequested: true,
         }),
-      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      this.results.activation,
       options?.analyse,
     );
   }
@@ -692,7 +692,7 @@ export class AdtServiceBinding<
     config: Partial<IServiceBindingConfig>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+  ): Promise<IAdtResponse<T['check'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -705,7 +705,7 @@ export class AdtServiceBinding<
           bindingName: name,
           version,
         }),
-      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      this.results.check,
       options?.analyse,
     );
   }
@@ -719,7 +719,7 @@ export class AdtServiceBinding<
   async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+  ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -734,7 +734,7 @@ export class AdtServiceBinding<
           description: config.description,
           operation: 'U',
         }),
-      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      this.results.transport,
       options?.analyse,
     );
   }
@@ -742,12 +742,10 @@ export class AdtServiceBinding<
   /** The binding types this system offers. */
   async getServiceBindingTypes<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['bindingTypes']>, E>> {
+  ): Promise<IAdtResponse<T['bindingTypes'], E>> {
     return answering(
       () => this.bindingTypesRequest(this.connection),
-      this.results.bindingTypes as IResultStrategy<
-        ReturnType<R['bindingTypes']>
-      >,
+      this.results.bindingTypes,
       options?.analyse,
     );
   }
@@ -984,10 +982,10 @@ export class AdtServiceBinding<
   async getServiceGroup<E extends IAdtError = IAdtError>(
     params: IServiceGroupParams,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['odata']>, E>> {
+  ): Promise<IAdtResponse<T['odata'], E>> {
     return answering(
       () => this.serviceGroupRequest(this.connection, params),
-      this.results.odata as IResultStrategy<ReturnType<R['odata']>>,
+      this.results.odata,
       options?.analyse,
     );
   }

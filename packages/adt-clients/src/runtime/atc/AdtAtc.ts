@@ -32,7 +32,11 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtLoggedOptions } from '../../core/shared/handlerOptions';
 import { AdtOperationError } from '../../utils/adtErrors';
 import { answering } from '../../utils/adtResponse';
-import { rawDocument } from '../../utils/resultStrategy';
+import {
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+  rawDocument,
+} from '../../utils/resultStrategy';
 import {
   buildAtcObjectUri,
   createAtcWorklist,
@@ -83,23 +87,26 @@ export const atcDocuments = {
   findings: rawDocument,
 } satisfies IAtcResults;
 
+/** What each slot of the result set answers. */
+export type AtcValues = {
+  readonly [K in keyof IAtcResults]: unknown;
+};
+
 /**
  * **Not `IAdtRunnable` since 19.0.0.** That atom's `run` is one call, and an
  * ATC run is three: the check variant, a worklist for it, then the run itself.
  * A member that made all three chose the order and denied the caller a worklist
  * they could reuse. The atom stays in the contract for whoever composes them.
  */
-export class AdtAtc<R extends IAtcResults = typeof atcDocuments>
-  implements
-    IAtcRunStatusReadable<ReturnType<R['runStatus']>>,
-    IAtcFindings<ReturnType<R['findings']>>
+export class AdtAtc<T extends AtcValues = ResultValuesOf<typeof atcDocuments>>
+  implements IAtcRunStatusReadable<T['runStatus']>, IAtcFindings<T['findings']>
 {
-  private readonly results: R;
+  private readonly results: ResultStrategiesOf<T>;
   private readonly logger: ILogger;
 
   constructor(
     private readonly connection: IAbapConnection,
-    options: AdtLoggedOptions<R>,
+    options: AdtLoggedOptions<ResultStrategiesOf<T>>,
   ) {
     this.logger = options.logger;
     this.results = options.results;
@@ -123,26 +130,22 @@ export class AdtAtc<R extends IAtcResults = typeof atcDocuments>
     worklistId: string,
     target: IAtcRunTarget,
     options: IAtcRunOptions & { wait: true } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['waitingRun']>, E>>;
+  ): Promise<IAdtResponse<T['waitingRun'], E>>;
   async startRun<E extends IAdtError = IAdtError>(
     worklistId: string,
     target: IAtcRunTarget,
     options?: IAtcRunOptions & { wait?: false } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['startedRun']>, E>>;
+  ): Promise<IAdtResponse<T['startedRun'], E>>;
   async startRun<E extends IAdtError = IAdtError>(
     worklistId: string,
     target: IAtcRunTarget,
     options?: IAtcRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<
-    IAdtResponse<ReturnType<R['waitingRun']> | ReturnType<R['startedRun']>, E>
-  >;
+  ): Promise<IAdtResponse<T['waitingRun'] | T['startedRun'], E>>;
   async startRun<E extends IAdtError = IAdtError>(
     worklistId: string,
     target: IAtcRunTarget,
     options?: IAtcRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<
-    IAdtResponse<ReturnType<R['waitingRun']> | ReturnType<R['startedRun']>, E>
-  > {
+  ): Promise<IAdtResponse<T['waitingRun'] | T['startedRun'], E>> {
     const wait = options?.wait ?? false;
     const maximumVerdicts =
       options?.maximumVerdicts ?? DEFAULT_MAXIMUM_VERDICTS;
@@ -152,14 +155,13 @@ export class AdtAtc<R extends IAtcResults = typeof atcDocuments>
 
     const uris = target.objects.map((o) => buildAtcObjectUri(o));
 
+    const read: IResultStrategy<T['waitingRun'] | T['startedRun']> = wait
+      ? this.results.waitingRun
+      : this.results.startedRun;
     return answering(
       () =>
         startAtcRun(this.connection, worklistId, uris, maximumVerdicts, wait),
-      (wait
-        ? this.results.waitingRun
-        : this.results.startedRun) as IResultStrategy<
-        ReturnType<R['waitingRun']> | ReturnType<R['startedRun']>
-      >,
+      read,
       options?.analyse,
     );
   }
@@ -167,10 +169,10 @@ export class AdtAtc<R extends IAtcResults = typeof atcDocuments>
   async getRunStatus<E extends IAdtError = IAdtError>(
     runId: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['runStatus']>, E>> {
+  ): Promise<IAdtResponse<T['runStatus'], E>> {
     return answering(
       () => getAtcRunStatus(this.connection, runId),
-      this.results.runStatus as IResultStrategy<ReturnType<R['runStatus']>>,
+      this.results.runStatus,
       options?.analyse,
     );
   }
@@ -178,10 +180,10 @@ export class AdtAtc<R extends IAtcResults = typeof atcDocuments>
   async getFindings<E extends IAdtError = IAdtError>(
     worklistId: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['findings']>, E>> {
+  ): Promise<IAdtResponse<T['findings'], E>> {
     return answering(
       () => getAtcWorklist(this.connection, worklistId),
-      this.results.findings as IResultStrategy<ReturnType<R['findings']>>,
+      this.results.findings,
       options?.analyse,
     );
   }
@@ -197,12 +199,10 @@ export class AdtAtc<R extends IAtcResults = typeof atcDocuments>
    */
   async resolveCheckVariant<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['checkVariant']>, E>> {
+  ): Promise<IAdtResponse<T['checkVariant'], E>> {
     return answering(
       () => getAtcCustomizing(this.connection),
-      this.results.checkVariant as IResultStrategy<
-        ReturnType<R['checkVariant']>
-      >,
+      this.results.checkVariant,
       options?.analyse,
     );
   }
@@ -217,12 +217,10 @@ export class AdtAtc<R extends IAtcResults = typeof atcDocuments>
   async listCheckVariants<E extends IAdtError = IAdtError>(
     name: string,
     options?: { maxItemCount?: number } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['checkVariants']>, E>> {
+  ): Promise<IAdtResponse<T['checkVariants'], E>> {
     return answering(
       () => listAtcCheckVariants(this.connection, name, options?.maxItemCount),
-      this.results.checkVariants as IResultStrategy<
-        ReturnType<R['checkVariants']>
-      >,
+      this.results.checkVariants,
       options?.analyse,
     );
   }
@@ -237,10 +235,10 @@ export class AdtAtc<R extends IAtcResults = typeof atcDocuments>
   async createWorklist<E extends IAdtError = IAdtError>(
     checkVariant: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['worklist']>, E>> {
+  ): Promise<IAdtResponse<T['worklist'], E>> {
     return answering(
       () => createAtcWorklist(this.connection, checkVariant),
-      this.results.worklist as IResultStrategy<ReturnType<R['worklist']>>,
+      this.results.worklist,
       options?.analyse,
     );
   }

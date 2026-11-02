@@ -23,18 +23,20 @@ import type {
   IAdtResponse,
   IAdtUpdatable,
   IAdtValidatable,
-  IClassResults,
   ILocalTypesConfig,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { AdtModernVariant } from '../../clients/variant';
 import { CHECK_RUN_HEADERS } from '../../constants/contentTypes';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
+import type {
+  ResultStrategiesOf,
+  ResultValuesOf,
+} from '../../utils/resultStrategy';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import type { IReadOptions } from '../shared/types';
-import { AdtClassMemberBase } from './AdtClassMemberBase';
+import { AdtClassMemberBase, type ClassValues } from './AdtClassMemberBase';
 import { checkClassLocalTypes } from './check';
 import { updateClassLocalTypes } from './includes';
 import { getClassImplementationsInclude } from './read';
@@ -57,26 +59,26 @@ export type { ILocalTypesConfig } from '@mcp-abap-adt/interfaces-adt';
  * emptiness — rather than a claim that this is a deletable object.
  */
 export class AdtLocalTypes<
-    R extends IClassResults = typeof classDocuments,
+    T extends ClassValues = ResultValuesOf<typeof classDocuments>,
     V extends AdtVariant = AdtModernVariant,
   >
-  extends AdtClassMemberBase<R, V, 'localTypes'>
+  extends AdtClassMemberBase<T, V, 'localTypes'>
   implements
-    IAdtReadable<ILocalTypesConfig, ReturnType<R['source']>>,
-    IAdtMetadataReadable<ILocalTypesConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<Partial<ILocalTypesConfig>, ReturnType<R['updated']>>,
-    IAdtValidatable<ILocalTypesConfig, ReturnType<R['validation']>>,
-    IAdtCheckable<ILocalTypesConfig, ReturnType<R['check']>>,
-    IAdtActivatable<ILocalTypesConfig, ReturnType<R['activation']>>
+    IAdtReadable<ILocalTypesConfig, T['source']>,
+    IAdtMetadataReadable<ILocalTypesConfig, T['metadata']>,
+    IAdtUpdatable<Partial<ILocalTypesConfig>, T['updated']>,
+    IAdtValidatable<ILocalTypesConfig, T['validation']>,
+    IAdtCheckable<ILocalTypesConfig, T['check']>,
+    IAdtActivatable<ILocalTypesConfig, T['activation']>
 {
   public readonly objectType: string = 'LocalTypes';
 
-  protected readonly results: R;
+  protected readonly results: ResultStrategiesOf<T>;
 
   constructor(
     connection: IAbapConnection,
     options: AdtHandlerOptions<
-      R,
+      ResultStrategiesOf<T>,
       'logger' | 'systemContext' | 'contentTypes' | 'lockRegistry'
     >,
   ) {
@@ -89,7 +91,7 @@ export class AdtLocalTypes<
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<ILocalTypesConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+  ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -106,7 +108,7 @@ export class AdtLocalTypes<
           'inactive',
           this.contentTypes?.sourceArtifactContentType(),
         ),
-      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      this.results.validation,
       options?.analyse,
     );
   }
@@ -116,7 +118,7 @@ export class AdtLocalTypes<
     config: Partial<ILocalTypesConfig>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+  ): Promise<IAdtResponse<T['source'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -133,7 +135,7 @@ export class AdtLocalTypes<
           this.logger,
           options,
         ),
-      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      this.results.source,
       options?.analyse,
     );
   }
@@ -159,7 +161,7 @@ export class AdtLocalTypes<
   async update<E extends IAdtError = IAdtError>(
     config: Partial<ILocalTypesConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -182,7 +184,7 @@ export class AdtLocalTypes<
           options?.lockHandle as string,
           config.transportRequest,
         ),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.updated,
       options?.analyse,
     );
   }
@@ -196,7 +198,7 @@ export class AdtLocalTypes<
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<ILocalTypesConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<T['updated'], E>> {
     return await this.update({ ...config, source: '' }, options);
   }
 
@@ -205,7 +207,7 @@ export class AdtLocalTypes<
     config: Partial<ILocalTypesConfig>,
     status: string = 'inactive',
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+  ): Promise<IAdtResponse<T['check'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -219,7 +221,7 @@ export class AdtLocalTypes<
           status === 'active' ? 'active' : 'inactive',
           this.contentTypes?.sourceArtifactContentType(),
         ),
-      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      this.results.check,
       options?.analyse,
     );
   }
@@ -228,7 +230,7 @@ export class AdtLocalTypes<
   async getVersions<E extends IAdtError = IAdtError>(
     config: Partial<ILocalTypesConfig>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
+  ): Promise<IAdtResponse<T['versions'], E>> {
     return this.includeVersions(
       config.className as string,
       'implementations',

@@ -6,7 +6,10 @@
  * never called from anywhere.
  */
 
-import { transportDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  type ResultValuesOf,
+  transportDocuments,
+} from '@mcp-abap-adt/adt-clients';
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -173,8 +176,10 @@ describe('legacy transport members', () => {
 
   it('list and readMetadata send one GET to the legacy collection', async () => {
     for (const call of [
-      (h: AdtRequestLegacy<typeof transportParsing>) => h.list(),
-      (h: AdtRequestLegacy<typeof transportParsing>) => h.readMetadata(cfg),
+      (h: AdtRequestLegacy<ResultValuesOf<typeof transportParsing>>) =>
+        h.list(),
+      (h: AdtRequestLegacy<ResultValuesOf<typeof transportParsing>>) =>
+        h.readMetadata(cfg),
     ]) {
       const { connection, calls } = recordingConnection();
       await call(

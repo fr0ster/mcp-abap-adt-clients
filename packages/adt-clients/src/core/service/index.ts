@@ -1,4 +1,7 @@
-export { AdtServiceBinding } from './AdtService';
+export {
+  AdtServiceBinding,
+  type ServiceValues,
+} from './AdtService';
 export type {
   DesiredPublicationState,
   GeneratedServiceType,

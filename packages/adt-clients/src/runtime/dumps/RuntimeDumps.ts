@@ -11,7 +11,11 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtLoggedOptions } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
-import { rawDocument } from '../../utils/resultStrategy';
+import {
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+  rawDocument,
+} from '../../utils/resultStrategy';
 import {
   buildDumpIdPrefix,
   buildRuntimeDumpsUserQuery,
@@ -38,17 +42,22 @@ export const runtimeDumpsDocuments = {
   dump: rawDocument,
 } satisfies IRuntimeDumpsResults;
 
+/** What each slot of the result set answers. */
+export type RuntimeDumpsValues = {
+  readonly [K in keyof IRuntimeDumpsResults]: unknown;
+};
+
 export class RuntimeDumps<
-  R extends IRuntimeDumpsResults = typeof runtimeDumpsDocuments,
-> implements IRuntimeDumps<ReturnType<R['list']>, ReturnType<R['dump']>>
+  T extends RuntimeDumpsValues = ResultValuesOf<typeof runtimeDumpsDocuments>,
+> implements IRuntimeDumps<T['list'], T['dump']>
 {
   readonly kind = 'runtimeDumps' as const;
-  private readonly results: R;
+  private readonly results: ResultStrategiesOf<T>;
   private readonly logger: ILogger;
 
   constructor(
     private readonly connection: IAbapConnection,
-    options: AdtLoggedOptions<R>,
+    options: AdtLoggedOptions<ResultStrategiesOf<T>>,
   ) {
     this.logger = options.logger;
     this.results = options.results;
@@ -56,10 +65,10 @@ export class RuntimeDumps<
 
   async list<E extends IAdtError = IAdtError>(
     options?: IRuntimeDumpsListOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['list']>, E>> {
+  ): Promise<IAdtResponse<T['list'], E>> {
     return answering(
       () => listRuntimeDumps(this.connection, options ?? {}),
-      this.results.list as IResultStrategy<ReturnType<R['list']>>,
+      this.results.list,
       options?.analyse,
     );
   }
@@ -67,10 +76,10 @@ export class RuntimeDumps<
   async listByUser<E extends IAdtError = IAdtError>(
     user?: string,
     options?: Omit<IRuntimeDumpsListOptions, 'query'> & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['list']>, E>> {
+  ): Promise<IAdtResponse<T['list'], E>> {
     return answering(
       () => listRuntimeDumpsByUser(this.connection, user, options),
-      this.results.list as IResultStrategy<ReturnType<R['list']>>,
+      this.results.list,
       options?.analyse,
     );
   }
@@ -78,10 +87,10 @@ export class RuntimeDumps<
   async getById<E extends IAdtError = IAdtError>(
     dumpId: string,
     options?: IRuntimeDumpReadOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['dump']>, E>> {
+  ): Promise<IAdtResponse<T['dump'], E>> {
     return answering(
       () => getRuntimeDumpById(this.connection, dumpId, options),
-      this.results.dump as IResultStrategy<ReturnType<R['dump']>>,
+      this.results.dump,
       options?.analyse,
     );
   }

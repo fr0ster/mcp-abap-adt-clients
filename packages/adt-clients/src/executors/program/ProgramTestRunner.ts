@@ -33,8 +33,13 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import type { AdtHandlerOptions } from '../../core/shared/handlerOptions';
 import { PROGRAM } from '../../endpoints/objects';
+import type {
+  ResultStrategiesOf,
+  ResultValuesOf,
+} from '../../utils/resultStrategy';
 import {
   AbapUnitRunner,
+  type AbapUnitRunnerValues,
   abapUnitRunnerDocuments,
   type IAbapUnitRunnerResults,
 } from '../abapUnitRunner';
@@ -43,16 +48,17 @@ export type IProgramTestRunnerResults = IAbapUnitRunnerResults;
 export const programTestRunnerDocuments = abapUnitRunnerDocuments;
 
 export class ProgramTestRunner<
-    R extends IProgramTestRunnerResults = typeof programTestRunnerDocuments,
+    T extends AbapUnitRunnerValues = ResultValuesOf<
+      typeof programTestRunnerDocuments
+    >,
     V extends AdtVariant = AdtModernVariant,
   >
-  extends AbapUnitRunner<R, V, 'program'>
-  implements
-    IAdtRunnable<string, ReturnType<R['run']>, IClassUnitTestRunOptions>
+  extends AbapUnitRunner<T, V, 'program'>
+  implements IAdtRunnable<string, T['run'], IClassUnitTestRunOptions>
 {
   constructor(
     connection: IAbapConnection,
-    options: AdtHandlerOptions<R, 'logger'>,
+    options: AdtHandlerOptions<ResultStrategiesOf<T>, 'logger'>,
   ) {
     super(connection, options);
   }
@@ -62,7 +68,7 @@ export class ProgramTestRunner<
     this: this & AdtPerformedBy<'program', 'unitTestRun'>,
     programName: string,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
+  ): Promise<IAdtResponse<T['run'], E>> {
     return this.startByObject(programName, 'PROG', options);
   }
 
@@ -89,7 +95,7 @@ export class ProgramTestRunner<
     this: this & AdtPerformedBy<'program', 'unitTestRunSync'>,
     programName: string,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {
+  ): Promise<IAdtResponse<T['result'], E>> {
     return this.startSync([PROGRAM.uri(programName)], options);
   }
 }

@@ -28,6 +28,7 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { FeedRepository } from '../../../../runtime/feeds/FeedRepository';
+import type { ResultValuesOf } from '../../../../utils/resultStrategy';
 import {
   configuredCase,
   gate,
@@ -82,7 +83,7 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
   // Built here rather than taken from `feeds`: the repository
   // answers each feed as its document by default, and these cases assert the
   // entries, so they construct it with the Atom readings.
-  let feeds: FeedRepository<typeof feedReading>;
+  let feeds: FeedRepository<ResultValuesOf<typeof feedReading>>;
 
   beforeAll(async () => {
     try {

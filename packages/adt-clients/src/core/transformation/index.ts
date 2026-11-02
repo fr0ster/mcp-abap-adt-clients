@@ -1,2 +1,5 @@
-export { AdtTransformation } from './AdtTransformation';
+export {
+  AdtTransformation,
+  type TransformationValues,
+} from './AdtTransformation';
 export * from './types';

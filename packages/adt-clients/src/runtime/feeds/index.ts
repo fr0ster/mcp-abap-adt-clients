@@ -4,6 +4,7 @@
 
 export {
   FeedRepository,
+  type FeedValues,
   feedDocuments,
   type IFeedResults,
 } from './FeedRepository';

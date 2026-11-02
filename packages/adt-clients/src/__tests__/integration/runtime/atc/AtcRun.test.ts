@@ -43,6 +43,7 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { AdtAtc, atcDocuments } from '../../../../runtime/atc/AdtAtc';
+import type { ResultValuesOf } from '../../../../utils/resultStrategy';
 import {
   configuredCase,
   gate,
@@ -107,7 +108,7 @@ const SECTION = 'atc_run';
  * SLIN_DEFAULT ran and found the dirty class's finding (0,1,0).
  */
 async function checkVariantFor(
-  atc: AdtAtc<typeof atcReading>,
+  atc: AdtAtc<ResultValuesOf<typeof atcReading>>,
   testCase: { params?: Record<string, unknown> },
 ): Promise<string> {
   const pinned = String(testCase.params?.check_variant ?? '').trim();

@@ -45,7 +45,6 @@ import type {
   IAdtHeaders,
   IAdtResponse,
   IClassUnitTestRunOptions,
-  IResultStrategy,
   IUnitTestResultOptions,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -59,7 +58,12 @@ import {
 } from '../core/shared/abapUnit';
 import type { AdtHandlerOptions } from '../core/shared/handlerOptions';
 import { answering } from '../utils/adtResponse';
+import type {
+  ResultStrategiesOf,
+  ResultValuesOf,
+} from '../utils/resultStrategy';
 import {
+  type AbapUnitRunnerValues,
   abapUnitRunnerDocuments,
   type IAbapUnitRunnerResults,
 } from './abapUnitRunner';
@@ -86,14 +90,11 @@ export const abapUnitTestRunnerDocuments = abapUnitRunnerDocuments;
 type OnRunsEndpoint = IAdtServedOn<AdtModernVariant>;
 
 export class AbapUnitTestRunner<
-  R extends IAbapUnitTestRunnerResults = typeof abapUnitTestRunnerDocuments,
+  T extends AbapUnitRunnerValues = ResultValuesOf<
+    typeof abapUnitTestRunnerDocuments
+  >,
   V extends AdtVariant = AdtModernVariant,
-> implements
-    IAbapUnitRunner<
-      ReturnType<R['run']>,
-      ReturnType<R['status']>,
-      ReturnType<R['result']>
-    >
+> implements IAbapUnitRunner<T['run'], T['status'], T['result']>
 {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -102,11 +103,11 @@ export class AbapUnitTestRunner<
   declare readonly variant?: V;
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
-  protected readonly results: R;
+  protected readonly results: ResultStrategiesOf<T>;
 
   constructor(
     connection: IAbapConnection,
-    options: AdtHandlerOptions<R, 'logger'>,
+    options: AdtHandlerOptions<ResultStrategiesOf<T>, 'logger'>,
   ) {
     const { logger, results } = options;
     this.connection = connection;
@@ -127,10 +128,10 @@ export class AbapUnitTestRunner<
     this: this & OnRunsEndpoint,
     target: AbapUnitRunTarget,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
+  ): Promise<IAdtResponse<T['run'], E>> {
     return answering(
       () => startUnitTestRunByTarget(this.connection, target, options),
-      this.results.run as IResultStrategy<ReturnType<R['run']>>,
+      this.results.run,
       options?.analyse,
     );
   }
@@ -148,14 +149,14 @@ export class AbapUnitTestRunner<
     uris: readonly [string, ...string[]],
     options: { headers: IAdtHeaders } & IClassUnitTestRunOptions &
       IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {
+  ): Promise<IAdtResponse<T['result'], E>> {
     // `runOptions` is an object even when the caller gave only the headers,
     // so the `<options>` element is always sent.
     const { analyse, headers, ...runOptions } = options;
     return answering(
       () =>
         startUnitTestRunSyncWith(this.connection, headers, uris, runOptions),
-      this.results.result as IResultStrategy<ReturnType<R['result']>>,
+      this.results.result,
       analyse,
     );
   }
@@ -169,11 +170,11 @@ export class AbapUnitTestRunner<
     runId: string,
     withLongPolling: boolean | undefined = true,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['status']>, E>> {
+  ): Promise<IAdtResponse<T['status'], E>> {
     return answering(
       () =>
         getUnitTestRunStatus(this.connection, runId, withLongPolling ?? true),
-      this.results.status as IResultStrategy<ReturnType<R['status']>>,
+      this.results.status,
       options?.analyse,
     );
   }
@@ -183,10 +184,10 @@ export class AbapUnitTestRunner<
     this: this & OnRunsEndpoint,
     runId: string,
     options?: IUnitTestResultOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {
+  ): Promise<IAdtResponse<T['result'], E>> {
     return answering(
       () => getUnitTestRunResult(this.connection, runId, options),
-      this.results.result as IResultStrategy<ReturnType<R['result']>>,
+      this.results.result,
       options?.analyse,
     );
   }

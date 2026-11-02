@@ -20,6 +20,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import { AdtAtc, atcDocuments } from '../../../../runtime/atc/AdtAtc';
+import type { ResultValuesOf } from '../../../../utils/resultStrategy';
 import { gate } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
@@ -58,7 +59,9 @@ function namesOf(document: string): { names: string[]; total: number } {
 describe('ATC check variants (AdtAtc.listCheckVariants)', () => {
   let connection: IAbapConnection | undefined;
   let atc: AdtAtc<
-    typeof atcDocuments & { checkVariant: typeof atcSystemCheckVariant }
+    ResultValuesOf<
+      typeof atcDocuments & { checkVariant: typeof atcSystemCheckVariant }
+    >
   >;
   let all: string[] = [];
 
