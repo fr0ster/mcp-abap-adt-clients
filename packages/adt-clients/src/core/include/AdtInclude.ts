@@ -65,31 +65,37 @@ function requireName(config: Partial<IIncludeConfig>): string {
   return config.includeName as string;
 }
 
+/** What each slot of an include's result set answers. */
+export type IncludeValues = { readonly [K in keyof IIncludeResults]: unknown };
+
+/** The result strategies that answer the values `T`. */
+export type ResultStrategiesOf<T> = {
+  readonly [K in keyof T]: IResultStrategy<T[K]>;
+};
+
+/** The values a result set answers, slot by slot. */
+export type ResultValuesOf<R> = {
+  readonly [K in keyof R]: R[K] extends IResultStrategy<infer X> ? X : never;
+};
+
 export class AdtInclude<
-  R extends IIncludeResults = typeof includeDocuments,
+  T extends IncludeValues = ResultValuesOf<typeof includeDocuments>,
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtIncludeEnhancementHost<
       IIncludeConfig,
-      ReturnType<R['enhancementElements']>,
-      ReturnType<R['enhancementOptions']>
+      T['enhancementElements'],
+      T['enhancementOptions']
     >,
-    IAdtMainProgramsReadable<IIncludeConfig, ReturnType<R['mainPrograms']>>,
-    IAdtCreatable<IIncludeConfig, ReturnType<R['created']>>,
-    IAdtReadable<IIncludeConfig, ReturnType<R['source']>>,
-    IAdtMetadataReadable<IIncludeConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<Partial<IIncludeConfig>, ReturnType<R['updated']>>,
-    IAdtMetadataUpdatable<
-      Partial<IIncludeConfig>,
-      ReturnType<R['metadataUpdated']>
-    >,
-    IAdtDeletable<
-      IIncludeConfig,
-      ReturnType<R['deletion']>,
-      ReturnType<R['deletionCheck']>
-    >,
-    IAdtValidatable<IIncludeConfig, ReturnType<R['validation']>>,
-    IAdtActivatable<IIncludeConfig, ReturnType<R['activation']>>,
+    IAdtMainProgramsReadable<IIncludeConfig, T['mainPrograms']>,
+    IAdtCreatable<IIncludeConfig, T['created']>,
+    IAdtReadable<IIncludeConfig, T['source']>,
+    IAdtMetadataReadable<IIncludeConfig, T['metadata']>,
+    IAdtUpdatable<Partial<IIncludeConfig>, T['updated']>,
+    IAdtMetadataUpdatable<Partial<IIncludeConfig>, T['metadataUpdated']>,
+    IAdtDeletable<IIncludeConfig, T['deletion'], T['deletionCheck']>,
+    IAdtValidatable<IIncludeConfig, T['validation']>,
+    IAdtActivatable<IIncludeConfig, T['activation']>,
     IAdtLockable<IIncludeConfig>
 {
   /**
@@ -102,12 +108,15 @@ export class AdtInclude<
   private readonly logger: ILogger | undefined;
   // Read by `create` until 36.0.0; its headers are the caller's now.
   private readonly contentTypes: IAdtContentTypes | undefined;
-  protected readonly results: R;
+  protected readonly results: ResultStrategiesOf<T>;
   private readonly systemContext: IAdtSystemContext;
 
   constructor(
     protected readonly connection: IAbapConnection,
-    options: AdtHandlerOptions<R, 'logger' | 'contentTypes' | 'systemContext'>,
+    options: AdtHandlerOptions<
+      ResultStrategiesOf<T>,
+      'logger' | 'contentTypes' | 'systemContext'
+    >,
   ) {
     this.logger = options.logger;
     this.contentTypes = options.contentTypes;
@@ -119,7 +128,7 @@ export class AdtInclude<
   async readEnhancementElements<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
     options?: IAdtOperationOptions<E> & { context?: string },
-  ): Promise<IAdtResponse<ReturnType<R['enhancementElements']>, E>> {
+  ): Promise<IAdtResponse<T['enhancementElements'], E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
       () =>
@@ -128,9 +137,7 @@ export class AdtInclude<
           config.includeName as string,
           options?.context,
         ),
-      this.results.enhancementElements as IResultStrategy<
-        ReturnType<R['enhancementElements']>
-      >,
+      this.results.enhancementElements,
       options?.analyse,
     );
   }
@@ -139,7 +146,7 @@ export class AdtInclude<
   async readEnhancementOptions<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
     options?: IAdtOperationOptions<E> & { context?: string },
-  ): Promise<IAdtResponse<ReturnType<R['enhancementOptions']>, E>> {
+  ): Promise<IAdtResponse<T['enhancementOptions'], E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
       () =>
@@ -148,9 +155,7 @@ export class AdtInclude<
           config.includeName as string,
           options?.context,
         ),
-      this.results.enhancementOptions as IResultStrategy<
-        ReturnType<R['enhancementOptions']>
-      >,
+      this.results.enhancementOptions,
       options?.analyse,
     );
   }
@@ -163,13 +168,11 @@ export class AdtInclude<
     this: this & AdtPerformedBy<'include', 'mainPrograms'>,
     config: Partial<IIncludeConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['mainPrograms']>, E>> {
+  ): Promise<IAdtResponse<T['mainPrograms'], E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
       () => getIncludeMainPrograms(connection, requireName(config)),
-      this.results.mainPrograms as IResultStrategy<
-        ReturnType<R['mainPrograms']>
-      >,
+      this.results.mainPrograms,
       options?.analyse,
     );
   }
@@ -185,7 +188,7 @@ export class AdtInclude<
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+  ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -208,7 +211,7 @@ export class AdtInclude<
           timeout: 0,
           headers: { Accept: 'application/vnd.sap.as+xml' },
         }),
-      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      this.results.validation,
       options?.analyse,
     );
   }
@@ -224,7 +227,7 @@ export class AdtInclude<
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IIncludeConfig, 'source'> & { source?: never },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+  ): Promise<IAdtResponse<T['created'], E>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // An object created without a package is the single thing `delete()` cannot
@@ -255,7 +258,7 @@ export class AdtInclude<
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,
         }),
-      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      this.results.created,
       options?.analyse,
     );
   }
@@ -265,14 +268,14 @@ export class AdtInclude<
     config: Partial<IIncludeConfig>,
     version?: AdtReadVersion,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+  ): Promise<IAdtResponse<T['source'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const includeName = requireName(config);
     return answering(
       () => getIncludeSource(connection, includeName, version),
-      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      this.results.source,
       options?.analyse,
     );
   }
@@ -284,14 +287,14 @@ export class AdtInclude<
       withLongPolling?: boolean;
       version?: AdtReadVersion;
     } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+  ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const includeName = requireName(config);
     return answering(
       () => getIncludeMetadata(connection, includeName, options?.version),
-      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      this.results.metadata,
       options?.analyse,
     );
   }
@@ -310,7 +313,7 @@ export class AdtInclude<
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -334,7 +337,7 @@ export class AdtInclude<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.updated,
       options?.analyse,
     );
   }
@@ -353,7 +356,7 @@ export class AdtInclude<
     this: this & AdtPerformedBy<'include', 'updateMetadata'>,
     config: Partial<IIncludeConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -367,9 +370,7 @@ export class AdtInclude<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.metadataUpdated as IResultStrategy<
-        ReturnType<R['metadataUpdated']>
-      >,
+      this.results.metadataUpdated,
       options?.analyse,
     );
   }
@@ -384,7 +385,7 @@ export class AdtInclude<
     this: this & AdtPerformedBy<'include', 'deletionCheck'>,
     config: Partial<IIncludeConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -397,9 +398,7 @@ export class AdtInclude<
           options.headers,
           includeUrl(includeName),
         ),
-      this.results.deletionCheck as IResultStrategy<
-        ReturnType<R['deletionCheck']>
-      >,
+      this.results.deletionCheck,
       options?.analyse,
     );
   }
@@ -414,7 +413,7 @@ export class AdtInclude<
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -428,7 +427,7 @@ export class AdtInclude<
           includeName,
           config.transportRequest,
         ),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }
@@ -437,14 +436,14 @@ export class AdtInclude<
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+  ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const includeName = requireName(config);
     return answering(
       () => activateInclude(connection, options.headers, includeName),
-      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      this.results.activation,
       options?.analyse,
     );
   }

@@ -62,6 +62,7 @@ import {
   functionGroupDocuments,
   functionIncludeDocuments,
   functionModuleDocuments,
+  type IncludeValues,
   includeDocuments,
   interfaceDocuments,
   METADATA_EXTENSION,
@@ -69,6 +70,7 @@ import {
   type metadataExtensionDocuments,
   packageDocuments,
   programDocuments,
+  type ResultValuesOf,
   SCALAR_FUNCTION,
   SCALAR_FUNCTION_IMPLEMENTATION,
   SERVICE_BINDING,
@@ -223,17 +225,17 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
 
   override getInclude(
     this: this & AdtServedBy<'include'>,
-  ): AdtIncludeLegacy<typeof includeDocuments>;
+  ): AdtIncludeLegacy<ResultValuesOf<typeof includeDocuments>>;
   override getInclude<R extends IIncludeResults>(
     this: this & AdtServedBy<'include'>,
     results: R,
-  ): AdtIncludeLegacy<R>;
+  ): AdtIncludeLegacy<ResultValuesOf<R>>;
   override getInclude(
     this: this & AdtServedBy<'include'>,
     results: IIncludeResults = includeDocuments,
-  ): AdtIncludeLegacy<IIncludeResults> {
+  ): AdtIncludeLegacy<IncludeValues> {
     this.assertConnected();
-    return new AdtIncludeLegacy<IIncludeResults>(this.connection, {
+    return new AdtIncludeLegacy<IncludeValues>(this.connection, {
       logger: this.logger,
       contentTypes: this.contentTypes,
       results,

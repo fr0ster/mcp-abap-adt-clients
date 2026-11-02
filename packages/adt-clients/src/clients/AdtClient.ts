@@ -105,7 +105,12 @@ import {
   AdtFunctionModule,
   functionModuleDocuments,
 } from '../core/functionModule';
-import { AdtInclude, includeDocuments } from '../core/include';
+import {
+  AdtInclude,
+  type IncludeValues,
+  includeDocuments,
+  type ResultValuesOf,
+} from '../core/include';
 import { AdtInterface, interfaceDocuments } from '../core/interface';
 import {
   AdtMessageClass,
@@ -318,17 +323,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getInclude(
     this: this & AdtServedBy<'include'>,
-  ): AdtInclude<typeof includeDocuments, V>;
+  ): AdtInclude<ResultValuesOf<typeof includeDocuments>, V>;
   getInclude<R extends IIncludeResults>(
     this: this & AdtServedBy<'include'>,
     results: R,
-  ): AdtInclude<R, V>;
+  ): AdtInclude<ResultValuesOf<R>, V>;
   getInclude(
     this: this & AdtServedBy<'include'>,
     results: IIncludeResults = includeDocuments,
-  ): AdtInclude<IIncludeResults, V> {
+  ): AdtInclude<IncludeValues, V> {
     this.assertConnected();
-    return new AdtInclude<IIncludeResults, V>(this.connection, {
+    return new AdtInclude<IncludeValues, V>(this.connection, {
       logger: this.logger,
       contentTypes: this.contentTypes,
       results,

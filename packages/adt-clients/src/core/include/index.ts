@@ -19,7 +19,12 @@
  * only on modern on-prem, so only there is its collection a POST target.
  */
 
-export { AdtInclude } from './AdtInclude';
+export {
+  AdtInclude,
+  type IncludeValues,
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+} from './AdtInclude';
 export { activateInclude } from './activation';
 export { CT_INCLUDE, create } from './create';
 export { deleteInclude } from './delete';

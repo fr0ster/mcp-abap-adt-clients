@@ -20,7 +20,13 @@
  */
 
 export { AdtBatchConnection } from './batch';
-export { AdtInclude, CT_INCLUDE } from './core/include';
+export {
+  AdtInclude,
+  CT_INCLUDE,
+  type IncludeValues,
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+} from './core/include';
 export * from './index.abapgit';
 export * from './index.core';
 export * from './index.executors';
