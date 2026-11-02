@@ -4,6 +4,32 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [0.6.0] - 2026-11-02
+
+On `@mcp-abap-adt/adt-clients` `^42.0.0`. A breaking change of a 0.x package,
+so a minor.
+
+### Breaking
+
+- **`create` takes `packageName: string`, required**, on every `*Legacy`
+  class that inherits a create needing a package from adt-clients 42.0.0:
+  `AdtClassLegacy`, `AdtProgramLegacy`, `AdtInterfaceLegacy`,
+  `AdtIncludeLegacy`, `AdtFunctionGroupLegacy`, `AdtMessageClassLegacy`,
+  `AdtDdlLegacy`, and the handlers `AdtClientLegacy` serves from its base
+  unchanged. A call without one does not compile: SAP creates nothing without
+  a package (read in SAP's handlers on a modern on-premise system, 2026-11-02;
+  not read on 7.40). `AdtProgramLegacy.validate` and `AdtIncludeLegacy.validate`
+  take `packageName` too, inherited: SAP's program validation refuses an empty
+  package. **Migrating:** install `@mcp-abap-adt/adt-clients@^42.0.0` and pass
+  `packageName` to those `create` and `validate` calls (see adt-clients'
+  [MIGRATION-42.md](../adt-clients/docs/usage/MIGRATION-42.md)).
+
+### Fixed
+
+- `validate` without a package, inherited from adt-clients 42.0.0, sends
+  `packagename` empty instead of the text `undefined`
+  (`AdtClassLegacy`, `AdtInterfaceLegacy`, `AdtDdlLegacy`).
+
 ## [0.5.0] - 2026-11-02
 
 On `@mcp-abap-adt/adt-clients` `^41.0.0`. A breaking change of a 0.x package,

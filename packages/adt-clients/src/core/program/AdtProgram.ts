@@ -172,7 +172,7 @@ export class AdtProgram<
 
   /** Validate a program name before creating it. */
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IProgramConfig>,
+    config: Partial<IProgramConfig> & { packageName: string },
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -180,16 +180,16 @@ export class AdtProgram<
 
     // Nothing was asked of the server, so there is no answer to describe: a
     // missing required argument is the caller's mistake and it throws.
-    // The endpoint requires it: without `packagename` it answers 400, so a
-    // missing package is a caller error worth naming here rather than an HTTP
-    // failure to decode later.
+    // The package is required: SAP's program validation refuses an empty one
+    // (read on premise, 2026-11-02: CL_SEDI_ADT_RES_OBJ_VALIDATION, SEDI_ADT
+    // 003) and an absent one with 400.
 
     return answering(
       () =>
         validateProgramName(
           connection,
           config.programName as string,
-          config.packageName as string,
+          config.packageName,
           config.description,
         ),
       this.results.validation,
@@ -199,20 +199,23 @@ export class AdtProgram<
 
   /** Create the program. */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IProgramConfig, 'source'> & { source?: never },
+    config: Omit<IProgramConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+    },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<T['created'], E>> {
     // **The one guard this package keeps, and only on a create.**
     //
-    // An object created without a package is the single thing `delete()` cannot
-    // undo: the deletion check resolves through the package, so it answers
-    // "Object does not exist" while the name stays taken for good, and clearing
-    // it is SAP GUI territory. Everywhere else a missing field produces a
-    // request the server answers, which is a reading a strategy can take. Here
-    // it produces a state with no way out through ADT at all.
+    // The type requires a package; this refuses an empty one, which the type
+    // cannot rule out. SAP creates nothing without a package: most creates are
+    // refused (CTS_WBO_API 018, "Object cannot be created without a package"),
+    // and a message class is answered 201 Created with nothing created (read on
+    // premise, 2026-11-02). Refused here, before any request, in words that say
+    // why.
     if (!config.packageName) {
       throw new Error(
-        'packageName is required for create: an object created without one cannot be deleted through ADT',
+        'packageName is required for create: SAP creates nothing without one',
       );
     }
 
@@ -224,7 +227,7 @@ export class AdtProgram<
       () =>
         createProgram(connection, options.headers, {
           programName: name,
-          packageName: config.packageName as string,
+          packageName: config.packageName,
           transportRequest: config.transportRequest,
           description: config.description,
           programType: config.programType,

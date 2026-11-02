@@ -191,20 +191,23 @@ export class AdtFunctionGroup<
 
   /** Create the function group. */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IFunctionGroupConfig, 'source'> & { source?: never },
+    config: Omit<IFunctionGroupConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+    },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<T['created'], E>> {
     // **The one guard this package keeps, and only on a create.**
     //
-    // An object created without a package is the single thing `delete()` cannot
-    // undo: the deletion check resolves through the package, so it answers
-    // "Object does not exist" while the name stays taken for good, and clearing
-    // it is SAP GUI territory. Everywhere else a missing field produces a
-    // request the server answers, which is a reading a strategy can take. Here
-    // it produces a state with no way out through ADT at all.
+    // The type requires a package; this refuses an empty one, which the type
+    // cannot rule out. SAP creates nothing without a package: most creates are
+    // refused (CTS_WBO_API 018, "Object cannot be created without a package"),
+    // and a message class is answered 201 Created with nothing created (read on
+    // premise, 2026-11-02). Refused here, before any request, in words that say
+    // why.
     if (!config.packageName) {
       throw new Error(
-        'packageName is required for create: an object created without one cannot be deleted through ADT',
+        'packageName is required for create: SAP creates nothing without one',
       );
     }
 
@@ -219,7 +222,7 @@ export class AdtFunctionGroup<
           options.headers,
           {
             functionGroupName: name,
-            packageName: config.packageName as string,
+            packageName: config.packageName,
             transportRequest: config.transportRequest,
             description: config.description as string,
             masterSystem:

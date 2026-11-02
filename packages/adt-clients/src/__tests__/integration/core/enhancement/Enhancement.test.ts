@@ -113,6 +113,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
     key = 'enhancement_name',
   ): Omit<IEnhancementConfig, 'source' | 'enhancementType'> & {
     enhancementType: T;
+    packageName: string;
     source?: never;
   } {
     const enhancementName = required(resolver, key);
