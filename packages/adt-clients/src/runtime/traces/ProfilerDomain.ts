@@ -72,11 +72,21 @@ export const profilerDocuments = {
 } satisfies IProfilerResults;
 
 /** The three views a profiler trace has, typed by the strategies that read them. */
-export interface IProfilerViews<T extends ProfilerValues> {
-  hitlist: ITraceView<T['hitlist'], IProfilerTraceHitListOptions>;
-  statements: ITraceView<T['statements'], IProfilerTraceStatementsOptions>;
-  dbAccesses: ITraceView<T['dbAccesses'], IProfilerTraceDbAccessesOptions>;
+/** Each view's own options. */
+interface IProfilerViewOptions {
+  hitlist: IProfilerTraceHitListOptions;
+  statements: IProfilerTraceStatementsOptions;
+  dbAccesses: IProfilerTraceDbAccessesOptions;
 }
+
+/**
+ * The three views a profiler trace has, typed by the values their strategies
+ * answer. A mapped type over the view names, so a view's result for a generic
+ * name is `T[K]` — what its strategy answers — with no cast.
+ */
+export type IProfilerViews<T extends ProfilerValues> = {
+  [K in keyof IProfilerViewOptions]: ITraceView<T[K], IProfilerViewOptions[K]>;
+};
 
 /**
  * What each slot of the result set answers.
@@ -192,7 +202,7 @@ export class Profiler<
     traceId: string,
     view: K,
     options?: ViewOptions<IProfilerViews<T>, K> & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ViewResult<IProfilerViews<T>, K>, E>> {
+  ): Promise<IAdtResponse<IProfilerViews<T>[K]['result'], E>> {
     // Before the request, not inside it: a view this family does not have is a
     // caller error, and classified inside `answering` it would come back as
     // `origin: 'connection'` — advice to check the network over a name the
@@ -202,7 +212,7 @@ export class Profiler<
     }
     return answering(
       () => this.viewResponse(traceId, view, options),
-      this.results[view] as IResultStrategy<ViewResult<IProfilerViews<T>, K>>,
+      this.results[view],
       options?.analyse,
     );
   }
