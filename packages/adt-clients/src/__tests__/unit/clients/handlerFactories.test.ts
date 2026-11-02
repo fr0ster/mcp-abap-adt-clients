@@ -23,6 +23,7 @@ import {
   memorySnapshotsDocuments,
 } from '../../../runtime/memory/MemorySnapshots';
 import { noopLogger } from '../../../utils/noopLogger';
+import type { ResultValuesOf } from '../../../utils/resultStrategy';
 import { RecordingConnection } from '../../helpers/recordingConnection';
 
 /** `true` only when `A` and `B` are the same type. */
@@ -43,22 +44,22 @@ function factoryTypes(connection: RecordingConnection): void {
   const git = AdtAbapGitClient.create(connection);
   const gitDefault: Equal<
     typeof git,
-    AdtAbapGitClient<typeof abapGitDocuments>
+    AdtAbapGitClient<ResultValuesOf<typeof abapGitDocuments>>
   > = true;
   const abap = AbapDebugger.create(connection, { onConflict: 'takeOver' });
   const abapDefault: Equal<
     typeof abap,
-    AbapDebugger<typeof abapDebuggerDocuments>
+    AbapDebugger<ResultValuesOf<typeof abapDebuggerDocuments>>
   > = true;
   const amdp = AmdpDebugger.create(connection, { logger: noopLogger });
   const amdpDefault: Equal<
     typeof amdp,
-    AmdpDebugger<typeof amdpDebuggerDocuments>
+    AmdpDebugger<ResultValuesOf<typeof amdpDebuggerDocuments>>
   > = true;
   const memory = MemorySnapshots.create(connection);
   const memoryDefault: Equal<
     typeof memory,
-    MemorySnapshots<typeof memorySnapshotsDocuments>
+    MemorySnapshots<ResultValuesOf<typeof memorySnapshotsDocuments>>
   > = true;
   void [gitDefault, abapDefault, amdpDefault, memoryDefault];
 
@@ -69,7 +70,7 @@ function factoryTypes(connection: RecordingConnection): void {
   });
   const gitOwn: Equal<
     typeof ownGit,
-    AdtAbapGitClient<Marked<typeof abapGitDocuments>>
+    AdtAbapGitClient<ResultValuesOf<Marked<typeof abapGitDocuments>>>
   > = true;
   const abapOptions = {
     results: marked(abapDebuggerDocuments),
@@ -78,13 +79,13 @@ function factoryTypes(connection: RecordingConnection): void {
   const ownAbap = AbapDebugger.create(connection, abapOptions);
   const abapOwn: Equal<
     typeof ownAbap,
-    AbapDebugger<Marked<typeof abapDebuggerDocuments>>
+    AbapDebugger<ResultValuesOf<Marked<typeof abapDebuggerDocuments>>>
   > = true;
   const amdpOptions = { results: marked(amdpDebuggerDocuments) };
   const ownAmdp = AmdpDebugger.create(connection, amdpOptions);
   const amdpOwn: Equal<
     typeof ownAmdp,
-    AmdpDebugger<Marked<typeof amdpDebuggerDocuments>>
+    AmdpDebugger<ResultValuesOf<Marked<typeof amdpDebuggerDocuments>>>
   > = true;
   const ownMemory = MemorySnapshots.create(connection, {
     results: marked(memorySnapshotsDocuments),
@@ -92,7 +93,7 @@ function factoryTypes(connection: RecordingConnection): void {
   });
   const memoryOwn: Equal<
     typeof ownMemory,
-    MemorySnapshots<Marked<typeof memorySnapshotsDocuments>>
+    MemorySnapshots<ResultValuesOf<Marked<typeof memorySnapshotsDocuments>>>
   > = true;
   void [gitOwn, abapOwn, amdpOwn, memoryOwn];
 

@@ -16,7 +16,11 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtLoggedOptions } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
-import { rawDocument } from '../../utils/resultStrategy';
+import {
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+  rawDocument,
+} from '../../utils/resultStrategy';
 import { getGatewayError, listGatewayErrors } from './read';
 
 /** One strategy per member of the gateway error log. */
@@ -35,6 +39,11 @@ export const gatewayErrorLogDocuments = {
   error: rawDocument,
 } satisfies IGatewayErrorLogResults;
 
+/** What each slot of the result set answers. */
+export type GatewayErrorLogValues = {
+  readonly [K in keyof IGatewayErrorLogResults]: unknown;
+};
+
 /**
  * The gateway error log.
  *
@@ -45,16 +54,18 @@ export const gatewayErrorLogDocuments = {
  * field of every entry.
  */
 export class GatewayErrorLog<
-  R extends IGatewayErrorLogResults = typeof gatewayErrorLogDocuments,
-> implements IGatewayErrorLog<ReturnType<R['list']>, ReturnType<R['error']>>
+  T extends GatewayErrorLogValues = ResultValuesOf<
+    typeof gatewayErrorLogDocuments
+  >,
+> implements IGatewayErrorLog<T['list'], T['error']>
 {
   readonly kind = 'gatewayErrorLog' as const;
-  private readonly results: R;
+  private readonly results: ResultStrategiesOf<T>;
   private readonly logger: ILogger;
 
   constructor(
     private readonly connection: IAbapConnection,
-    options: AdtLoggedOptions<R>,
+    options: AdtLoggedOptions<ResultStrategiesOf<T>>,
   ) {
     this.logger = options.logger;
     this.results = options.results;
@@ -62,10 +73,10 @@ export class GatewayErrorLog<
 
   async list<E extends IAdtError = IAdtError>(
     options?: IFeedQueryOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['list']>, E>> {
+  ): Promise<IAdtResponse<T['list'], E>> {
     return answering(
       () => listGatewayErrors(this.connection, options),
-      this.results.list as IResultStrategy<ReturnType<R['list']>>,
+      this.results.list,
       options?.analyse,
     );
   }
@@ -74,10 +85,10 @@ export class GatewayErrorLog<
     errorType: string,
     errorId: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['error']>, E>> {
+  ): Promise<IAdtResponse<T['error'], E>> {
     return answering(
       () => getGatewayError(this.connection, errorType, errorId),
-      this.results.error as IResultStrategy<ReturnType<R['error']>>,
+      this.results.error,
       options?.analyse,
     );
   }

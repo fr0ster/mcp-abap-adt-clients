@@ -24,8 +24,6 @@ export {
   AdtInclude,
   CT_INCLUDE,
   type IncludeValues,
-  type ResultStrategiesOf,
-  type ResultValuesOf,
 } from './core/include';
 export * from './index.abapgit';
 export * from './index.core';

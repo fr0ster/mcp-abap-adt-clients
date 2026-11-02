@@ -31,14 +31,17 @@ import type {
   IAdtTransportAware,
   IAdtValidatable,
   IPackageResults,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
-import { nothing } from '../../utils/resultStrategy';
+import {
+  nothing,
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+} from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
@@ -53,23 +56,22 @@ import { unlockPackage } from './unlock';
 import { updatePackage } from './update';
 import { validatePackageBasic } from './validation';
 
-export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
-  implements
-    IAdtCreatable<IPackageConfig, ReturnType<R['created']>>,
-    IAdtMetadataReadable<IPackageConfig, ReturnType<R['metadata']>>,
-    IAdtMetadataUpdatable<
-      Partial<IPackageConfig>,
-      ReturnType<R['metadataUpdated']>
-    >,
-    IAdtDeletable<
-      IPackageConfig,
-      ReturnType<R['deletion']>,
-      ReturnType<R['deletionCheck']>
-    >,
-    IAdtValidatable<IPackageConfig, ReturnType<R['validation']>>,
-    IAdtCheckable<IPackageConfig, ReturnType<R['check']>>,
+/** What each slot of the result set answers. */
+export type PackageValues = {
+  readonly [K in keyof IPackageResults]: unknown;
+};
+
+export class AdtPackage<
+  T extends PackageValues = ResultValuesOf<typeof packageDocuments>,
+> implements
+    IAdtCreatable<IPackageConfig, T['created']>,
+    IAdtMetadataReadable<IPackageConfig, T['metadata']>,
+    IAdtMetadataUpdatable<Partial<IPackageConfig>, T['metadataUpdated']>,
+    IAdtDeletable<IPackageConfig, T['deletion'], T['deletionCheck']>,
+    IAdtValidatable<IPackageConfig, T['validation']>,
+    IAdtCheckable<IPackageConfig, T['check']>,
     IAdtLockable<IPackageConfig>,
-    IAdtTransportAware<IPackageConfig, ReturnType<R['transport']>>
+    IAdtTransportAware<IPackageConfig, T['transport']>
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
@@ -77,11 +79,14 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Package';
 
-  protected readonly results: R;
+  protected readonly results: ResultStrategiesOf<T>;
 
   constructor(
     connection: IAbapConnection,
-    options: AdtHandlerOptions<R, 'logger' | 'systemContext' | 'lockRegistry'>,
+    options: AdtHandlerOptions<
+      ResultStrategiesOf<T>,
+      'logger' | 'systemContext' | 'lockRegistry'
+    >,
   ) {
     const { logger, systemContext, lockRegistry } = options;
     this.results = options.results;
@@ -111,7 +116,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+  ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -131,7 +136,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
           responsible: config.responsible,
           record_changes: config.recordChanges ?? false,
         }),
-      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      this.results.validation,
       options?.analyse,
     );
   }
@@ -151,7 +156,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IPackageConfig, 'source'> & { source?: never },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+  ): Promise<IAdtResponse<T['created'], E>> {
     // **No guard here, unlike every other create.**
     //
     // Elsewhere `packageName` is the package an object is bound to, and an
@@ -183,7 +188,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
             undefined,
           record_changes: config.recordChanges ?? false,
         }),
-      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      this.results.created,
       options?.analyse,
     );
   }
@@ -192,7 +197,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+  ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -201,7 +206,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     return answering(
       () =>
         getPackage(connection, name, options?.version, options, this.logger),
-      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      this.results.metadata,
       options?.analyse,
     );
   }
@@ -210,7 +215,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
   async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+  ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -218,7 +223,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
 
     return answering(
       () => getPackageTransport(connection, name, options),
-      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      this.results.transport,
       options?.analyse,
     );
   }
@@ -236,7 +241,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -274,9 +279,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
           options?.source as string,
           options?.lockHandle as string,
         ),
-      this.results.metadataUpdated as IResultStrategy<
-        ReturnType<R['metadataUpdated']>
-      >,
+      this.results.metadataUpdated,
       options?.analyse,
     );
   }
@@ -291,7 +294,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -302,9 +305,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
           package_name: name,
           transport_request: config.transportRequest,
         }),
-      this.results.deletionCheck as IResultStrategy<
-        ReturnType<R['deletionCheck']>
-      >,
+      this.results.deletionCheck,
       options?.analyse,
     );
   }
@@ -329,7 +330,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -340,7 +341,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
           package_name: name,
           transport_request: config.transportRequest,
         }),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }
@@ -350,7 +351,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
     config: Partial<IPackageConfig>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+  ): Promise<IAdtResponse<T['check'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -360,7 +361,7 @@ export class AdtPackage<R extends IPackageResults = typeof packageDocuments>
 
     return answering(
       () => checkPackage(connection, options.headers, name, version),
-      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      this.results.check,
       options?.analyse,
     );
   }

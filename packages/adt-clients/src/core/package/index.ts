@@ -2,5 +2,8 @@
  * Package operations - exports
  */
 
-export { AdtPackage } from './AdtPackage';
+export {
+  AdtPackage,
+  type PackageValues,
+} from './AdtPackage';
 export * from './types';

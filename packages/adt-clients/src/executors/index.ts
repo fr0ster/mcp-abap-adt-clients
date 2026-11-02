@@ -1,5 +1,6 @@
 export {
   AbapUnitRunner,
+  type AbapUnitRunnerValues,
   abapUnitRunnerDocuments,
   type IAbapUnitRunnerResults,
 } from './abapUnitRunner';
@@ -10,6 +11,7 @@ export {
 } from './abapUnitTestRunner';
 export {
   ClassExecutor,
+  type ClassExecutorValues,
   ClassTestRunner,
   classExecutorDocuments,
   classTestRunnerDocuments,
@@ -32,6 +34,7 @@ export {
   type IProgramExecutorResults,
   type IProgramTestRunnerResults,
   ProgramExecutor,
+  type ProgramExecutorValues,
   ProgramTestRunner,
   programExecutorDocuments,
   programTestRunnerDocuments,
@@ -39,5 +42,6 @@ export {
 export {
   type ITraceSchedulingResults,
   TraceScheduling,
+  type TraceSchedulingValues,
   traceSchedulingDocuments,
 } from './traceScheduling';

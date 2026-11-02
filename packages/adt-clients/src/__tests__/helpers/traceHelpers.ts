@@ -40,6 +40,7 @@ import {
   Profiler,
   profilerDocuments,
 } from '../../runtime/traces/ProfilerDomain';
+import type { ResultValuesOf } from '../../utils/resultStrategy';
 import { expectResult } from './contract';
 
 /**
@@ -66,7 +67,7 @@ export const profilerReading: Omit<
   dbAccesses: profilerDbAccesses,
 };
 
-export type ReadingProfiler = Profiler<typeof profilerReading>;
+export type ReadingProfiler = Profiler<ResultValuesOf<typeof profilerReading>>;
 
 /** A profiler that reads its feed into entries and its views into rows. */
 export function readingProfiler(
@@ -164,7 +165,9 @@ export type ReadingResults<D> = Omit<D, keyof typeof schedulingReading> &
 export function readingClassExecutor(
   connection: IAbapConnection,
   logger: ILogger,
-): ClassExecutor<ReadingResults<typeof classExecutorDocuments>> {
+): ClassExecutor<
+  ResultValuesOf<ReadingResults<typeof classExecutorDocuments>>
+> {
   return new ClassExecutor(connection, {
     logger,
     results: {
@@ -177,10 +180,13 @@ export function readingClassExecutor(
 export function readingProgramExecutor(
   connection: IAbapConnection,
   logger: ILogger,
-): ProgramExecutor<ReadingResults<typeof programExecutorDocuments>, 'onprem'> {
+): ProgramExecutor<
+  ResultValuesOf<ReadingResults<typeof programExecutorDocuments>>,
+  'onprem'
+> {
   // A program is run and profiled on premise only: ABAP cloud refuses both.
   return new ProgramExecutor<
-    ReadingResults<typeof programExecutorDocuments>,
+    ResultValuesOf<ReadingResults<typeof programExecutorDocuments>>,
     'onprem'
   >(connection, {
     logger,

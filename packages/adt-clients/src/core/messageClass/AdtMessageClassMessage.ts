@@ -37,7 +37,6 @@ import type {
   IAdtResponse,
   IAdtUpdatable,
   IMessageClassMessageResults,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -48,6 +47,10 @@ import { withCallTimeout } from '../../utils/callTimeout';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { requestHeaders } from '../../utils/requestHeaders';
+import type {
+  ResultStrategiesOf,
+  ResultValuesOf,
+} from '../../utils/resultStrategy';
 import { chain } from '../shared/chain';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import { lockClassForMessageOrPlain, lockMessageIfGranted } from './lock';
@@ -57,6 +60,11 @@ import { unlockAllMessages, unlockMessageClass } from './unlock';
 import { buildMessageClassXml, parseMessageClass } from './xml';
 
 const BASE = MESSAGE_CLASS.collection;
+
+/** What each slot of the result set answers. */
+export type MessageClassMessageValues = {
+  readonly [K in keyof IMessageClassMessageResults]: unknown;
+};
 
 /**
  * Not `IAdtDeletable`, and that is the honest shape rather than an omission.
@@ -72,22 +80,22 @@ const BASE = MESSAGE_CLASS.collection;
  * emptiness — rather than a claim that this is a deletable object.
  */
 export class AdtMessageClassMessage<
-  R extends IMessageClassMessageResults = typeof messageDocuments,
+  T extends MessageClassMessageValues = ResultValuesOf<typeof messageDocuments>,
 > implements
-    IAdtCreatable<IMessageClassMessageConfig, ReturnType<R['written']>>,
-    IAdtReadable<IMessageClassMessageConfig, ReturnType<R['read']>>,
-    IAdtMetadataReadable<IMessageClassMessageConfig, ReturnType<R['read']>>,
-    IAdtUpdatable<Partial<IMessageClassMessageConfig>, ReturnType<R['written']>>
+    IAdtCreatable<IMessageClassMessageConfig, T['written']>,
+    IAdtReadable<IMessageClassMessageConfig, T['read']>,
+    IAdtMetadataReadable<IMessageClassMessageConfig, T['read']>,
+    IAdtUpdatable<Partial<IMessageClassMessageConfig>, T['written']>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   public readonly objectType: string = 'MessageClassMessage';
 
-  private readonly results: R;
+  private readonly results: ResultStrategiesOf<T>;
 
   constructor(
     connection: IAbapConnection,
-    options: AdtHandlerOptions<R, 'logger'>,
+    options: AdtHandlerOptions<ResultStrategiesOf<T>, 'logger'>,
   ) {
     const { logger } = options;
     this.results = options.results;
@@ -121,7 +129,7 @@ export class AdtMessageClassMessage<
     config: Partial<IMessageClassMessageConfig>,
     version?: AdtReadVersion,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
+  ): Promise<IAdtResponse<T['read'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -129,7 +137,7 @@ export class AdtMessageClassMessage<
 
     return answering(
       () => getMessageClassSource(connection, name, { version }),
-      this.results.read as IResultStrategy<ReturnType<R['read']>>,
+      this.results.read,
       // The class answering is not the message existing; a caller who wants
       // an absent message read as a failure passes
       // `analyseMessageClassMessage(msgno)` from @mcp-abap-adt/adt-strategies.
@@ -144,7 +152,7 @@ export class AdtMessageClassMessage<
       withLongPolling?: boolean;
       version?: AdtReadVersion;
     } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['read']>, E>> {
+  ): Promise<IAdtResponse<T['read'], E>> {
     return this.read(config, options?.version, options);
   }
 
@@ -156,7 +164,7 @@ export class AdtMessageClassMessage<
       source?: never;
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['written']>, E>> {
+  ): Promise<IAdtResponse<T['written'], E>> {
     return this.writeClass(config, false, options);
   }
 
@@ -168,7 +176,7 @@ export class AdtMessageClassMessage<
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassMessageConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['written']>, E>> {
+  ): Promise<IAdtResponse<T['written'], E>> {
     return this.writeClass(config, false, options);
   }
 
@@ -183,9 +191,9 @@ export class AdtMessageClassMessage<
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassMessageConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deleted']>, E>> {
+  ): Promise<IAdtResponse<T['deleted'], E>> {
     return this.writeClass(config, true, options) as Promise<
-      IAdtResponse<ReturnType<R['deleted']>, E>
+      IAdtResponse<T['deleted'], E>
     >;
   }
 
@@ -201,7 +209,7 @@ export class AdtMessageClassMessage<
     config: Partial<IMessageClassMessageConfig>,
     deleting: boolean,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['written']>, E>> {
+  ): Promise<IAdtResponse<T['written'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -313,7 +321,7 @@ export class AdtMessageClassMessage<
               // locks and unlocks keep their own.
               headers: requestHeaders(options.headers),
             }),
-          this.results.written as IResultStrategy<ReturnType<R['written']>>,
+          this.results.written,
           options?.analyse,
         ),
       );

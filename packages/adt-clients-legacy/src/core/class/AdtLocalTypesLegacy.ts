@@ -10,20 +10,21 @@ import {
   AdtLocalTypes,
   type AdtPerformedBy,
   CLASS,
+  type ClassValues,
   type classDocuments,
+  type ResultValuesOf,
 } from '@mcp-abap-adt/adt-clients';
 import type {
   IAdtError,
   IAdtOperationOptions,
   IAdtResponse,
   IClassConfig,
-  IClassResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import { noTransportResource } from '../shared/refusalLegacy';
 
 export class AdtLocalTypesLegacy<
-  R extends IClassResults = typeof classDocuments,
-> extends AdtLocalTypes<R, 'basis740'> {
+  T extends ClassValues = ResultValuesOf<typeof classDocuments>,
+> extends AdtLocalTypes<T, 'basis740'> {
   /**
    * Refused without a request: the inherited member asks for the container
    * class's `GET <class URI>/transport`, which answers `404` on 7.40 SP04
@@ -34,8 +35,8 @@ export class AdtLocalTypesLegacy<
     this: this & AdtPerformedBy<'localTypes', 'transport'>,
     config: Partial<IClassConfig>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
-    return noTransportResource<ReturnType<R['transport']>, E>(
+  ): Promise<IAdtResponse<T['transport'], E>> {
+    return noTransportResource<T['transport'], E>(
       CLASS.uri(config.className as string),
     );
   }

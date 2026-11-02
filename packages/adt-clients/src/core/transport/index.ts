@@ -2,7 +2,11 @@
  * Transport operations - exports
  */
 
-export { AdtRequest, hasDeferredResponses } from './AdtRequest';
+export {
+  AdtRequest,
+  hasDeferredResponses,
+  type TransportValues,
+} from './AdtRequest';
 export {
   addObjectToTransport,
   changeTransportTaskType,

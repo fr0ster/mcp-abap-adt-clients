@@ -27,7 +27,6 @@ import type {
   IAdtRunnable,
   IClassUnitTestDefinition,
   IClassUnitTestRunOptions,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
@@ -37,8 +36,13 @@ import {
 } from '../../core/class/run';
 import type { AdtHandlerOptions } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
+import type {
+  ResultStrategiesOf,
+  ResultValuesOf,
+} from '../../utils/resultStrategy';
 import {
   AbapUnitRunner,
+  type AbapUnitRunnerValues,
   abapUnitRunnerDocuments,
   type IAbapUnitRunnerResults,
 } from '../abapUnitRunner';
@@ -66,20 +70,18 @@ export type IClassTestRunnerResults = IAbapUnitRunnerResults;
 export const classTestRunnerDocuments = abapUnitRunnerDocuments;
 
 export class ClassTestRunner<
-    R extends IClassTestRunnerResults = typeof classTestRunnerDocuments,
+    T extends AbapUnitRunnerValues = ResultValuesOf<
+      typeof classTestRunnerDocuments
+    >,
     V extends AdtVariant = AdtModernVariant,
   >
-  extends AbapUnitRunner<R, V, 'class'>
+  extends AbapUnitRunner<T, V, 'class'>
   implements
-    IAdtRunnable<
-      IClassTestRunTarget,
-      ReturnType<R['run']>,
-      IClassUnitTestRunOptions
-    >
+    IAdtRunnable<IClassTestRunTarget, T['run'], IClassUnitTestRunOptions>
 {
   constructor(
     connection: IAbapConnection,
-    options: AdtHandlerOptions<R, 'logger'>,
+    options: AdtHandlerOptions<ResultStrategiesOf<T>, 'logger'>,
   ) {
     super(connection, options);
   }
@@ -99,13 +101,13 @@ export class ClassTestRunner<
     this: this & AdtPerformedBy<'class', 'unitTestRun'>,
     target: IClassTestRunTarget,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
+  ): Promise<IAdtResponse<T['run'], E>> {
     if (typeof target === 'string') {
       return this.startByObject(target, 'CLAS', options);
     }
     return answering(
       () => startClassUnitTestRun(this.connection, target, options),
-      this.results.run as IResultStrategy<ReturnType<R['run']>>,
+      this.results.run,
       options?.analyse,
     );
   }
@@ -134,7 +136,7 @@ export class ClassTestRunner<
     this: this & AdtPerformedBy<'class', 'unitTestRunSync'>,
     target: IClassTestRunTarget,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {
+  ): Promise<IAdtResponse<T['result'], E>> {
     const { analyse, ...runOptions } = options ?? {};
     return answering(
       () =>
@@ -143,7 +145,7 @@ export class ClassTestRunner<
           containersOf(target),
           runOptions,
         ),
-      this.results.result as IResultStrategy<ReturnType<R['result']>>,
+      this.results.result,
       analyse,
     );
   }

@@ -16,8 +16,10 @@ This project exposes the following client classes:
 `ReadOnlyClient` and `CrudClient` have been removed in the builderless API.
 
 **A factory answers its class** (since 38.0.0). `client.getClass()` answers
-`AdtClass<typeof classDocuments>`, `client.getClass(results)` answers
-`AdtClass<typeof results>`, and so on for every factory: the class implements
+`AdtClass<ResultValuesOf<typeof classDocuments>>`, `client.getClass(results)`
+answers `AdtClass<ResultValuesOf<typeof results>>`, and so on for every
+factory (since 41.0.0 a class is typed by the values its result slots answer,
+[MIGRATION-41.md](MIGRATION-41.md)): the class implements
 the capability atoms its object supports, and its members are what the factory
 offers. This package declares no composition of those atoms. A consumer that
 names the type of the client it accepts composes that contract from
@@ -28,7 +30,9 @@ compiler checks, where the client is taken, that `AdtClient` satisfies it. See
 and [MIGRATION-38.md](MIGRATION-38.md); since 39.0.0 the search filter takes
 search names and where-used and the group members interfaces-adt's typed
 references ([MIGRATION-39.md](MIGRATION-39.md)); since 40.0.0 every read
-takes `AdtReadVersion` ([MIGRATION-40.md](MIGRATION-40.md)).
+takes `AdtReadVersion` ([MIGRATION-40.md](MIGRATION-40.md)); since 41.0.0 a
+class's type parameter is the values its slots answer
+([MIGRATION-41.md](MIGRATION-41.md)).
 
 **Every member issues one ADT request.** `create` is the POST, `update` is the
 write and carries `options.lockHandle` as given, `delete` is the DELETE,
@@ -1698,7 +1702,7 @@ interfaces-adt's typed references, `IAdtCodedReference<C>[]`, `C` the codes
 of the client's variant whose API lists the operation (`AdtActivationCode<V>`,
 `AdtDeletionCheckCode<V>`, `AdtDeletionCode<V>` — equal, per variant, to
 interfaces-adt's `AdtGroupActivationCode<V>`, `AdtGroupDeletionCheckCode<V>`
-and `AdtGroupDeletionCode<V>`; since 39.0.0 `AdtUtils<R, V>` is an
+and `AdtGroupDeletionCode<V>`; since 39.0.0 `AdtUtils<T, V>` is an
 `IAdtTypedGroupLifecycle<…, V>`). A group activation also takes `DEVC/K` on
 the modern variants, and the group activation and deletion take `VIEW/DV`, a
 DDIC database view no factory serves, addressed under
@@ -1766,7 +1770,7 @@ Where-used is two requests, and both are yours:
 Both take `IGetWhereUsedParams<AdtWhereUsedCode<V>>`: every code of the
 variant but a function include (`FUGR/I`, whose group where-used has no field
 for — a function module is named `GROUP|FM`) and a message class message, and
-`VIEW/DV` (39.0.0; `AdtUtils<R, V>` is an `IAdtTypedWhereUsed<…, V>`).
+`VIEW/DV` (39.0.0; `AdtUtils<T, V>` is an `IAdtTypedWhereUsed<…, V>`).
 
 See `docs/architecture/ARCHITECTURE.md` for the architectural overview.
 

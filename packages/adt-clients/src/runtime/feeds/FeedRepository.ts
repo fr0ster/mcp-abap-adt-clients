@@ -18,7 +18,11 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtLoggedOptions } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
-import { rawDocument } from '../../utils/resultStrategy';
+import {
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+  rawDocument,
+} from '../../utils/resultStrategy';
 import type { IRuntimeAnalysisObject } from '../types';
 import { fetchFeed, getFeeds, getFeedVariants } from './read';
 
@@ -63,26 +67,32 @@ export const feedDocuments = {
   gatewayErrorDetail: rawDocument,
 } satisfies IFeedResults;
 
-export class FeedRepository<R extends IFeedResults = typeof feedDocuments>
-  implements
+/** What each slot of the result set answers. */
+export type FeedValues = {
+  readonly [K in keyof IFeedResults]: unknown;
+};
+
+export class FeedRepository<
+  T extends FeedValues = ResultValuesOf<typeof feedDocuments>,
+> implements
     IFeedRepository<
-      ReturnType<R['feeds']>,
-      ReturnType<R['variants']>,
-      ReturnType<R['entries']>,
-      ReturnType<R['systemMessages']>,
-      ReturnType<R['gatewayErrors']>,
-      ReturnType<R['gatewayErrorDetail']>
+      T['feeds'],
+      T['variants'],
+      T['entries'],
+      T['systemMessages'],
+      T['gatewayErrors'],
+      T['gatewayErrorDetail']
     >,
     IRuntimeAnalysisObject
 {
   readonly kind = 'feedRepository' as const;
 
-  private readonly results: R;
+  private readonly results: ResultStrategiesOf<T>;
   private readonly logger: ILogger;
 
   constructor(
     private readonly connection: IAbapConnection,
-    options: AdtLoggedOptions<R>,
+    options: AdtLoggedOptions<ResultStrategiesOf<T>>,
   ) {
     this.logger = options.logger;
     this.results = options.results;
@@ -91,10 +101,10 @@ export class FeedRepository<R extends IFeedResults = typeof feedDocuments>
   /** The feeds this system offers. */
   async list<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['feeds']>, E>> {
+  ): Promise<IAdtResponse<T['feeds'], E>> {
     return answering(
       () => getFeeds(this.connection),
-      this.results.feeds as IResultStrategy<ReturnType<R['feeds']>>,
+      this.results.feeds,
       options?.analyse,
     );
   }
@@ -110,7 +120,7 @@ export class FeedRepository<R extends IFeedResults = typeof feedDocuments>
   async variants<E extends IAdtError = IAdtError>(
     category: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['variants']>, E>> {
+  ): Promise<IAdtResponse<T['variants'], E>> {
     // The compiler rejects a missing category; JavaScript callers reach here
     // anyway, so it says so rather than sending a request the server answers
     // with 400.
@@ -122,7 +132,7 @@ export class FeedRepository<R extends IFeedResults = typeof feedDocuments>
     }
     return answering(
       () => getFeedVariants(this.connection, category),
-      this.results.variants as IResultStrategy<ReturnType<R['variants']>>,
+      this.results.variants,
       options?.analyse,
     );
   }
@@ -130,19 +140,17 @@ export class FeedRepository<R extends IFeedResults = typeof feedDocuments>
   /** The runtime dumps feed. */
   async dumps<E extends IAdtError = IAdtError>(
     options?: IFeedQueryOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['entries']>, E>> {
+  ): Promise<IAdtResponse<T['entries'], E>> {
     return this.byUrl(FEED_URLS.dumps, options);
   }
 
   /** The system-messages feed. */
   async systemMessages<E extends IAdtError = IAdtError>(
     options?: IFeedQueryOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['systemMessages']>, E>> {
+  ): Promise<IAdtResponse<T['systemMessages'], E>> {
     return answering(
       () => fetchFeed(this.connection, FEED_URLS.systemMessages, options),
-      this.results.systemMessages as IResultStrategy<
-        ReturnType<R['systemMessages']>
-      >,
+      this.results.systemMessages,
       options?.analyse,
     );
   }
@@ -155,7 +163,7 @@ export class FeedRepository<R extends IFeedResults = typeof feedDocuments>
    */
   async gatewayErrors<E extends IAdtError = IAdtError>(
     options?: IFeedQueryOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['gatewayErrors']>, E>> {
+  ): Promise<IAdtResponse<T['gatewayErrors'], E>> {
     return answering(
       () =>
         fetchFeed(
@@ -164,9 +172,7 @@ export class FeedRepository<R extends IFeedResults = typeof feedDocuments>
           options,
           'username',
         ),
-      this.results.gatewayErrors as IResultStrategy<
-        ReturnType<R['gatewayErrors']>
-      >,
+      this.results.gatewayErrors,
       options?.analyse,
     );
   }
@@ -175,12 +181,10 @@ export class FeedRepository<R extends IFeedResults = typeof feedDocuments>
   async gatewayErrorDetail<E extends IAdtError = IAdtError>(
     feedUrl: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['gatewayErrorDetail']>, E>> {
+  ): Promise<IAdtResponse<T['gatewayErrorDetail'], E>> {
     return answering(
       () => fetchFeed(this.connection, feedUrl),
-      this.results.gatewayErrorDetail as IResultStrategy<
-        ReturnType<R['gatewayErrorDetail']>
-      >,
+      this.results.gatewayErrorDetail,
       options?.analyse,
     );
   }
@@ -194,10 +198,10 @@ export class FeedRepository<R extends IFeedResults = typeof feedDocuments>
   async byUrl<E extends IAdtError = IAdtError>(
     feedUrl: string,
     options?: IFeedQueryOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['entries']>, E>> {
+  ): Promise<IAdtResponse<T['entries'], E>> {
     return answering(
       () => fetchFeed(this.connection, feedUrl, options),
-      this.results.entries as IResultStrategy<ReturnType<R['entries']>>,
+      this.results.entries,
       options?.analyse,
     );
   }

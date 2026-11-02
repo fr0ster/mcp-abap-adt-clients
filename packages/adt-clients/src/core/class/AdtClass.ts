@@ -45,16 +45,18 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
-  IClassResults,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { CLASS } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
+import type {
+  ResultStrategiesOf,
+  ResultValuesOf,
+} from '../../utils/resultStrategy';
 import { writeObjectDocument } from '../shared/documentWrite';
 import type { IReadOptions } from '../shared/types';
-import { AdtClassMemberBase } from './AdtClassMemberBase';
+import { AdtClassMemberBase, type ClassValues } from './AdtClassMemberBase';
 import { checkClass } from './check';
 import { create as createClass } from './create';
 import { checkDeletion, deleteClass } from './delete';
@@ -65,47 +67,36 @@ import { updateClass } from './update';
 import { validateClassName } from './validation';
 
 export class AdtClass<
-    R extends IClassResults = typeof classDocuments,
+    T extends ClassValues = ResultValuesOf<typeof classDocuments>,
     V extends AdtVariant = AdtModernVariant,
   >
-  extends AdtClassMemberBase<R, V, 'class'>
+  extends AdtClassMemberBase<T, V, 'class'>
   implements
     IAdtEnhancementHost<
       IClassConfig,
-      ReturnType<R['enhancementElements']>,
-      ReturnType<R['enhancementOptions']>
+      T['enhancementElements'],
+      T['enhancementOptions']
     >,
-    IAdtCreatable<IClassConfig, ReturnType<R['created']>>,
-    IAdtReadable<IClassConfig, ReturnType<R['source']>>,
-    IAdtMetadataReadable<IClassConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<Partial<IClassConfig>, ReturnType<R['updated']>>,
-    IAdtMetadataUpdatable<
-      Partial<IClassConfig>,
-      ReturnType<R['metadataUpdated']>
-    >,
-    IAdtDeletable<
-      IClassConfig,
-      ReturnType<R['deletion']>,
-      ReturnType<R['deletionCheck']>
-    >,
-    IAdtValidatable<IClassConfig, ReturnType<R['validation']>>,
-    IAdtCheckable<IClassConfig, ReturnType<R['check']>>,
-    IAdtActivatable<IClassConfig, ReturnType<R['activation']>>,
+    IAdtCreatable<IClassConfig, T['created']>,
+    IAdtReadable<IClassConfig, T['source']>,
+    IAdtMetadataReadable<IClassConfig, T['metadata']>,
+    IAdtUpdatable<Partial<IClassConfig>, T['updated']>,
+    IAdtMetadataUpdatable<Partial<IClassConfig>, T['metadataUpdated']>,
+    IAdtDeletable<IClassConfig, T['deletion'], T['deletionCheck']>,
+    IAdtValidatable<IClassConfig, T['validation']>,
+    IAdtCheckable<IClassConfig, T['check']>,
+    IAdtActivatable<IClassConfig, T['activation']>,
     IAdtLockable<IClassConfig>,
-    IAdtVersionable<
-      IClassConfig,
-      ReturnType<R['versions']>,
-      ReturnType<R['versionSource']>
-    >
+    IAdtVersionable<IClassConfig, T['versions'], T['versionSource']>
 {
   public readonly objectType: string = 'Class';
 
-  protected readonly results: R;
+  protected readonly results: ResultStrategiesOf<T>;
 
   constructor(
     connection: IAbapConnection,
     options: AdtHandlerOptions<
-      R,
+      ResultStrategiesOf<T>,
       'logger' | 'systemContext' | 'contentTypes' | 'lockRegistry'
     >,
   ) {
@@ -118,13 +109,11 @@ export class AdtClass<
   async readEnhancementElements<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['enhancementElements']>, E>> {
+  ): Promise<IAdtResponse<T['enhancementElements'], E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
       () => getClassEnhancementElements(connection, config.className as string),
-      this.results.enhancementElements as IResultStrategy<
-        ReturnType<R['enhancementElements']>
-      >,
+      this.results.enhancementElements,
       options?.analyse,
     );
   }
@@ -133,13 +122,11 @@ export class AdtClass<
   async readEnhancementOptions<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['enhancementOptions']>, E>> {
+  ): Promise<IAdtResponse<T['enhancementOptions'], E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
       () => getClassEnhancementOptions(connection, config.className as string),
-      this.results.enhancementOptions as IResultStrategy<
-        ReturnType<R['enhancementOptions']>
-      >,
+      this.results.enhancementOptions,
       options?.analyse,
     );
   }
@@ -150,7 +137,7 @@ export class AdtClass<
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+  ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -166,7 +153,7 @@ export class AdtClass<
           config.description,
           config.superclass,
         ),
-      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      this.results.validation,
       options?.analyse,
     );
   }
@@ -177,7 +164,7 @@ export class AdtClass<
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IClassConfig, 'source'> & { source?: never },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+  ): Promise<IAdtResponse<T['created'], E>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // An object created without a package is the single thing `delete()` cannot
@@ -228,7 +215,7 @@ export class AdtClass<
           },
           this.logger,
         ),
-      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      this.results.created,
       options?.analyse,
     );
   }
@@ -240,7 +227,7 @@ export class AdtClass<
     config: Partial<IClassConfig>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+  ): Promise<IAdtResponse<T['source'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -256,7 +243,7 @@ export class AdtClass<
           version,
           options,
         ),
-      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      this.results.source,
       options?.analyse,
     );
   }
@@ -273,7 +260,7 @@ export class AdtClass<
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -304,7 +291,7 @@ export class AdtClass<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.updated,
       options?.analyse,
     );
   }
@@ -323,7 +310,7 @@ export class AdtClass<
     this: this & AdtPerformedBy<'class', 'updateMetadata'>,
     config: Partial<IClassConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -337,9 +324,7 @@ export class AdtClass<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.metadataUpdated as IResultStrategy<
-        ReturnType<R['metadataUpdated']>
-      >,
+      this.results.metadataUpdated,
       options?.analyse,
     );
   }
@@ -351,7 +336,7 @@ export class AdtClass<
     this: this & AdtPerformedBy<'class', 'deletionCheck'>,
     config: Partial<IClassConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -361,9 +346,7 @@ export class AdtClass<
           class_name: config.className as string,
           transport_request: config.transportRequest,
         }),
-      this.results.deletionCheck as IResultStrategy<
-        ReturnType<R['deletionCheck']>
-      >,
+      this.results.deletionCheck,
       options?.analyse,
     );
   }
@@ -374,7 +357,7 @@ export class AdtClass<
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -387,7 +370,7 @@ export class AdtClass<
           class_name: config.className as string,
           transport_request: config.transportRequest,
         }),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }
@@ -399,7 +382,7 @@ export class AdtClass<
     config: Partial<IClassConfig>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+  ): Promise<IAdtResponse<T['check'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -421,7 +404,7 @@ export class AdtClass<
           config.source,
           this.contentTypes?.sourceArtifactContentType(),
         ),
-      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      this.results.check,
       options?.analyse,
     );
   }
@@ -433,7 +416,7 @@ export class AdtClass<
   async activateTestClasses<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig> & { testClassName: string },
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+  ): Promise<IAdtResponse<T['activation'], E>> {
     return answering(
       () =>
         activateClassTestClasses(
@@ -441,7 +424,7 @@ export class AdtClass<
           config.className as string,
           config.testClassName,
         ),
-      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      this.results.activation,
       options?.analyse,
     );
   }
@@ -450,7 +433,7 @@ export class AdtClass<
   async getVersions<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
+  ): Promise<IAdtResponse<T['versions'], E>> {
     return this.includeVersions(config.className as string, 'main', options);
   }
 }

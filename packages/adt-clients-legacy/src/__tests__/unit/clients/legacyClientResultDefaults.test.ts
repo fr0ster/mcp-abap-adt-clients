@@ -7,7 +7,11 @@
  *
  * Type-level: the checks sit in a function nothing calls.
  */
-import { classDocuments, utilDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  classDocuments,
+  type ResultValuesOf,
+  utilDocuments,
+} from '@mcp-abap-adt/adt-clients';
 import { RecordingConnection } from '../../../../../adt-clients/src/__tests__/helpers/recordingConnection';
 import type { AdtClientLegacy } from '../../../clients/AdtClientLegacy';
 import { AdtClassLegacy } from '../../../core/class/AdtClassLegacy';
@@ -31,7 +35,7 @@ function legacyGetterTypes(legacy: AdtClientLegacy): void {
   const classes = legacy.getClass();
   const isDefault: Equal<
     typeof classes,
-    AdtClassLegacy<typeof classDocuments>
+    AdtClassLegacy<ResultValuesOf<typeof classDocuments>>
   > = true;
   void isDefault;
 
@@ -39,7 +43,7 @@ function legacyGetterTypes(legacy: AdtClientLegacy): void {
   const own = legacy.getClass(marked(classDocuments));
   const isOwn: Equal<
     typeof own,
-    AdtClassLegacy<Marked<typeof classDocuments>>
+    AdtClassLegacy<ResultValuesOf<Marked<typeof classDocuments>>>
   > = true;
   void isOwn;
 
@@ -53,8 +57,9 @@ function legacyGetterTypes(legacy: AdtClientLegacy): void {
 function legacyConstructorTypes(): void {
   const connection = new RecordingConnection();
   // The base constructor's required results, inherited.
+  type MarkedValues = ResultValuesOf<Marked<typeof classDocuments>>;
   // @ts-expect-error -- results are required
-  new AdtClassLegacy<Marked<typeof classDocuments>>(connection, {});
+  new AdtClassLegacy<MarkedValues>(connection, {});
   new AdtClassLegacy(connection, { results: classDocuments });
   // The base's required logger, inherited: in the options, by type alone.
   // @ts-expect-error -- the logger is required

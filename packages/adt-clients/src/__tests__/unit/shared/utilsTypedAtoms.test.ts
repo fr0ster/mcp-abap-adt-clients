@@ -5,14 +5,14 @@
  * references each request serves on variant `V`: `VIEW/DV` among their codes,
  * `parentName` required for a parented code (`FUGR/FF`). A consumer that
  * composes its contract from them — the server's client contract does — needs
- * `AdtUtils<R, V>` to be assignable to them, for its own `V`. `AdtUtils` does
+ * `AdtUtils<ResultValuesOf<R>, V>` to be assignable to them, for its own `V`. `AdtUtils` does
  * not list them in `implements`: while `V` is open the compiler cannot relate
  * the two code sets (interfaces-adt's are keyed by `V`), so each variant is
  * held here.
  *
  * Three things are checked, at compile time (`npm run test:check`):
  * - the library's code sets equal the contract's, per variant, both ways;
- * - `AdtUtils<R, V>` is assignable to both atoms of `V`, for `'onprem'`,
+ * - `AdtUtils<ResultValuesOf<R>, V>` is assignable to both atoms of `V`, for `'onprem'`,
  *   `'cloud'`, `'basis740'` and the modern default;
  * - what the references refuse: a function module without its group, a code
  *   the operation does not take on the variant (`MSAG/NN`, `FUGR/I`).
@@ -39,6 +39,7 @@ import type {
 } from '../../../core/shared/codeSets';
 import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { noopLogger } from '../../../utils/noopLogger';
+import type { ResultValuesOf } from '../../../utils/resultStrategy';
 import { RecordingConnection } from '../../helpers/recordingConnection';
 
 type R = typeof utilDocuments;
@@ -75,18 +76,24 @@ const cloudSets: SetsEqual<'cloud'> = ALL_EQUAL;
 const basis740Sets: SetsEqual<'basis740'> = ALL_EQUAL;
 const modernSets: SetsEqual<AdtModernVariant> = ALL_EQUAL;
 
-// Compiles only when `AdtUtils<R, V>` is each atom of `V`.
-function onprem(utils: AdtUtils<R, 'onprem'>): TypedAtoms<'onprem'> {
+// Compiles only when `AdtUtils<ResultValuesOf<R>, V>` is each atom of `V`.
+function onprem(
+  utils: AdtUtils<ResultValuesOf<R>, 'onprem'>,
+): TypedAtoms<'onprem'> {
   return utils;
 }
-function cloud(utils: AdtUtils<R, 'cloud'>): TypedAtoms<'cloud'> {
+function cloud(
+  utils: AdtUtils<ResultValuesOf<R>, 'cloud'>,
+): TypedAtoms<'cloud'> {
   return utils;
 }
-function basis740(utils: AdtUtils<R, 'basis740'>): TypedAtoms<'basis740'> {
+function basis740(
+  utils: AdtUtils<ResultValuesOf<R>, 'basis740'>,
+): TypedAtoms<'basis740'> {
   return utils;
 }
 function modern(
-  utils: AdtUtils<R, AdtModernVariant>,
+  utils: AdtUtils<ResultValuesOf<R>, AdtModernVariant>,
 ): TypedAtoms<AdtModernVariant> {
   return utils;
 }
@@ -95,8 +102,8 @@ const headers = { accept: 'application/xml', contentType: 'application/xml' };
 
 /** What the references take and refuse. Type-level: never called. */
 async function referenceChecks(
-  utils: AdtUtils<R, 'onprem'>,
-  utils740: AdtUtils<R, 'basis740'>,
+  utils: AdtUtils<ResultValuesOf<R>, 'onprem'>,
+  utils740: AdtUtils<ResultValuesOf<R>, 'basis740'>,
 ): Promise<void> {
   // A function module names its group…
   await utils.activateObjectsGroup(
@@ -176,7 +183,7 @@ describe('getUtils() and the typed atoms', () => {
 
   it('sends VIEW/DV under /sap/bc/adt/ddic/views in a group activation', async () => {
     const connection = new RecordingConnection();
-    const utils = new AdtUtils<R, 'onprem'>(connection, {
+    const utils = new AdtUtils<ResultValuesOf<R>, 'onprem'>(connection, {
       logger: noopLogger,
       results: utilDocuments,
     });
@@ -191,7 +198,7 @@ describe('getUtils() and the typed atoms', () => {
 
   it('sends VIEW/DV as the where-used object', async () => {
     const connection = new RecordingConnection();
-    const utils = new AdtUtils<R, 'cloud'>(connection, {
+    const utils = new AdtUtils<ResultValuesOf<R>, 'cloud'>(connection, {
       logger: noopLogger,
       results: utilDocuments,
     });

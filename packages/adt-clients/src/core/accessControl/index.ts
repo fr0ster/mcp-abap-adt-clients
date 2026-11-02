@@ -1,2 +1,5 @@
-export { AdtAccessControl } from './AdtAccessControl';
+export {
+  type AccessControlValues,
+  AdtAccessControl,
+} from './AdtAccessControl';
 export * from './types';

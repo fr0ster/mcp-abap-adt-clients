@@ -26,7 +26,12 @@ import type {
   AdtShippedOptions,
 } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
-import { nothing, rawDocument } from '../../utils/resultStrategy';
+import {
+  nothing,
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+  rawDocument,
+} from '../../utils/resultStrategy';
 import {
   attach,
   checkListener,
@@ -108,10 +113,10 @@ export interface IAbapDebuggerOptions {
 export type AbapDebuggerConstructorOptions<R extends IAbapDebuggerResults> =
   AdtHandlerOptions<R, 'logger'> & IAbapDebuggerOptions;
 
-type Of<
-  R extends IAbapDebuggerResults,
-  K extends keyof IAbapDebuggerResults,
-> = ReturnType<R[K]>;
+/** What each slot of the result set answers. */
+export type AbapDebuggerValues = {
+  readonly [K in keyof IAbapDebuggerResults]: unknown;
+};
 
 /**
  * The ABAP debugger on one connection, with the settings it was constructed
@@ -127,24 +132,24 @@ type Of<
  * server as it is.
  */
 export class AbapDebugger<
-  R extends IAbapDebuggerResults = typeof abapDebuggerDocuments,
+  T extends AbapDebuggerValues = ResultValuesOf<typeof abapDebuggerDocuments>,
 > implements
     IAbapDebugger<
-      Of<R, 'breakpoints'>,
-      Of<R, 'listener'>,
-      Of<R, 'attach'>,
-      Of<R, 'stack'>,
-      Of<R, 'variables'>,
-      Of<R, 'step'>,
-      Of<R, 'done'>,
-      Of<R, 'watchpoints'>,
-      Of<R, 'memory'>,
-      Of<R, 'settings'>
+      T['breakpoints'],
+      T['listener'],
+      T['attach'],
+      T['stack'],
+      T['variables'],
+      T['step'],
+      T['done'],
+      T['watchpoints'],
+      T['memory'],
+      T['settings']
     >
 {
   readonly kind = 'abapDebugger' as const;
 
-  private readonly results: R;
+  private readonly results: ResultStrategiesOf<T>;
   private readonly options: IAbapDebuggerOptions;
 
   /**
@@ -155,16 +160,16 @@ export class AbapDebugger<
   static create(
     connection: IAbapConnection,
     options?: AdtShippedOptions<'logger'> & IAbapDebuggerOptions,
-  ): AbapDebugger<typeof abapDebuggerDocuments>;
+  ): AbapDebugger<ResultValuesOf<typeof abapDebuggerDocuments>>;
   static create<R extends IAbapDebuggerResults>(
     connection: IAbapConnection,
     options: AbapDebuggerConstructorOptions<R>,
-  ): AbapDebugger<R>;
+  ): AbapDebugger<ResultValuesOf<R>>;
   static create(
     connection: IAbapConnection,
     options: Partial<AbapDebuggerConstructorOptions<IAbapDebuggerResults>> = {},
-  ): AbapDebugger<IAbapDebuggerResults> {
-    return new AbapDebugger<IAbapDebuggerResults>(connection, {
+  ): AbapDebugger<AbapDebuggerValues> {
+    return new AbapDebugger<AbapDebuggerValues>(connection, {
       ...options,
       results: options.results ?? abapDebuggerDocuments,
     });
@@ -172,17 +177,15 @@ export class AbapDebugger<
 
   constructor(
     private readonly connection: IAbapConnection,
-    options: AbapDebuggerConstructorOptions<R>,
+    options: AbapDebuggerConstructorOptions<ResultStrategiesOf<T>>,
   ) {
     const { results, logger: _logger, ...settings } = options;
     this.results = results;
     this.options = settings;
   }
 
-  private reading<K extends keyof IAbapDebuggerResults>(
-    key: K,
-  ): IResultStrategy<Of<R, K>> {
-    return this.results[key] as IResultStrategy<Of<R, K>>;
+  private reading<K extends keyof T>(key: K): IResultStrategy<T[K]> {
+    return this.results[key];
   }
 
   /**
@@ -199,7 +202,7 @@ export class AbapDebugger<
     options: { headers: IAdtHeaders } & {
       validationOnly?: boolean;
     } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'breakpoints'>, E>> {
+  ): Promise<IAdtResponse<T['breakpoints'], E>> {
     return answering(
       () =>
         setBreakpoints(
@@ -218,7 +221,7 @@ export class AbapDebugger<
     identity: IDebuggerIdentity,
     breakpointId: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'done'>, E>> {
+  ): Promise<IAdtResponse<T['done'], E>> {
     return answering(
       () => deleteBreakpoint(this.connection, identity, breakpointId),
       this.reading('done'),
@@ -237,7 +240,7 @@ export class AbapDebugger<
   async listen<E extends IAdtError = IAdtError>(
     identity: IDebuggerIdentity,
     options?: { holdSeconds?: number } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'listener'>, E>> {
+  ): Promise<IAdtResponse<T['listener'], E>> {
     return answering(
       () =>
         listen(
@@ -260,7 +263,7 @@ export class AbapDebugger<
   async stopListener<E extends IAdtError = IAdtError>(
     identity: IDebuggerIdentity,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'done'>, E>> {
+  ): Promise<IAdtResponse<T['done'], E>> {
     return answering(
       () => stopListener(this.connection, identity),
       this.reading('done'),
@@ -282,7 +285,7 @@ export class AbapDebugger<
       /** The debuggee's application server (`INSTANCE_NAME` in the listener's answer). */
       server?: string;
     } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'attach'>, E>> {
+  ): Promise<IAdtResponse<T['attach'], E>> {
     return answering(
       () =>
         attach(
@@ -299,7 +302,7 @@ export class AbapDebugger<
 
   async getStack<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'stack'>, E>> {
+  ): Promise<IAdtResponse<T['stack'], E>> {
     return answering(
       () => getStack(this.connection),
       this.reading('stack'),
@@ -310,7 +313,7 @@ export class AbapDebugger<
   async getChildVariables<E extends IAdtError = IAdtError>(
     parentIds: readonly string[],
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'variables'>, E>> {
+  ): Promise<IAdtResponse<T['variables'], E>> {
     return answering(
       () => getChildVariables(this.connection, options.headers, parentIds),
       this.reading('variables'),
@@ -321,7 +324,7 @@ export class AbapDebugger<
   async getVariables<E extends IAdtError = IAdtError>(
     variableIds: readonly string[],
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'variables'>, E>> {
+  ): Promise<IAdtResponse<T['variables'], E>> {
     return answering(
       () => getVariables(this.connection, options.headers, variableIds),
       this.reading('variables'),
@@ -332,7 +335,7 @@ export class AbapDebugger<
   async step<E extends IAdtError = IAdtError>(
     method: IDebuggerStepMethod,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'step'>, E>> {
+  ): Promise<IAdtResponse<T['step'], E>> {
     return answering(
       () => step(this.connection, method),
       this.reading('step'),
@@ -344,7 +347,7 @@ export class AbapDebugger<
     method: IDebuggerStepToLineMethod,
     uri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'step'>, E>> {
+  ): Promise<IAdtResponse<T['step'], E>> {
     return answering(
       () => stepToLine(this.connection, method, uri),
       this.reading('step'),
@@ -355,7 +358,7 @@ export class AbapDebugger<
   async setStackPosition<E extends IAdtError = IAdtError>(
     position: number,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'done'>, E>> {
+  ): Promise<IAdtResponse<T['done'], E>> {
     return answering(
       () => setStackPosition(this.connection, position),
       this.reading('done'),
@@ -367,7 +370,7 @@ export class AbapDebugger<
     variableName: string,
     value: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'variables'>, E>> {
+  ): Promise<IAdtResponse<T['variables'], E>> {
     return answering(
       () => setVariableValue(this.connection, variableName, value),
       this.reading('variables'),
@@ -377,7 +380,7 @@ export class AbapDebugger<
 
   async terminateDebuggee<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'done'>, E>> {
+  ): Promise<IAdtResponse<T['done'], E>> {
     return answering(
       () => terminateDebuggee(this.connection),
       this.reading('done'),
@@ -388,7 +391,7 @@ export class AbapDebugger<
   async createWatchpoint<E extends IAdtError = IAdtError>(
     variableName: string,
     options?: { condition?: string } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'watchpoints'>, E>> {
+  ): Promise<IAdtResponse<T['watchpoints'], E>> {
     return answering(
       () => createWatchpoint(this.connection, variableName, options?.condition),
       this.reading('watchpoints'),
@@ -398,7 +401,7 @@ export class AbapDebugger<
 
   async listWatchpoints<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'watchpoints'>, E>> {
+  ): Promise<IAdtResponse<T['watchpoints'], E>> {
     return answering(
       () => listWatchpoints(this.connection),
       this.reading('watchpoints'),
@@ -409,7 +412,7 @@ export class AbapDebugger<
   async deleteWatchpoint<E extends IAdtError = IAdtError>(
     watchpointId: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'done'>, E>> {
+  ): Promise<IAdtResponse<T['done'], E>> {
     return answering(
       () => deleteWatchpoint(this.connection, watchpointId),
       this.reading('done'),
@@ -419,7 +422,7 @@ export class AbapDebugger<
 
   async getMemorySizes<E extends IAdtError = IAdtError>(
     options?: { includeAbap?: boolean } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'memory'>, E>> {
+  ): Promise<IAdtResponse<T['memory'], E>> {
     return answering(
       () => getMemorySizes(this.connection, options?.includeAbap),
       this.reading('memory'),
@@ -429,7 +432,7 @@ export class AbapDebugger<
 
   async createMemorySnapshot<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'memory'>, E>> {
+  ): Promise<IAdtResponse<T['memory'], E>> {
     return answering(
       () => createMemorySnapshot(this.connection),
       this.reading('memory'),
@@ -449,7 +452,7 @@ export class AbapDebugger<
     identity: IDebuggerIdentity,
     sync: IDebuggerBreakpointSync,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'breakpoints'>, E>> {
+  ): Promise<IAdtResponse<T['breakpoints'], E>> {
     return answering(
       () => syncBreakpoints(this.connection, options.headers, identity, sync),
       this.reading('breakpoints'),
@@ -465,7 +468,7 @@ export class AbapDebugger<
   async checkListener<E extends IAdtError = IAdtError>(
     identity: IDebuggerIdentity,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'done'>, E>> {
+  ): Promise<IAdtResponse<T['done'], E>> {
     return answering(
       () => checkListener(this.connection, identity),
       this.reading('done'),
@@ -475,7 +478,7 @@ export class AbapDebugger<
 
   async detachDebugger<E extends IAdtError = IAdtError>(
     options?: { debuggeeId?: string } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'done'>, E>> {
+  ): Promise<IAdtResponse<T['done'], E>> {
     return answering(
       () => detachDebugger(this.connection, options?.debuggeeId),
       this.reading('done'),
@@ -493,7 +496,7 @@ export class AbapDebugger<
    */
   async terminateDebugger<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'done'>, E>> {
+  ): Promise<IAdtResponse<T['done'], E>> {
     return answering(
       () => terminateDebugger(this.connection),
       this.reading('done'),
@@ -504,7 +507,7 @@ export class AbapDebugger<
   async setDebuggerSettings<E extends IAdtError = IAdtError>(
     settings: IDebuggerSettings,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'settings'>, E>> {
+  ): Promise<IAdtResponse<T['settings'], E>> {
     return answering(
       () => setDebuggerSettings(this.connection, options.headers, settings),
       this.reading('settings'),

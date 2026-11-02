@@ -32,7 +32,6 @@ import type {
   IAdtValidatable,
   IIncludeConfig,
   IIncludeResults,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -42,7 +41,11 @@ import { PROGRAM_INCLUDE } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
-import { nothing } from '../../utils/resultStrategy';
+import {
+  nothing,
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+} from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { checkDeletionByUri } from '../shared/deletionCheckByUri';
 import { writeObjectDocument } from '../shared/documentWrite';
@@ -67,16 +70,6 @@ function requireName(config: Partial<IIncludeConfig>): string {
 
 /** What each slot of an include's result set answers. */
 export type IncludeValues = { readonly [K in keyof IIncludeResults]: unknown };
-
-/** The result strategies that answer the values `T`. */
-export type ResultStrategiesOf<T> = {
-  readonly [K in keyof T]: IResultStrategy<T[K]>;
-};
-
-/** The values a result set answers, slot by slot. */
-export type ResultValuesOf<R> = {
-  readonly [K in keyof R]: R[K] extends IResultStrategy<infer X> ? X : never;
-};
 
 export class AdtInclude<
   T extends IncludeValues = ResultValuesOf<typeof includeDocuments>,

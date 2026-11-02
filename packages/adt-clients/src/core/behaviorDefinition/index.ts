@@ -2,5 +2,8 @@
  * Behavior Definition operations - exports
  */
 
-export { AdtBehaviorDefinition } from './AdtBehaviorDefinition';
+export {
+  AdtBehaviorDefinition,
+  type BehaviorDefinitionValues,
+} from './AdtBehaviorDefinition';
 export * from './types';

@@ -68,3 +68,24 @@ export const nothing: IResultStrategy<void> = () => undefined;
  * everything is not the same as a reading that keeps the body.
  */
 export const wireItself: IResultStrategy<IAdtWireResponse> = (answer) => answer;
+
+/**
+ * The result strategies that answer the values `T`, slot by slot.
+ *
+ * A handler class is generic over the values its slots answer and stores its
+ * strategies as this type, so a slot read is `IResultStrategy<T[K]>` by
+ * construction and needs no cast.
+ */
+export type ResultStrategiesOf<T> = {
+  readonly [K in keyof T]: IResultStrategy<T[K]>;
+};
+
+/**
+ * The values a result set answers, slot by slot.
+ *
+ * What a getter hands its class: `getX(results)` answers
+ * `X<ResultValuesOf<typeof results>>`.
+ */
+export type ResultValuesOf<R> = {
+  readonly [K in keyof R]: R[K] extends IResultStrategy<infer X> ? X : never;
+};

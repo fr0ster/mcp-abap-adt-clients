@@ -74,7 +74,7 @@ export type ClassUpdated = undefined;
  * `satisfies`, never a `: IClassResults` annotation, and it matters more now
  * than it did: the interface types every field as `IResultStrategy<unknown>`,
  * so annotating this constant with it would widen all of them to `unknown` and
- * `ReturnType<R['created']>` would answer `unknown` for the default set. With
+ * `ResultValuesOf<typeof classDocuments>` would answer `unknown` for every slot. With
  * `satisfies` the shape is checked and the types are kept, which is what makes
  * the positional parameters unnecessary. The rule is the same everywhere.
  */

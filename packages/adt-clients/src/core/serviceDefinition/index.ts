@@ -2,5 +2,8 @@
  * ServiceDefinition operations - exports
  */
 
-export { AdtServiceDefinition } from './AdtServiceDefinition';
+export {
+  AdtServiceDefinition,
+  type ServiceDefinitionValues,
+} from './AdtServiceDefinition';
 export * from './types';

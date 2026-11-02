@@ -35,6 +35,7 @@ import type {
   functionModuleDocuments,
   interfaceDocuments,
   programDocuments,
+  ResultValuesOf,
   transportDocuments,
   utilDocuments,
 } from '@mcp-abap-adt/adt-clients';
@@ -117,41 +118,53 @@ type LegacyCheckDeletion = AllTrue<{
   class: SameMember<
     AdtClassLegacy,
     AdtClassLegacy['checkDeletion'],
-    AdtClass<typeof classDocuments, 'basis740'>,
-    AdtClass<typeof classDocuments, 'basis740'>['checkDeletion']
+    AdtClass<ResultValuesOf<typeof classDocuments>, 'basis740'>,
+    AdtClass<ResultValuesOf<typeof classDocuments>, 'basis740'>['checkDeletion']
   >;
   ddl: SameMember<
     AdtDdlLegacy,
     AdtDdlLegacy['checkDeletion'],
-    AdtDdl<typeof ddlDocuments, 'basis740'>,
-    AdtDdl<typeof ddlDocuments, 'basis740'>['checkDeletion']
+    AdtDdl<ResultValuesOf<typeof ddlDocuments>, 'basis740'>,
+    AdtDdl<ResultValuesOf<typeof ddlDocuments>, 'basis740'>['checkDeletion']
   >;
   functionGroup: SameMember<
     AdtFunctionGroupLegacy,
     AdtFunctionGroupLegacy['checkDeletion'],
-    AdtFunctionGroup<typeof functionGroupDocuments, 'basis740'>,
-    AdtFunctionGroup<typeof functionGroupDocuments, 'basis740'>['checkDeletion']
+    AdtFunctionGroup<ResultValuesOf<typeof functionGroupDocuments>, 'basis740'>,
+    AdtFunctionGroup<
+      ResultValuesOf<typeof functionGroupDocuments>,
+      'basis740'
+    >['checkDeletion']
   >;
   functionModule: SameMember<
     AdtFunctionModuleLegacy,
     AdtFunctionModuleLegacy['checkDeletion'],
-    AdtFunctionModule<typeof functionModuleDocuments, 'basis740'>,
     AdtFunctionModule<
-      typeof functionModuleDocuments,
+      ResultValuesOf<typeof functionModuleDocuments>,
+      'basis740'
+    >,
+    AdtFunctionModule<
+      ResultValuesOf<typeof functionModuleDocuments>,
       'basis740'
     >['checkDeletion']
   >;
   interface: SameMember<
     AdtInterfaceLegacy,
     AdtInterfaceLegacy['checkDeletion'],
-    AdtInterface<typeof interfaceDocuments, 'basis740'>,
-    AdtInterface<typeof interfaceDocuments, 'basis740'>['checkDeletion']
+    AdtInterface<ResultValuesOf<typeof interfaceDocuments>, 'basis740'>,
+    AdtInterface<
+      ResultValuesOf<typeof interfaceDocuments>,
+      'basis740'
+    >['checkDeletion']
   >;
   program: SameMember<
     AdtProgramLegacy,
     AdtProgramLegacy['checkDeletion'],
-    AdtProgram<typeof programDocuments, 'basis740'>,
-    AdtProgram<typeof programDocuments, 'basis740'>['checkDeletion']
+    AdtProgram<ResultValuesOf<typeof programDocuments>, 'basis740'>,
+    AdtProgram<
+      ResultValuesOf<typeof programDocuments>,
+      'basis740'
+    >['checkDeletion']
   >;
 }>;
 
@@ -166,7 +179,7 @@ type LegacyPackageRefusals = AllTrue<
 type LegacyRequestRefusals = AllTrue<
   SameMembers<
     AdtRequestLegacy,
-    AdtRequest<typeof transportDocuments, 'basis740'>,
+    AdtRequest<ResultValuesOf<typeof transportDocuments>, 'basis740'>,
     | 'searchConfigurations'
     | 'checkDeletion'
     | 'readObjects'
@@ -183,7 +196,7 @@ type LegacyRequestRefusals = AllTrue<
 type LegacyUtilsOverrides = AllTrue<
   SameMembers<
     AdtUtilsLegacy,
-    AdtUtils<typeof utilDocuments, 'basis740'>,
+    AdtUtils<ResultValuesOf<typeof utilDocuments>, 'basis740'>,
     | 'checkDeletionGroup'
     | 'deleteObjectsGroup'
     | 'getWhereUsed'

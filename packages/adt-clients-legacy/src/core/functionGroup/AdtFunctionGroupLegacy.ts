@@ -18,7 +18,9 @@ import {
   type AdtPerformedBy,
   answering,
   FUNCTION_GROUP,
+  type FunctionGroupValues,
   type functionGroupDocuments,
+  type ResultValuesOf,
   requestHeaders,
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
@@ -28,15 +30,13 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IFunctionGroupConfig,
-  IFunctionGroupResults,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import { noDeletionCheck, noTransportResource } from '../shared/refusalLegacy';
 
 export class AdtFunctionGroupLegacy<
-  R extends IFunctionGroupResults = typeof functionGroupDocuments,
-> extends AdtFunctionGroup<R, 'basis740'> {
+  T extends FunctionGroupValues = ResultValuesOf<typeof functionGroupDocuments>,
+> extends AdtFunctionGroup<T, 'basis740'> {
   /**
    * Delete function group — legacy override.
    *
@@ -53,7 +53,7 @@ export class AdtFunctionGroupLegacy<
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     const name = config.functionGroupName as string;
 
     const objectUrl = FUNCTION_GROUP.uri(name);
@@ -66,7 +66,7 @@ export class AdtFunctionGroupLegacy<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }
@@ -80,8 +80,8 @@ export class AdtFunctionGroupLegacy<
     this: this & AdtPerformedBy<'functionGroup', 'deletionCheck'>,
     _config: Partial<IFunctionGroupConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
-    return noDeletionCheck<ReturnType<R['deletionCheck']>, E>();
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+    return noDeletionCheck<T['deletionCheck'], E>();
   }
 
   /**
@@ -92,8 +92,8 @@ export class AdtFunctionGroupLegacy<
     this: this & AdtPerformedBy<'functionGroup', 'transport'>,
     config: Partial<IFunctionGroupConfig>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
-    return noTransportResource<ReturnType<R['transport']>, E>(
+  ): Promise<IAdtResponse<T['transport'], E>> {
+    return noTransportResource<T['transport'], E>(
       FUNCTION_GROUP.uri(config.functionGroupName as string),
     );
   }
@@ -109,7 +109,7 @@ export class AdtFunctionGroupLegacy<
   override async activate<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+  ): Promise<IAdtResponse<T['activation'], E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     const name = config.functionGroupName as string;
     const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
@@ -126,7 +126,7 @@ export class AdtFunctionGroupLegacy<
           data: xmlPayload,
           headers: requestHeaders(options.headers),
         }),
-      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      this.results.activation,
       options?.analyse,
     );
   }

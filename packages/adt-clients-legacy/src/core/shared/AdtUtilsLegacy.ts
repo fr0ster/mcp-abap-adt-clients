@@ -62,10 +62,12 @@ import {
   type IAdtGroupReference,
   PACKAGE,
   type ParentedArguments,
+  type ResultValuesOf,
   requestHeaders,
   STRUCTURE,
   TABLE,
   TABLE_TYPE,
+  type UtilValues,
   type utilDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import type {
@@ -83,7 +85,6 @@ import type {
   IGetWhereUsedScopeParams,
   IObjectReference,
   IReadOptions,
-  IUtilResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import {
   ADT_SEARCH_TYPES_BASIS_740,
@@ -95,7 +96,6 @@ import {
   type IAdtOperationOptions,
   type IAdtResponse,
   type IGetNodeContentsOptions,
-  type IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import {
   legacyRefusal,
@@ -224,8 +224,8 @@ function refuseCode<T, E extends IAdtError>(
 }
 
 export class AdtUtilsLegacy<
-  R extends IUtilResults = typeof utilDocuments,
-> extends AdtUtils<R, 'basis740'> {
+  T extends UtilValues = ResultValuesOf<typeof utilDocuments>,
+> extends AdtUtils<T, 'basis740'> {
   /**
    * Legacy group activation — synchronous POST to /sap/bc/adt/activation
    *
@@ -245,12 +245,12 @@ export class AdtUtilsLegacy<
     objects: IAdtCodedReference<AdtActivationCode<'basis740'>>[],
     preauditRequested: boolean = false,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+  ): Promise<IAdtResponse<T['activation'], E>> {
     // The type admits only the codes 7.40's table activates; a caller outside
     // the type system is answered the refusal, and nothing is sent.
     const foreign = objects.find((o) => !ACTIVATED_740.has(o.type));
     if (foreign)
-      return refuseCode<ReturnType<R['activation']>, E>(
+      return refuseCode<T['activation'], E>(
         'activateObjectsGroup',
         foreign.type,
       );
@@ -276,7 +276,7 @@ ${objectReferences}
           data: xmlBody,
           headers: requestHeaders(options.headers),
         }),
-      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      this.results.activation,
       options?.analyse,
     );
   }
@@ -302,7 +302,7 @@ ${objectReferences}
   override async getTableColumns<E extends IAdtError = IAdtError>(
     _tableName: string,
     _options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['columns']>, E>> {
+  ): Promise<IAdtResponse<T['columns'], E>> {
     return this.refuse(
       'Table columns',
       '/sap/bc/adt/datapreview/ddic/{name}/metadata',
@@ -312,21 +312,21 @@ ${objectReferences}
   override async getTableContents<E extends IAdtError = IAdtError>(
     _params: IGetTableContentsParams,
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['contents']>, E>> {
+  ): Promise<IAdtResponse<T['contents'], E>> {
     return this.refuse('Table contents', '/sap/bc/adt/datapreview/ddic');
   }
 
   override async getSqlQuery<E extends IAdtError = IAdtError>(
     _params: IGetSqlQueryParams,
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['query']>, E>> {
+  ): Promise<IAdtResponse<T['query'], E>> {
     return this.refuse('SQL query', '/sap/bc/adt/datapreview/freestyle');
   }
 
   override async getObjectProperties<E extends IAdtError = IAdtError>(
     _objectUri: string,
     _options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['objectProperties']>, E>> {
+  ): Promise<IAdtResponse<T['objectProperties'], E>> {
     return this.refuse(
       'Object properties',
       '/sap/bc/adt/repository/informationsystem/objectproperties/values',
@@ -340,10 +340,8 @@ ${objectReferences}
   override async checkDeletionGroup<E extends IAdtError = IAdtError>(
     _objects: IAdtCodedReference<AdtDeletionCheckCode<'basis740'>>[],
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
-    return noDeletionCheck<ReturnType<R['deletionCheck']>, E>(
-      'checkDeletionGroup',
-    );
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+    return noDeletionCheck<T['deletionCheck'], E>('checkDeletionGroup');
   }
 
   /**
@@ -355,8 +353,8 @@ ${objectReferences}
     _objects: IAdtCodedReference<AdtDeletionCode<'basis740'>>[],
     _transportRequest: string | undefined,
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
-    return noDeletionApi<ReturnType<R['deletion']>, E>(
+  ): Promise<IAdtResponse<T['deletion'], E>> {
+    return noDeletionApi<T['deletion'], E>(
       'deleteObjectsGroup',
       "Delete each object through its handler's delete() with the object's lock handle, from lock().",
     );
@@ -370,8 +368,8 @@ ${objectReferences}
   override async getWhereUsed<E extends IAdtError = IAdtError>(
     _params: IGetWhereUsedParams<AdtWhereUsedCode<'basis740'>>,
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['whereUsed']>, E>> {
-    return legacyRefusal<ReturnType<R['whereUsed']>, E>(
+  ): Promise<IAdtResponse<T['whereUsed'], E>> {
+    return legacyRefusal<T['whereUsed'], E>(
       'getWhereUsed',
       WHERE_USED,
       WHERE_USED_ON_740,
@@ -382,8 +380,8 @@ ${objectReferences}
   override async getWhereUsedScope<E extends IAdtError = IAdtError>(
     _params: IGetWhereUsedScopeParams<AdtWhereUsedCode<'basis740'>>,
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['whereUsedScope']>, E>> {
-    return legacyRefusal<ReturnType<R['whereUsedScope']>, E>(
+  ): Promise<IAdtResponse<T['whereUsedScope'], E>> {
+    return legacyRefusal<T['whereUsedScope'], E>(
       'getWhereUsedScope',
       WHERE_USED_SCOPE,
       WHERE_USED_ON_740,
@@ -398,8 +396,8 @@ ${objectReferences}
   override async getVirtualFoldersContents<E extends IAdtError = IAdtError>(
     _params: IGetVirtualFoldersContentsParams,
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['folders']>, E>> {
-    return legacyRefusal<ReturnType<R['folders']>, E>(
+  ): Promise<IAdtResponse<T['folders'], E>> {
+    return legacyRefusal<T['folders'], E>(
       'getVirtualFoldersContents',
       VIRTUAL_FOLDERS,
       "A package's contents: fetchNodeStructure with the package and type DEVC/K.",
@@ -415,8 +413,8 @@ ${objectReferences}
     _name?: string,
     _data?: string,
     _options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['types']>, E>> {
-    return legacyRefusal<ReturnType<R['types']>, E>(
+  ): Promise<IAdtResponse<T['types'], E>> {
+    return legacyRefusal<T['types'], E>(
       'getAllTypes',
       OBJECT_TYPES,
       OBJECT_TYPES_ON_740,
@@ -430,8 +428,8 @@ ${objectReferences}
   override async getActivationRun<E extends IAdtError = IAdtError>(
     _runId: string,
     _options?: { withLongPolling?: boolean } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
-    return legacyRefusal<ReturnType<R['run']>, E>(
+  ): Promise<IAdtResponse<T['run'], E>> {
+    return legacyRefusal<T['run'], E>(
       'getActivationRun',
       ACTIVATION_RUNS,
       NO_RUN_ID,
@@ -442,8 +440,8 @@ ${objectReferences}
   override async getActivationResults<E extends IAdtError = IAdtError>(
     _runId: string,
     _options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['results']>, E>> {
-    return legacyRefusal<ReturnType<R['results']>, E>(
+  ): Promise<IAdtResponse<T['results'], E>> {
+    return legacyRefusal<T['results'], E>(
       'getActivationResults',
       ACTIVATION_RESULTS,
       NO_RUN_ID,
@@ -466,18 +464,15 @@ ${objectReferences}
       C,
       [options?: IReadOptions & IAdtAnalyseOptions<E>]
     >
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+  ): Promise<IAdtResponse<T['metadata'], E>> {
     const endpoint = refusedFor(METADATA_REFUSED, objectType);
     if (endpoint)
-      return refuseRead<ReturnType<R['metadata']>, E>(
+      return refuseRead<T['metadata'], E>(
         `readObjectMetadata(${objectType})`,
         endpoint,
       );
     if (!CODES_740.has(objectType))
-      return refuseCode<ReturnType<R['metadata']>, E>(
-        'readObjectMetadata',
-        objectType,
-      );
+      return refuseCode<T['metadata'], E>('readObjectMetadata', objectType);
     return super.readObjectMetadata(objectType, objectName, ...rest);
   }
 
@@ -496,18 +491,15 @@ ${objectReferences}
       C,
       [version?: AdtReadVersion, options?: IReadOptions & IAdtAnalyseOptions<E>]
     >
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+  ): Promise<IAdtResponse<T['source'], E>> {
     const endpoint = refusedFor(SOURCE_REFUSED, objectType);
     if (endpoint)
-      return refuseRead<ReturnType<R['source']>, E>(
+      return refuseRead<T['source'], E>(
         `readObjectSource(${objectType})`,
         endpoint,
       );
     if (!CODES_740.has(objectType))
-      return refuseCode<ReturnType<R['source']>, E>(
-        'readObjectSource',
-        objectType,
-      );
+      return refuseCode<T['source'], E>('readObjectSource', objectType);
     return super.readObjectSource(objectType, objectName, ...rest);
   }
 
@@ -520,12 +512,12 @@ ${objectReferences}
   override async search<E extends IAdtError = IAdtError>(
     criteria: IAdtSearchObjectsParamsOf<'basis740'>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['search']>, E>> {
+  ): Promise<IAdtResponse<T['search'], E>> {
     if (
       criteria.objectType !== undefined &&
       !Object.hasOwn(ADT_SEARCH_TYPES_BASIS_740, criteria.objectType)
     )
-      return legacyRefusal<ReturnType<R['search']>, E>(
+      return legacyRefusal<T['search'], E>(
         `search(${criteria.objectType})`,
         `${criteria.objectType} in ADT_SEARCH_TYPES_BASIS_740`,
         'Nothing is sent.',
@@ -542,12 +534,9 @@ ${objectReferences}
     parentName: string,
     options: { headers: IAdtHeaders } & IGetNodeContentsOptions &
       IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['node']>, E>> {
+  ): Promise<IAdtResponse<T['node'], E>> {
     if (!CODES_740.has(parentType) && parentType !== 'DEVC/K')
-      return refuseCode<ReturnType<R['node']>, E>(
-        'fetchNodeStructure',
-        parentType,
-      );
+      return refuseCode<T['node'], E>('fetchNodeStructure', parentType);
     return super.fetchNodeStructure(parentType, parentName, options);
   }
 
@@ -556,9 +545,9 @@ ${objectReferences}
     objectType: AdtStructureCode<'basis740'>,
     objectName: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['objectStructure']>, E>> {
+  ): Promise<IAdtResponse<T['objectStructure'], E>> {
     if (!CODES_740.has(objectType) && objectType !== 'DEVC/K')
-      return refuseCode<ReturnType<R['objectStructure']>, E>(
+      return refuseCode<T['objectStructure'], E>(
         'getObjectStructure',
         objectType,
       );

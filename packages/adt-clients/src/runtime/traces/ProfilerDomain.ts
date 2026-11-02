@@ -24,7 +24,12 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtLoggedOptions } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
-import { nothing, rawDocument } from '../../utils/resultStrategy';
+import {
+  nothing,
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+  rawDocument,
+} from '../../utils/resultStrategy';
 import {
   buildTraceParametersXml,
   DEFAULT_PROFILER_TRACE_PARAMETERS,
@@ -67,17 +72,19 @@ export const profilerDocuments = {
 } satisfies IProfilerResults;
 
 /** The three views a profiler trace has, typed by the strategies that read them. */
-export interface IProfilerViews<R extends IProfilerResults> {
-  hitlist: ITraceView<ReturnType<R['hitlist']>, IProfilerTraceHitListOptions>;
-  statements: ITraceView<
-    ReturnType<R['statements']>,
-    IProfilerTraceStatementsOptions
-  >;
-  dbAccesses: ITraceView<
-    ReturnType<R['dbAccesses']>,
-    IProfilerTraceDbAccessesOptions
-  >;
+export interface IProfilerViews<T extends ProfilerValues> {
+  hitlist: ITraceView<T['hitlist'], IProfilerTraceHitListOptions>;
+  statements: ITraceView<T['statements'], IProfilerTraceStatementsOptions>;
+  dbAccesses: ITraceView<T['dbAccesses'], IProfilerTraceDbAccessesOptions>;
 }
+
+/**
+ * What each slot of the result set answers.
+ *
+ * Read from the contract rather than `unknown` for every slot: `deletion` is
+ * fixed to `void` by `IProfilerResults`, and `delete` answers that.
+ */
+export type ProfilerValues = ResultValuesOf<IProfilerResults>;
 
 /**
  * The ABAP profiler: list, read a view, delete — one request each.
@@ -87,21 +94,22 @@ export interface IProfilerViews<R extends IProfilerResults> {
  * answers whatever the `list` strategy makes of the feed — the document, by
  * default.
  */
-export class Profiler<R extends IProfilerResults = typeof profilerDocuments>
-  implements
+export class Profiler<
+  T extends ProfilerValues = ResultValuesOf<typeof profilerDocuments>,
+> implements
     ITraceFamily<'profiler'>,
-    ITraceListing<ITraceEntry, IProfilerListOptions, ReturnType<R['list']>>,
-    ITraceReading<IProfilerViews<R>>,
+    ITraceListing<ITraceEntry, IProfilerListOptions, T['list']>,
+    ITraceReading<IProfilerViews<T>>,
     ITraceDeletion
 {
   readonly kind = 'profiler' as const;
 
-  private readonly results: R;
+  private readonly results: ResultStrategiesOf<T>;
   readonly _logger: ILogger;
 
   constructor(
     private readonly connection: IAbapConnection,
-    options: AdtLoggedOptions<R>,
+    options: AdtLoggedOptions<ResultStrategiesOf<T>>,
   ) {
     this._logger = options.logger;
     this.results = options.results;
@@ -110,10 +118,10 @@ export class Profiler<R extends IProfilerResults = typeof profilerDocuments>
   /** What traces exist. */
   async list<E extends IAdtError = IAdtError>(
     options?: IProfilerListOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['list']>, E>> {
+  ): Promise<IAdtResponse<T['list'], E>> {
     return answering(
       () => listTraceFiles(this.connection, options),
-      this.results.list as IResultStrategy<ReturnType<R['list']>>,
+      this.results.list,
       options?.analyse,
     );
   }
@@ -140,7 +148,7 @@ export class Profiler<R extends IProfilerResults = typeof profilerDocuments>
    *
    * One place that knows which URL and which options a view sends.
    */
-  private async viewResponse<K extends keyof IProfilerViews<R>>(
+  private async viewResponse<K extends keyof IProfilerViews<T>>(
     traceId: string,
     view: K,
     options: unknown,
@@ -178,13 +186,13 @@ export class Profiler<R extends IProfilerResults = typeof profilerDocuments>
    * compiler refuses a view this family does not have.
    */
   async read<
-    K extends keyof IProfilerViews<R>,
+    K extends keyof IProfilerViews<T>,
     E extends IAdtError = IAdtError,
   >(
     traceId: string,
     view: K,
-    options?: ViewOptions<IProfilerViews<R>, K> & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ViewResult<IProfilerViews<R>, K>, E>> {
+    options?: ViewOptions<IProfilerViews<T>, K> & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<ViewResult<IProfilerViews<T>, K>, E>> {
     // Before the request, not inside it: a view this family does not have is a
     // caller error, and classified inside `answering` it would come back as
     // `origin: 'connection'` — advice to check the network over a name the
@@ -194,7 +202,7 @@ export class Profiler<R extends IProfilerResults = typeof profilerDocuments>
     }
     return answering(
       () => this.viewResponse(traceId, view, options),
-      this.results[view] as IResultStrategy<ViewResult<IProfilerViews<R>, K>>,
+      this.results[view] as IResultStrategy<ViewResult<IProfilerViews<T>, K>>,
       options?.analyse,
     );
   }

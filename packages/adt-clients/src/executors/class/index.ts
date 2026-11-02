@@ -1,5 +1,6 @@
 export {
   ClassExecutor,
+  type ClassExecutorValues,
   classExecutorDocuments,
   type IClassExecutorResults,
 } from './ClassExecutor';

@@ -108,7 +108,11 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { withRequestTrace } from '../../utils/requestTrace';
-import { rawDocument } from '../../utils/resultStrategy';
+import {
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+  rawDocument,
+} from '../../utils/resultStrategy';
 import { getAllTypes as getAllTypesUtil } from './allTypes';
 import { getDiscovery as getDiscoveryUtil } from './discovery';
 import { fetchInactiveObjects } from './getInactiveObjects';
@@ -223,8 +227,8 @@ import type { utilDocuments } from './utilResultSet';
  * one) and the three group members of `IAdtGroupLifecycle`. The typed atoms
  * are not in this list either, because the compiler cannot relate their code
  * sets to this class's while `V` is open; per variant they are held by
- * `utilsTypedAtoms.test.ts` — `AdtUtils<R, 'onprem'>`, `<R, 'cloud'>`
- * and `<R, 'basis740'>` each assignable to both.
+ * `utilsTypedAtoms.test.ts` — `AdtUtils<T, 'onprem'>`, `<T, 'cloud'>`
+ * and `<T, 'basis740'>` each assignable to both.
  *
  * And it said a caller who needs another shape "passes a parser" to the sibling.
  * The parser overloads went in 30.0.0, when the reading became something
@@ -266,47 +270,44 @@ function performEvery(
   }
 }
 
+/** What each slot of the result set answers. */
+export type UtilValues = {
+  readonly [K in keyof IUtilResults]: unknown;
+};
+
 export class AdtUtils<
-  R extends IUtilResults = typeof utilDocuments,
+  T extends UtilValues = ResultValuesOf<typeof utilDocuments>,
   V extends AdtVariant = AdtModernVariant,
 > implements
-    IAdtObjectSearch<ReturnType<R['search']>>,
-    IAdtVirtualFolders<ReturnType<R['folders']>>,
-    IAdtTypeCatalogue<ReturnType<R['types']>>,
-    IAdtRepositoryStructure<
-      ReturnType<R['node']>,
-      ReturnType<R['objectStructure']>
-    >,
+    IAdtObjectSearch<T['search']>,
+    IAdtVirtualFolders<T['folders']>,
+    IAdtTypeCatalogue<T['types']>,
+    IAdtRepositoryStructure<T['node'], T['objectStructure']>,
     Pick<
       IAdtGroupLifecycle<
-        ReturnType<R['inactive']>,
-        ReturnType<R['activation']>,
-        ReturnType<R['run']>,
-        ReturnType<R['results']>,
-        ReturnType<R['deletionCheck']>,
-        ReturnType<R['deletion']>
+        T['inactive'],
+        T['activation'],
+        T['run'],
+        T['results'],
+        T['deletionCheck'],
+        T['deletion']
       >,
       'getInactiveObjects' | 'getActivationRun' | 'getActivationResults'
     >,
-    IAdtDataPreview<
-      ReturnType<R['query']>,
-      ReturnType<R['columns']>,
-      ReturnType<R['contents']>
-    >,
-    IAdtDiscovery<ReturnType<R['discovery']>>,
-    IAdtObjectAccess<
-      ReturnType<R['source']>,
-      ReturnType<R['metadata']>,
-      ReturnType<R['include']>
-    >,
-    IAdtObjectProperties<ReturnType<R['objectProperties']>>
+    IAdtDataPreview<T['query'], T['columns'], T['contents']>,
+    IAdtDiscovery<T['discovery']>,
+    IAdtObjectAccess<T['source'], T['metadata'], T['include']>,
+    IAdtObjectProperties<T['objectProperties']>
 {
   protected connection: IAbapConnection;
   private logger: ILogger;
 
-  protected readonly results: R;
+  protected readonly results: ResultStrategiesOf<T>;
 
-  constructor(connection: IAbapConnection, options: AdtLoggedOptions<R>) {
+  constructor(
+    connection: IAbapConnection,
+    options: AdtLoggedOptions<ResultStrategiesOf<T>>,
+  ) {
     this.results = options.results;
     // Wrapped once, here, where a connection enters the library. The wrapper
     // puts the request back on the answer and reads nothing: what a body means
@@ -331,13 +332,13 @@ export class AdtUtils<
   async search<E extends IAdtError = IAdtError>(
     criteria: IAdtSearchObjectsParamsOf<V>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['search']>, E>> {
+  ): Promise<IAdtResponse<T['search'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     return answering(
       () => searchObjects(connection, criteria),
-      this.results.search as IResultStrategy<ReturnType<R['search']>>,
+      this.results.search,
       options?.analyse,
     );
   }
@@ -351,10 +352,10 @@ export class AdtUtils<
   async getVirtualFoldersContents<E extends IAdtError = IAdtError>(
     params: IGetVirtualFoldersContentsParams,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['folders']>, E>> {
+  ): Promise<IAdtResponse<T['folders'], E>> {
     return answering(
       () => getVirtualFoldersContents(this.connection, options.headers, params),
-      this.results.folders as IResultStrategy<ReturnType<R['folders']>>,
+      this.results.folders,
       options?.analyse,
     );
   }
@@ -394,16 +395,14 @@ export class AdtUtils<
   async getWhereUsedScope<E extends IAdtError = IAdtError>(
     params: IGetWhereUsedScopeParams<AdtWhereUsedCode<V>>,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['whereUsedScope']>, E>> {
+  ): Promise<IAdtResponse<T['whereUsedScope'], E>> {
     // Built before the request: a type where-used cannot address is the
     // caller's argument, not something the server said.
     whereUsedObjectUri(params.object_name, params.object_type);
 
     return answering(
       () => getWhereUsedScope(this.connection, options.headers, params),
-      this.results.whereUsedScope as IResultStrategy<
-        ReturnType<R['whereUsedScope']>
-      >,
+      this.results.whereUsedScope,
       options?.analyse,
     );
   }
@@ -486,13 +485,13 @@ export class AdtUtils<
   async getWhereUsed<E extends IAdtError = IAdtError>(
     params: IGetWhereUsedParams<AdtWhereUsedCode<V>>,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['whereUsed']>, E>> {
+  ): Promise<IAdtResponse<T['whereUsed'], E>> {
     // See getWhereUsedScope: an unknown type is thrown, not asked about.
     whereUsedObjectUri(params.object_name, params.object_type);
 
     return answering(
       () => getWhereUsed(this.connection, options.headers, params),
-      this.results.whereUsed as IResultStrategy<ReturnType<R['whereUsed']>>,
+      this.results.whereUsed,
       options?.analyse,
     );
   }
@@ -505,10 +504,10 @@ export class AdtUtils<
    */
   async getInactiveObjects<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['inactive']>, E>> {
+  ): Promise<IAdtResponse<T['inactive'], E>> {
     return answering(
       () => fetchInactiveObjects(this.connection),
-      this.results.inactive as IResultStrategy<ReturnType<R['inactive']>>,
+      this.results.inactive,
       options?.analyse,
     );
   }
@@ -527,7 +526,7 @@ export class AdtUtils<
     objects: IAdtCodedReference<AdtActivationCode<V>>[],
     preauditRequested: boolean = false,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+  ): Promise<IAdtResponse<T['activation'], E>> {
     addressEvery(objects);
     performEvery(
       objects.filter((o) => !isActivatedWithoutTable(o.type)),
@@ -541,7 +540,7 @@ export class AdtUtils<
           objects,
           preauditRequested,
         ),
-      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      this.results.activation,
       options?.analyse,
     );
   }
@@ -557,13 +556,13 @@ export class AdtUtils<
   async getActivationRun<E extends IAdtError = IAdtError>(
     runId: string,
     options?: { withLongPolling?: boolean } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
+  ): Promise<IAdtResponse<T['run'], E>> {
     return answering(
       () =>
         getActivationRun(this.connection, runId, {
           withLongPolling: options?.withLongPolling,
         }),
-      this.results.run as IResultStrategy<ReturnType<R['run']>>,
+      this.results.run,
       options?.analyse,
     );
   }
@@ -577,10 +576,10 @@ export class AdtUtils<
   async getActivationResults<E extends IAdtError = IAdtError>(
     runId: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['results']>, E>> {
+  ): Promise<IAdtResponse<T['results'], E>> {
     return answering(
       () => getActivationResults(this.connection, runId),
-      this.results.results as IResultStrategy<ReturnType<R['results']>>,
+      this.results.results,
       options?.analyse,
     );
   }
@@ -594,14 +593,12 @@ export class AdtUtils<
   async checkDeletionGroup<E extends IAdtError = IAdtError>(
     objects: IAdtCodedReference<AdtDeletionCheckCode<V>>[],
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     addressEvery(objects);
     performEvery(objects, 'deletionCheck');
     return answering(
       () => checkDeletionGroup(this.connection, options.headers, objects),
-      this.results.deletionCheck as IResultStrategy<
-        ReturnType<R['deletionCheck']>
-      >,
+      this.results.deletionCheck,
       options?.analyse,
     );
   }
@@ -621,7 +618,7 @@ export class AdtUtils<
     objects: IAdtCodedReference<AdtDeletionCode<V>>[],
     transportRequest: string | undefined,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     addressEvery(objects);
     performEvery(objects, 'delete');
     return answering(
@@ -632,7 +629,7 @@ export class AdtUtils<
           objects,
           transportRequest,
         ),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }
@@ -658,7 +655,7 @@ export class AdtUtils<
       C,
       [options?: IReadOptions & IAdtAnalyseOptions<E>]
     >
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+  ): Promise<IAdtResponse<T['metadata'], E>> {
     // Refused before anything is asked: the member reads only the codes whose
     // request it sent before 38.0.0 (`METADATA_READ`), which its type holds; a
     // caller outside the type system gets the refusal, and no request.
@@ -684,7 +681,7 @@ export class AdtUtils<
           options,
           this.logger,
         ),
-      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      this.results.metadata,
       options?.analyse,
     );
   }
@@ -712,7 +709,7 @@ export class AdtUtils<
       C,
       [version?: AdtReadVersion, options?: IReadOptions & IAdtAnalyseOptions<E>]
     >
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+  ): Promise<IAdtResponse<T['source'], E>> {
     // Raised before anything is asked, rather than dressed as a verdict about
     // the server: a code this member does not read (`SOURCE_READ`, which its
     // type holds), and a function module with no function group, are both
@@ -739,7 +736,7 @@ export class AdtUtils<
           options,
           this.logger,
         ),
-      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      this.results.source,
       options?.analyse,
     );
   }
@@ -785,10 +782,10 @@ export class AdtUtils<
   async getSqlQuery<E extends IAdtError = IAdtError>(
     params: IGetSqlQueryParams,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['query']>, E>> {
+  ): Promise<IAdtResponse<T['query'], E>> {
     return answering(
       () => getSqlQuery(this.connection, options.headers, params),
-      this.results.query as IResultStrategy<ReturnType<R['query']>>,
+      this.results.query,
       options?.analyse,
     );
   }
@@ -803,10 +800,10 @@ export class AdtUtils<
   async getTableColumns<E extends IAdtError = IAdtError>(
     tableName: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['columns']>, E>> {
+  ): Promise<IAdtResponse<T['columns'], E>> {
     return answering(
       () => getTableColumns(this.connection, tableName),
-      this.results.columns as IResultStrategy<ReturnType<R['columns']>>,
+      this.results.columns,
       options?.analyse,
     );
   }
@@ -821,10 +818,10 @@ export class AdtUtils<
   async getTableContents<E extends IAdtError = IAdtError>(
     params: IGetTableContentsParams,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['contents']>, E>> {
+  ): Promise<IAdtResponse<T['contents'], E>> {
     return answering(
       () => getTableContents(this.connection, options.headers, params),
-      this.results.contents as IResultStrategy<ReturnType<R['contents']>>,
+      this.results.contents,
       options?.analyse,
     );
   }
@@ -838,10 +835,10 @@ export class AdtUtils<
   async discovery<E extends IAdtError = IAdtError>(
     params: IGetDiscoveryParams = {},
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['discovery']>, E>> {
+  ): Promise<IAdtResponse<T['discovery'], E>> {
     return answering(
       () => getDiscoveryUtil(this.connection, params),
-      this.results.discovery as IResultStrategy<ReturnType<R['discovery']>>,
+      this.results.discovery,
       options?.analyse,
     );
   }
@@ -867,7 +864,7 @@ export class AdtUtils<
     parentName: string,
     options: { headers: IAdtHeaders } & IGetNodeContentsOptions &
       IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['node']>, E>> {
+  ): Promise<IAdtResponse<T['node'], E>> {
     return answering(
       () =>
         fetchNodeStructureUtil(
@@ -878,7 +875,7 @@ export class AdtUtils<
           options?.nodeId,
           options?.withShortDescriptions ?? true,
         ),
-      this.results.node as IResultStrategy<ReturnType<R['node']>>,
+      this.results.node,
       options?.analyse,
     );
   }
@@ -901,12 +898,10 @@ export class AdtUtils<
     objectType: AdtStructureCode<V>,
     objectName: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['objectStructure']>, E>> {
+  ): Promise<IAdtResponse<T['objectStructure'], E>> {
     return answering(
       () => getObjectStructureUtil(this.connection, objectType, objectName),
-      this.results.objectStructure as IResultStrategy<
-        ReturnType<R['objectStructure']>
-      >,
+      this.results.objectStructure,
       options?.analyse,
     );
   }
@@ -937,12 +932,10 @@ export class AdtUtils<
   async getObjectProperties<E extends IAdtError = IAdtError>(
     objectUri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['objectProperties']>, E>> {
+  ): Promise<IAdtResponse<T['objectProperties'], E>> {
     return answering(
       () => getObjectPropertiesUtil(this.connection, objectUri),
-      this.results.objectProperties as IResultStrategy<
-        ReturnType<R['objectProperties']>
-      >,
+      this.results.objectProperties,
       options?.analyse,
     );
   }
@@ -964,10 +957,10 @@ export class AdtUtils<
   async getInclude<E extends IAdtError = IAdtError>(
     includeName: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['include']>, E>> {
+  ): Promise<IAdtResponse<T['include'], E>> {
     return answering(
       () => getIncludeUtil(this.connection, includeName),
-      this.results.include as IResultStrategy<ReturnType<R['include']>>,
+      this.results.include,
       options?.analyse,
     );
   }
@@ -993,10 +986,10 @@ export class AdtUtils<
     name: string = '*',
     data: string = 'usedByProvider',
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['types']>, E>> {
+  ): Promise<IAdtResponse<T['types'], E>> {
     return answering(
       () => getAllTypesUtil(this.connection, maxItemCount, name, data),
-      this.results.types as IResultStrategy<ReturnType<R['types']>>,
+      this.results.types,
       options?.analyse,
     );
   }

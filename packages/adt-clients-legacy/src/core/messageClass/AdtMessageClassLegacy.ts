@@ -17,7 +17,9 @@ import {
   type AdtPerformedBy,
   answering,
   MESSAGE_CLASS,
+  type MessageClassValues,
   type messageClassDocuments,
+  type ResultValuesOf,
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
 import type {
@@ -26,8 +28,6 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IMessageClassConfig,
-  IMessageClassResults,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import {
@@ -36,15 +36,15 @@ import {
 } from '../shared/refusalLegacy';
 
 export class AdtMessageClassLegacy<
-  R extends IMessageClassResults = typeof messageClassDocuments,
-> extends AdtMessageClass<R, 'basis740'> {
+  T extends MessageClassValues = ResultValuesOf<typeof messageClassDocuments>,
+> extends AdtMessageClass<T, 'basis740'> {
   /** Refused without a request: 7.40 has no `/sap/bc/adt/deletion/check` (§5). */
   override async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'messageClass', 'deletionCheck'>,
     _config: Partial<IMessageClassConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
-    return noDeletionCheck<ReturnType<R['deletionCheck']>, E>();
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+    return noDeletionCheck<T['deletionCheck'], E>();
   }
 
   /**
@@ -59,7 +59,7 @@ export class AdtMessageClassLegacy<
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     const objectUrl = MESSAGE_CLASS.uri(config.name as string);
     return answering(
       () =>
@@ -70,7 +70,7 @@ export class AdtMessageClassLegacy<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }
@@ -84,8 +84,8 @@ export class AdtMessageClassLegacy<
     this: this & AdtPerformedBy<'messageClass', 'updateMetadata'>,
     _config: Partial<IMessageClassConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
-    return legacyMeasuredRefusal<ReturnType<R['metadataUpdated']>, E>(
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+    return legacyMeasuredRefusal<T['metadataUpdated'], E>(
       'updateMetadata',
       'PUT of the message class document answers 400 ExceptionInvalidData (7.40 expects another root element).',
     );

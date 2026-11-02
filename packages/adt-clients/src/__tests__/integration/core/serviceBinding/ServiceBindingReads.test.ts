@@ -18,6 +18,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtServiceBinding } from '../../../../core/service/AdtService';
 import type { serviceDocuments } from '../../../../core/service/types';
+import type { ResultValuesOf } from '../../../../utils/resultStrategy';
 import { gateOn } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
 import {
@@ -61,7 +62,7 @@ const readsBinding = gateOn(() => !!sharedBinding());
 
 describe('Service binding reads (getServiceBinding contract)', () => {
   let connection: IAbapConnection | undefined;
-  let bindings: AdtServiceBinding<typeof serviceDocuments>;
+  let bindings: AdtServiceBinding<ResultValuesOf<typeof serviceDocuments>>;
   let shared: ISharedBinding | undefined;
 
   beforeAll(async () => {

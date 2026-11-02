@@ -12,7 +12,9 @@ import {
   AdtProgram,
   answering,
   PROGRAM,
+  type ProgramValues,
   type programDocuments,
+  type ResultValuesOf,
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
 import type {
@@ -21,8 +23,6 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IProgramConfig,
-  IProgramResults,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import {
@@ -32,8 +32,8 @@ import {
 } from '../shared/refusalLegacy';
 
 export class AdtProgramLegacy<
-  R extends IProgramResults = typeof programDocuments,
-> extends AdtProgram<R, 'basis740'> {
+  T extends ProgramValues = ResultValuesOf<typeof programDocuments>,
+> extends AdtProgram<T, 'basis740'> {
   /**
    * Delete program — legacy override.
    *
@@ -50,7 +50,7 @@ export class AdtProgramLegacy<
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     const name = config.programName as string;
 
     const objectUrl = `${PROGRAM.uri(name)}`;
@@ -63,7 +63,7 @@ export class AdtProgramLegacy<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }
@@ -77,8 +77,8 @@ export class AdtProgramLegacy<
     this: this & AdtPerformedBy<'program', 'deletionCheck'>,
     _config: Partial<IProgramConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
-    return noDeletionCheck<ReturnType<R['deletionCheck']>, E>();
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+    return noDeletionCheck<T['deletionCheck'], E>();
   }
 
   /**
@@ -90,8 +90,8 @@ export class AdtProgramLegacy<
     this: this & AdtPerformedBy<'program', 'updateMetadata'>,
     _config: Partial<IProgramConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
-    return legacyNotMeasuredRefusal<ReturnType<R['metadataUpdated']>, E>(
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+    return legacyNotMeasuredRefusal<T['metadataUpdated'], E>(
       'updateMetadata',
       'PUT /sap/bc/adt/programs/programs/{name}',
     );
@@ -105,8 +105,8 @@ export class AdtProgramLegacy<
     this: this & AdtPerformedBy<'program', 'transport'>,
     config: Partial<IProgramConfig>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
-    return noTransportResource<ReturnType<R['transport']>, E>(
+  ): Promise<IAdtResponse<T['transport'], E>> {
+    return noTransportResource<T['transport'], E>(
       PROGRAM.uri(config.programName as string),
     );
   }

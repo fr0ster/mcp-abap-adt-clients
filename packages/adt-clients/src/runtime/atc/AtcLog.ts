@@ -10,7 +10,11 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtLoggedOptions } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
-import { rawDocument } from '../../utils/resultStrategy';
+import {
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+  rawDocument,
+} from '../../utils/resultStrategy';
 import { getCheckFailureLogs, getExecutionLog } from './logs';
 
 /** One strategy per member of the ATC logs. */
@@ -29,18 +33,23 @@ export const atcLogDocuments = {
   executionLog: rawDocument,
 } satisfies IAtcLogResults;
 
-export class AtcLog<R extends IAtcLogResults = typeof atcLogDocuments>
-  implements
-    IAtcLog<ReturnType<R['checkFailures']>, ReturnType<R['executionLog']>>
+/** What each slot of the result set answers. */
+export type AtcLogValues = {
+  readonly [K in keyof IAtcLogResults]: unknown;
+};
+
+export class AtcLog<
+  T extends AtcLogValues = ResultValuesOf<typeof atcLogDocuments>,
+> implements IAtcLog<T['checkFailures'], T['executionLog']>
 {
   readonly kind = 'atcLog' as const;
 
-  private readonly results: R;
+  private readonly results: ResultStrategiesOf<T>;
   private readonly logger: ILogger;
 
   constructor(
     private readonly connection: IAbapConnection,
-    options: AdtLoggedOptions<R>,
+    options: AdtLoggedOptions<ResultStrategiesOf<T>>,
   ) {
     this.logger = options.logger;
     this.results = options.results;
@@ -48,12 +57,10 @@ export class AtcLog<R extends IAtcLogResults = typeof atcLogDocuments>
 
   async getCheckFailureLogs<E extends IAdtError = IAdtError>(
     options?: IGetCheckFailureLogsOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['checkFailures']>, E>> {
+  ): Promise<IAdtResponse<T['checkFailures'], E>> {
     return answering(
       () => getCheckFailureLogs(this.connection, options),
-      this.results.checkFailures as IResultStrategy<
-        ReturnType<R['checkFailures']>
-      >,
+      this.results.checkFailures,
       options?.analyse,
     );
   }
@@ -61,12 +68,10 @@ export class AtcLog<R extends IAtcLogResults = typeof atcLogDocuments>
   async getExecutionLog<E extends IAdtError = IAdtError>(
     executionId: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['executionLog']>, E>> {
+  ): Promise<IAdtResponse<T['executionLog'], E>> {
     return answering(
       () => getExecutionLog(this.connection, executionId),
-      this.results.executionLog as IResultStrategy<
-        ReturnType<R['executionLog']>
-      >,
+      this.results.executionLog,
       options?.analyse,
     );
   }

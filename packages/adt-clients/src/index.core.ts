@@ -30,10 +30,22 @@ export type {
   AdtServingVariantsIn,
   IAdtServedOn,
 } from './clients/variant';
-export { AdtAccessControl } from './core/accessControl';
-export { AdtAppendStructure } from './core/appendStructure';
-export { AdtAuthorizationField } from './core/authorizationField';
-export { AdtBehaviorDefinition } from './core/behaviorDefinition';
+export {
+  type AccessControlValues,
+  AdtAccessControl,
+} from './core/accessControl';
+export {
+  AdtAppendStructure,
+  type AppendStructureValues,
+} from './core/appendStructure';
+export {
+  AdtAuthorizationField,
+  type AuthorizationFieldValues,
+} from './core/authorizationField';
+export {
+  AdtBehaviorDefinition,
+  type BehaviorDefinitionValues,
+} from './core/behaviorDefinition';
 export { AdtBehaviorImplementation } from './core/behaviorImplementation';
 export {
   AdtClass,
@@ -41,32 +53,85 @@ export {
   AdtLocalMacros,
   AdtLocalTestClass,
   AdtLocalTypes,
+  type ClassValues,
 } from './core/class';
 export { startClassUnitTestRunSync } from './core/class/run';
-export { AdtDataElement } from './core/dataElement';
-export { AdtDdl } from './core/ddl';
-export { AdtDomain } from './core/domain';
-export { AdtEnhancement, type EnhancementTypeWith } from './core/enhancement';
-export { AdtFeatureToggle } from './core/featureToggle';
-export { AdtFunctionGroup } from './core/functionGroup';
-export { AdtFunctionInclude } from './core/functionInclude';
-export { AdtFunctionModule } from './core/functionModule';
-export { AdtInterface } from './core/interface';
+export {
+  AdtDataElement,
+  type DataElementValues,
+} from './core/dataElement';
+export {
+  AdtDdl,
+  type DdlValues,
+} from './core/ddl';
+export {
+  AdtDomain,
+  type DomainValues,
+} from './core/domain';
+export {
+  AdtEnhancement,
+  type EnhancementTypeWith,
+  type EnhancementValues,
+} from './core/enhancement';
+export {
+  AdtFeatureToggle,
+  type FeatureToggleValues,
+} from './core/featureToggle';
+export {
+  AdtFunctionGroup,
+  type FunctionGroupValues,
+} from './core/functionGroup';
+export {
+  AdtFunctionInclude,
+  type FunctionIncludeValues,
+} from './core/functionInclude';
+export {
+  AdtFunctionModule,
+  type FunctionModuleValues,
+} from './core/functionModule';
+export {
+  AdtInterface,
+  type InterfaceValues,
+} from './core/interface';
 export {
   AdtMessageClass,
   AdtMessageClassMessage,
+  type MessageClassMessageValues,
+  type MessageClassValues,
 } from './core/messageClass';
-export { AdtMetadataExtension } from './core/metadataExtension';
-export { AdtPackage } from './core/package';
-export { AdtProgram } from './core/program';
-export { AdtScalarFunction } from './core/scalarFunction';
-export { AdtScalarFunctionImplementation } from './core/scalarFunctionImplementation';
+export {
+  AdtMetadataExtension,
+  type MetadataExtensionValues,
+} from './core/metadataExtension';
+export {
+  AdtPackage,
+  type PackageValues,
+} from './core/package';
+export {
+  AdtProgram,
+  type ProgramValues,
+} from './core/program';
+export {
+  AdtScalarFunction,
+  type ScalarFunctionValues,
+} from './core/scalarFunction';
+export {
+  AdtScalarFunctionImplementation,
+  type ScalarFunctionImplementationValues,
+} from './core/scalarFunctionImplementation';
 export {
   AdtServiceBinding,
   resolveBindingVariant,
+  type ServiceValues,
 } from './core/service';
-export { AdtServiceDefinition } from './core/serviceDefinition';
-export { AdtUtils } from './core/shared/AdtUtils';
+export {
+  AdtServiceDefinition,
+  type ServiceDefinitionValues,
+} from './core/serviceDefinition';
+export {
+  AdtUtils,
+  type UtilValues,
+} from './core/shared/AdtUtils';
 export { startUnitTestRunSync } from './core/shared/abapUnit';
 export type {
   AdtActivationCode,
@@ -91,11 +156,23 @@ export type {
   AdtShippedOptions,
   IAdtHandlerContext,
 } from './core/shared/handlerOptions';
-export { AdtStructure } from './core/structure';
-export { AdtTable } from './core/table';
-export { AdtDdicTableType } from './core/tabletype';
-export { AdtTransformation } from './core/transformation';
-export { AdtRequest } from './core/transport';
+export {
+  AdtStructure,
+  type StructureValues,
+} from './core/structure';
+export {
+  AdtTable,
+  type TableValues,
+} from './core/table';
+export {
+  AdtDdicTableType,
+  type TableTypeValues,
+} from './core/tabletype';
+export {
+  AdtTransformation,
+  type TransformationValues,
+} from './core/transformation';
+export { AdtRequest, type TransportValues } from './core/transport';
 export { changeTransportTaskType } from './core/transport/objects';
 export type {
   AdtAddressableCode,

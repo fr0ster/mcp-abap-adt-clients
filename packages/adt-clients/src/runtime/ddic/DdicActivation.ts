@@ -10,7 +10,11 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtLoggedOptions } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
-import { rawDocument } from '../../utils/resultStrategy';
+import {
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+  rawDocument,
+} from '../../utils/resultStrategy';
 import { getActivationGraph } from './activationGraph';
 
 /** One strategy per member of the DDIC activation graph. */
@@ -27,18 +31,25 @@ export const ddicActivationDocuments = {
   graph: rawDocument,
 } satisfies IDdicActivationResults;
 
+/** What each slot of the result set answers. */
+export type DdicActivationValues = {
+  readonly [K in keyof IDdicActivationResults]: unknown;
+};
+
 export class DdicActivation<
-  R extends IDdicActivationResults = typeof ddicActivationDocuments,
-> implements IDdicActivation<ReturnType<R['graph']>>
+  T extends DdicActivationValues = ResultValuesOf<
+    typeof ddicActivationDocuments
+  >,
+> implements IDdicActivation<T['graph']>
 {
   readonly kind = 'ddicActivation' as const;
 
-  private readonly results: R;
+  private readonly results: ResultStrategiesOf<T>;
   private readonly logger: ILogger;
 
   constructor(
     private readonly connection: IAbapConnection,
-    options: AdtLoggedOptions<R>,
+    options: AdtLoggedOptions<ResultStrategiesOf<T>>,
   ) {
     this.logger = options.logger;
     this.results = options.results;
@@ -46,10 +57,10 @@ export class DdicActivation<
 
   async getGraph<E extends IAdtError = IAdtError>(
     options?: IGetActivationGraphOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['graph']>, E>> {
+  ): Promise<IAdtResponse<T['graph'], E>> {
     return answering(
       () => getActivationGraph(this.connection, options),
-      this.results.graph as IResultStrategy<ReturnType<R['graph']>>,
+      this.results.graph,
       options?.analyse,
     );
   }

@@ -3,6 +3,7 @@
  */
 
 export { AdtClass } from './AdtClass';
+export type { ClassValues } from './AdtClassMemberBase';
 export {
   AdtLocalDefinitions,
   type ILocalDefinitionsConfig,

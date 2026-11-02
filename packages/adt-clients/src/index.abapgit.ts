@@ -4,7 +4,10 @@
  * types (IAdtAbapGitClient and friends) come from @mcp-abap-adt/interfaces-adt.
  */
 
-export { AdtAbapGitClient } from './clients/AdtAbapGitClient';
+export {
+  type AbapGitValues,
+  AdtAbapGitClient,
+} from './clients/AdtAbapGitClient';
 export {
   abapGitDocuments,
   type IAbapGitResults,

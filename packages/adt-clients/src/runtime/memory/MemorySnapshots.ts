@@ -23,7 +23,11 @@ import type {
   AdtShippedOptions,
 } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
-import { rawDocument } from '../../utils/resultStrategy';
+import {
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+  rawDocument,
+} from '../../utils/resultStrategy';
 import {
   getSnapshot,
   getSnapshotChildren,
@@ -61,26 +65,28 @@ export const memorySnapshotsDocuments = {
   references: rawDocument,
 } satisfies IMemorySnapshotsResults;
 
-type Of<
-  R extends IMemorySnapshotsResults,
-  K extends keyof IMemorySnapshotsResults,
-> = ReturnType<R[K]>;
+/** What each slot of the result set answers. */
+export type MemorySnapshotsValues = {
+  readonly [K in keyof IMemorySnapshotsResults]: unknown;
+};
 
 export class MemorySnapshots<
-  R extends IMemorySnapshotsResults = typeof memorySnapshotsDocuments,
+  T extends MemorySnapshotsValues = ResultValuesOf<
+    typeof memorySnapshotsDocuments
+  >,
 > implements
     IMemorySnapshots<
-      Of<R, 'list'>,
-      Of<R, 'snapshot'>,
-      Of<R, 'overview'>,
-      Of<R, 'rankingList'>,
-      Of<R, 'children'>,
-      Of<R, 'references'>
+      T['list'],
+      T['snapshot'],
+      T['overview'],
+      T['rankingList'],
+      T['children'],
+      T['references']
     >
 {
   readonly kind = 'memorySnapshots' as const;
 
-  private readonly results: R;
+  private readonly results: ResultStrategiesOf<T>;
 
   /**
    * Memory snapshots with the shipped documents, or with the caller's results.
@@ -90,16 +96,16 @@ export class MemorySnapshots<
   static create(
     connection: IAbapConnection,
     options?: AdtShippedOptions<'logger'>,
-  ): MemorySnapshots<typeof memorySnapshotsDocuments>;
+  ): MemorySnapshots<ResultValuesOf<typeof memorySnapshotsDocuments>>;
   static create<R extends IMemorySnapshotsResults>(
     connection: IAbapConnection,
     options: AdtHandlerOptions<R, 'logger'>,
-  ): MemorySnapshots<R>;
+  ): MemorySnapshots<ResultValuesOf<R>>;
   static create(
     connection: IAbapConnection,
     options: Partial<AdtHandlerOptions<IMemorySnapshotsResults, 'logger'>> = {},
-  ): MemorySnapshots<IMemorySnapshotsResults> {
-    return new MemorySnapshots<IMemorySnapshotsResults>(connection, {
+  ): MemorySnapshots<MemorySnapshotsValues> {
+    return new MemorySnapshots<MemorySnapshotsValues>(connection, {
       ...options,
       results: options.results ?? memorySnapshotsDocuments,
     });
@@ -107,20 +113,18 @@ export class MemorySnapshots<
 
   constructor(
     private readonly connection: IAbapConnection,
-    options: AdtHandlerOptions<R, 'logger'>,
+    options: AdtHandlerOptions<ResultStrategiesOf<T>, 'logger'>,
   ) {
     this.results = options.results;
   }
 
-  private reading<K extends keyof IMemorySnapshotsResults>(
-    key: K,
-  ): IResultStrategy<Of<R, K>> {
-    return this.results[key] as IResultStrategy<Of<R, K>>;
+  private reading<K extends keyof T>(key: K): IResultStrategy<T[K]> {
+    return this.results[key];
   }
 
   async list<E extends IAdtError = IAdtError>(
     options?: IMemorySnapshotsListOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'list'>, E>> {
+  ): Promise<IAdtResponse<T['list'], E>> {
     return answering(
       () =>
         listSnapshots(this.connection, options?.user, options?.originalUser),
@@ -132,7 +136,7 @@ export class MemorySnapshots<
   async getById<E extends IAdtError = IAdtError>(
     snapshotId: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'snapshot'>, E>> {
+  ): Promise<IAdtResponse<T['snapshot'], E>> {
     return answering(
       () => getSnapshot(this.connection, snapshotId),
       this.reading('snapshot'),
@@ -143,7 +147,7 @@ export class MemorySnapshots<
   async getOverview<E extends IAdtError = IAdtError>(
     snapshotId: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'overview'>, E>> {
+  ): Promise<IAdtResponse<T['overview'], E>> {
     return answering(
       () => getSnapshotOverview(this.connection, snapshotId),
       this.reading('overview'),
@@ -154,7 +158,7 @@ export class MemorySnapshots<
   async getRankingList<E extends IAdtError = IAdtError>(
     snapshotId: string,
     options: ISnapshotRankingListOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'rankingList'>, E>> {
+  ): Promise<IAdtResponse<T['rankingList'], E>> {
     return answering(
       () => getSnapshotRankingList(this.connection, snapshotId, options),
       this.reading('rankingList'),
@@ -166,7 +170,7 @@ export class MemorySnapshots<
     snapshotId: string,
     parentKey: string,
     options: ISnapshotChildrenOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'children'>, E>> {
+  ): Promise<IAdtResponse<T['children'], E>> {
     return answering(
       () =>
         getSnapshotChildren(this.connection, snapshotId, parentKey, options),
@@ -179,7 +183,7 @@ export class MemorySnapshots<
     snapshotId: string,
     objectKey: string,
     options: ISnapshotReferencesOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'references'>, E>> {
+  ): Promise<IAdtResponse<T['references'], E>> {
     return answering(
       () =>
         getSnapshotReferences(this.connection, snapshotId, objectKey, options),
@@ -192,7 +196,7 @@ export class MemorySnapshots<
     fromId: string,
     toId: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'overview'>, E>> {
+  ): Promise<IAdtResponse<T['overview'], E>> {
     return answering(
       () => getSnapshotDeltaOverview(this.connection, fromId, toId),
       this.reading('overview'),
@@ -204,7 +208,7 @@ export class MemorySnapshots<
     fromId: string,
     toId: string,
     options: ISnapshotRankingListOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'rankingList'>, E>> {
+  ): Promise<IAdtResponse<T['rankingList'], E>> {
     return answering(
       () => getSnapshotDeltaRankingList(this.connection, fromId, toId, options),
       this.reading('rankingList'),
@@ -217,7 +221,7 @@ export class MemorySnapshots<
     toId: string,
     parentKey: string,
     options: ISnapshotChildrenOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'children'>, E>> {
+  ): Promise<IAdtResponse<T['children'], E>> {
     return answering(
       () =>
         getSnapshotDeltaChildren(
@@ -237,7 +241,7 @@ export class MemorySnapshots<
     toId: string,
     objectKey: string,
     options: ISnapshotReferencesOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<Of<R, 'references'>, E>> {
+  ): Promise<IAdtResponse<T['references'], E>> {
     return answering(
       () =>
         getSnapshotDeltaReferences(

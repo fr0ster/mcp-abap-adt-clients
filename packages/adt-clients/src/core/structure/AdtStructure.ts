@@ -29,7 +29,6 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
-  IResultStrategy,
   IStructureResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -39,7 +38,11 @@ import { STRUCTURE } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
-import { nothing } from '../../utils/resultStrategy';
+import {
+  nothing,
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+} from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { writeObjectDocument } from '../shared/documentWrite';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
@@ -61,33 +64,27 @@ import { upload } from './update';
 import { validateStructureName } from './validation';
 import { getStructureVersionSource, getStructureVersions } from './versions';
 
+/** What each slot of the result set answers. */
+export type StructureValues = {
+  readonly [K in keyof IStructureResults]: unknown;
+};
+
 export class AdtStructure<
-  R extends IStructureResults = typeof structureDocuments,
+  T extends StructureValues = ResultValuesOf<typeof structureDocuments>,
   V extends AdtVariant = AdtModernVariant,
 > implements
-    IAdtCreatable<IStructureConfig, ReturnType<R['created']>>,
-    IAdtReadable<IStructureConfig, ReturnType<R['source']>>,
-    IAdtMetadataReadable<IStructureConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<Partial<IStructureConfig>, ReturnType<R['updated']>>,
-    IAdtMetadataUpdatable<
-      Partial<IStructureConfig>,
-      ReturnType<R['metadataUpdated']>
-    >,
-    IAdtDeletable<
-      IStructureConfig,
-      ReturnType<R['deletion']>,
-      ReturnType<R['deletionCheck']>
-    >,
-    IAdtValidatable<IStructureConfig, ReturnType<R['validation']>>,
-    IAdtCheckable<IStructureConfig, ReturnType<R['check']>>,
-    IAdtActivatable<IStructureConfig, ReturnType<R['activation']>>,
+    IAdtCreatable<IStructureConfig, T['created']>,
+    IAdtReadable<IStructureConfig, T['source']>,
+    IAdtMetadataReadable<IStructureConfig, T['metadata']>,
+    IAdtUpdatable<Partial<IStructureConfig>, T['updated']>,
+    IAdtMetadataUpdatable<Partial<IStructureConfig>, T['metadataUpdated']>,
+    IAdtDeletable<IStructureConfig, T['deletion'], T['deletionCheck']>,
+    IAdtValidatable<IStructureConfig, T['validation']>,
+    IAdtCheckable<IStructureConfig, T['check']>,
+    IAdtActivatable<IStructureConfig, T['activation']>,
     IAdtLockable<IStructureConfig>,
-    IAdtTransportAware<IStructureConfig, ReturnType<R['transport']>>,
-    IAdtVersionable<
-      IStructureConfig,
-      ReturnType<R['versions']>,
-      ReturnType<R['versionSource']>
-    >
+    IAdtTransportAware<IStructureConfig, T['transport']>,
+    IAdtVersionable<IStructureConfig, T['versions'], T['versionSource']>
 {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -100,11 +97,14 @@ export class AdtStructure<
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Structure';
 
-  protected readonly results: R;
+  protected readonly results: ResultStrategiesOf<T>;
 
   constructor(
     connection: IAbapConnection,
-    options: AdtHandlerOptions<R, 'logger' | 'systemContext' | 'lockRegistry'>,
+    options: AdtHandlerOptions<
+      ResultStrategiesOf<T>,
+      'logger' | 'systemContext' | 'lockRegistry'
+    >,
   ) {
     const { logger, systemContext, lockRegistry } = options;
     this.results = options.results;
@@ -134,7 +134,7 @@ export class AdtStructure<
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IStructureConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+  ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -142,7 +142,7 @@ export class AdtStructure<
 
     return answering(
       () => validateStructureName(connection, name, config.description),
-      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      this.results.validation,
       options?.analyse,
     );
   }
@@ -151,7 +151,7 @@ export class AdtStructure<
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IStructureConfig, 'source'> & { source?: never },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+  ): Promise<IAdtResponse<T['created'], E>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // An object created without a package is the single thing `delete()` cannot
@@ -182,7 +182,7 @@ export class AdtStructure<
           masterLanguage:
             config.masterLanguage ?? this.systemContext.masterLanguage,
         }),
-      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      this.results.created,
       options?.analyse,
     );
   }
@@ -192,7 +192,7 @@ export class AdtStructure<
     config: Partial<IStructureConfig>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+  ): Promise<IAdtResponse<T['source'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -203,7 +203,7 @@ export class AdtStructure<
     // an empty body *is* absence is the caller's reading, through `analyse`.
     return answering(
       () => getStructureSource(connection, name, version, options),
-      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      this.results.source,
       options?.analyse,
     );
   }
@@ -212,7 +212,7 @@ export class AdtStructure<
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IStructureConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+  ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -220,7 +220,7 @@ export class AdtStructure<
 
     return answering(
       () => getStructureMetadata(connection, name, options),
-      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      this.results.metadata,
       options?.analyse,
     );
   }
@@ -229,7 +229,7 @@ export class AdtStructure<
   async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IStructureConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+  ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -244,7 +244,7 @@ export class AdtStructure<
             ? { withLongPolling: options.withLongPolling }
             : undefined,
         ),
-      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      this.results.transport,
       options?.analyse,
     );
   }
@@ -263,7 +263,7 @@ export class AdtStructure<
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IStructureConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -282,7 +282,7 @@ export class AdtStructure<
           },
           options?.lockHandle,
         ),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.updated,
       options?.analyse,
     );
   }
@@ -301,7 +301,7 @@ export class AdtStructure<
     this: this & AdtPerformedBy<'structure', 'updateMetadata'>,
     config: Partial<IStructureConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -315,9 +315,7 @@ export class AdtStructure<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.metadataUpdated as IResultStrategy<
-        ReturnType<R['metadataUpdated']>
-      >,
+      this.results.metadataUpdated,
       options?.analyse,
     );
   }
@@ -332,7 +330,7 @@ export class AdtStructure<
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IStructureConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -343,9 +341,7 @@ export class AdtStructure<
           structure_name: name,
           transport_request: config.transportRequest,
         }),
-      this.results.deletionCheck as IResultStrategy<
-        ReturnType<R['deletionCheck']>
-      >,
+      this.results.deletionCheck,
       options?.analyse,
     );
   }
@@ -362,7 +358,7 @@ export class AdtStructure<
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IStructureConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -373,7 +369,7 @@ export class AdtStructure<
           structure_name: name,
           transport_request: config.transportRequest,
         }),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }
@@ -382,7 +378,7 @@ export class AdtStructure<
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IStructureConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+  ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -390,7 +386,7 @@ export class AdtStructure<
 
     return answering(
       () => activateStructure(connection, options.headers, name),
-      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      this.results.activation,
       options?.analyse,
     );
   }
@@ -400,7 +396,7 @@ export class AdtStructure<
     config: Partial<IStructureConfig>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+  ): Promise<IAdtResponse<T['check'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -418,7 +414,7 @@ export class AdtStructure<
           config.source,
           this.logger,
         ),
-      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      this.results.check,
       options?.analyse,
     );
   }
@@ -474,10 +470,10 @@ export class AdtStructure<
   async getVersions<E extends IAdtError = IAdtError>(
     config: Partial<IStructureConfig>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
+  ): Promise<IAdtResponse<T['versions'], E>> {
     return answering(
       () => getStructureVersions(this.connection, config),
-      this.results.versions as IResultStrategy<ReturnType<R['versions']>>,
+      this.results.versions,
       options?.analyse,
     );
   }
@@ -486,12 +482,10 @@ export class AdtStructure<
   async getVersionSource<E extends IAdtError = IAdtError>(
     contentUri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versionSource']>, E>> {
+  ): Promise<IAdtResponse<T['versionSource'], E>> {
     return answering(
       () => getStructureVersionSource(this.connection, contentUri),
-      this.results.versionSource as IResultStrategy<
-        ReturnType<R['versionSource']>
-      >,
+      this.results.versionSource,
       options?.analyse,
     );
   }

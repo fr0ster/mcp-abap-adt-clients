@@ -27,7 +27,6 @@ import type {
   IAdtValidatable,
   IAdtVersionable,
   IMetadataExtensionResults,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -36,7 +35,11 @@ import { METADATA_EXTENSION } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
-import { nothing } from '../../utils/resultStrategy';
+import {
+  nothing,
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+} from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { checkDeletionByUri } from '../shared/deletionCheckByUri';
 import { writeObjectDocument } from '../shared/documentWrite';
@@ -65,33 +68,32 @@ import {
   getMetadataExtensionVersions,
 } from './versions';
 
+/** What each slot of the result set answers. */
+export type MetadataExtensionValues = {
+  readonly [K in keyof IMetadataExtensionResults]: unknown;
+};
+
 export class AdtMetadataExtension<
-  R extends IMetadataExtensionResults = typeof metadataExtensionDocuments,
+  T extends MetadataExtensionValues = ResultValuesOf<
+    typeof metadataExtensionDocuments
+  >,
   V extends AdtVariant = AdtModernVariant,
 > implements
-    IAdtCreatable<IMetadataExtensionConfig, ReturnType<R['created']>>,
-    IAdtReadable<IMetadataExtensionConfig, ReturnType<R['source']>>,
-    IAdtMetadataReadable<IMetadataExtensionConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<Partial<IMetadataExtensionConfig>, ReturnType<R['updated']>>,
+    IAdtCreatable<IMetadataExtensionConfig, T['created']>,
+    IAdtReadable<IMetadataExtensionConfig, T['source']>,
+    IAdtMetadataReadable<IMetadataExtensionConfig, T['metadata']>,
+    IAdtUpdatable<Partial<IMetadataExtensionConfig>, T['updated']>,
     IAdtMetadataUpdatable<
       Partial<IMetadataExtensionConfig>,
-      ReturnType<R['metadataUpdated']>
+      T['metadataUpdated']
     >,
-    IAdtDeletable<
-      IMetadataExtensionConfig,
-      ReturnType<R['deletion']>,
-      ReturnType<R['deletionCheck']>
-    >,
-    IAdtValidatable<IMetadataExtensionConfig, ReturnType<R['validation']>>,
-    IAdtCheckable<IMetadataExtensionConfig, ReturnType<R['check']>>,
-    IAdtActivatable<IMetadataExtensionConfig, ReturnType<R['activation']>>,
+    IAdtDeletable<IMetadataExtensionConfig, T['deletion'], T['deletionCheck']>,
+    IAdtValidatable<IMetadataExtensionConfig, T['validation']>,
+    IAdtCheckable<IMetadataExtensionConfig, T['check']>,
+    IAdtActivatable<IMetadataExtensionConfig, T['activation']>,
     IAdtLockable<IMetadataExtensionConfig>,
-    IAdtTransportAware<IMetadataExtensionConfig, ReturnType<R['transport']>>,
-    IAdtVersionable<
-      IMetadataExtensionConfig,
-      ReturnType<R['versions']>,
-      ReturnType<R['versionSource']>
-    >
+    IAdtTransportAware<IMetadataExtensionConfig, T['transport']>,
+    IAdtVersionable<IMetadataExtensionConfig, T['versions'], T['versionSource']>
 {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -104,11 +106,14 @@ export class AdtMetadataExtension<
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'MetadataExtension';
 
-  protected readonly results: R;
+  protected readonly results: ResultStrategiesOf<T>;
 
   constructor(
     connection: IAbapConnection,
-    options: AdtHandlerOptions<R, 'logger' | 'systemContext' | 'lockRegistry'>,
+    options: AdtHandlerOptions<
+      ResultStrategiesOf<T>,
+      'logger' | 'systemContext' | 'lockRegistry'
+    >,
   ) {
     const { logger, systemContext, lockRegistry } = options;
     this.results = options.results;
@@ -139,7 +144,7 @@ export class AdtMetadataExtension<
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IMetadataExtensionConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+  ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -152,7 +157,7 @@ export class AdtMetadataExtension<
           description: config.description ?? name,
           packageName: config.packageName as string,
         }),
-      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      this.results.validation,
       options?.analyse,
     );
   }
@@ -163,7 +168,7 @@ export class AdtMetadataExtension<
       source?: never;
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+  ): Promise<IAdtResponse<T['created'], E>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // An object created without a package is the single thing `delete()` cannot
@@ -193,7 +198,7 @@ export class AdtMetadataExtension<
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,
         }),
-      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      this.results.created,
       options?.analyse,
     );
   }
@@ -203,7 +208,7 @@ export class AdtMetadataExtension<
     config: Partial<IMetadataExtensionConfig>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+  ): Promise<IAdtResponse<T['source'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -214,7 +219,7 @@ export class AdtMetadataExtension<
     // an empty body *is* absence is the caller's reading, through `analyse`.
     return answering(
       () => readMetadataExtensionSource(connection, name, version, options),
-      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      this.results.source,
       options?.analyse,
     );
   }
@@ -223,7 +228,7 @@ export class AdtMetadataExtension<
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IMetadataExtensionConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+  ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -231,7 +236,7 @@ export class AdtMetadataExtension<
 
     return answering(
       () => readMetadataExtension(connection, name, options),
-      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      this.results.metadata,
       options?.analyse,
     );
   }
@@ -240,7 +245,7 @@ export class AdtMetadataExtension<
   async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IMetadataExtensionConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+  ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -248,7 +253,7 @@ export class AdtMetadataExtension<
 
     return answering(
       () => getMetadataExtensionTransport(connection, name, options),
-      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      this.results.transport,
       options?.analyse,
     );
   }
@@ -267,7 +272,7 @@ export class AdtMetadataExtension<
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IMetadataExtensionConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -289,7 +294,7 @@ export class AdtMetadataExtension<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.updated,
       options?.analyse,
     );
   }
@@ -309,7 +314,7 @@ export class AdtMetadataExtension<
     this: this & AdtPerformedBy<'metadataExtension', 'updateMetadata'>,
     config: Partial<IMetadataExtensionConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -323,9 +328,7 @@ export class AdtMetadataExtension<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.metadataUpdated as IResultStrategy<
-        ReturnType<R['metadataUpdated']>
-      >,
+      this.results.metadataUpdated,
       options?.analyse,
     );
   }
@@ -339,7 +342,7 @@ export class AdtMetadataExtension<
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IMetadataExtensionConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -352,9 +355,7 @@ export class AdtMetadataExtension<
           options.headers,
           `${METADATA_EXTENSION.uri(name)}`,
         ),
-      this.results.deletionCheck as IResultStrategy<
-        ReturnType<R['deletionCheck']>
-      >,
+      this.results.deletionCheck,
       options?.analyse,
     );
   }
@@ -362,7 +363,7 @@ export class AdtMetadataExtension<
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IMetadataExtensionConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -375,7 +376,7 @@ export class AdtMetadataExtension<
           name,
           config.transportRequest,
         ),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }
@@ -384,7 +385,7 @@ export class AdtMetadataExtension<
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IMetadataExtensionConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+  ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -392,7 +393,7 @@ export class AdtMetadataExtension<
 
     return answering(
       () => activateMetadataExtension(connection, options.headers, name),
-      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      this.results.activation,
       options?.analyse,
     );
   }
@@ -402,7 +403,7 @@ export class AdtMetadataExtension<
     config: Partial<IMetadataExtensionConfig>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+  ): Promise<IAdtResponse<T['check'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -412,7 +413,7 @@ export class AdtMetadataExtension<
 
     return answering(
       () => checkMetadataExtension(connection, options.headers, name, version),
-      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      this.results.check,
       options?.analyse,
     );
   }
@@ -473,10 +474,10 @@ export class AdtMetadataExtension<
   async getVersions<E extends IAdtError = IAdtError>(
     config: Partial<IMetadataExtensionConfig>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
+  ): Promise<IAdtResponse<T['versions'], E>> {
     return answering(
       () => getMetadataExtensionVersions(this.connection, config),
-      this.results.versions as IResultStrategy<ReturnType<R['versions']>>,
+      this.results.versions,
       options?.analyse,
     );
   }
@@ -485,12 +486,10 @@ export class AdtMetadataExtension<
   async getVersionSource<E extends IAdtError = IAdtError>(
     contentUri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versionSource']>, E>> {
+  ): Promise<IAdtResponse<T['versionSource'], E>> {
     return answering(
       () => getMetadataExtensionVersionSource(this.connection, contentUri),
-      this.results.versionSource as IResultStrategy<
-        ReturnType<R['versionSource']>
-      >,
+      this.results.versionSource,
       options?.analyse,
     );
   }

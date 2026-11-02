@@ -2,5 +2,8 @@
  * FunctionModule operations - exports
  */
 
-export { AdtFunctionModule } from './AdtFunctionModule';
+export {
+  AdtFunctionModule,
+  type FunctionModuleValues,
+} from './AdtFunctionModule';
 export * from './types';

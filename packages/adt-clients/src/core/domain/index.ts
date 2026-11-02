@@ -2,5 +2,8 @@
  * Domain operations - exports
  */
 
-export { AdtDomain } from './AdtDomain';
+export {
+  AdtDomain,
+  type DomainValues,
+} from './AdtDomain';
 export * from './types';

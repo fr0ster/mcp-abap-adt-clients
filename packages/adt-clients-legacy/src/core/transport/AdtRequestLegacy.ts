@@ -30,7 +30,9 @@ import {
   AdtRequest,
   answering,
   failed,
+  type ResultValuesOf,
   TRANSPORT_REQUEST,
+  type TransportValues,
   type transportDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import type {
@@ -42,9 +44,7 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IListTransportsOptions,
-  IResultStrategy,
   ITransportConfig,
-  ITransportResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import {
@@ -65,16 +65,16 @@ const unsupported = (what: string, why: string): IAdtError => ({
 const NOT_ADVERTISED = `${TRANSPORT_REQUEST.collection} is not advertised on 7.40 SP04, so this member has no endpoint there.`;
 
 export class AdtRequestLegacy<
-  R extends ITransportResults = typeof transportDocuments,
-> extends AdtRequest<R, 'basis740'> {
+  T extends TransportValues = ResultValuesOf<typeof transportDocuments>,
+> extends AdtRequest<T, 'basis740'> {
   /**
    * Refused: the legacy CTS endpoint rejects every POST payload with "user
    * action is not supported" — no useraction value is accepted.
    */
   override async create<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'create'>,
-  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
-    return failed<ReturnType<R['created']>, E>(
+  ): Promise<IAdtResponse<T['created'], E>> {
+    return failed<T['created'], E>(
       unsupported(
         'Creating transport requests',
         `The ${TRANSPORT_REQUEST_LEGACY.collection} endpoint rejects every create payload.`,
@@ -95,10 +95,10 @@ export class AdtRequestLegacy<
   override async readMetadata<E extends IAdtError = IAdtError>(
     _config: Partial<ITransportConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+  ): Promise<IAdtResponse<T['metadata'], E>> {
     return answering(
       () => getTransportLegacy(this.connection),
-      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      this.results.metadata,
       options?.analyse,
     );
   }
@@ -120,9 +120,9 @@ export class AdtRequestLegacy<
     // search, so there is no `configUri` to require — and one that is passed
     // is refused below rather than ignored.
     options?: Partial<IListTransportsOptions> & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['list']>, E>> {
+  ): Promise<IAdtResponse<T['list'], E>> {
     if (options?.configUri) {
-      return failed<ReturnType<R['list']>, E>(
+      return failed<T['list'], E>(
         unsupported(
           'configUri',
           `${TRANSPORT_REQUEST_LEGACY.collection} is not a saved-configuration search and always returns the full list for the current user.`,
@@ -132,7 +132,7 @@ export class AdtRequestLegacy<
 
     return answering(
       () => listTransportsLegacy(this.connection),
-      this.results.list as IResultStrategy<ReturnType<R['list']>>,
+      this.results.list,
       options?.analyse,
     );
   }
@@ -140,8 +140,8 @@ export class AdtRequestLegacy<
   /** Refused: the legacy endpoint's update shape has never been captured. */
   override async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'updateMetadata'>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
-    return failed<ReturnType<R['metadataUpdated']>, E>(
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+    return failed<T['metadataUpdated'], E>(
       unsupported(
         'Updating transport requests',
         `The legacy ${TRANSPORT_REQUEST_LEGACY.collection} endpoint has never been captured, so whether or how it supports changing a description is unknown.`,
@@ -152,8 +152,8 @@ export class AdtRequestLegacy<
   /** Refused: the legacy endpoint's delete shape has never been captured. */
   override async delete<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'delete'>,
-  ): Promise<IAdtResponse<ReturnType<R['deleted']>, E>> {
-    return failed<ReturnType<R['deleted']>, E>(
+  ): Promise<IAdtResponse<T['deleted'], E>> {
+    return failed<T['deleted'], E>(
       unsupported(
         'Deleting transport requests',
         `The legacy ${TRANSPORT_REQUEST_LEGACY.collection} endpoint has never been captured, so whether it supports deleting a request is unknown.`,
@@ -165,8 +165,8 @@ export class AdtRequestLegacy<
   override async searchConfigurations<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'searchConfigurations'>,
     _options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['searchConfigurations']>, E>> {
-    return failed<ReturnType<R['searchConfigurations']>, E>(
+  ): Promise<IAdtResponse<T['searchConfigurations'], E>> {
+    return failed<T['searchConfigurations'], E>(
       unsupported('Searching transport configurations', NOT_ADVERTISED) as E,
     );
   }
@@ -176,8 +176,8 @@ export class AdtRequestLegacy<
     this: this & AdtPerformedBy<'request', 'deletionCheck'>,
     _config: Partial<ITransportConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
-    return failed<ReturnType<R['deletionCheck']>, E>(
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+    return failed<T['deletionCheck'], E>(
       unsupported(
         'Checking the deletion of a transport request',
         NOT_ADVERTISED,
@@ -190,8 +190,8 @@ export class AdtRequestLegacy<
     this: this & AdtPerformedBy<'request', 'readObjects'>,
     _transportNumber: string,
     _options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['objects']>, E>> {
-    return failed<ReturnType<R['objects']>, E>(
+  ): Promise<IAdtResponse<T['objects'], E>> {
+    return failed<T['objects'], E>(
       unsupported(
         'Reading the objects of a transport request',
         NOT_ADVERTISED,
@@ -204,8 +204,8 @@ export class AdtRequestLegacy<
     this: this & AdtPerformedBy<'request', 'readActionLog'>,
     _transportNumber: string,
     _options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['actionLog']>, E>> {
-    return failed<ReturnType<R['actionLog']>, E>(
+  ): Promise<IAdtResponse<T['actionLog'], E>> {
+    return failed<T['actionLog'], E>(
       unsupported(
         'Reading the action log of a transport request',
         NOT_ADVERTISED,
@@ -219,8 +219,8 @@ export class AdtRequestLegacy<
     _transportNumber: string,
     _object: IAbapObjectEntry,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['addedObject']>, E>> {
-    return failed<ReturnType<R['addedObject']>, E>(
+  ): Promise<IAdtResponse<T['addedObject'], E>> {
+    return failed<T['addedObject'], E>(
       unsupported(
         'Adding an object to a transport request',
         NOT_ADVERTISED,
@@ -234,8 +234,8 @@ export class AdtRequestLegacy<
     _transportNumber: string,
     _object: IAbapObjectEntry & { position: string },
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['removedObject']>, E>> {
-    return failed<ReturnType<R['removedObject']>, E>(
+  ): Promise<IAdtResponse<T['removedObject'], E>> {
+    return failed<T['removedObject'], E>(
       unsupported(
         'Removing an object from a transport request',
         NOT_ADVERTISED,
@@ -250,8 +250,8 @@ export class AdtRequestLegacy<
     _targetNumber: string,
     _objects: readonly (IAbapObjectEntry & { position: string })[],
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['movedObjects']>, E>> {
-    return failed<ReturnType<R['movedObjects']>, E>(
+  ): Promise<IAdtResponse<T['movedObjects'], E>> {
+    return failed<T['movedObjects'], E>(
       unsupported(
         'Moving objects between transport requests',
         NOT_ADVERTISED,
@@ -264,8 +264,8 @@ export class AdtRequestLegacy<
     this: this & AdtPerformedBy<'request', 'sortAndCompress'>,
     _taskNumber: string,
     _options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['sortedAndCompressed']>, E>> {
-    return failed<ReturnType<R['sortedAndCompressed']>, E>(
+  ): Promise<IAdtResponse<T['sortedAndCompressed'], E>> {
+    return failed<T['sortedAndCompressed'], E>(
       unsupported(
         'Sorting and compressing a transport task',
         NOT_ADVERTISED,
@@ -280,8 +280,8 @@ export class AdtRequestLegacy<
     _options: { headers: IAdtHeaders } & {
       targetUser: string;
     } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['createdTask']>, E>> {
-    return failed<ReturnType<R['createdTask']>, E>(
+  ): Promise<IAdtResponse<T['createdTask'], E>> {
+    return failed<T['createdTask'], E>(
       unsupported(
         'Creating a task under a transport request',
         NOT_ADVERTISED,
@@ -295,8 +295,8 @@ export class AdtRequestLegacy<
     _taskNumber: string,
     _type: AdtTaskType,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['taskTypeChanged']>, E>> {
-    return failed<ReturnType<R['taskTypeChanged']>, E>(
+  ): Promise<IAdtResponse<T['taskTypeChanged'], E>> {
+    return failed<T['taskTypeChanged'], E>(
       unsupported('Changing the type of a transport task', NOT_ADVERTISED) as E,
     );
   }

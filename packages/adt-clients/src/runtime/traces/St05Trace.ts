@@ -9,7 +9,11 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtLoggedOptions } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
-import { rawDocument } from '../../utils/resultStrategy';
+import {
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+  rawDocument,
+} from '../../utils/resultStrategy';
 import { getSt05TraceDirectory, getSt05TraceState } from './st05';
 
 /** One strategy per member of the ST05 trace. */
@@ -28,17 +32,23 @@ export const st05TraceDocuments = {
   directory: rawDocument,
 } satisfies ISt05TraceResults;
 
-export class St05Trace<R extends ISt05TraceResults = typeof st05TraceDocuments>
-  implements ISt05Trace<ReturnType<R['state']>, ReturnType<R['directory']>>
+/** What each slot of the result set answers. */
+export type St05TraceValues = {
+  readonly [K in keyof ISt05TraceResults]: unknown;
+};
+
+export class St05Trace<
+  T extends St05TraceValues = ResultValuesOf<typeof st05TraceDocuments>,
+> implements ISt05Trace<T['state'], T['directory']>
 {
   readonly kind = 'st05Trace' as const;
 
-  private readonly results: R;
+  private readonly results: ResultStrategiesOf<T>;
   private readonly logger: ILogger;
 
   constructor(
     private readonly connection: IAbapConnection,
-    options: AdtLoggedOptions<R>,
+    options: AdtLoggedOptions<ResultStrategiesOf<T>>,
   ) {
     this.logger = options.logger;
     this.results = options.results;
@@ -46,20 +56,20 @@ export class St05Trace<R extends ISt05TraceResults = typeof st05TraceDocuments>
 
   async getState<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['state']>, E>> {
+  ): Promise<IAdtResponse<T['state'], E>> {
     return answering(
       () => getSt05TraceState(this.connection),
-      this.results.state as IResultStrategy<ReturnType<R['state']>>,
+      this.results.state,
       options?.analyse,
     );
   }
 
   async getDirectory<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['directory']>, E>> {
+  ): Promise<IAdtResponse<T['directory'], E>> {
     return answering(
       () => getSt05TraceDirectory(this.connection),
-      this.results.directory as IResultStrategy<ReturnType<R['directory']>>,
+      this.results.directory,
       options?.analyse,
     );
   }

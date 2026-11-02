@@ -27,7 +27,6 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IAdtVersionable,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -36,7 +35,11 @@ import { ACCESS_CONTROL } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
-import { nothing } from '../../utils/resultStrategy';
+import {
+  nothing,
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+} from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { writeObjectDocument } from '../shared/documentWrite';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
@@ -61,33 +64,27 @@ import {
   getAccessControlVersions,
 } from './versions';
 
+/** What each slot of the result set answers. */
+export type AccessControlValues = {
+  readonly [K in keyof IAccessControlResults]: unknown;
+};
+
 export class AdtAccessControl<
-  R extends IAccessControlResults = typeof accessControlDocuments,
+  T extends AccessControlValues = ResultValuesOf<typeof accessControlDocuments>,
   V extends AdtVariant = AdtModernVariant,
 > implements
-    IAdtCreatable<IAccessControlConfig, ReturnType<R['created']>>,
-    IAdtReadable<IAccessControlConfig, ReturnType<R['source']>>,
-    IAdtMetadataReadable<IAccessControlConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<Partial<IAccessControlConfig>, ReturnType<R['updated']>>,
-    IAdtMetadataUpdatable<
-      Partial<IAccessControlConfig>,
-      ReturnType<R['metadataUpdated']>
-    >,
-    IAdtDeletable<
-      IAccessControlConfig,
-      ReturnType<R['deletion']>,
-      ReturnType<R['deletionCheck']>
-    >,
-    IAdtValidatable<IAccessControlConfig, ReturnType<R['validation']>>,
-    IAdtCheckable<IAccessControlConfig, ReturnType<R['check']>>,
-    IAdtActivatable<IAccessControlConfig, ReturnType<R['activation']>>,
+    IAdtCreatable<IAccessControlConfig, T['created']>,
+    IAdtReadable<IAccessControlConfig, T['source']>,
+    IAdtMetadataReadable<IAccessControlConfig, T['metadata']>,
+    IAdtUpdatable<Partial<IAccessControlConfig>, T['updated']>,
+    IAdtMetadataUpdatable<Partial<IAccessControlConfig>, T['metadataUpdated']>,
+    IAdtDeletable<IAccessControlConfig, T['deletion'], T['deletionCheck']>,
+    IAdtValidatable<IAccessControlConfig, T['validation']>,
+    IAdtCheckable<IAccessControlConfig, T['check']>,
+    IAdtActivatable<IAccessControlConfig, T['activation']>,
     IAdtLockable<IAccessControlConfig>,
-    IAdtTransportAware<IAccessControlConfig, ReturnType<R['transport']>>,
-    IAdtVersionable<
-      IAccessControlConfig,
-      ReturnType<R['versions']>,
-      ReturnType<R['versionSource']>
-    >
+    IAdtTransportAware<IAccessControlConfig, T['transport']>,
+    IAdtVersionable<IAccessControlConfig, T['versions'], T['versionSource']>
 {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -100,11 +97,14 @@ export class AdtAccessControl<
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'AccessControl';
 
-  protected readonly results: R;
+  protected readonly results: ResultStrategiesOf<T>;
 
   constructor(
     connection: IAbapConnection,
-    options: AdtHandlerOptions<R, 'logger' | 'systemContext' | 'lockRegistry'>,
+    options: AdtHandlerOptions<
+      ResultStrategiesOf<T>,
+      'logger' | 'systemContext' | 'lockRegistry'
+    >,
   ) {
     const { logger, systemContext, lockRegistry } = options;
     this.results = options.results;
@@ -135,7 +135,7 @@ export class AdtAccessControl<
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IAccessControlConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+  ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -149,7 +149,7 @@ export class AdtAccessControl<
           config.packageName as string,
           config.description,
         ),
-      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      this.results.validation,
       options?.analyse,
     );
   }
@@ -158,7 +158,7 @@ export class AdtAccessControl<
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IAccessControlConfig, 'source'> & { source?: never },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+  ): Promise<IAdtResponse<T['created'], E>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // An object created without a package is the single thing `delete()` cannot
@@ -189,7 +189,7 @@ export class AdtAccessControl<
           masterLanguage:
             config.masterLanguage ?? this.systemContext.masterLanguage,
         }),
-      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      this.results.created,
       options?.analyse,
     );
   }
@@ -199,7 +199,7 @@ export class AdtAccessControl<
     config: Partial<IAccessControlConfig>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+  ): Promise<IAdtResponse<T['source'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -210,7 +210,7 @@ export class AdtAccessControl<
     // an empty body *is* absence is the caller's reading, through `analyse`.
     return answering(
       () => getAccessControlSource(connection, name, version, options),
-      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      this.results.source,
       options?.analyse,
     );
   }
@@ -219,7 +219,7 @@ export class AdtAccessControl<
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IAccessControlConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+  ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -227,7 +227,7 @@ export class AdtAccessControl<
 
     return answering(
       () => getAccessControl(connection, name, options?.version, options),
-      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      this.results.metadata,
       options?.analyse,
     );
   }
@@ -236,7 +236,7 @@ export class AdtAccessControl<
   async readTransport<E extends IAdtError = IAdtError>(
     config: Partial<IAccessControlConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+  ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -244,7 +244,7 @@ export class AdtAccessControl<
 
     return answering(
       () => getAccessControlTransport(connection, name, options),
-      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      this.results.transport,
       options?.analyse,
     );
   }
@@ -263,7 +263,7 @@ export class AdtAccessControl<
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IAccessControlConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -287,7 +287,7 @@ export class AdtAccessControl<
           },
           options?.lockHandle,
         ),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.updated,
       options?.analyse,
     );
   }
@@ -306,7 +306,7 @@ export class AdtAccessControl<
     this: this & AdtPerformedBy<'accessControl', 'updateMetadata'>,
     config: Partial<IAccessControlConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -320,9 +320,7 @@ export class AdtAccessControl<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.metadataUpdated as IResultStrategy<
-        ReturnType<R['metadataUpdated']>
-      >,
+      this.results.metadataUpdated,
       options?.analyse,
     );
   }
@@ -337,7 +335,7 @@ export class AdtAccessControl<
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IAccessControlConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -348,9 +346,7 @@ export class AdtAccessControl<
           access_control_name: name,
           transport_request: config.transportRequest,
         }),
-      this.results.deletionCheck as IResultStrategy<
-        ReturnType<R['deletionCheck']>
-      >,
+      this.results.deletionCheck,
       options?.analyse,
     );
   }
@@ -367,7 +363,7 @@ export class AdtAccessControl<
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IAccessControlConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -378,7 +374,7 @@ export class AdtAccessControl<
           access_control_name: name,
           transport_request: config.transportRequest,
         }),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }
@@ -387,7 +383,7 @@ export class AdtAccessControl<
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IAccessControlConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+  ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -395,7 +391,7 @@ export class AdtAccessControl<
 
     return answering(
       () => activateAccessControl(connection, options.headers, name),
-      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      this.results.activation,
       options?.analyse,
     );
   }
@@ -405,7 +401,7 @@ export class AdtAccessControl<
     config: Partial<IAccessControlConfig>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+  ): Promise<IAdtResponse<T['check'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -422,7 +418,7 @@ export class AdtAccessControl<
           version,
           config.source,
         ),
-      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      this.results.check,
       options?.analyse,
     );
   }
@@ -478,10 +474,10 @@ export class AdtAccessControl<
   async getVersions<E extends IAdtError = IAdtError>(
     config: Partial<IAccessControlConfig>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
+  ): Promise<IAdtResponse<T['versions'], E>> {
     return answering(
       () => getAccessControlVersions(this.connection, config),
-      this.results.versions as IResultStrategy<ReturnType<R['versions']>>,
+      this.results.versions,
       options?.analyse,
     );
   }
@@ -490,12 +486,10 @@ export class AdtAccessControl<
   async getVersionSource<E extends IAdtError = IAdtError>(
     contentUri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versionSource']>, E>> {
+  ): Promise<IAdtResponse<T['versionSource'], E>> {
     return answering(
       () => getAccessControlVersionSource(this.connection, contentUri),
-      this.results.versionSource as IResultStrategy<
-        ReturnType<R['versionSource']>
-      >,
+      this.results.versionSource,
       options?.analyse,
     );
   }

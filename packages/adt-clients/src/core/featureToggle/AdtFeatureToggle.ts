@@ -27,14 +27,17 @@ import type {
   IFeatureToggleObject,
   IFeatureToggleResults,
   IFeatureToggleSource,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
-import { nothing } from '../../utils/resultStrategy';
+import {
+  nothing,
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+} from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
@@ -60,29 +63,30 @@ import { updateFeatureToggle } from './update';
 import { uploadFeatureToggleSource } from './updateSource';
 import { validateFeatureToggleName } from './validation';
 
+/** What each slot of the result set answers. */
+export type FeatureToggleValues = {
+  readonly [K in keyof IFeatureToggleResults]: unknown;
+};
+
 export class AdtFeatureToggle<
-  R extends IFeatureToggleResults = typeof featureToggleDocuments,
+  T extends FeatureToggleValues = ResultValuesOf<typeof featureToggleDocuments>,
 > implements
-    IAdtCreatable<IFeatureToggleConfig, ReturnType<R['created']>>,
-    IAdtReadable<IFeatureToggleConfig, ReturnType<R['source']>>,
-    IAdtMetadataReadable<IFeatureToggleConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<Partial<IFeatureToggleConfig>, ReturnType<R['updated']>>,
-    IAdtDeletable<
-      IFeatureToggleConfig,
-      ReturnType<R['deletion']>,
-      ReturnType<R['deletionCheck']>
-    >,
-    IAdtValidatable<IFeatureToggleConfig, ReturnType<R['validation']>>,
-    IAdtCheckable<IFeatureToggleConfig, ReturnType<R['check']>>,
-    IAdtActivatable<IFeatureToggleConfig, ReturnType<R['activation']>>,
+    IAdtCreatable<IFeatureToggleConfig, T['created']>,
+    IAdtReadable<IFeatureToggleConfig, T['source']>,
+    IAdtMetadataReadable<IFeatureToggleConfig, T['metadata']>,
+    IAdtUpdatable<Partial<IFeatureToggleConfig>, T['updated']>,
+    IAdtDeletable<IFeatureToggleConfig, T['deletion'], T['deletionCheck']>,
+    IAdtValidatable<IFeatureToggleConfig, T['validation']>,
+    IAdtCheckable<IFeatureToggleConfig, T['check']>,
+    IAdtActivatable<IFeatureToggleConfig, T['activation']>,
     // No IAdtTransportAware: a feature toggle has no transport resource of its
     // own, and the member that claimed one read the toggle's document instead.
     IAdtLockable<IFeatureToggleConfig>,
     IFeatureToggleObject<{
-      switched: ReturnType<R['switched']>;
-      runtimeState: ReturnType<R['runtimeState']>;
-      checkState: ReturnType<R['checkState']>;
-      source: ReturnType<R['sourceDocument']>;
+      switched: T['switched'];
+      runtimeState: T['runtimeState'];
+      checkState: T['checkState'];
+      source: T['sourceDocument'];
     }>
 {
   protected readonly connection: IAbapConnection;
@@ -91,11 +95,14 @@ export class AdtFeatureToggle<
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'FeatureToggle';
 
-  protected readonly results: R;
+  protected readonly results: ResultStrategiesOf<T>;
 
   constructor(
     connection: IAbapConnection,
-    options: AdtHandlerOptions<R, 'logger' | 'systemContext' | 'lockRegistry'>,
+    options: AdtHandlerOptions<
+      ResultStrategiesOf<T>,
+      'logger' | 'systemContext' | 'lockRegistry'
+    >,
   ) {
     const { logger, systemContext, lockRegistry } = options;
     this.results = options.results;
@@ -149,7 +156,7 @@ export class AdtFeatureToggle<
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+  ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -163,7 +170,7 @@ export class AdtFeatureToggle<
           config.packageName,
           config.description,
         ),
-      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      this.results.validation,
       options?.analyse,
     );
   }
@@ -172,7 +179,7 @@ export class AdtFeatureToggle<
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IFeatureToggleConfig, 'source'> & { source?: never },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+  ): Promise<IAdtResponse<T['created'], E>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // An object created without a package is the single thing `delete()` cannot
@@ -200,7 +207,7 @@ export class AdtFeatureToggle<
           options.headers,
           this.createParams(config),
         ),
-      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      this.results.created,
       options?.analyse,
     );
   }
@@ -210,7 +217,7 @@ export class AdtFeatureToggle<
     config: Partial<IFeatureToggleConfig>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+  ): Promise<IAdtResponse<T['source'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -221,7 +228,7 @@ export class AdtFeatureToggle<
     // an empty body *is* absence is the caller's reading, through `analyse`.
     return answering(
       () => readFeatureToggle(connection, name, version),
-      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      this.results.source,
       options?.analyse,
     );
   }
@@ -230,7 +237,7 @@ export class AdtFeatureToggle<
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+  ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -238,7 +245,7 @@ export class AdtFeatureToggle<
 
     return answering(
       () => readFeatureToggle(connection, name, options?.version),
-      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      this.results.metadata,
       options?.analyse,
     );
   }
@@ -257,7 +264,7 @@ export class AdtFeatureToggle<
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -269,9 +276,7 @@ export class AdtFeatureToggle<
           this.createParams(config as IFeatureToggleConfig),
           options?.lockHandle,
         ),
-      this.results.metadataUpdated as IResultStrategy<
-        ReturnType<R['metadataUpdated']>
-      >,
+      this.results.metadataUpdated,
       options?.analyse,
     );
   }
@@ -291,7 +296,7 @@ export class AdtFeatureToggle<
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -308,7 +313,7 @@ export class AdtFeatureToggle<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.updated,
       options?.analyse,
     );
   }
@@ -323,7 +328,7 @@ export class AdtFeatureToggle<
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -333,9 +338,7 @@ export class AdtFeatureToggle<
     return answering(
       () =>
         checkDeletion(connection, options.headers, this.deleteParams(config)),
-      this.results.deletionCheck as IResultStrategy<
-        ReturnType<R['deletionCheck']>
-      >,
+      this.results.deletionCheck,
       options?.analyse,
     );
   }
@@ -352,7 +355,7 @@ export class AdtFeatureToggle<
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -366,7 +369,7 @@ export class AdtFeatureToggle<
           options.headers,
           this.deleteParams(config),
         ),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }
@@ -375,7 +378,7 @@ export class AdtFeatureToggle<
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+  ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -383,7 +386,7 @@ export class AdtFeatureToggle<
 
     return answering(
       () => activateFeatureToggle(connection, options.headers, name),
-      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      this.results.activation,
       options?.analyse,
     );
   }
@@ -393,7 +396,7 @@ export class AdtFeatureToggle<
     config: Partial<IFeatureToggleConfig>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+  ): Promise<IAdtResponse<T['check'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -403,7 +406,7 @@ export class AdtFeatureToggle<
 
     return answering(
       () => checkFeatureToggle(connection, options.headers, name, version),
-      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      this.results.check,
       options?.analyse,
     );
   }
@@ -469,7 +472,7 @@ export class AdtFeatureToggle<
     config: Partial<IFeatureToggleConfig>,
     opts: { transportRequest: string; userSpecific?: boolean },
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['switched']>, E>> {
+  ): Promise<IAdtResponse<T['switched'], E>> {
     return this.switchTo(config, opts, 'on', options);
   }
 
@@ -478,7 +481,7 @@ export class AdtFeatureToggle<
     config: Partial<IFeatureToggleConfig>,
     opts: { transportRequest: string; userSpecific?: boolean },
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['switched']>, E>> {
+  ): Promise<IAdtResponse<T['switched'], E>> {
     return this.switchTo(config, opts, 'off', options);
   }
 
@@ -487,7 +490,7 @@ export class AdtFeatureToggle<
     opts: { transportRequest: string; userSpecific?: boolean },
     targetState: 'on' | 'off',
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['switched']>, E>> {
+  ): Promise<IAdtResponse<T['switched'], E>> {
     const name = this.name(config);
     return answering(
       () =>
@@ -497,7 +500,7 @@ export class AdtFeatureToggle<
           is_user_specific: Boolean(opts.userSpecific),
           transport_request: opts.transportRequest,
         }),
-      this.results.switched as IResultStrategy<ReturnType<R['switched']>>,
+      this.results.switched,
       options?.analyse,
     );
   }
@@ -509,13 +512,11 @@ export class AdtFeatureToggle<
   async getRuntimeState<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['runtimeState']>, E>> {
+  ): Promise<IAdtResponse<T['runtimeState'], E>> {
     const name = this.name(config);
     return answering(
       () => getFeatureToggleState(this.connection, name),
-      this.results.runtimeState as IResultStrategy<
-        ReturnType<R['runtimeState']>
-      >,
+      this.results.runtimeState,
       options?.analyse,
     );
   }
@@ -528,12 +529,12 @@ export class AdtFeatureToggle<
     config: Partial<IFeatureToggleConfig>,
     opts: { userSpecific?: boolean } | undefined,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['checkState']>, E>> {
+  ): Promise<IAdtResponse<T['checkState'], E>> {
     const name = this.name(config);
     return answering(
       () =>
         checkFeatureToggleState(this.connection, options.headers, name, opts),
-      this.results.checkState as IResultStrategy<ReturnType<R['checkState']>>,
+      this.results.checkState,
       options?.analyse,
     );
   }
@@ -550,14 +551,12 @@ export class AdtFeatureToggle<
     config: Partial<IFeatureToggleConfig>,
     version?: AdtReadVersion,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['sourceDocument']>, E>> {
+  ): Promise<IAdtResponse<T['sourceDocument'], E>> {
     const name = this.name(config);
 
     return answering(
       () => readFeatureToggleSource(this.connection, name, version),
-      this.results.sourceDocument as IResultStrategy<
-        ReturnType<R['sourceDocument']>
-      >,
+      this.results.sourceDocument,
       options?.analyse,
     );
   }

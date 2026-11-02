@@ -2,5 +2,8 @@
  * Table operations - exports
  */
 
-export { AdtTable } from './AdtTable';
+export {
+  AdtTable,
+  type TableValues,
+} from './AdtTable';
 export * from './types';

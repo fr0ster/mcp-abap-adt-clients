@@ -14,7 +14,9 @@ import {
   AdtPackage,
   failed,
   PACKAGE,
+  type PackageValues,
   type packageDocuments,
+  type ResultValuesOf,
 } from '@mcp-abap-adt/adt-clients';
 import type {
   IAdtAnalyseOptions,
@@ -23,7 +25,6 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IPackageConfig,
-  IPackageResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import {
@@ -52,36 +53,36 @@ const UNSUPPORTED: IAdtError = {
  * consumer branches on `UNSUPPORTED_OPERATION` rather than matching a message.
  */
 export class AdtPackageLegacy<
-  R extends IPackageResults = typeof packageDocuments,
-> extends AdtPackage<R> {
+  T extends PackageValues = ResultValuesOf<typeof packageDocuments>,
+> extends AdtPackage<T> {
   override async create<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['created']>, E>
+    IAdtResponse<T['created'], E>
   > {
-    return failed<ReturnType<R['created']>, E>(UNSUPPORTED as E);
+    return failed<T['created'], E>(UNSUPPORTED as E);
   }
 
   override async readMetadata<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['metadata']>, E>
+    IAdtResponse<T['metadata'], E>
   > {
-    return failed<ReturnType<R['metadata']>, E>(UNSUPPORTED as E);
+    return failed<T['metadata'], E>(UNSUPPORTED as E);
   }
 
   override async validate<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['validation']>, E>
+    IAdtResponse<T['validation'], E>
   > {
-    return failed<ReturnType<R['validation']>, E>(UNSUPPORTED as E);
+    return failed<T['validation'], E>(UNSUPPORTED as E);
   }
 
   override async updateMetadata<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['metadataUpdated']>, E>
+    IAdtResponse<T['metadataUpdated'], E>
   > {
-    return failed<ReturnType<R['metadataUpdated']>, E>(UNSUPPORTED as E);
+    return failed<T['metadataUpdated'], E>(UNSUPPORTED as E);
   }
 
   override async delete<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<ReturnType<R['deletion']>, E>
+    IAdtResponse<T['deletion'], E>
   > {
-    return failed<ReturnType<R['deletion']>, E>(UNSUPPORTED as E);
+    return failed<T['deletion'], E>(UNSUPPORTED as E);
   }
 
   /**
@@ -92,8 +93,8 @@ export class AdtPackageLegacy<
   override async checkDeletion<E extends IAdtError = IAdtError>(
     _config: Partial<IPackageConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
-    return noDeletionCheckNorDelete<ReturnType<R['deletionCheck']>, E>();
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+    return noDeletionCheckNorDelete<T['deletionCheck'], E>();
   }
 
   /**
@@ -119,8 +120,8 @@ export class AdtPackageLegacy<
   override async readTransport<E extends IAdtError = IAdtError>(
     _config: Partial<IPackageConfig>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
-    return legacyRefusal<ReturnType<R['transport']>, E>(
+  ): Promise<IAdtResponse<T['transport'], E>> {
+    return legacyRefusal<T['transport'], E>(
       'readTransport',
       `${ITEM_RESOURCE}/transport`,
     );
@@ -130,8 +131,8 @@ export class AdtPackageLegacy<
     _config: Partial<IPackageConfig>,
     _status: string | undefined,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
-    return legacyRefusal<ReturnType<R['check']>, E>(
+  ): Promise<IAdtResponse<T['check'], E>> {
+    return legacyRefusal<T['check'], E>(
       'check',
       `${ITEM_RESOURCE} to check (the check run names it)`,
     );

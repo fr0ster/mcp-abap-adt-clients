@@ -1,1 +1,4 @@
-export { AdtAbapGitClient } from '../AdtAbapGitClient';
+export {
+  type AbapGitValues,
+  AdtAbapGitClient,
+} from '../AdtAbapGitClient';

@@ -27,6 +27,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtAtc, atcDocuments } from '../../../runtime/atc/AdtAtc';
+import type { ResultValuesOf } from '../../../utils/resultStrategy';
 import { expectResult } from '../../helpers/contract';
 
 /** An ATC client that reads its answers — the set a caller passes. */
@@ -45,7 +46,7 @@ const reading = {
  * stay one member — the order and the worklist's reuse are the caller's.
  */
 const runAtc = async (
-  atc: AdtAtc<typeof reading>,
+  atc: AdtAtc<ResultValuesOf<typeof reading>>,
   target: IAtcRunTarget,
   options?: IAtcRunOptions,
 ) => {

@@ -38,7 +38,6 @@ import type {
   IAdtUpdatable,
   IAdtValidatable,
   IFunctionGroupResults,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -46,7 +45,11 @@ import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
-import { nothing } from '../../utils/resultStrategy';
+import {
+  nothing,
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+} from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
@@ -70,33 +73,31 @@ import { unlockFunctionGroup } from './unlock';
 import { updateFunctionGroup, uploadFunctionGroupSource } from './update';
 import { validateFunctionGroupName } from './validation';
 
+/** What each slot of the result set answers. */
+export type FunctionGroupValues = {
+  readonly [K in keyof IFunctionGroupResults]: unknown;
+};
+
 export class AdtFunctionGroup<
-  R extends IFunctionGroupResults = typeof functionGroupDocuments,
+  T extends FunctionGroupValues = ResultValuesOf<typeof functionGroupDocuments>,
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtEnhancementHost<
       IFunctionGroupConfig,
-      ReturnType<R['enhancementElements']>,
-      ReturnType<R['enhancementOptions']>
+      T['enhancementElements'],
+      T['enhancementOptions']
     >,
-    IAdtCreatable<IFunctionGroupConfig, ReturnType<R['created']>>,
-    IAdtReadable<IFunctionGroupConfig, ReturnType<R['source']>>,
-    IAdtMetadataReadable<IFunctionGroupConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<Partial<IFunctionGroupConfig>, ReturnType<R['updated']>>,
-    IAdtMetadataUpdatable<
-      Partial<IFunctionGroupConfig>,
-      ReturnType<R['metadataUpdated']>
-    >,
-    IAdtDeletable<
-      IFunctionGroupConfig,
-      ReturnType<R['deletion']>,
-      ReturnType<R['deletionCheck']>
-    >,
-    IAdtValidatable<IFunctionGroupConfig, ReturnType<R['validation']>>,
-    IAdtCheckable<IFunctionGroupConfig, ReturnType<R['check']>>,
-    IAdtActivatable<IFunctionGroupConfig, ReturnType<R['activation']>>,
+    IAdtCreatable<IFunctionGroupConfig, T['created']>,
+    IAdtReadable<IFunctionGroupConfig, T['source']>,
+    IAdtMetadataReadable<IFunctionGroupConfig, T['metadata']>,
+    IAdtUpdatable<Partial<IFunctionGroupConfig>, T['updated']>,
+    IAdtMetadataUpdatable<Partial<IFunctionGroupConfig>, T['metadataUpdated']>,
+    IAdtDeletable<IFunctionGroupConfig, T['deletion'], T['deletionCheck']>,
+    IAdtValidatable<IFunctionGroupConfig, T['validation']>,
+    IAdtCheckable<IFunctionGroupConfig, T['check']>,
+    IAdtActivatable<IFunctionGroupConfig, T['activation']>,
     IAdtLockable<IFunctionGroupConfig>,
-    IAdtTransportAware<IFunctionGroupConfig, ReturnType<R['transport']>>
+    IAdtTransportAware<IFunctionGroupConfig, T['transport']>
 {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -110,12 +111,12 @@ export class AdtFunctionGroup<
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'FunctionGroup';
 
-  protected readonly results: R;
+  protected readonly results: ResultStrategiesOf<T>;
 
   constructor(
     connection: IAbapConnection,
     options: AdtHandlerOptions<
-      R,
+      ResultStrategiesOf<T>,
       'logger' | 'systemContext' | 'contentTypes' | 'lockRegistry'
     >,
   ) {
@@ -137,7 +138,7 @@ export class AdtFunctionGroup<
   async readEnhancementElements<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['enhancementElements']>, E>> {
+  ): Promise<IAdtResponse<T['enhancementElements'], E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
       () =>
@@ -145,9 +146,7 @@ export class AdtFunctionGroup<
           connection,
           config.functionGroupName as string,
         ),
-      this.results.enhancementElements as IResultStrategy<
-        ReturnType<R['enhancementElements']>
-      >,
+      this.results.enhancementElements,
       options?.analyse,
     );
   }
@@ -156,7 +155,7 @@ export class AdtFunctionGroup<
   async readEnhancementOptions<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['enhancementOptions']>, E>> {
+  ): Promise<IAdtResponse<T['enhancementOptions'], E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
       () =>
@@ -164,9 +163,7 @@ export class AdtFunctionGroup<
           connection,
           config.functionGroupName as string,
         ),
-      this.results.enhancementOptions as IResultStrategy<
-        ReturnType<R['enhancementOptions']>
-      >,
+      this.results.enhancementOptions,
       options?.analyse,
     );
   }
@@ -175,7 +172,7 @@ export class AdtFunctionGroup<
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+  ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -187,7 +184,7 @@ export class AdtFunctionGroup<
           config.packageName,
           config.description,
         ),
-      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      this.results.validation,
       options?.analyse,
     );
   }
@@ -196,7 +193,7 @@ export class AdtFunctionGroup<
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IFunctionGroupConfig, 'source'> & { source?: never },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+  ): Promise<IAdtResponse<T['created'], E>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // An object created without a package is the single thing `delete()` cannot
@@ -233,7 +230,7 @@ export class AdtFunctionGroup<
           },
           this.logger,
         ),
-      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      this.results.created,
       options?.analyse,
     );
   }
@@ -244,7 +241,7 @@ export class AdtFunctionGroup<
     config: Partial<IFunctionGroupConfig>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+  ): Promise<IAdtResponse<T['source'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -256,7 +253,7 @@ export class AdtFunctionGroup<
           version,
           options,
         ),
-      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      this.results.source,
       options?.analyse,
     );
   }
@@ -268,7 +265,7 @@ export class AdtFunctionGroup<
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+  ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -279,7 +276,7 @@ export class AdtFunctionGroup<
           config.functionGroupName as string,
           options,
         ),
-      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      this.results.metadata,
       options?.analyse,
     );
   }
@@ -289,7 +286,7 @@ export class AdtFunctionGroup<
     this: this & AdtPerformedBy<'functionGroup', 'transport'>,
     config: Partial<IFunctionGroupConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+  ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -302,7 +299,7 @@ export class AdtFunctionGroup<
             ? { withLongPolling: options.withLongPolling }
             : undefined,
         ),
-      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      this.results.transport,
       options?.analyse,
     );
   }
@@ -320,7 +317,7 @@ export class AdtFunctionGroup<
     this: this & AdtPerformedBy<'functionGroup', 'update'>,
     config: Partial<IFunctionGroupConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -334,7 +331,7 @@ export class AdtFunctionGroup<
           options?.lockHandle as string,
           config.transportRequest,
         ),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.updated,
       options?.analyse,
     );
   }
@@ -353,7 +350,7 @@ export class AdtFunctionGroup<
     this: this & AdtPerformedBy<'functionGroup', 'updateMetadata'>,
     config: Partial<IFunctionGroupConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -377,9 +374,7 @@ export class AdtFunctionGroup<
           // the read and the window are theirs now.
           options?.source as string,
         ),
-      this.results.metadataUpdated as IResultStrategy<
-        ReturnType<R['metadataUpdated']>
-      >,
+      this.results.metadataUpdated,
       options?.analyse,
     );
   }
@@ -395,7 +390,7 @@ export class AdtFunctionGroup<
     this: this & AdtPerformedBy<'functionGroup', 'deletionCheck'>,
     config: Partial<IFunctionGroupConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -406,9 +401,7 @@ export class AdtFunctionGroup<
           function_group_name: name,
           transport_request: config.transportRequest,
         }),
-      this.results.deletionCheck as IResultStrategy<
-        ReturnType<R['deletionCheck']>
-      >,
+      this.results.deletionCheck,
       options?.analyse,
     );
   }
@@ -421,7 +414,7 @@ export class AdtFunctionGroup<
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -432,7 +425,7 @@ export class AdtFunctionGroup<
           function_group_name: name,
           transport_request: config.transportRequest,
         }),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }
@@ -441,7 +434,7 @@ export class AdtFunctionGroup<
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+  ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -452,7 +445,7 @@ export class AdtFunctionGroup<
           options.headers,
           config.functionGroupName as string,
         ),
-      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      this.results.activation,
       options?.analyse,
     );
   }
@@ -462,7 +455,7 @@ export class AdtFunctionGroup<
     config: Partial<IFunctionGroupConfig>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+  ): Promise<IAdtResponse<T['check'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -477,7 +470,7 @@ export class AdtFunctionGroup<
           config.functionGroupName as string,
           version,
         ),
-      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      this.results.check,
       options?.analyse,
     );
   }

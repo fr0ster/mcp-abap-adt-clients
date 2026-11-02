@@ -9,7 +9,7 @@
  * - Update: lock → check(inactive) → update → unlock → check → activate
  * - Delete: check(deletion) → delete
  *
- * Each factory answers its own handler class (`AdtClass<R>`, …) over the
+ * Each factory answers its own handler class (`AdtClass<ResultValuesOf<R>>`, …) over the
  * result set it is given, or the shipped default without one. This package
  * declares no composition of the atoms: a consumer composes the contract it
  * accepts from `@mcp-abap-adt/interfaces-adt`, and the compiler checks there
@@ -59,19 +59,23 @@ import type {
 import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
+  type AccessControlValues,
   AdtAccessControl,
   accessControlDocuments,
 } from '../core/accessControl';
 import {
   AdtAppendStructure,
+  type AppendStructureValues,
   appendStructureDocuments,
 } from '../core/appendStructure';
 import {
   AdtAuthorizationField,
+  type AuthorizationFieldValues,
   authorizationFieldDocuments,
 } from '../core/authorizationField';
 import {
   AdtBehaviorDefinition,
+  type BehaviorDefinitionValues,
   behaviorDefinitionDocuments,
 } from '../core/behaviorDefinition';
 import {
@@ -84,71 +88,119 @@ import {
   AdtLocalMacros,
   AdtLocalTestClass,
   AdtLocalTypes,
+  type ClassValues,
 } from '../core/class';
-import { AdtDataElement, dataElementDocuments } from '../core/dataElement';
-import { AdtDdl, ddlDocuments } from '../core/ddl';
-import { AdtDomain, domainDocuments } from '../core/domain';
-import { AdtEnhancement, enhancementDocuments } from '../core/enhancement';
+import {
+  AdtDataElement,
+  type DataElementValues,
+  dataElementDocuments,
+} from '../core/dataElement';
+import { AdtDdl, type DdlValues, ddlDocuments } from '../core/ddl';
+import { AdtDomain, type DomainValues, domainDocuments } from '../core/domain';
+import {
+  AdtEnhancement,
+  type EnhancementValues,
+  enhancementDocuments,
+} from '../core/enhancement';
 import {
   AdtFeatureToggle,
+  type FeatureToggleValues,
   featureToggleDocuments,
 } from '../core/featureToggle';
 import {
   AdtFunctionGroup,
+  type FunctionGroupValues,
   functionGroupDocuments,
 } from '../core/functionGroup';
 import {
   AdtFunctionInclude,
+  type FunctionIncludeValues,
   functionIncludeDocuments,
 } from '../core/functionInclude';
 import {
   AdtFunctionModule,
+  type FunctionModuleValues,
   functionModuleDocuments,
 } from '../core/functionModule';
 import {
   AdtInclude,
   type IncludeValues,
   includeDocuments,
-  type ResultValuesOf,
 } from '../core/include';
-import { AdtInterface, interfaceDocuments } from '../core/interface';
+import {
+  AdtInterface,
+  type InterfaceValues,
+  interfaceDocuments,
+} from '../core/interface';
 import {
   AdtMessageClass,
   AdtMessageClassMessage,
+  type MessageClassMessageValues,
+  type MessageClassValues,
   messageClassDocuments,
   messageDocuments,
 } from '../core/messageClass';
 import {
   AdtMetadataExtension,
+  type MetadataExtensionValues,
   metadataExtensionDocuments,
 } from '../core/metadataExtension';
-import { AdtPackage, packageDocuments } from '../core/package';
-import { AdtProgram, programDocuments } from '../core/program';
+import {
+  AdtPackage,
+  type PackageValues,
+  packageDocuments,
+} from '../core/package';
+import {
+  AdtProgram,
+  type ProgramValues,
+  programDocuments,
+} from '../core/program';
 import {
   AdtScalarFunction,
+  type ScalarFunctionValues,
   scalarFunctionDocuments,
 } from '../core/scalarFunction';
 import {
   AdtScalarFunctionImplementation,
+  type ScalarFunctionImplementationValues,
   scalarFunctionImplementationDocuments,
 } from '../core/scalarFunctionImplementation';
-import { AdtServiceBinding, serviceDocuments } from '../core/service';
+import {
+  AdtServiceBinding,
+  type ServiceValues,
+  serviceDocuments,
+} from '../core/service';
 import {
   AdtServiceDefinition,
+  type ServiceDefinitionValues,
   serviceDefinitionDocuments,
 } from '../core/serviceDefinition';
-import { AdtUtils } from '../core/shared/AdtUtils';
+import { AdtUtils, type UtilValues } from '../core/shared/AdtUtils';
 import { type LockFailure, LockRegistry } from '../core/shared/LockRegistry';
 import { utilDocuments } from '../core/shared/utilResultSet';
-import { AdtStructure, structureDocuments } from '../core/structure';
-import { AdtTable, tableDocuments } from '../core/table';
-import { AdtDdicTableType, tableTypeDocuments } from '../core/tabletype';
+import {
+  AdtStructure,
+  type StructureValues,
+  structureDocuments,
+} from '../core/structure';
+import { AdtTable, type TableValues, tableDocuments } from '../core/table';
+import {
+  AdtDdicTableType,
+  type TableTypeValues,
+  tableTypeDocuments,
+} from '../core/tabletype';
 import {
   AdtTransformation,
+  type TransformationValues,
   transformationDocuments,
 } from '../core/transformation';
-import { AdtRequest, transportDocuments } from '../core/transport';
+import {
+  AdtRequest,
+  type TransportValues,
+  transportDocuments,
+} from '../core/transport';
 import { withRequestTrace } from '../utils/requestTrace';
+import type { ResultValuesOf } from '../utils/resultStrategy';
 import type { AdtModernVariant, AdtServedBy } from './variant';
 
 /**
@@ -266,17 +318,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
   // its own R passes its results — no default is typed as R.
   getClass(
     this: this & AdtServedBy<'class'>,
-  ): AdtClass<typeof classDocuments, V>;
+  ): AdtClass<ResultValuesOf<typeof classDocuments>, V>;
   getClass<R extends IClassResults>(
     this: this & AdtServedBy<'class'>,
     results: R,
-  ): AdtClass<R, V>;
+  ): AdtClass<ResultValuesOf<R>, V>;
   getClass(
     this: this & AdtServedBy<'class'>,
     results: IClassResults = classDocuments,
-  ): AdtClass<IClassResults, V> {
+  ): AdtClass<ClassValues, V> {
     this.assertConnected();
-    return new AdtClass<IClassResults, V>(this.connection, {
+    return new AdtClass<ClassValues, V>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       contentTypes: this.contentTypes,
@@ -291,17 +343,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getProgram(
     this: this & AdtServedBy<'program'>,
-  ): AdtProgram<typeof programDocuments, V>;
+  ): AdtProgram<ResultValuesOf<typeof programDocuments>, V>;
   getProgram<R extends IProgramResults>(
     this: this & AdtServedBy<'program'>,
     results: R,
-  ): AdtProgram<R, V>;
+  ): AdtProgram<ResultValuesOf<R>, V>;
   getProgram(
     this: this & AdtServedBy<'program'>,
     results: IProgramResults = programDocuments,
-  ): AdtProgram<IProgramResults, V> {
+  ): AdtProgram<ProgramValues, V> {
     this.assertConnected();
-    return new AdtProgram<IProgramResults, V>(this.connection, {
+    return new AdtProgram<ProgramValues, V>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       contentTypes: this.contentTypes,
@@ -347,17 +399,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getInterface(
     this: this & AdtServedBy<'interface'>,
-  ): AdtInterface<typeof interfaceDocuments, V>;
+  ): AdtInterface<ResultValuesOf<typeof interfaceDocuments>, V>;
   getInterface<R extends IInterfaceResults>(
     this: this & AdtServedBy<'interface'>,
     results: R,
-  ): AdtInterface<R, V>;
+  ): AdtInterface<ResultValuesOf<R>, V>;
   getInterface(
     this: this & AdtServedBy<'interface'>,
     results: IInterfaceResults = interfaceDocuments,
-  ): AdtInterface<IInterfaceResults, V> {
+  ): AdtInterface<InterfaceValues, V> {
     this.assertConnected();
-    return new AdtInterface<IInterfaceResults, V>(this.connection, {
+    return new AdtInterface<InterfaceValues, V>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       lockRegistry: this.lockRegistry,
@@ -371,17 +423,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getDomain(
     this: this & AdtServedBy<'domain'>,
-  ): AdtDomain<typeof domainDocuments>;
+  ): AdtDomain<ResultValuesOf<typeof domainDocuments>>;
   getDomain<R extends IDomainResults>(
     this: this & AdtServedBy<'domain'>,
     results: R,
-  ): AdtDomain<R>;
+  ): AdtDomain<ResultValuesOf<R>>;
   getDomain(
     this: this & AdtServedBy<'domain'>,
     results: IDomainResults = domainDocuments,
-  ): AdtDomain<IDomainResults> {
+  ): AdtDomain<DomainValues> {
     this.assertConnected();
-    return new AdtDomain<IDomainResults>(this.connection, {
+    return new AdtDomain<DomainValues>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       lockRegistry: this.lockRegistry,
@@ -447,17 +499,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getDataElement(
     this: this & AdtServedBy<'dataElement'>,
-  ): AdtDataElement<typeof dataElementDocuments>;
+  ): AdtDataElement<ResultValuesOf<typeof dataElementDocuments>>;
   getDataElement<R extends IDataElementResults>(
     this: this & AdtServedBy<'dataElement'>,
     results: R,
-  ): AdtDataElement<R>;
+  ): AdtDataElement<ResultValuesOf<R>>;
   getDataElement(
     this: this & AdtServedBy<'dataElement'>,
     results: IDataElementResults = dataElementDocuments,
-  ): AdtDataElement<IDataElementResults> {
+  ): AdtDataElement<DataElementValues> {
     this.assertConnected();
-    return new AdtDataElement<IDataElementResults>(this.connection, {
+    return new AdtDataElement<DataElementValues>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       lockRegistry: this.lockRegistry,
@@ -471,17 +523,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getAuthorizationField(
     this: this & AdtServedBy<'authorizationField'>,
-  ): AdtAuthorizationField<typeof authorizationFieldDocuments>;
+  ): AdtAuthorizationField<ResultValuesOf<typeof authorizationFieldDocuments>>;
   getAuthorizationField<R extends IAuthorizationFieldResults>(
     this: this & AdtServedBy<'authorizationField'>,
     results: R,
-  ): AdtAuthorizationField<R>;
+  ): AdtAuthorizationField<ResultValuesOf<R>>;
   getAuthorizationField(
     this: this & AdtServedBy<'authorizationField'>,
     results: IAuthorizationFieldResults = authorizationFieldDocuments,
-  ): AdtAuthorizationField<IAuthorizationFieldResults> {
+  ): AdtAuthorizationField<AuthorizationFieldValues> {
     this.assertConnected();
-    return new AdtAuthorizationField<IAuthorizationFieldResults>(
+    return new AdtAuthorizationField<AuthorizationFieldValues>(
       this.connection,
       {
         logger: this.logger,
@@ -498,17 +550,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getStructure(
     this: this & AdtServedBy<'structure'>,
-  ): AdtStructure<typeof structureDocuments, V>;
+  ): AdtStructure<ResultValuesOf<typeof structureDocuments>, V>;
   getStructure<R extends IStructureResults>(
     this: this & AdtServedBy<'structure'>,
     results: R,
-  ): AdtStructure<R, V>;
+  ): AdtStructure<ResultValuesOf<R>, V>;
   getStructure(
     this: this & AdtServedBy<'structure'>,
     results: IStructureResults = structureDocuments,
-  ): AdtStructure<IStructureResults, V> {
+  ): AdtStructure<StructureValues, V> {
     this.assertConnected();
-    return new AdtStructure<IStructureResults, V>(this.connection, {
+    return new AdtStructure<StructureValues, V>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       lockRegistry: this.lockRegistry,
@@ -522,17 +574,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getTable(
     this: this & AdtServedBy<'table'>,
-  ): AdtTable<typeof tableDocuments, V>;
+  ): AdtTable<ResultValuesOf<typeof tableDocuments>, V>;
   getTable<R extends ITableResults>(
     this: this & AdtServedBy<'table'>,
     results: R,
-  ): AdtTable<R, V>;
+  ): AdtTable<ResultValuesOf<R>, V>;
   getTable(
     this: this & AdtServedBy<'table'>,
     results: ITableResults = tableDocuments,
-  ): AdtTable<ITableResults, V> {
+  ): AdtTable<TableValues, V> {
     this.assertConnected();
-    return new AdtTable<ITableResults, V>(this.connection, {
+    return new AdtTable<TableValues, V>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       lockRegistry: this.lockRegistry,
@@ -546,17 +598,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getTableType(
     this: this & AdtServedBy<'tableType'>,
-  ): AdtDdicTableType<typeof tableTypeDocuments>;
+  ): AdtDdicTableType<ResultValuesOf<typeof tableTypeDocuments>>;
   getTableType<R extends ITableTypeResults>(
     this: this & AdtServedBy<'tableType'>,
     results: R,
-  ): AdtDdicTableType<R>;
+  ): AdtDdicTableType<ResultValuesOf<R>>;
   getTableType(
     this: this & AdtServedBy<'tableType'>,
     results: ITableTypeResults = tableTypeDocuments,
-  ): AdtDdicTableType<ITableTypeResults> {
+  ): AdtDdicTableType<TableTypeValues> {
     this.assertConnected();
-    return new AdtDdicTableType<ITableTypeResults>(this.connection, {
+    return new AdtDdicTableType<TableTypeValues>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       lockRegistry: this.lockRegistry,
@@ -571,17 +623,19 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    * (`/ddic/dsfd/sources/`) have their own clients.
    * @returns IAdtObject instance for DDL source operations
    */
-  getDdl(this: this & AdtServedBy<'ddl'>): AdtDdl<typeof ddlDocuments, V>;
+  getDdl(
+    this: this & AdtServedBy<'ddl'>,
+  ): AdtDdl<ResultValuesOf<typeof ddlDocuments>, V>;
   getDdl<R extends IDdlResults>(
     this: this & AdtServedBy<'ddl'>,
     results: R,
-  ): AdtDdl<R, V>;
+  ): AdtDdl<ResultValuesOf<R>, V>;
   getDdl(
     this: this & AdtServedBy<'ddl'>,
     results: IDdlResults = ddlDocuments,
-  ): AdtDdl<IDdlResults, V> {
+  ): AdtDdl<DdlValues, V> {
     this.assertConnected();
-    return new AdtDdl<IDdlResults, V>(this.connection, {
+    return new AdtDdl<DdlValues, V>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       lockRegistry: this.lockRegistry,
@@ -595,17 +649,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getFunctionGroup(
     this: this & AdtServedBy<'functionGroup'>,
-  ): AdtFunctionGroup<typeof functionGroupDocuments, V>;
+  ): AdtFunctionGroup<ResultValuesOf<typeof functionGroupDocuments>, V>;
   getFunctionGroup<R extends IFunctionGroupResults>(
     this: this & AdtServedBy<'functionGroup'>,
     results: R,
-  ): AdtFunctionGroup<R, V>;
+  ): AdtFunctionGroup<ResultValuesOf<R>, V>;
   getFunctionGroup(
     this: this & AdtServedBy<'functionGroup'>,
     results: IFunctionGroupResults = functionGroupDocuments,
-  ): AdtFunctionGroup<IFunctionGroupResults, V> {
+  ): AdtFunctionGroup<FunctionGroupValues, V> {
     this.assertConnected();
-    return new AdtFunctionGroup<IFunctionGroupResults, V>(this.connection, {
+    return new AdtFunctionGroup<FunctionGroupValues, V>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       contentTypes: this.contentTypes,
@@ -620,17 +674,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getFunctionModule(
     this: this & AdtServedBy<'functionModule'>,
-  ): AdtFunctionModule<typeof functionModuleDocuments, V>;
+  ): AdtFunctionModule<ResultValuesOf<typeof functionModuleDocuments>, V>;
   getFunctionModule<R extends IFunctionModuleResults>(
     this: this & AdtServedBy<'functionModule'>,
     results: R,
-  ): AdtFunctionModule<R, V>;
+  ): AdtFunctionModule<ResultValuesOf<R>, V>;
   getFunctionModule(
     this: this & AdtServedBy<'functionModule'>,
     results: IFunctionModuleResults = functionModuleDocuments,
-  ): AdtFunctionModule<IFunctionModuleResults, V> {
+  ): AdtFunctionModule<FunctionModuleValues, V> {
     this.assertConnected();
-    return new AdtFunctionModule<IFunctionModuleResults, V>(this.connection, {
+    return new AdtFunctionModule<FunctionModuleValues, V>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       contentTypes: this.contentTypes,
@@ -645,17 +699,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getFunctionInclude(
     this: this & AdtServedBy<'functionInclude'>,
-  ): AdtFunctionInclude<typeof functionIncludeDocuments, V>;
+  ): AdtFunctionInclude<ResultValuesOf<typeof functionIncludeDocuments>, V>;
   getFunctionInclude<R extends IFunctionIncludeResults>(
     this: this & AdtServedBy<'functionInclude'>,
     results: R,
-  ): AdtFunctionInclude<R, V>;
+  ): AdtFunctionInclude<ResultValuesOf<R>, V>;
   getFunctionInclude(
     this: this & AdtServedBy<'functionInclude'>,
     results: IFunctionIncludeResults = functionIncludeDocuments,
-  ): AdtFunctionInclude<IFunctionIncludeResults, V> {
+  ): AdtFunctionInclude<FunctionIncludeValues, V> {
     this.assertConnected();
-    return new AdtFunctionInclude<IFunctionIncludeResults, V>(this.connection, {
+    return new AdtFunctionInclude<FunctionIncludeValues, V>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       contentTypes: this.contentTypes,
@@ -670,17 +724,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getPackage(
     this: this & AdtServedBy<'package'>,
-  ): AdtPackage<typeof packageDocuments>;
+  ): AdtPackage<ResultValuesOf<typeof packageDocuments>>;
   getPackage<R extends IPackageResults>(
     this: this & AdtServedBy<'package'>,
     results: R,
-  ): AdtPackage<R>;
+  ): AdtPackage<ResultValuesOf<R>>;
   getPackage(
     this: this & AdtServedBy<'package'>,
     results: IPackageResults = packageDocuments,
-  ): AdtPackage<IPackageResults> {
+  ): AdtPackage<PackageValues> {
     this.assertConnected();
-    return new AdtPackage<IPackageResults>(this.connection, {
+    return new AdtPackage<PackageValues>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       lockRegistry: this.lockRegistry,
@@ -694,17 +748,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getMessageClass(
     this: this & AdtServedBy<'messageClass'>,
-  ): AdtMessageClass<typeof messageClassDocuments, V>;
+  ): AdtMessageClass<ResultValuesOf<typeof messageClassDocuments>, V>;
   getMessageClass<R extends IMessageClassResults>(
     this: this & AdtServedBy<'messageClass'>,
     results: R,
-  ): AdtMessageClass<R, V>;
+  ): AdtMessageClass<ResultValuesOf<R>, V>;
   getMessageClass(
     this: this & AdtServedBy<'messageClass'>,
     results: IMessageClassResults = messageClassDocuments,
-  ): AdtMessageClass<IMessageClassResults, V> {
+  ): AdtMessageClass<MessageClassValues, V> {
     this.assertConnected();
-    return new AdtMessageClass<IMessageClassResults, V>(this.connection, {
+    return new AdtMessageClass<MessageClassValues, V>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       lockRegistry: this.lockRegistry,
@@ -722,17 +776,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getMessageClassMessage(
     this: this & AdtServedBy<'messageClassMessage'>,
-  ): AdtMessageClassMessage<typeof messageDocuments>;
+  ): AdtMessageClassMessage<ResultValuesOf<typeof messageDocuments>>;
   getMessageClassMessage<R extends IMessageClassMessageResults>(
     this: this & AdtServedBy<'messageClassMessage'>,
     results: R,
-  ): AdtMessageClassMessage<R>;
+  ): AdtMessageClassMessage<ResultValuesOf<R>>;
   getMessageClassMessage(
     this: this & AdtServedBy<'messageClassMessage'>,
     results: IMessageClassMessageResults = messageDocuments,
-  ): AdtMessageClassMessage<IMessageClassMessageResults> {
+  ): AdtMessageClassMessage<MessageClassMessageValues> {
     this.assertConnected();
-    return new AdtMessageClassMessage<IMessageClassMessageResults>(
+    return new AdtMessageClassMessage<MessageClassMessageValues>(
       this.connection,
       { logger: this.logger, results },
     );
@@ -744,17 +798,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getAccessControl(
     this: this & AdtServedBy<'accessControl'>,
-  ): AdtAccessControl<typeof accessControlDocuments, V>;
+  ): AdtAccessControl<ResultValuesOf<typeof accessControlDocuments>, V>;
   getAccessControl<R extends IAccessControlResults>(
     this: this & AdtServedBy<'accessControl'>,
     results: R,
-  ): AdtAccessControl<R, V>;
+  ): AdtAccessControl<ResultValuesOf<R>, V>;
   getAccessControl(
     this: this & AdtServedBy<'accessControl'>,
     results: IAccessControlResults = accessControlDocuments,
-  ): AdtAccessControl<IAccessControlResults, V> {
+  ): AdtAccessControl<AccessControlValues, V> {
     this.assertConnected();
-    return new AdtAccessControl<IAccessControlResults, V>(this.connection, {
+    return new AdtAccessControl<AccessControlValues, V>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       lockRegistry: this.lockRegistry,
@@ -769,17 +823,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getTransformation(
     this: this & AdtServedBy<'transformation'>,
-  ): AdtTransformation<typeof transformationDocuments, V>;
+  ): AdtTransformation<ResultValuesOf<typeof transformationDocuments>, V>;
   getTransformation<R extends ITransformationResults>(
     this: this & AdtServedBy<'transformation'>,
     results: R,
-  ): AdtTransformation<R, V>;
+  ): AdtTransformation<ResultValuesOf<R>, V>;
   getTransformation(
     this: this & AdtServedBy<'transformation'>,
     results: ITransformationResults = transformationDocuments,
-  ): AdtTransformation<ITransformationResults, V> {
+  ): AdtTransformation<TransformationValues, V> {
     this.assertConnected();
-    return new AdtTransformation<ITransformationResults, V>(this.connection, {
+    return new AdtTransformation<TransformationValues, V>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       lockRegistry: this.lockRegistry,
@@ -793,17 +847,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getServiceDefinition(
     this: this & AdtServedBy<'serviceDefinition'>,
-  ): AdtServiceDefinition<typeof serviceDefinitionDocuments, V>;
+  ): AdtServiceDefinition<ResultValuesOf<typeof serviceDefinitionDocuments>, V>;
   getServiceDefinition<R extends IServiceDefinitionResults>(
     this: this & AdtServedBy<'serviceDefinition'>,
     results: R,
-  ): AdtServiceDefinition<R, V>;
+  ): AdtServiceDefinition<ResultValuesOf<R>, V>;
   getServiceDefinition(
     this: this & AdtServedBy<'serviceDefinition'>,
     results: IServiceDefinitionResults = serviceDefinitionDocuments,
-  ): AdtServiceDefinition<IServiceDefinitionResults, V> {
+  ): AdtServiceDefinition<ServiceDefinitionValues, V> {
     this.assertConnected();
-    return new AdtServiceDefinition<IServiceDefinitionResults, V>(
+    return new AdtServiceDefinition<ServiceDefinitionValues, V>(
       this.connection,
       {
         logger: this.logger,
@@ -819,17 +873,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getScalarFunction(
     this: this & AdtServedBy<'scalarFunction'>,
-  ): AdtScalarFunction<typeof scalarFunctionDocuments, V>;
+  ): AdtScalarFunction<ResultValuesOf<typeof scalarFunctionDocuments>, V>;
   getScalarFunction<R extends IScalarFunctionResults>(
     this: this & AdtServedBy<'scalarFunction'>,
     results: R,
-  ): AdtScalarFunction<R, V>;
+  ): AdtScalarFunction<ResultValuesOf<R>, V>;
   getScalarFunction(
     this: this & AdtServedBy<'scalarFunction'>,
     results: IScalarFunctionResults = scalarFunctionDocuments,
-  ): AdtScalarFunction<IScalarFunctionResults, V> {
+  ): AdtScalarFunction<ScalarFunctionValues, V> {
     this.assertConnected();
-    return new AdtScalarFunction<IScalarFunctionResults, V>(this.connection, {
+    return new AdtScalarFunction<ScalarFunctionValues, V>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       lockRegistry: this.lockRegistry,
@@ -843,20 +897,20 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
   getScalarFunctionImplementation(
     this: this & AdtServedBy<'scalarFunctionImplementation'>,
   ): AdtScalarFunctionImplementation<
-    typeof scalarFunctionImplementationDocuments
+    ResultValuesOf<typeof scalarFunctionImplementationDocuments>
   >;
   getScalarFunctionImplementation<
     R extends IScalarFunctionImplementationResults,
   >(
     this: this & AdtServedBy<'scalarFunctionImplementation'>,
     results: R,
-  ): AdtScalarFunctionImplementation<R>;
+  ): AdtScalarFunctionImplementation<ResultValuesOf<R>>;
   getScalarFunctionImplementation(
     this: this & AdtServedBy<'scalarFunctionImplementation'>,
     results: IScalarFunctionImplementationResults = scalarFunctionImplementationDocuments,
-  ): AdtScalarFunctionImplementation<IScalarFunctionImplementationResults> {
+  ): AdtScalarFunctionImplementation<ScalarFunctionImplementationValues> {
     this.assertConnected();
-    return new AdtScalarFunctionImplementation<IScalarFunctionImplementationResults>(
+    return new AdtScalarFunctionImplementation<ScalarFunctionImplementationValues>(
       this.connection,
       {
         logger: this.logger,
@@ -872,17 +926,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getAppendStructure(
     this: this & AdtServedBy<'appendStructure'>,
-  ): AdtAppendStructure<typeof appendStructureDocuments>;
+  ): AdtAppendStructure<ResultValuesOf<typeof appendStructureDocuments>>;
   getAppendStructure<R extends IAppendStructureResults>(
     this: this & AdtServedBy<'appendStructure'>,
     results: R,
-  ): AdtAppendStructure<R>;
+  ): AdtAppendStructure<ResultValuesOf<R>>;
   getAppendStructure(
     this: this & AdtServedBy<'appendStructure'>,
     results: IAppendStructureResults = appendStructureDocuments,
-  ): AdtAppendStructure<IAppendStructureResults> {
+  ): AdtAppendStructure<AppendStructureValues> {
     this.assertConnected();
-    return new AdtAppendStructure<IAppendStructureResults>(this.connection, {
+    return new AdtAppendStructure<AppendStructureValues>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       lockRegistry: this.lockRegistry,
@@ -896,17 +950,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getServiceBinding(
     this: this & AdtServedBy<'serviceBinding'>,
-  ): AdtServiceBinding<typeof serviceDocuments, V>;
+  ): AdtServiceBinding<ResultValuesOf<typeof serviceDocuments>, V>;
   getServiceBinding<R extends IServiceResults>(
     this: this & AdtServedBy<'serviceBinding'>,
     results: R,
-  ): AdtServiceBinding<R, V>;
+  ): AdtServiceBinding<ResultValuesOf<R>, V>;
   getServiceBinding(
     this: this & AdtServedBy<'serviceBinding'>,
     results: IServiceResults = serviceDocuments,
-  ): AdtServiceBinding<IServiceResults, V> {
+  ): AdtServiceBinding<ServiceValues, V> {
     this.assertConnected();
-    return new AdtServiceBinding<IServiceResults, V>(this.connection, {
+    return new AdtServiceBinding<ServiceValues, V>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       results,
@@ -919,17 +973,20 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getBehaviorDefinition(
     this: this & AdtServedBy<'behaviorDefinition'>,
-  ): AdtBehaviorDefinition<typeof behaviorDefinitionDocuments, V>;
+  ): AdtBehaviorDefinition<
+    ResultValuesOf<typeof behaviorDefinitionDocuments>,
+    V
+  >;
   getBehaviorDefinition<R extends IBehaviorDefinitionResults>(
     this: this & AdtServedBy<'behaviorDefinition'>,
     results: R,
-  ): AdtBehaviorDefinition<R, V>;
+  ): AdtBehaviorDefinition<ResultValuesOf<R>, V>;
   getBehaviorDefinition(
     this: this & AdtServedBy<'behaviorDefinition'>,
     results: IBehaviorDefinitionResults = behaviorDefinitionDocuments,
-  ): AdtBehaviorDefinition<IBehaviorDefinitionResults, V> {
+  ): AdtBehaviorDefinition<BehaviorDefinitionValues, V> {
     this.assertConnected();
-    return new AdtBehaviorDefinition<IBehaviorDefinitionResults, V>(
+    return new AdtBehaviorDefinition<BehaviorDefinitionValues, V>(
       this.connection,
       {
         logger: this.logger,
@@ -946,17 +1003,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getBehaviorImplementation(
     this: this & AdtServedBy<'behaviorImplementation'>,
-  ): AdtBehaviorImplementation<typeof classDocuments>;
+  ): AdtBehaviorImplementation<ResultValuesOf<typeof classDocuments>>;
   getBehaviorImplementation<R extends IClassResults>(
     this: this & AdtServedBy<'behaviorImplementation'>,
     results: R,
-  ): AdtBehaviorImplementation<R>;
+  ): AdtBehaviorImplementation<ResultValuesOf<R>>;
   getBehaviorImplementation(
     this: this & AdtServedBy<'behaviorImplementation'>,
     results: IClassResults = classDocuments,
-  ): AdtBehaviorImplementation<IClassResults> {
+  ): AdtBehaviorImplementation<ClassValues> {
     this.assertConnected();
-    return new AdtBehaviorImplementation<IClassResults>(this.connection, {
+    return new AdtBehaviorImplementation<ClassValues>(this.connection, {
       logger: this.logger,
       lockRegistry: this.lockRegistry,
       results,
@@ -970,17 +1027,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getMetadataExtension(
     this: this & AdtServedBy<'metadataExtension'>,
-  ): AdtMetadataExtension<typeof metadataExtensionDocuments, V>;
+  ): AdtMetadataExtension<ResultValuesOf<typeof metadataExtensionDocuments>, V>;
   getMetadataExtension<R extends IMetadataExtensionResults>(
     this: this & AdtServedBy<'metadataExtension'>,
     results: R,
-  ): AdtMetadataExtension<R, V>;
+  ): AdtMetadataExtension<ResultValuesOf<R>, V>;
   getMetadataExtension(
     this: this & AdtServedBy<'metadataExtension'>,
     results: IMetadataExtensionResults = metadataExtensionDocuments,
-  ): AdtMetadataExtension<IMetadataExtensionResults, V> {
+  ): AdtMetadataExtension<MetadataExtensionValues, V> {
     this.assertConnected();
-    return new AdtMetadataExtension<IMetadataExtensionResults, V>(
+    return new AdtMetadataExtension<MetadataExtensionValues, V>(
       this.connection,
       {
         logger: this.logger,
@@ -1003,17 +1060,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getEnhancement(
     this: this & AdtServedBy<'enhancement'>,
-  ): AdtEnhancement<typeof enhancementDocuments, V>;
+  ): AdtEnhancement<ResultValuesOf<typeof enhancementDocuments>, V>;
   getEnhancement<R extends IEnhancementResults>(
     this: this & AdtServedBy<'enhancement'>,
     results: R,
-  ): AdtEnhancement<R, V>;
+  ): AdtEnhancement<ResultValuesOf<R>, V>;
   getEnhancement(
     this: this & AdtServedBy<'enhancement'>,
     results: IEnhancementResults = enhancementDocuments,
-  ): AdtEnhancement<IEnhancementResults, V> {
+  ): AdtEnhancement<EnhancementValues, V> {
     this.assertConnected();
-    return new AdtEnhancement<IEnhancementResults, V>(this.connection, {
+    return new AdtEnhancement<EnhancementValues, V>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       lockRegistry: this.lockRegistry,
@@ -1027,17 +1084,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getFeatureToggle(
     this: this & AdtServedBy<'featureToggle'>,
-  ): AdtFeatureToggle<typeof featureToggleDocuments>;
+  ): AdtFeatureToggle<ResultValuesOf<typeof featureToggleDocuments>>;
   getFeatureToggle<R extends IFeatureToggleResults>(
     this: this & AdtServedBy<'featureToggle'>,
     results: R,
-  ): AdtFeatureToggle<R>;
+  ): AdtFeatureToggle<ResultValuesOf<R>>;
   getFeatureToggle(
     this: this & AdtServedBy<'featureToggle'>,
     results: IFeatureToggleResults = featureToggleDocuments,
-  ): AdtFeatureToggle<IFeatureToggleResults> {
+  ): AdtFeatureToggle<FeatureToggleValues> {
     this.assertConnected();
-    return new AdtFeatureToggle<IFeatureToggleResults>(this.connection, {
+    return new AdtFeatureToggle<FeatureToggleValues>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       lockRegistry: this.lockRegistry,
@@ -1066,17 +1123,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getRequest(
     this: this & AdtServedBy<'request'>,
-  ): AdtRequest<typeof transportDocuments, V>;
+  ): AdtRequest<ResultValuesOf<typeof transportDocuments>, V>;
   getRequest<R extends ITransportResults>(
     this: this & AdtServedBy<'request'>,
     results: R,
-  ): AdtRequest<R, V>;
+  ): AdtRequest<ResultValuesOf<R>, V>;
   getRequest(
     this: this & AdtServedBy<'request'>,
     results: ITransportResults = transportDocuments,
-  ): AdtRequest<ITransportResults, V> {
+  ): AdtRequest<TransportValues, V> {
     this.assertConnected();
-    return new AdtRequest<ITransportResults, V>(this.connection, {
+    return new AdtRequest<TransportValues, V>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       results,
@@ -1111,11 +1168,11 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    *
    * @returns The cross-cutting operations, `AdtUtils`
    */
-  getUtils(): AdtUtils<typeof utilDocuments, V>;
-  getUtils<R extends IUtilResults>(results: R): AdtUtils<R, V>;
-  getUtils(results: IUtilResults = utilDocuments): AdtUtils<IUtilResults, V> {
+  getUtils(): AdtUtils<ResultValuesOf<typeof utilDocuments>, V>;
+  getUtils<R extends IUtilResults>(results: R): AdtUtils<ResultValuesOf<R>, V>;
+  getUtils(results: IUtilResults = utilDocuments): AdtUtils<UtilValues, V> {
     this.assertConnected();
-    return new AdtUtils<IUtilResults, V>(this.connection, {
+    return new AdtUtils<UtilValues, V>(this.connection, {
       logger: this.logger,
       results,
     });
@@ -1131,17 +1188,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getLocalTestClass(
     this: this & AdtServedBy<'localTestClass'>,
-  ): AdtLocalTestClass<typeof classDocuments, V>;
+  ): AdtLocalTestClass<ResultValuesOf<typeof classDocuments>, V>;
   getLocalTestClass<R extends IClassResults>(
     this: this & AdtServedBy<'localTestClass'>,
     results: R,
-  ): AdtLocalTestClass<R, V>;
+  ): AdtLocalTestClass<ResultValuesOf<R>, V>;
   getLocalTestClass(
     this: this & AdtServedBy<'localTestClass'>,
     results: IClassResults = classDocuments,
-  ): AdtLocalTestClass<IClassResults, V> {
+  ): AdtLocalTestClass<ClassValues, V> {
     this.assertConnected();
-    return new AdtLocalTestClass<IClassResults, V>(this.connection, {
+    return new AdtLocalTestClass<ClassValues, V>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       contentTypes: this.contentTypes,
@@ -1160,17 +1217,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getLocalTypes(
     this: this & AdtServedBy<'localTypes'>,
-  ): AdtLocalTypes<typeof classDocuments, V>;
+  ): AdtLocalTypes<ResultValuesOf<typeof classDocuments>, V>;
   getLocalTypes<R extends IClassResults>(
     this: this & AdtServedBy<'localTypes'>,
     results: R,
-  ): AdtLocalTypes<R, V>;
+  ): AdtLocalTypes<ResultValuesOf<R>, V>;
   getLocalTypes(
     this: this & AdtServedBy<'localTypes'>,
     results: IClassResults = classDocuments,
-  ): AdtLocalTypes<IClassResults, V> {
+  ): AdtLocalTypes<ClassValues, V> {
     this.assertConnected();
-    return new AdtLocalTypes<IClassResults, V>(this.connection, {
+    return new AdtLocalTypes<ClassValues, V>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       contentTypes: this.contentTypes,
@@ -1189,17 +1246,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getLocalDefinitions(
     this: this & AdtServedBy<'localDefinitions'>,
-  ): AdtLocalDefinitions<typeof classDocuments, V>;
+  ): AdtLocalDefinitions<ResultValuesOf<typeof classDocuments>, V>;
   getLocalDefinitions<R extends IClassResults>(
     this: this & AdtServedBy<'localDefinitions'>,
     results: R,
-  ): AdtLocalDefinitions<R, V>;
+  ): AdtLocalDefinitions<ResultValuesOf<R>, V>;
   getLocalDefinitions(
     this: this & AdtServedBy<'localDefinitions'>,
     results: IClassResults = classDocuments,
-  ): AdtLocalDefinitions<IClassResults, V> {
+  ): AdtLocalDefinitions<ClassValues, V> {
     this.assertConnected();
-    return new AdtLocalDefinitions<IClassResults, V>(this.connection, {
+    return new AdtLocalDefinitions<ClassValues, V>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       contentTypes: this.contentTypes,
@@ -1218,17 +1275,17 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getLocalMacros(
     this: this & AdtServedBy<'localMacros'>,
-  ): AdtLocalMacros<typeof classDocuments, V>;
+  ): AdtLocalMacros<ResultValuesOf<typeof classDocuments>, V>;
   getLocalMacros<R extends IClassResults>(
     this: this & AdtServedBy<'localMacros'>,
     results: R,
-  ): AdtLocalMacros<R, V>;
+  ): AdtLocalMacros<ResultValuesOf<R>, V>;
   getLocalMacros(
     this: this & AdtServedBy<'localMacros'>,
     results: IClassResults = classDocuments,
-  ): AdtLocalMacros<IClassResults, V> {
+  ): AdtLocalMacros<ClassValues, V> {
     this.assertConnected();
-    return new AdtLocalMacros<IClassResults, V>(this.connection, {
+    return new AdtLocalMacros<ClassValues, V>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       contentTypes: this.contentTypes,

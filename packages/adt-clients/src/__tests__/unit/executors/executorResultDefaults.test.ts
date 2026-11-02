@@ -27,6 +27,7 @@ import type { functionGroupTestRunnerDocuments } from '../../../executors/functi
 import type { functionModuleTestRunnerDocuments } from '../../../executors/functionModule/FunctionModuleTestRunner';
 import type { programExecutorDocuments } from '../../../executors/program/ProgramExecutor';
 import type { programTestRunnerDocuments } from '../../../executors/program/ProgramTestRunner';
+import type { ResultValuesOf } from '../../../utils/resultStrategy';
 import { RecordingConnection } from '../../helpers/recordingConnection';
 
 /** `true` only when `A` and `B` are the same type. */
@@ -47,7 +48,10 @@ function getterTypes(executor: AdtExecutor): void {
   const runner = executor.getAbapUnitTestRunner();
   const isDefault: Equal<
     typeof runner,
-    AbapUnitTestRunner<typeof abapUnitTestRunnerDocuments, AdtModernVariant>
+    AbapUnitTestRunner<
+      ResultValuesOf<typeof abapUnitTestRunnerDocuments>,
+      AdtModernVariant
+    >
   > = true;
   void isDefault;
 
@@ -58,7 +62,7 @@ function getterTypes(executor: AdtExecutor): void {
   const isOwn: Equal<
     typeof own,
     AbapUnitTestRunner<
-      Marked<typeof abapUnitTestRunnerDocuments>,
+      ResultValuesOf<Marked<typeof abapUnitTestRunnerDocuments>>,
       AdtModernVariant
     >
   > = true;
@@ -86,8 +90,9 @@ function getterTypes(executor: AdtExecutor): void {
 
   // A constructor takes its results.
   const connection = new RecordingConnection();
+  type MarkedValues = ResultValuesOf<Marked<typeof classTestRunnerDocuments>>;
   // @ts-expect-error -- results are required
-  new ClassTestRunner<Marked<typeof classTestRunnerDocuments>>(connection, {});
+  new ClassTestRunner<MarkedValues>(connection, {});
   // @ts-expect-error -- results are required
   new ClassExecutor(connection, { logger: undefined });
 }

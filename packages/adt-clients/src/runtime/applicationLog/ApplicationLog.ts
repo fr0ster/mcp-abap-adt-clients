@@ -11,7 +11,11 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtLoggedOptions } from '../../core/shared/handlerOptions';
 import { answering } from '../../utils/adtResponse';
-import { rawDocument } from '../../utils/resultStrategy';
+import {
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+  rawDocument,
+} from '../../utils/resultStrategy';
 import {
   getApplicationLogObject,
   getApplicationLogSource,
@@ -36,23 +40,25 @@ export const applicationLogDocuments = {
   validation: rawDocument,
 } satisfies IApplicationLogResults;
 
+/** What each slot of the result set answers. */
+export type ApplicationLogValues = {
+  readonly [K in keyof IApplicationLogResults]: unknown;
+};
+
 export class ApplicationLog<
-  R extends IApplicationLogResults = typeof applicationLogDocuments,
-> implements
-    IApplicationLog<
-      ReturnType<R['object']>,
-      ReturnType<R['source']>,
-      ReturnType<R['validation']>
-    >
+  T extends ApplicationLogValues = ResultValuesOf<
+    typeof applicationLogDocuments
+  >,
+> implements IApplicationLog<T['object'], T['source'], T['validation']>
 {
   readonly kind = 'applicationLog' as const;
 
-  private readonly results: R;
+  private readonly results: ResultStrategiesOf<T>;
   private readonly logger: ILogger;
 
   constructor(
     private readonly connection: IAbapConnection,
-    options: AdtLoggedOptions<R>,
+    options: AdtLoggedOptions<ResultStrategiesOf<T>>,
   ) {
     this.logger = options.logger;
     this.results = options.results;
@@ -61,10 +67,10 @@ export class ApplicationLog<
   async getObject<E extends IAdtError = IAdtError>(
     objectName: string,
     options?: IGetApplicationLogObjectOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['object']>, E>> {
+  ): Promise<IAdtResponse<T['object'], E>> {
     return answering(
       () => getApplicationLogObject(this.connection, objectName, options),
-      this.results.object as IResultStrategy<ReturnType<R['object']>>,
+      this.results.object,
       options?.analyse,
     );
   }
@@ -72,10 +78,10 @@ export class ApplicationLog<
   async getSource<E extends IAdtError = IAdtError>(
     objectName: string,
     options?: IGetApplicationLogSourceOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+  ): Promise<IAdtResponse<T['source'], E>> {
     return answering(
       () => getApplicationLogSource(this.connection, objectName, options),
-      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      this.results.source,
       options?.analyse,
     );
   }
@@ -83,10 +89,10 @@ export class ApplicationLog<
   async validateName<E extends IAdtError = IAdtError>(
     objectName: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+  ): Promise<IAdtResponse<T['validation'], E>> {
     return answering(
       () => validateApplicationLogName(this.connection, objectName),
-      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      this.results.validation,
       options?.analyse,
     );
   }

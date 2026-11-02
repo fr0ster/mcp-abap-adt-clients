@@ -100,4 +100,10 @@ export { transportDocuments } from './core/transport/types';
  */
 export { nothingIsARefusal } from './utils/adtResponse';
 /** The readings this package ships, as building blocks for your own sets. */
-export { nothing, rawDocument, wireItself } from './utils/resultStrategy';
+export {
+  nothing,
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+  rawDocument,
+  wireItself,
+} from './utils/resultStrategy';

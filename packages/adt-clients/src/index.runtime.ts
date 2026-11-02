@@ -6,21 +6,25 @@
 export { AdtRuntimeClient } from './clients/AdtRuntimeClient';
 export {
   ApplicationLog,
+  type ApplicationLogValues,
   applicationLogDocuments,
   type IApplicationLogResults,
 } from './runtime/applicationLog/ApplicationLog';
 export {
   AdtAtc,
+  type AtcValues,
   atcDocuments,
   type IAtcResults,
 } from './runtime/atc/AdtAtc';
 export {
   AtcLog,
+  type AtcLogValues,
   atcLogDocuments,
   type IAtcLogResults,
 } from './runtime/atc/AtcLog';
 export {
   DdicActivation,
+  type DdicActivationValues,
   ddicActivationDocuments,
   type IDdicActivationResults,
 } from './runtime/ddic/DdicActivation';
@@ -30,12 +34,14 @@ export {
 export {
   AbapDebugger,
   type AbapDebuggerConstructorOptions,
+  type AbapDebuggerValues,
   abapDebuggerDocuments,
   type IAbapDebuggerOptions,
   type IAbapDebuggerResults,
 } from './runtime/debugger/AbapDebugger';
 export {
   AmdpDebugger,
+  type AmdpDebuggerValues,
   amdpDebuggerDocuments,
   type IAmdpDebuggerResults,
 } from './runtime/debugger/AmdpDebugger';
@@ -51,32 +57,38 @@ export {
 export {
   type IRuntimeDumpsResults,
   RuntimeDumps,
+  type RuntimeDumpsValues,
   runtimeDumpsDocuments,
 } from './runtime/dumps/RuntimeDumps';
 export {
   FeedRepository,
+  type FeedValues,
   feedDocuments,
   type IFeedResults,
 } from './runtime/feeds/FeedRepository';
 export {
   GatewayErrorLog,
+  type GatewayErrorLogValues,
   gatewayErrorLogDocuments,
   type IGatewayErrorLogResults,
 } from './runtime/gatewayErrorLog/GatewayErrorLog';
 export {
   type IMemorySnapshotsResults,
   MemorySnapshots,
+  type MemorySnapshotsValues,
   memorySnapshotsDocuments,
 } from './runtime/memory/MemorySnapshots';
 
 export {
   type ISystemMessagesResults,
   SystemMessages,
+  type SystemMessagesValues,
   systemMessagesDocuments,
 } from './runtime/systemMessages/SystemMessages';
 
 export {
   CrossTrace,
+  type CrossTraceValues,
   crossTraceDocuments,
   type ICrossTraceResultSet,
 } from './runtime/traces/CrossTraceDomain';
@@ -84,10 +96,12 @@ export {
 export {
   type IProfilerResults,
   Profiler,
+  type ProfilerValues,
   profilerDocuments,
 } from './runtime/traces/ProfilerDomain';
 export {
   type ISt05TraceResults,
   St05Trace,
+  type St05TraceValues,
   st05TraceDocuments,
 } from './runtime/traces/St05Trace';

@@ -42,7 +42,6 @@ import type {
   IAdtValidatable,
   IAdtVersionable,
   IProgramResults,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -51,7 +50,11 @@ import { PROGRAM } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
-import { nothing } from '../../utils/resultStrategy';
+import {
+  nothing,
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+} from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { writeObjectDocument } from '../shared/documentWrite';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
@@ -77,38 +80,32 @@ import { uploadProgramSource } from './update';
 import { validateProgramName } from './validation';
 import { getProgramVersionSource, getProgramVersions } from './versions';
 
+/** What each slot of the result set answers. */
+export type ProgramValues = {
+  readonly [K in keyof IProgramResults]: unknown;
+};
+
 export class AdtProgram<
-  R extends IProgramResults = typeof programDocuments,
+  T extends ProgramValues = ResultValuesOf<typeof programDocuments>,
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtEnhancementHost<
       IProgramConfig,
-      ReturnType<R['enhancementElements']>,
-      ReturnType<R['enhancementOptions']>
+      T['enhancementElements'],
+      T['enhancementOptions']
     >,
-    IAdtCreatable<IProgramConfig, ReturnType<R['created']>>,
-    IAdtReadable<IProgramConfig, ReturnType<R['source']>>,
-    IAdtMetadataReadable<IProgramConfig, ReturnType<R['metadata']>>,
-    IAdtUpdatable<Partial<IProgramConfig>, ReturnType<R['updated']>>,
-    IAdtMetadataUpdatable<
-      Partial<IProgramConfig>,
-      ReturnType<R['metadataUpdated']>
-    >,
-    IAdtDeletable<
-      IProgramConfig,
-      ReturnType<R['deletion']>,
-      ReturnType<R['deletionCheck']>
-    >,
-    IAdtValidatable<IProgramConfig, ReturnType<R['validation']>>,
-    IAdtCheckable<IProgramConfig, ReturnType<R['check']>>,
-    IAdtActivatable<IProgramConfig, ReturnType<R['activation']>>,
+    IAdtCreatable<IProgramConfig, T['created']>,
+    IAdtReadable<IProgramConfig, T['source']>,
+    IAdtMetadataReadable<IProgramConfig, T['metadata']>,
+    IAdtUpdatable<Partial<IProgramConfig>, T['updated']>,
+    IAdtMetadataUpdatable<Partial<IProgramConfig>, T['metadataUpdated']>,
+    IAdtDeletable<IProgramConfig, T['deletion'], T['deletionCheck']>,
+    IAdtValidatable<IProgramConfig, T['validation']>,
+    IAdtCheckable<IProgramConfig, T['check']>,
+    IAdtActivatable<IProgramConfig, T['activation']>,
     IAdtLockable<IProgramConfig>,
-    IAdtTransportAware<IProgramConfig, ReturnType<R['transport']>>,
-    IAdtVersionable<
-      IProgramConfig,
-      ReturnType<R['versions']>,
-      ReturnType<R['versionSource']>
-    >
+    IAdtTransportAware<IProgramConfig, T['transport']>,
+    IAdtVersionable<IProgramConfig, T['versions'], T['versionSource']>
 {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -122,12 +119,12 @@ export class AdtProgram<
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Program';
 
-  protected readonly results: R;
+  protected readonly results: ResultStrategiesOf<T>;
 
   constructor(
     connection: IAbapConnection,
     options: AdtHandlerOptions<
-      R,
+      ResultStrategiesOf<T>,
       'logger' | 'systemContext' | 'contentTypes' | 'lockRegistry'
     >,
   ) {
@@ -149,14 +146,12 @@ export class AdtProgram<
   async readEnhancementElements<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['enhancementElements']>, E>> {
+  ): Promise<IAdtResponse<T['enhancementElements'], E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
       () =>
         getProgramEnhancementElements(connection, config.programName as string),
-      this.results.enhancementElements as IResultStrategy<
-        ReturnType<R['enhancementElements']>
-      >,
+      this.results.enhancementElements,
       options?.analyse,
     );
   }
@@ -165,14 +160,12 @@ export class AdtProgram<
   async readEnhancementOptions<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['enhancementOptions']>, E>> {
+  ): Promise<IAdtResponse<T['enhancementOptions'], E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
       () =>
         getProgramEnhancementOptions(connection, config.programName as string),
-      this.results.enhancementOptions as IResultStrategy<
-        ReturnType<R['enhancementOptions']>
-      >,
+      this.results.enhancementOptions,
       options?.analyse,
     );
   }
@@ -181,7 +174,7 @@ export class AdtProgram<
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+  ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -199,7 +192,7 @@ export class AdtProgram<
           config.packageName as string,
           config.description,
         ),
-      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      this.results.validation,
       options?.analyse,
     );
   }
@@ -208,7 +201,7 @@ export class AdtProgram<
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IProgramConfig, 'source'> & { source?: never },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+  ): Promise<IAdtResponse<T['created'], E>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // An object created without a package is the single thing `delete()` cannot
@@ -250,7 +243,7 @@ export class AdtProgram<
           masterLanguage:
             config.masterLanguage ?? this.systemContext.masterLanguage,
         }),
-      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      this.results.created,
       options?.analyse,
     );
   }
@@ -260,7 +253,7 @@ export class AdtProgram<
     config: Partial<IProgramConfig>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['source']>, E>> {
+  ): Promise<IAdtResponse<T['source'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -276,7 +269,7 @@ export class AdtProgram<
           version,
           options,
         ),
-      this.results.source as IResultStrategy<ReturnType<R['source']>>,
+      this.results.source,
       options?.analyse,
     );
   }
@@ -285,14 +278,14 @@ export class AdtProgram<
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+  ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     return answering(
       () =>
         getProgramMetadata(connection, config.programName as string, options),
-      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      this.results.metadata,
       options?.analyse,
     );
   }
@@ -311,7 +304,7 @@ export class AdtProgram<
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['updated']>, E>> {
+  ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -335,7 +328,7 @@ export class AdtProgram<
           sessionId,
           config.transportRequest,
         ),
-      this.results.updated as IResultStrategy<ReturnType<R['updated']>>,
+      this.results.updated,
       options?.analyse,
     );
   }
@@ -354,7 +347,7 @@ export class AdtProgram<
     this: this & AdtPerformedBy<'program', 'updateMetadata'>,
     config: Partial<IProgramConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -368,9 +361,7 @@ export class AdtProgram<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.metadataUpdated as IResultStrategy<
-        ReturnType<R['metadataUpdated']>
-      >,
+      this.results.metadataUpdated,
       options?.analyse,
     );
   }
@@ -386,7 +377,7 @@ export class AdtProgram<
     this: this & AdtPerformedBy<'program', 'deletionCheck'>,
     config: Partial<IProgramConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -397,9 +388,7 @@ export class AdtProgram<
           programName: name,
           transportRequest: config.transportRequest,
         }),
-      this.results.deletionCheck as IResultStrategy<
-        ReturnType<R['deletionCheck']>
-      >,
+      this.results.deletionCheck,
       options?.analyse,
     );
   }
@@ -416,7 +405,7 @@ export class AdtProgram<
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -427,7 +416,7 @@ export class AdtProgram<
           programName: name,
           transportRequest: config.transportRequest,
         }),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }
@@ -436,7 +425,7 @@ export class AdtProgram<
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['activation']>, E>> {
+  ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -447,7 +436,7 @@ export class AdtProgram<
           options.headers,
           config.programName as string,
         ),
-      this.results.activation as IResultStrategy<ReturnType<R['activation']>>,
+      this.results.activation,
       options?.analyse,
     );
   }
@@ -457,7 +446,7 @@ export class AdtProgram<
     config: Partial<IProgramConfig>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['check']>, E>> {
+  ): Promise<IAdtResponse<T['check'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -474,7 +463,7 @@ export class AdtProgram<
           config.source,
           this.contentTypes?.sourceArtifactContentType(),
         ),
-      this.results.check as IResultStrategy<ReturnType<R['check']>>,
+      this.results.check,
       options?.analyse,
     );
   }
@@ -484,7 +473,7 @@ export class AdtProgram<
     this: this & AdtPerformedBy<'program', 'transport'>,
     config: Partial<IProgramConfig>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
+  ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -497,7 +486,7 @@ export class AdtProgram<
             ? { withLongPolling: options.withLongPolling }
             : undefined,
         ),
-      this.results.transport as IResultStrategy<ReturnType<R['transport']>>,
+      this.results.transport,
       options?.analyse,
     );
   }
@@ -552,10 +541,10 @@ export class AdtProgram<
   async getVersions<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
+  ): Promise<IAdtResponse<T['versions'], E>> {
     return answering(
       () => getProgramVersions(this.connection, config),
-      this.results.versions as IResultStrategy<ReturnType<R['versions']>>,
+      this.results.versions,
       options?.analyse,
     );
   }
@@ -564,12 +553,10 @@ export class AdtProgram<
   async getVersionSource<E extends IAdtError = IAdtError>(
     contentUri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versionSource']>, E>> {
+  ): Promise<IAdtResponse<T['versionSource'], E>> {
     return answering(
       () => getProgramVersionSource(this.connection, contentUri),
-      this.results.versionSource as IResultStrategy<
-        ReturnType<R['versionSource']>
-      >,
+      this.results.versionSource,
       options?.analyse,
     );
   }

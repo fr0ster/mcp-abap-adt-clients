@@ -17,9 +17,10 @@ import type { AdtModernVariant } from '../../../clients/variant';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
 import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { noopLogger } from '../../../utils/noopLogger';
+import type { ResultValuesOf } from '../../../utils/resultStrategy';
 import { RecordingConnection } from '../../helpers/recordingConnection';
 
-type R = typeof utilDocuments;
+type R = ResultValuesOf<typeof utilDocuments>;
 
 function utilsOf<V extends AdtVariant>(): {
   connection: RecordingConnection;

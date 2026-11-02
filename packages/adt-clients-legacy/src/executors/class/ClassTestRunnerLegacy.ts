@@ -12,13 +12,14 @@
  */
 
 import {
+  type AbapUnitRunnerValues,
   type AdtPerformedBy,
   answering,
   ClassTestRunner,
   type classTestRunnerDocuments,
   containersOf,
-  type IClassTestRunnerResults,
   type IClassTestRunTarget,
+  type ResultValuesOf,
   startClassUnitTestRunSync,
 } from '@mcp-abap-adt/adt-clients';
 import type {
@@ -26,13 +27,14 @@ import type {
   IAdtError,
   IAdtResponse,
   IClassUnitTestRunOptions,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { noResultToFetch, noRunToPoll } from '../abapUnitRunLegacy';
 
 export class ClassTestRunnerLegacy<
-  R extends IClassTestRunnerResults = typeof classTestRunnerDocuments,
-> extends ClassTestRunner<R, 'basis740'> {
+  T extends AbapUnitRunnerValues = ResultValuesOf<
+    typeof classTestRunnerDocuments
+  >,
+> extends ClassTestRunner<T, 'basis740'> {
   /**
    * Run the tests. On a legacy system the POST answers the finished result:
    * the request `runSync` sends, with `<options>` — the caller's scope, risk
@@ -42,7 +44,7 @@ export class ClassTestRunnerLegacy<
     this: this & AdtPerformedBy<'class', 'unitTestRun'>,
     target: IClassTestRunTarget,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
+  ): Promise<IAdtResponse<T['run'], E>> {
     const { analyse, ...runOptions } = options ?? {};
     return answering(
       () =>
@@ -51,7 +53,7 @@ export class ClassTestRunnerLegacy<
           containersOf(target),
           runOptions,
         ),
-      this.results.run as IResultStrategy<ReturnType<R['run']>>,
+      this.results.run,
       analyse,
     );
   }
@@ -62,14 +64,14 @@ export class ClassTestRunnerLegacy<
    */
   override async getStatus<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'class', 'unitTestStatus'>,
-  ): Promise<IAdtResponse<ReturnType<R['status']>, E>> {
-    return noRunToPoll<ReturnType<R['status']>, E>();
+  ): Promise<IAdtResponse<T['status'], E>> {
+    return noRunToPoll<T['status'], E>();
   }
 
   /** Refused for the same reason: `run`'s answer is the result document. */
   override async getResult<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'class', 'unitTestResult'>,
-  ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {
-    return noResultToFetch<ReturnType<R['result']>, E>();
+  ): Promise<IAdtResponse<T['result'], E>> {
+    return noResultToFetch<T['result'], E>();
   }
 }

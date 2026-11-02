@@ -16,8 +16,10 @@ import {
   type AdtPerformedBy,
   answering,
   DDL_SOURCE,
+  type DdlValues,
   type ddlDocuments,
   failed,
+  type ResultValuesOf,
   versionsUri,
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
@@ -28,8 +30,6 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IDdlConfig,
-  IDdlResults,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
@@ -41,8 +41,8 @@ import {
 } from '../shared/refusalLegacy';
 
 export class AdtDdlLegacy<
-  R extends IDdlResults = typeof ddlDocuments,
-> extends AdtDdl<R, 'basis740'> {
+  T extends DdlValues = ResultValuesOf<typeof ddlDocuments>,
+> extends AdtDdl<T, 'basis740'> {
   /**
    * Delete DDL source — legacy override.
    *
@@ -58,7 +58,7 @@ export class AdtDdlLegacy<
   override async delete<E extends IAdtError = IAdtError>(
     config: Partial<IDdlConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     const name = config.ddlName as string;
 
     const objectUrl = `${DDL_SOURCE.uri(name)}`;
@@ -71,7 +71,7 @@ export class AdtDdlLegacy<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }
@@ -81,8 +81,8 @@ export class AdtDdlLegacy<
     this: this & AdtPerformedBy<'ddl', 'checkCdsTestDoubles'>,
     _cdsViewName: string,
     _options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['testDoubles']>, E>> {
-    return failed<ReturnType<R['testDoubles']>, E>({
+  ): Promise<IAdtResponse<T['testDoubles'], E>> {
+    return failed<T['testDoubles'], E>({
       origin: 'refusal',
       code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
       message:
@@ -99,8 +99,8 @@ export class AdtDdlLegacy<
     this: this & AdtPerformedBy<'ddl', 'deletionCheck'>,
     _config: Partial<IDdlConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
-    return noDeletionCheck<ReturnType<R['deletionCheck']>, E>();
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+    return noDeletionCheck<T['deletionCheck'], E>();
   }
 
   /**
@@ -112,8 +112,8 @@ export class AdtDdlLegacy<
     this: this & AdtPerformedBy<'ddl', 'updateMetadata'>,
     _config: Partial<IDdlConfig>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
-    return legacyNotMeasuredRefusal<ReturnType<R['metadataUpdated']>, E>(
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+    return legacyNotMeasuredRefusal<T['metadataUpdated'], E>(
       'updateMetadata',
       'PUT /sap/bc/adt/ddic/ddl/sources/{name}',
     );
@@ -127,8 +127,8 @@ export class AdtDdlLegacy<
     this: this & AdtPerformedBy<'ddl', 'transport'>,
     config: Partial<IDdlConfig>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['transport']>, E>> {
-    return noTransportResource<ReturnType<R['transport']>, E>(
+  ): Promise<IAdtResponse<T['transport'], E>> {
+    return noTransportResource<T['transport'], E>(
       DDL_SOURCE.uri(config.ddlName as string),
     );
   }
@@ -141,8 +141,8 @@ export class AdtDdlLegacy<
     this: this & AdtPerformedBy<'ddl', 'versions'>,
     config: Partial<IDdlConfig>,
     _options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versions']>, E>> {
-    return legacyMeasuredRefusal<ReturnType<R['versions']>, E>(
+  ): Promise<IAdtResponse<T['versions'], E>> {
+    return legacyMeasuredRefusal<T['versions'], E>(
       'getVersions',
       `GET ${versionsUri(DDL_SOURCE.uri(config.ddlName as string))} answers 404.`,
     );
@@ -156,8 +156,8 @@ export class AdtDdlLegacy<
     this: this & AdtPerformedBy<'ddl', 'versions'>,
     _contentUri: string,
     _options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['versionSource']>, E>> {
-    return legacyMeasuredRefusal<ReturnType<R['versionSource']>, E>(
+  ): Promise<IAdtResponse<T['versionSource'], E>> {
+    return legacyMeasuredRefusal<T['versionSource'], E>(
       'getVersionSource',
       'the DDL version list (GET <DDL URI>/versions) answers 404, so there is no version to read.',
     );

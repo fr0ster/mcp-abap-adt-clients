@@ -2,5 +2,8 @@
  * Structure operations - exports
  */
 
-export { AdtStructure } from './AdtStructure';
+export {
+  AdtStructure,
+  type StructureValues,
+} from './AdtStructure';
 export * from './types';

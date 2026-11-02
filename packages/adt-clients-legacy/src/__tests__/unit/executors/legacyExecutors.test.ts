@@ -9,6 +9,7 @@ import {
   classExecutorDocuments,
   ProgramExecutor,
   programExecutorDocuments,
+  type ResultValuesOf,
 } from '@mcp-abap-adt/adt-clients';
 import {
   AdtObjectErrorCodes,
@@ -41,8 +42,11 @@ function connection() {
  * members this drives are served on every variant.
  */
 type Executor =
-  | ClassExecutor<typeof classExecutorDocuments, AdtVariant>
-  | ProgramExecutor<typeof programExecutorDocuments, AdtVariant>;
+  | ClassExecutor<ResultValuesOf<typeof classExecutorDocuments>, AdtVariant>
+  | ProgramExecutor<
+      ResultValuesOf<typeof programExecutorDocuments>,
+      AdtVariant
+    >;
 
 describe('legacy executors', () => {
   it('the legacy executor hands out the legacy class and program executors', () => {

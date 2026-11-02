@@ -15,25 +15,28 @@
  */
 
 import {
+  type AbapUnitRunnerValues,
   AbapUnitTestRunner,
   type AdtModernVariant,
   type abapUnitTestRunnerDocuments,
   failed,
-  type IAbapUnitTestRunnerResults,
   type IAdtServedOn,
+  type ResultValuesOf,
 } from '@mcp-abap-adt/adt-clients';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { noResultToFetch, noRunToPoll } from '../abapUnitRunLegacy';
 
 export class AbapUnitTestRunnerLegacy<
-  R extends IAbapUnitTestRunnerResults = typeof abapUnitTestRunnerDocuments,
-> extends AbapUnitTestRunner<R, 'basis740'> {
+  T extends AbapUnitRunnerValues = ResultValuesOf<
+    typeof abapUnitTestRunnerDocuments
+  >,
+> extends AbapUnitTestRunner<T, 'basis740'> {
   /** Refused without a request: see the class's comment. */
   override async run<E extends IAdtError = IAdtError>(
     this: this & IAdtServedOn<AdtModernVariant>,
-  ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
-    return failed<ReturnType<R['run']>, E>({
+  ): Promise<IAdtResponse<T['run'], E>> {
+    return failed<T['run'], E>({
       origin: 'refusal',
       code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
       message:
@@ -43,13 +46,13 @@ export class AbapUnitTestRunnerLegacy<
 
   override async getStatus<E extends IAdtError = IAdtError>(
     this: this & IAdtServedOn<AdtModernVariant>,
-  ): Promise<IAdtResponse<ReturnType<R['status']>, E>> {
-    return noRunToPoll<ReturnType<R['status']>, E>();
+  ): Promise<IAdtResponse<T['status'], E>> {
+    return noRunToPoll<T['status'], E>();
   }
 
   override async getResult<E extends IAdtError = IAdtError>(
     this: this & IAdtServedOn<AdtModernVariant>,
-  ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {
-    return noResultToFetch<ReturnType<R['result']>, E>();
+  ): Promise<IAdtResponse<T['result'], E>> {
+    return noResultToFetch<T['result'], E>();
   }
 }

@@ -26,7 +26,6 @@ import type {
   IAdtSystemContext,
   IAdtValidatable,
   IMessageClassResults,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -35,7 +34,11 @@ import { MESSAGE_CLASS } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
-import { nothing } from '../../utils/resultStrategy';
+import {
+  nothing,
+  type ResultStrategiesOf,
+  type ResultValuesOf,
+} from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
@@ -49,22 +52,20 @@ import { updateMessageClass } from './update';
 
 const VALIDATE_BASE = MESSAGE_CLASS.validation;
 
+/** What each slot of the result set answers. */
+export type MessageClassValues = {
+  readonly [K in keyof IMessageClassResults]: unknown;
+};
+
 export class AdtMessageClass<
-  R extends IMessageClassResults = typeof messageClassDocuments,
+  T extends MessageClassValues = ResultValuesOf<typeof messageClassDocuments>,
   V extends AdtVariant = AdtModernVariant,
 > implements
-    IAdtCreatable<IMessageClassConfig, ReturnType<R['created']>>,
-    IAdtMetadataReadable<IMessageClassConfig, ReturnType<R['metadata']>>,
-    IAdtMetadataUpdatable<
-      Partial<IMessageClassConfig>,
-      ReturnType<R['metadataUpdated']>
-    >,
-    IAdtDeletable<
-      IMessageClassConfig,
-      ReturnType<R['deletion']>,
-      ReturnType<R['deletionCheck']>
-    >,
-    IAdtValidatable<IMessageClassConfig, ReturnType<R['validation']>>,
+    IAdtCreatable<IMessageClassConfig, T['created']>,
+    IAdtMetadataReadable<IMessageClassConfig, T['metadata']>,
+    IAdtMetadataUpdatable<Partial<IMessageClassConfig>, T['metadataUpdated']>,
+    IAdtDeletable<IMessageClassConfig, T['deletion'], T['deletionCheck']>,
+    IAdtValidatable<IMessageClassConfig, T['validation']>,
     IAdtLockable<IMessageClassConfig>
 {
   /**
@@ -78,11 +79,14 @@ export class AdtMessageClass<
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'MessageClass';
 
-  protected readonly results: R;
+  protected readonly results: ResultStrategiesOf<T>;
 
   constructor(
     connection: IAbapConnection,
-    options: AdtHandlerOptions<R, 'logger' | 'systemContext' | 'lockRegistry'>,
+    options: AdtHandlerOptions<
+      ResultStrategiesOf<T>,
+      'logger' | 'systemContext' | 'lockRegistry'
+    >,
   ) {
     const { logger, systemContext, lockRegistry } = options;
     this.results = options.results;
@@ -118,7 +122,7 @@ export class AdtMessageClass<
   async validate<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassConfig>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['validation']>, E>> {
+  ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -135,7 +139,7 @@ export class AdtMessageClass<
           method: 'POST',
           timeout: 0,
         }),
-      this.results.validation as IResultStrategy<ReturnType<R['validation']>>,
+      this.results.validation,
       options?.analyse,
     );
   }
@@ -144,7 +148,7 @@ export class AdtMessageClass<
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IMessageClassConfig, 'source'> & { source?: never },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['created']>, E>> {
+  ): Promise<IAdtResponse<T['created'], E>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // An object created without a package is the single thing `delete()` cannot
@@ -182,7 +186,7 @@ export class AdtMessageClass<
           // sent as ?corrNr= for a transportable package; empty for local
           transport_request: config.transportRequest,
         }),
-      this.results.created as IResultStrategy<ReturnType<R['created']>>,
+      this.results.created,
       options?.analyse,
     );
   }
@@ -194,7 +198,7 @@ export class AdtMessageClass<
       withLongPolling?: boolean;
       version?: AdtReadVersion;
     } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadata']>, E>> {
+  ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -202,7 +206,7 @@ export class AdtMessageClass<
 
     return answering(
       () => getMessageClassSource(connection, name, options),
-      this.results.metadata as IResultStrategy<ReturnType<R['metadata']>>,
+      this.results.metadata,
       options?.analyse,
     );
   }
@@ -223,7 +227,7 @@ export class AdtMessageClass<
     this: this & AdtPerformedBy<'messageClass', 'updateMetadata'>,
     config: Partial<IMessageClassConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['metadataUpdated']>, E>> {
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -239,9 +243,7 @@ export class AdtMessageClass<
           options?.lockHandle,
           config.transportRequest,
         ),
-      this.results.metadataUpdated as IResultStrategy<
-        ReturnType<R['metadataUpdated']>
-      >,
+      this.results.metadataUpdated,
       options?.analyse,
     );
   }
@@ -267,7 +269,7 @@ export class AdtMessageClass<
     this: this & AdtPerformedBy<'messageClass', 'deletionCheck'>,
     config: Partial<IMessageClassConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletionCheck']>, E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -275,9 +277,7 @@ export class AdtMessageClass<
 
     return answering(
       () => checkDeletion(connection, options.headers, name),
-      this.results.deletionCheck as IResultStrategy<
-        ReturnType<R['deletionCheck']>
-      >,
+      this.results.deletionCheck,
       options?.analyse,
     );
   }
@@ -285,7 +285,7 @@ export class AdtMessageClass<
   async delete<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['deletion']>, E>> {
+  ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -299,7 +299,7 @@ export class AdtMessageClass<
           name,
           config.transportRequest,
         ),
-      this.results.deletion as IResultStrategy<ReturnType<R['deletion']>>,
+      this.results.deletion,
       options?.analyse,
     );
   }

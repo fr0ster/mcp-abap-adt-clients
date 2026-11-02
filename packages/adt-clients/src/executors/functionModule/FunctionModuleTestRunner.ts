@@ -33,8 +33,13 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import type { AdtHandlerOptions } from '../../core/shared/handlerOptions';
 import { FUNCTION_MODULE } from '../../endpoints/objects';
+import type {
+  ResultStrategiesOf,
+  ResultValuesOf,
+} from '../../utils/resultStrategy';
 import {
   AbapUnitRunner,
+  type AbapUnitRunnerValues,
   abapUnitRunnerDocuments,
   type IAbapUnitRunnerResults,
 } from '../abapUnitRunner';
@@ -52,17 +57,17 @@ export type IFunctionModuleTestRunnerResults = IAbapUnitRunnerResults;
 export const functionModuleTestRunnerDocuments = abapUnitRunnerDocuments;
 
 export class FunctionModuleTestRunner<
-    R extends
-      IFunctionModuleTestRunnerResults = typeof functionModuleTestRunnerDocuments,
+    T extends AbapUnitRunnerValues = ResultValuesOf<
+      typeof functionModuleTestRunnerDocuments
+    >,
     V extends AdtVariant = AdtModernVariant,
   >
-  extends AbapUnitRunner<R, V, 'functionModule'>
-  implements
-    IAdtRunnable<string, ReturnType<R['run']>, IClassUnitTestRunOptions>
+  extends AbapUnitRunner<T, V, 'functionModule'>
+  implements IAdtRunnable<string, T['run'], IClassUnitTestRunOptions>
 {
   constructor(
     connection: IAbapConnection,
-    options: AdtHandlerOptions<R, 'logger'>,
+    options: AdtHandlerOptions<ResultStrategiesOf<T>, 'logger'>,
   ) {
     super(connection, options);
   }
@@ -72,7 +77,7 @@ export class FunctionModuleTestRunner<
     this: this & AdtPerformedBy<'functionModule', 'unitTestRun'>,
     functionModuleName: string,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['run']>, E>> {
+  ): Promise<IAdtResponse<T['run'], E>> {
     return this.startByObject(functionModuleName, 'FUNC', options);
   }
 
@@ -109,7 +114,7 @@ export class FunctionModuleTestRunner<
     this: this & AdtPerformedBy<'functionModule', 'unitTestRunSync'>,
     target: IFunctionModuleTestRunSyncTarget,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<ReturnType<R['result']>, E>> {
+  ): Promise<IAdtResponse<T['result'], E>> {
     return this.startSync(
       [
         FUNCTION_MODULE.uri(

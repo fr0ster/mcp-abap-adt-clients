@@ -26,6 +26,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtAbapGitClient } from '../../../../clients/AdtAbapGitClient';
 import { abapGitDocuments } from '../../../../clients/abapGit/types';
+import type { ResultValuesOf } from '../../../../utils/resultStrategy';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import {
   configuredCase,
@@ -55,7 +56,7 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
     repos: abapGitRepos,
     externalRepo: abapGitExternalRepo,
   };
-  let abapGit: AdtAbapGitClient<typeof results>;
+  let abapGit: AdtAbapGitClient<ResultValuesOf<typeof results>>;
 
   beforeAll(async () => {
     try {
