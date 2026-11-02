@@ -274,6 +274,13 @@ program name. The default answers XML; custom result sets provide
 `enhancementElements` and `enhancementOptions`. These reads live on the hosts,
 not `AdtUtils`. See [enhancement examples](docs/usage/CLIENT_API_REFERENCE.md#enhancements-and-their-hosts).
 
+An on-premise client's `getInclude()` also reads the include's main programs:
+`readMainPrograms` (`IAdtMainProgramsReadable`, result slot `mainPrograms`),
+one GET of `…/programs/includes/{name}/mainprograms`. It answers
+`adtcore:objectReferences`, one reference per main program — a program
+(`PROG/P`), or a function group (`FUGR/F`) for its includes — and none for an
+include no program includes directly. ABAP cloud's table does not list it.
+
 ## Quick Start
 
 ### Using AdtClient (Recommended - High-Level CRUD API)

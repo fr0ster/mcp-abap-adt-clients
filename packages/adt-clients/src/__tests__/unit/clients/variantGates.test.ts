@@ -60,6 +60,13 @@ async function variantGates(
   // variant.
   // @ts-expect-error -- `include` lists no `check`
   onprem.getInclude().check;
+  // An include's main programs: on premise only (unmeasured on ABAP cloud), so
+  // not on the modern default either, which is what both modern tables serve.
+  await onprem.getInclude().readMainPrograms({ includeName: 'ZGATE_INC' });
+  // @ts-expect-error -- ADT_TYPES_CLOUD's `PROG/I` lists no `mainPrograms`
+  await cloud.getInclude().readMainPrograms({ includeName: 'ZGATE_INC' });
+  // @ts-expect-error -- `mainPrograms` is not on both modern tables
+  await modern.getInclude().readMainPrograms({ includeName: 'ZGATE_INC' });
   // …and one the API lacks on one variant: 7.40's `ddl` lists no `versions`.
   await onprem.getDdl().getVersions({ ddlName: 'ZI_GATE' });
   // @ts-expect-error -- ADT_TYPES_BASIS_740's `ddl` lists no `versions`

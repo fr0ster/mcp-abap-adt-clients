@@ -21,6 +21,7 @@ import type {
   IAdtHeaders,
   IAdtIncludeEnhancementHost,
   IAdtLockable,
+  IAdtMainProgramsReadable,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
@@ -54,6 +55,7 @@ import {
   getIncludeEnhancementOptions,
 } from './enhancements';
 import { includeUrl, lockInclude } from './lock';
+import { getIncludeMainPrograms } from './mainPrograms';
 import { getIncludeMetadata, getIncludeSource } from './read';
 import type { includeDocuments } from './types';
 import { unlockInclude } from './unlock';
@@ -72,6 +74,7 @@ export class AdtInclude<
       ReturnType<R['enhancementElements']>,
       ReturnType<R['enhancementOptions']>
     >,
+    IAdtMainProgramsReadable<IIncludeConfig, ReturnType<R['mainPrograms']>>,
     IAdtCreatable<IIncludeConfig, ReturnType<R['created']>>,
     IAdtReadable<IIncludeConfig, ReturnType<R['source']>>,
     IAdtMetadataReadable<IIncludeConfig, ReturnType<R['metadata']>>,
@@ -147,6 +150,25 @@ export class AdtInclude<
         ),
       this.results.enhancementOptions as IResultStrategy<
         ReturnType<R['enhancementOptions']>
+      >,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * The include's main programs — a program (`PROG/P`), or a function group
+   * (`FUGR/F`) for its includes — none when no program includes it directly.
+   */
+  async readMainPrograms<E extends IAdtError = IAdtError>(
+    this: this & AdtPerformedBy<'include', 'mainPrograms'>,
+    config: Partial<IIncludeConfig>,
+    options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<ReturnType<R['mainPrograms']>, E>> {
+    const connection = withCallTimeout(this.connection, options?.timeout);
+    return answering(
+      () => getIncludeMainPrograms(connection, requireName(config)),
+      this.results.mainPrograms as IResultStrategy<
+        ReturnType<R['mainPrograms']>
       >,
       options?.analyse,
     );

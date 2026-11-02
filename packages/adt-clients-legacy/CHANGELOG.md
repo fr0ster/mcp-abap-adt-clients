@@ -4,6 +4,16 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [0.4.1] - 2026-11-02
+
+### Added
+
+- `getInclude().readMainPrograms`, which `AdtInclude` gained in adt-clients
+  40.1.0, is refused without a request: 7.40 SP04's type table lists no
+  `mainPrograms` for the include and no run there has sent its GET
+  (`legacyNotMeasuredRefusal`, as `updateMetadata`). `docs/LEGACY.md` records
+  it. `@mcp-abap-adt/adt-clients` `^40.1.0`.
+
 ## [0.4.0] - 2026-11-01
 
 On `@mcp-abap-adt/adt-clients` `^40.0.0`, `@mcp-abap-adt/adt-strategies`

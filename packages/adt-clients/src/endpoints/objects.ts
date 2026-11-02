@@ -66,6 +66,7 @@ export const PROGRAM_INCLUDE = {
     `${PROGRAM_INCLUDE.uri(name)}/source/main/enhancements/elements`,
   enhancementOptions: (name: string) =>
     `${PROGRAM_INCLUDE.uri(name)}/enhancements/options`,
+  mainPrograms: (name: string) => `${PROGRAM_INCLUDE.uri(name)}/mainprograms`,
 } as const;
 
 export const CLASS = {
