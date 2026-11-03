@@ -2197,6 +2197,35 @@ library had failed. The readings now answer `''` for what is not there
 look for it before the next step. The outcome to guard against on an
 unfamiliar system is a confident zero that reads exactly like a clean check.
 
+**Results that already exist: `listResults(options)` and `getResult(displayId)`**
+(42.1.0, `IAtcResultsReadable` of `interfaces-adt` 25.1.0). SAP keeps every
+run's result under a Display ID — the server's own runs, a person's in ADT, a
+central run. Each member is one `GET`, answered through its slot
+(`resultList`, `result`; the document as it came by default).
+
+- `listResults({ createdBy, centralOnly?, ageMin?, ageMax? })` —
+  `/atc/results`. `createdBy` is required: a user name, or `*` for every user;
+  an empty one is refused before the request, since SAP matches nobody for
+  it. `centralOnly: true` sends `centralResult=true`; without it the list
+  holds every kind. `ageMin` / `ageMax` are days. Without them SAP applies a
+  window of its own, which listed 26 central results on premise one day and
+  none the next (2026-11-02, 2026-11-03): state the ages for a list you can
+  rely on. Each entry carries its Display ID, title, check variant, run
+  series, creation time and counts; no objects.
+- `getResult(displayId)` — `/atc/results/{displayId}`: the same `resultList`
+  holding one result with its objects and their findings, in the worklist's
+  shape. An unknown Display ID is `404`.
+
+```typescript
+const list = await atc.listResults({
+  createdBy: '*',
+  centralOnly: true,
+  ageMin: 0,
+  ageMax: 30,
+});
+const one = await atc.getResult('E6AC99B2161F1FE1B5A1E9B68E5CD628');
+```
+
 ### ATC Log
 
 Different resources, same subject: `getAtcLog()` reads the execution log and the

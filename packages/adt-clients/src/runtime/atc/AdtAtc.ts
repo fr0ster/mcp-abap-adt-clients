@@ -2,7 +2,7 @@
  * ATC check runs: the check variant, a worklist, the run, its status, its
  * findings — one request each.
  *
- * Three contract capabilities and two members of its own. A check run is not
+ * Four contract capabilities and two members of its own. A check run is not
  * created, updated, locked, activated or versioned — it is run, and then read.
  *
  * **Nothing here reads a verdict into an answer.** Each answer a run depends on
@@ -22,6 +22,8 @@ import {
   type IAdtError,
   type IAdtResponse,
   type IAtcFindings,
+  type IAtcResultListOptions,
+  type IAtcResultsReadable,
   type IAtcRunOptions,
   type IAtcRunStatusReadable,
   type IAtcRunTarget,
@@ -37,6 +39,7 @@ import {
   type ResultValuesOf,
   rawDocument,
 } from '../../utils/resultStrategy';
+import { getAtcResult, listAtcResults } from './results';
 import {
   buildAtcObjectUri,
   createAtcWorklist,
@@ -70,6 +73,10 @@ export interface IAtcResults {
   readonly runStatus: IResultStrategy<unknown>;
   /** The worklist — `getFindings`. */
   readonly findings: IResultStrategy<unknown>;
+  /** `/atc/results`, `atcresult:resultList` without objects — `listResults`. */
+  readonly resultList: IResultStrategy<unknown>;
+  /** `/atc/results/{displayId}`, one result with its objects — `getResult`. */
+  readonly result: IResultStrategy<unknown>;
 }
 
 /**
@@ -85,6 +92,8 @@ export const atcDocuments = {
   waitingRun: rawDocument,
   runStatus: rawDocument,
   findings: rawDocument,
+  resultList: rawDocument,
+  result: rawDocument,
 } satisfies IAtcResults;
 
 /** What each slot of the result set answers. */
@@ -99,7 +108,10 @@ export type AtcValues = {
  * they could reuse. The atom stays in the contract for whoever composes them.
  */
 export class AdtAtc<T extends AtcValues = ResultValuesOf<typeof atcDocuments>>
-  implements IAtcRunStatusReadable<T['runStatus']>, IAtcFindings<T['findings']>
+  implements
+    IAtcRunStatusReadable<T['runStatus']>,
+    IAtcFindings<T['findings']>,
+    IAtcResultsReadable<T['resultList'], T['result']>
 {
   private readonly results: ResultStrategiesOf<T>;
   private readonly logger: ILogger;
@@ -189,6 +201,41 @@ export class AdtAtc<T extends AtcValues = ResultValuesOf<typeof atcDocuments>>
   }
 
   /**
+   * The results SAP holds for `createdBy` — `/atc/results`.
+   *
+   * One request, with only the parameters given (see `listAtcResults`).
+   * `createdBy` is required by the type; an empty one, or one of spaces only,
+   * is refused before any request, since SAP matches nobody for it.
+   */
+  async listResults<E extends IAdtError = IAdtError>(
+    options: IAtcResultListOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<T['resultList'], E>> {
+    this.assertCreatedBy(options.createdBy);
+    return answering(
+      () => listAtcResults(this.connection, options),
+      this.results.resultList,
+      options.analyse,
+    );
+  }
+
+  /**
+   * One result by its Display ID — `/atc/results/{displayId}`.
+   *
+   * One request; the Display ID is URI-encoded. The answer holds the result's
+   * objects and their findings.
+   */
+  async getResult<E extends IAdtError = IAdtError>(
+    displayId: string,
+    options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<T['result'], E>> {
+    return answering(
+      () => getAtcResult(this.connection, displayId),
+      this.results.result,
+      options?.analyse,
+    );
+  }
+
+  /**
    * ATC customizing, which carries the system's check variant —
    * `/atc/customizing`.
    *
@@ -251,6 +298,16 @@ export class AdtAtc<T extends AtcValues = ResultValuesOf<typeof atcDocuments>>
     if (!target?.objects?.length) {
       const error = new AdtOperationError(
         'ATC run needs at least one object to check.',
+      );
+      error.code = AdtObjectErrorCodes.VALIDATION_FAILED;
+      throw error;
+    }
+  }
+
+  private assertCreatedBy(createdBy: string): void {
+    if (createdBy.trim() === '') {
+      const error = new AdtOperationError(
+        'createdBy must name a user, or * for every user: SAP matches nobody for an empty one.',
       );
       error.code = AdtObjectErrorCodes.VALIDATION_FAILED;
       throw error;
