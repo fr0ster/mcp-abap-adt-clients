@@ -36,6 +36,6 @@ export async function updateDdl(
     method: 'PUT',
     timeout: 0,
     data: ddlSource,
-    headers: updateRequestHeaders(headers, ifMatch),
+    headers: updateRequestHeaders(headers, ifMatch, 'kept'),
   });
 }

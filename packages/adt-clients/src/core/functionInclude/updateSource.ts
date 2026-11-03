@@ -40,6 +40,6 @@ export async function uploadFunctionIncludeSource(
     method: 'PUT',
     timeout: 0,
     data: sourceCode,
-    headers: updateRequestHeaders(headers, ifMatch),
+    headers: updateRequestHeaders(headers, ifMatch, 'kept'),
   });
 }

@@ -26,7 +26,7 @@ export async function uploadFeatureToggleSource(
     method: 'PUT',
     url: `${sourceUri(FEATURE_TOGGLE.uri(name))}`,
     timeout: 0,
-    headers: updateRequestHeaders(headers, ifMatch),
+    headers: updateRequestHeaders(headers, ifMatch, 'kept'),
     params,
     data: JSON.stringify(source),
   });

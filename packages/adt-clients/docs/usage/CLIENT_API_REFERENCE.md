@@ -1156,6 +1156,19 @@ source write answers its own ETag. The other write paths — a class include, a
 function module, a DDL source, a structure's source — have live suites
 (`src/__tests__/integration/core/*/IfMatch*.test.ts`) that send the same
 header; that SAP refuses a stale one there is what those suites check.
+**The charset of a guarded write.** SAP builds the ETag of an object's XML
+document and of a DDIC source with the media type and compares it with the
+write's `Content-Type`: a domain write with `; charset=utf-8` was refused `412`
+with the read's ETag and accepted without it, and a structure's source the same
+with `text/plain` (measured on premise, 2026-11-03). So, when `ifMatch` is
+given, every `updateMetadata`, the message class message's `update` and the
+DDIC source `update`s (structure, table, append structure) send their
+`Content-Type` without `charset`; the other sources keep it, as their ETags
+carry no media type. The writer states which (`GuardedCharset`, `'kept'` or
+`'dropped'`, passed to `updateRequestHeaders`). Without `ifMatch` every header
+goes byte for byte as given. That a DDIC source's non-ASCII text survives the
+write without `charset` is what the structure live suite checks (not yet run).
+
 SAP_BASIS 7.40 does not act on `If-Match` (see `@mcp-abap-adt/adt-clients-legacy`,
 `docs/LEGACY.md`).
 

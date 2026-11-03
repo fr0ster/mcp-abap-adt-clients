@@ -70,6 +70,6 @@ export async function update(
     method: 'PUT',
     timeout: 0,
     data: params.sourceCode,
-    headers: updateRequestHeaders(headers, ifMatch),
+    headers: updateRequestHeaders(headers, ifMatch, 'kept'),
   });
 }

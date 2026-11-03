@@ -49,6 +49,6 @@ export async function updateAuthorizationField(
     method: 'PUT',
     timeout: 0,
     data: xmlBody,
-    headers: updateRequestHeaders(headers, ifMatch),
+    headers: updateRequestHeaders(headers, ifMatch, 'dropped'),
   });
 }

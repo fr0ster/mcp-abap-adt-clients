@@ -30,7 +30,7 @@ export async function updateFeatureToggle(
     method: 'PUT',
     url: `${FEATURE_TOGGLE.uri(params.feature_toggle_name)}`,
     timeout: 0,
-    headers: updateRequestHeaders(headers, ifMatch),
+    headers: updateRequestHeaders(headers, ifMatch, 'dropped'),
     params: query,
     data: xml,
   });

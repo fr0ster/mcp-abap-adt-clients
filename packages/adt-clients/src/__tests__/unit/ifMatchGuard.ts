@@ -7,7 +7,9 @@
  * path (test-only source in this repository).
  */
 
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { headersOf } from '../helpers/adtHeaders';
 import { HANDLERS, type HandlerEntry } from './capabilities/manifest';
 import {
   CHAIN_MAIN_WRITE,
@@ -94,16 +96,19 @@ export function etagFor(row: UpdateRow): string {
 async function callRow(
   row: UpdateRow,
   ifMatch: string | undefined,
-): Promise<{ owner: string; calls: Recorded[] }> {
+  pairOf: (handler: object) => IAdtHeaders = () =>
+    pairFor(`${row.name}.${row.member}`),
+): Promise<{ owner: string; calls: Recorded[]; pair?: IAdtHeaders }> {
   const { connection, calls } = recordingConnection();
   const handler = row.build(connection);
-  const owner =
-    typeof handler === 'object' && handler !== null
-      ? ownerOf(handler, row.member)
-      : '(none)';
+  if (typeof handler !== 'object' || handler === null) {
+    return { owner: '(none)', calls };
+  }
+  const owner = ownerOf(handler, row.member);
+  const pair = pairOf(handler);
   try {
     await m(handler, row.member)(row.config, {
-      headers: pairFor(`${row.name}.${row.member}`),
+      headers: pair,
       source: String(row.config.source ?? '" guard'),
       lockHandle: 'GUARD-LOCK',
       ...(ifMatch === undefined ? {} : { ifMatch }),
@@ -112,7 +117,7 @@ async function callRow(
     // What the member answered is another test's subject; what it sent is
     // this one's.
   }
-  return { owner, calls };
+  return { owner, calls, pair };
 }
 
 /** The `If-Match` values a request carried, whatever the header's case. */
@@ -190,4 +195,92 @@ export async function expectNoIfMatchOutsideUpdates(
   }
   expect(calls.flatMap(ifMatchOf)).toEqual([]);
   return calls;
+}
+
+/** The `Content-Type` values a request carried, whatever the header's case. */
+function contentTypeOf(call: Recorded): unknown[] {
+  return valuesOf(call.headers, 'content-type');
+}
+
+/**
+ * The update members whose guarded write goes without the `charset`
+ * parameter, by `<class>.<member>` — SAP builds their ETag with the media
+ * type. Every `updateMetadata` writes an XML document and is one of them;
+ * these `update`s are too: the DDIC sources and the message class message
+ * (a `PUT` of its class's XML document).
+ */
+export const SOURCES_WITHOUT_CHARSET_WHEN_GUARDED: ReadonlySet<string> =
+  new Set([
+    'AdtStructure.update',
+    'AdtTable.update',
+    'AdtAppendStructure.update',
+    'AdtMessageClassMessage.update',
+  ]);
+
+/** Whether a member's guarded write drops the charset (see above). */
+export function dropsCharsetWhenGuarded(key: string): boolean {
+  return (
+    key.endsWith('.updateMetadata') ||
+    SOURCES_WITHOUT_CHARSET_WHEN_GUARDED.has(key)
+  );
+}
+
+/** `contentType` without its `charset` parameter, in plain string code. */
+export function withoutCharset(contentType: string): string {
+  return contentType
+    .split(';')
+    .filter(
+      (part, index) =>
+        index === 0 ||
+        (part.split('=')[0] ?? '').trim().toLowerCase() !== 'charset',
+    )
+    .join(';');
+}
+
+/**
+ * The row's write, given the pair the member sent before 36.0.0 (the
+ * recorded one, `headersOf`): with `ifMatch`, an XML document's
+ * `Content-Type` of a member {@link dropsCharsetWhenGuarded} names goes without
+ * its `charset` — SAP builds that document's ETag with the write's media type,
+ * so a charset never matches the read's (measured, 2026-11-03) — and every
+ * other `Content-Type` goes as given;
+ * without `ifMatch` the pair goes byte for byte. Answers the row's verdict:
+ * `'stripped'`, `'as given'`, or `'no request'`.
+ */
+export async function expectGuardedContentType(
+  row: UpdateRow,
+  sendsNoRequest: ReadonlySet<string>,
+): Promise<'stripped' | 'as given' | 'no request'> {
+  const recorded = (handler: object) => headersOf(handler, row.member);
+  const given = await callRow(row, etagFor(row), recorded);
+  const absent = await callRow(row, undefined, recorded);
+  const key = `${given.owner}.${row.member}`;
+  const pair = given.pair;
+  if (
+    pair === undefined ||
+    given.owner === '(own property)' ||
+    sendsNoRequest.has(key)
+  ) {
+    expect(given.calls).toEqual([]);
+    return 'no request';
+  }
+
+  const mainVerb = CHAIN_MAIN_WRITE[key];
+  const writeOf = (calls: Recorded[]) =>
+    (mainVerb ? calls.filter((c) => c.method === mainVerb) : calls)[0];
+  const guarded = writeOf(given.calls);
+  const unguarded = writeOf(absent.calls);
+
+  // Without `ifMatch`: the caller's pair, byte for byte.
+  expect(unguarded === undefined ? [] : contentTypeOf(unguarded)).toEqual([
+    pair.contentType,
+  ]);
+
+  const dropped = withoutCharset(pair.contentType);
+  const strips = dropsCharsetWhenGuarded(key) && dropped !== pair.contentType;
+  const expected = strips ? dropped : pair.contentType;
+  expect(guarded === undefined ? [] : contentTypeOf(guarded)).toEqual([
+    expected,
+  ]);
+  return strips ? 'stripped' : 'as given';
 }

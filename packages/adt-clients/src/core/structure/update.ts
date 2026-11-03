@@ -31,7 +31,7 @@ export async function upload(
     method: 'PUT',
     timeout: 0,
     data: params.ddlCode,
-    headers: updateRequestHeaders(headers, ifMatch),
+    headers: updateRequestHeaders(headers, ifMatch, 'dropped'),
   });
 }
 

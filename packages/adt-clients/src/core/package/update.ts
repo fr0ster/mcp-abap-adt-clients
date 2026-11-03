@@ -43,6 +43,6 @@ export async function updatePackage(
     method: 'PUT',
     timeout: 0,
     data: document,
-    headers: updateRequestHeaders(headers, ifMatch),
+    headers: updateRequestHeaders(headers, ifMatch, 'dropped'),
   });
 }

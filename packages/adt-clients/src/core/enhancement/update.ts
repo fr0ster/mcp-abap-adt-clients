@@ -84,7 +84,7 @@ export async function update(
       method: 'PUT',
       timeout: 0,
       data: args.source_code,
-      headers: updateRequestHeaders(headers, ifMatch),
+      headers: updateRequestHeaders(headers, ifMatch, 'kept'),
     });
     return response;
   } catch (error: unknown) {
@@ -167,6 +167,6 @@ export async function updateEnhancementMetadata(
     method: 'PUT',
     timeout: 0,
     data: source,
-    headers: updateRequestHeaders(headers, ifMatch),
+    headers: updateRequestHeaders(headers, ifMatch, 'dropped'),
   });
 }

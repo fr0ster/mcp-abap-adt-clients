@@ -34,6 +34,6 @@ export async function updateServiceDefinition(
     method: 'PUT',
     timeout: 0,
     data: args.source_code,
-    headers: updateRequestHeaders(headers, ifMatch),
+    headers: updateRequestHeaders(headers, ifMatch, 'kept'),
   });
 }

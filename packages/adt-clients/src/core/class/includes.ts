@@ -145,6 +145,6 @@ async function updateClassInclude(
     method: 'PUT',
     timeout: 0,
     data: includeSource,
-    headers: updateRequestHeaders(headers, ifMatch),
+    headers: updateRequestHeaders(headers, ifMatch, 'kept'),
   });
 }

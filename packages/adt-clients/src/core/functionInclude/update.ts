@@ -52,6 +52,6 @@ export async function updateFunctionInclude(
     method: 'PUT',
     timeout: 0,
     data: xmlBody,
-    headers: updateRequestHeaders(headers, ifMatch),
+    headers: updateRequestHeaders(headers, ifMatch, 'dropped'),
   });
 }

@@ -34,6 +34,6 @@ export async function updateTable(
     method: 'PUT',
     timeout: 0,
     data: params.ddl_code,
-    headers: updateRequestHeaders(headers, ifMatch),
+    headers: updateRequestHeaders(headers, ifMatch, 'dropped'),
   });
 }

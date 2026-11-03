@@ -324,7 +324,11 @@ export class AdtMessageClassMessage<
               // The main write carries the caller's pair, and `If-Match`
               // when the update was given `ifMatch`; the chain's read, locks
               // and unlocks keep their own.
-              headers: updateRequestHeaders(options.headers, ifMatch),
+              headers: updateRequestHeaders(
+                options.headers,
+                ifMatch,
+                'dropped',
+              ),
             }),
           this.results.written,
           options?.analyse,

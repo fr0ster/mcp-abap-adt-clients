@@ -42,7 +42,7 @@ export async function updateFunctionGroup(
     method: 'PUT',
     timeout: 0,
     data: document,
-    headers: updateRequestHeaders(headers, ifMatch),
+    headers: updateRequestHeaders(headers, ifMatch, 'dropped'),
   });
 }
 
@@ -69,6 +69,6 @@ export async function uploadFunctionGroupSource(
     method: 'PUT',
     timeout: 0,
     data: sourceCode,
-    headers: updateRequestHeaders(headers, ifMatch),
+    headers: updateRequestHeaders(headers, ifMatch, 'kept'),
   });
 }

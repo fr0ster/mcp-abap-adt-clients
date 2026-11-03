@@ -36,7 +36,7 @@ export async function updateClassTestInclude(
     method: 'PUT',
     timeout: 0,
     data: testClassSource,
-    headers: updateRequestHeaders(headers, ifMatch),
+    headers: updateRequestHeaders(headers, ifMatch, 'kept'),
   });
 }
 

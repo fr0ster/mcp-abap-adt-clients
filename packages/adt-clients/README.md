@@ -804,6 +804,23 @@ program's and a class's source and a domain's metadata document):
   `src/__tests__/integration/core/*/IfMatch*.test.ts`. The service binding's
   `update` is its publication job and writes no document: it sends no
   `If-Match`.
+- **A guarded write of a document whose ETag SAP builds with the media type
+  goes without `charset`.** SAP builds the ETag of an object's XML document and
+  of a DDIC source with the media type, and on a write compares it with the
+  write's `Content-Type`: a domain `PUT` of
+  `application/vnd.sap.adt.domains.v2+xml` with the read's ETag answered `200`,
+  the same with `; charset=utf-8` answered `412`; a structure's source read
+  answered an ETag ending `text/plain2`, and a write with
+  `text/plain; charset=utf-8` was refused where `text/plain` was not (measured
+  on premise, 2026-11-03). So, when `ifMatch` is given, every `updateMetadata`,
+  the message class message's `update` and the DDIC source `update`s
+  (structure, table, append structure) send their `Content-Type` without the
+  `charset` parameter (an XML document's declaration carries its encoding);
+  every other source keeps it — its ETag carries no media type, and a guarded
+  write with it was measured passing for a program, a class and a DDL source.
+  Without `ifMatch` every header goes byte for byte as before. Whether a DDIC
+  source with non-ASCII text survives a write without `charset` is what the
+  structure live suite checks; it has not run yet.
 - **SAP_BASIS 7.40 does not act on it**: a stale `If-Match` answered `200` and
   the write took place (`@mcp-abap-adt/adt-clients-legacy`, `docs/LEGACY.md`).
 
