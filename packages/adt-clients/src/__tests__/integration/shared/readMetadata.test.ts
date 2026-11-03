@@ -272,7 +272,7 @@ describe('Shared - readMetadata', () => {
             undefined,
             { analyse: analyseException },
           ),
-      ).rejects.toThrow('No ADT address is known for object type');
+      ).rejects.toThrow('readObjectMetadata reads no unsupported_type');
     },
   );
 });

@@ -2721,7 +2721,7 @@ where_used:
       description: "Test getWhereUsed with default scope (Eclipse default behavior). Uses shared_dependencies.tables."
       params:
         object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables (referenced by ZAC_SHR_CDSUT_DDLS)
-        object_type: "table"  # class | program | include | functionGroup | functionModule | interface | package | table | structure | domain | dataElement | view
+        object_type: "TABL/DT"  # a code of the ADT type tables: CLAS/OC, PROG/P, PROG/I, FUGR/F, FUGR/FF, INTF/OI, DEVC/K, TABL/DT, TABL/DS, DOMA/DD, DTEL/DE, DDLS/DF, …
 
     - name: "where_used_all_types"
       enabled: true
@@ -2729,7 +2729,7 @@ where_used:
       description: "Test getWhereUsed with all types enabled (Eclipse 'select all' behavior). Uses shared_dependencies.tables."
       params:
         object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables
-        object_type: "table"
+        object_type: "TABL/DT"
 
     - name: "where_used_table"
       enabled: true
@@ -2737,7 +2737,7 @@ where_used:
       description: "Test getWhereUsed for table object type. Uses shared_dependencies.tables."
       params:
         object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables
-        object_type: "table"
+        object_type: "TABL/DT"
 
     - name: "where_used_error_no_name"
       enabled: true
@@ -2757,7 +2757,7 @@ where_used:
       description: "The scope, edited, then the search, read into references. Uses shared_dependencies.tables."
       params:
         object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables
-        object_type: "table"
+        object_type: "TABL/DT"
         enable_all_types: true
 
     - name: "where_used_list_raw_xml"
@@ -2766,7 +2766,7 @@ where_used:
       description: "The same search, answered as the document. Uses shared_dependencies.tables."
       params:
         object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables
-        object_type: "table"
+        object_type: "TABL/DT"
 
     - name: "where_used_list_filtered"
       enabled: true
@@ -2774,7 +2774,7 @@ where_used:
       description: "Compare enableAllTypes (everything) vs enableOnlyTypes (narrowed to one type). ZAC_SHR_VTABL is referenced by the CDS view ZAC_SHR_CDSUT_DDLS (DDLS/DF)."
       params:
         object_name: "ZAC_SHR_VTABL"  # → referenced by ZAC_SHR_CDSUT_DDLS
-        object_type: "table"
+        object_type: "TABL/DT"
         enable_only_types: ["DDLS/DF"]  # keep only CDS DDL sources
 
 # Read Accept (read methods should return 2xx; 406 is error)
