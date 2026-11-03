@@ -24,6 +24,7 @@ import type {
   IAdtResponse,
   IAdtSystemContext,
   IAdtTransportAware,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
   ITableTypeResults,
@@ -219,7 +220,7 @@ export class AdtDdicTableType<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<ITableTypeConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -235,6 +236,7 @@ export class AdtDdicTableType<
         updateTableType(
           connection,
           options.headers,
+          options.ifMatch,
           {
             tabletype_name: name,
             transport_request: config.transportRequest,

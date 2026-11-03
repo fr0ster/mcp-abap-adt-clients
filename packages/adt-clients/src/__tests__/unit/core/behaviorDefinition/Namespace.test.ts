@@ -48,11 +48,16 @@ describe('behavior definition namespace URL encoding', () => {
 
   it('update() encodes the namespaced name in the path', async () => {
     const connection = createConnectionMock();
-    await update(connection, headersFor('AdtBehaviorDefinition.update'), {
-      name: NS_NAME,
-      sourceCode: 'managed; define behavior for ZX {}',
-      lockHandle: 'LH123',
-    });
+    await update(
+      connection,
+      headersFor('AdtBehaviorDefinition.update'),
+      undefined,
+      {
+        name: NS_NAME,
+        sourceCode: 'managed; define behavior for ZX {}',
+        lockHandle: 'LH123',
+      },
+    );
     const url = firstUrl(connection);
     expect(url).toContain(ENCODED);
     expect(url).not.toContain(RAW_SLASHES);

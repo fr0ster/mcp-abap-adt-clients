@@ -29,6 +29,7 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtUpdatable,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
   ITableResults,
@@ -266,7 +267,7 @@ export class AdtTable<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<ITableConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -279,6 +280,7 @@ export class AdtTable<
         updateTable(
           connection,
           options.headers,
+          options.ifMatch,
           {
             table_name: name,
             ddl_code: source as string,
@@ -304,7 +306,7 @@ export class AdtTable<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'table', 'updateMetadata'>,
     config: Partial<ITableConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -314,6 +316,7 @@ export class AdtTable<
         writeObjectDocument(
           connection,
           options.headers,
+          options.ifMatch,
           TABLE.uri(this.name(config)),
           options?.source as string,
           options?.lockHandle,

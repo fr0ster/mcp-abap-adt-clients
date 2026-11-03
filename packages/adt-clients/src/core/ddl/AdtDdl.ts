@@ -29,6 +29,7 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtUpdatable,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
   ICdsTestDoubleCheckable,
@@ -269,7 +270,7 @@ export class AdtDdl<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IDdlConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -282,6 +283,7 @@ export class AdtDdl<
         updateDdl(
           connection,
           options.headers,
+          options.ifMatch,
           name,
           source as string,
           options?.lockHandle,
@@ -306,7 +308,7 @@ export class AdtDdl<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'ddl', 'updateMetadata'>,
     config: Partial<IDdlConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -316,6 +318,7 @@ export class AdtDdl<
         writeObjectDocument(
           connection,
           options.headers,
+          options.ifMatch,
           DDL_SOURCE.uri(this.name(config)),
           options?.source as string,
           options?.lockHandle,

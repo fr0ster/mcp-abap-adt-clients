@@ -37,6 +37,7 @@ describe('updatePackage URL', () => {
     await updatePackage(
       connection,
       headersFor('AdtPackage.updateMetadata'),
+      undefined,
       params,
       '<pak:package/>',
       'ABC123',
@@ -51,6 +52,7 @@ describe('updatePackage URL', () => {
     await updatePackage(
       connection,
       headersFor('AdtPackage.updateMetadata'),
+      undefined,
       params,
       '<pak:package/>',
       undefined as unknown as string,

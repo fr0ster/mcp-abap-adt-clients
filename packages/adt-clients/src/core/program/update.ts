@@ -5,7 +5,7 @@
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { PROGRAM, sourceUri } from '../../endpoints/objects';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Upload program source code (low-level - uses existing lockHandle)
@@ -15,6 +15,7 @@ import { requestHeaders } from '../../utils/requestHeaders';
 export async function uploadProgramSource(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   programName: string,
   sourceCode: string,
   lockHandle: string,
@@ -31,6 +32,6 @@ export async function uploadProgramSource(
     method: 'PUT',
     timeout: 0,
     data: sourceCode,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch),
   });
 }

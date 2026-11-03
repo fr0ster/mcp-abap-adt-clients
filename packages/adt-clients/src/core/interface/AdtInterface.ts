@@ -33,6 +33,7 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtUpdatable,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
   IInterfaceResults,
@@ -253,7 +254,7 @@ export class AdtInterface<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IInterfaceConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -271,6 +272,7 @@ export class AdtInterface<
         upload(
           connection,
           options.headers,
+          options.ifMatch,
           name,
           source as string,
           options?.lockHandle as string,
@@ -294,7 +296,7 @@ export class AdtInterface<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'interface', 'updateMetadata'>,
     config: Partial<IInterfaceConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -304,6 +306,7 @@ export class AdtInterface<
         writeObjectDocument(
           connection,
           options.headers,
+          options.ifMatch,
           INTERFACE.uri(config.interfaceName as string),
           options?.source as string,
           options?.lockHandle,

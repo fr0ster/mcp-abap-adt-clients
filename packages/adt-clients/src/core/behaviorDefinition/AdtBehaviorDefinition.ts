@@ -24,6 +24,7 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtUpdatable,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
   IBehaviorDefinitionResults,
@@ -298,7 +299,7 @@ export class AdtBehaviorDefinition<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorDefinitionConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -313,7 +314,7 @@ export class AdtBehaviorDefinition<
 
     return answering(
       () =>
-        updateBehaviorDefinition(connection, options.headers, {
+        updateBehaviorDefinition(connection, options.headers, options.ifMatch, {
           name,
           sourceCode: source as string,
           lockHandle: options?.lockHandle,
@@ -337,7 +338,7 @@ export class AdtBehaviorDefinition<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'behaviorDefinition', 'updateMetadata'>,
     config: Partial<IBehaviorDefinitionConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -347,6 +348,7 @@ export class AdtBehaviorDefinition<
         writeObjectDocument(
           connection,
           options.headers,
+          options.ifMatch,
           BEHAVIOR_DEFINITION.uri(this.name(config)),
           options?.source as string,
           options?.lockHandle,

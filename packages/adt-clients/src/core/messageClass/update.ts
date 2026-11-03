@@ -9,7 +9,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { MESSAGE_CLASS } from '../../endpoints/objects';
 import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 
 const BASE = MESSAGE_CLASS.collection;
 
@@ -31,6 +31,7 @@ const BASE = MESSAGE_CLASS.collection;
 export async function updateMessageClass(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   name: string,
   document: string,
   lockHandle: string | undefined,
@@ -42,6 +43,6 @@ export async function updateMessageClass(
     method: 'PUT',
     timeout: 0,
     data: document,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch),
   });
 }

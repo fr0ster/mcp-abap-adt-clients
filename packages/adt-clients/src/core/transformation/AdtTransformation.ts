@@ -24,6 +24,7 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtUpdatable,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
   ITransformationResults,
@@ -275,7 +276,7 @@ export class AdtTransformation<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<ITransformationConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -293,6 +294,7 @@ export class AdtTransformation<
         updateTransformation(
           connection,
           options.headers,
+          options.ifMatch,
           {
             transformation_name: name,
             source_code: source as string,
@@ -318,7 +320,7 @@ export class AdtTransformation<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'transformation', 'updateMetadata'>,
     config: Partial<ITransformationConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -328,6 +330,7 @@ export class AdtTransformation<
         writeObjectDocument(
           connection,
           options.headers,
+          options.ifMatch,
           TRANSFORMATION.uri(this.name(config)),
           options?.source as string,
           options?.lockHandle,

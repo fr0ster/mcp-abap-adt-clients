@@ -24,6 +24,7 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IAdtSystemContext,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IMessageClassResults,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -229,7 +230,7 @@ export class AdtMessageClass<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'messageClass', 'updateMetadata'>,
     config: Partial<IMessageClassConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -241,6 +242,7 @@ export class AdtMessageClass<
         updateMessageClass(
           connection,
           options.headers,
+          options.ifMatch,
           name,
           options?.source as string,
           options?.lockHandle,

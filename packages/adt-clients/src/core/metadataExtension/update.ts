@@ -11,7 +11,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { METADATA_EXTENSION, sourceUri } from '../../endpoints/objects';
 import { writeQuery } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Update metadata extension source code
@@ -43,6 +43,7 @@ import { requestHeaders } from '../../utils/requestHeaders';
 export async function updateMetadataExtension(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   name: string,
   sourceCode: string,
   lockHandle?: string,
@@ -55,6 +56,6 @@ export async function updateMetadataExtension(
     method: 'PUT',
     timeout: 0,
     data: sourceCode,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch),
   });
 }

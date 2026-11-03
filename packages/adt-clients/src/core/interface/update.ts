@@ -9,7 +9,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { INTERFACE, sourceUri } from '../../endpoints/objects';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Low-level: Upload interface source code (PUT)
@@ -18,6 +18,7 @@ import { requestHeaders } from '../../utils/requestHeaders';
 export async function upload(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   interfaceName: string,
   sourceCode: string,
   lockHandle: string,
@@ -35,6 +36,6 @@ export async function upload(
     method: 'PUT',
     timeout: 0,
     data: sourceCode,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch),
   });
 }

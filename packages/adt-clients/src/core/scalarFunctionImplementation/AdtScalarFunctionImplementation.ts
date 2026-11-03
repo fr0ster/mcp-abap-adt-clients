@@ -30,6 +30,7 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtUpdatable,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
   IScalarFunctionImplementationResults,
@@ -297,7 +298,7 @@ export class AdtScalarFunctionImplementation<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionImplementationConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -315,6 +316,7 @@ export class AdtScalarFunctionImplementation<
         updateScalarFunctionImplementation(
           connection,
           options.headers,
+          options.ifMatch,
           {
             implementation_name: name,
             source_code: source as string,
@@ -339,7 +341,7 @@ export class AdtScalarFunctionImplementation<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionImplementationConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -352,6 +354,7 @@ export class AdtScalarFunctionImplementation<
         updateScalarFunctionImplementationMetadata(
           connection,
           options.headers,
+          options.ifMatch,
           {
             implementation_name: name,
             source_code: source as string,

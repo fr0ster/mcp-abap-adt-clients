@@ -9,7 +9,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { CLASS_INCLUDE } from '../../endpoints/objects';
 import { writeQuery } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Update behavior implementation class implementations include source code (low-level function)
@@ -24,6 +24,7 @@ import { requestHeaders } from '../../utils/requestHeaders';
 export async function updateBehaviorImplementation(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   className: string,
   sourceCode: string,
   lockHandle?: string,
@@ -36,6 +37,6 @@ export async function updateBehaviorImplementation(
     method: 'PUT',
     timeout: 0,
     data: sourceCode,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch),
   });
 }

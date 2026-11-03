@@ -61,6 +61,7 @@ describe('metadata extension namespace URL encoding', () => {
     await updateMetadataExtension(
       connection,
       headersFor('AdtMetadataExtension.update'),
+      undefined,
       NS_NAME,
       '@Metadata.layer: #CUSTOMER\nannotate entity X with {}',
       'LH123',

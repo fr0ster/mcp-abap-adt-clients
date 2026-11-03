@@ -33,6 +33,7 @@ describe('appendStructure wire', () => {
     await updateAppendStructure(
       conn,
       headersFor('AdtAppendStructure.update'),
+      undefined,
       {
         append_structure_name: 'ZOK_S_APPEND',
         source_code: 'extend type ...',

@@ -28,6 +28,7 @@ import type {
   IAdtResponse,
   IAdtTransportAware,
   IAdtUpdatable,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
   IClassResults,
@@ -304,7 +305,7 @@ export class AdtBehaviorImplementation<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -324,6 +325,7 @@ export class AdtBehaviorImplementation<
         updateBehaviorImplementation(
           connection,
           options.headers,
+          options.ifMatch,
           name,
           source as string,
           options?.lockHandle,

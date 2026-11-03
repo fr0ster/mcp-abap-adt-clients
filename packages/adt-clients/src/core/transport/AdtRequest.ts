@@ -40,6 +40,7 @@ import type {
   IAdtTransportMoveObjects,
   IAdtTransportObjectActions,
   IAdtTransportSortAndCompress,
+  IAdtUpdateOptions,
   IListTransportsOptions,
   ITransportResults,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -296,7 +297,7 @@ export class AdtRequest<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'updateMetadata'>,
     config: Partial<ITransportConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -309,6 +310,7 @@ export class AdtRequest<
         updateTransport(
           connection,
           options.headers,
+          options.ifMatch,
           number,
           options?.source as string,
         ),

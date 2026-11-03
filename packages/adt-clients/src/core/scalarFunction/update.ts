@@ -5,7 +5,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { SCALAR_FUNCTION, sourceUri } from '../../endpoints/objects';
 import { writeQuery } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 import type { IUpdateScalarFunctionParams } from './types';
 
 /** *
@@ -16,6 +16,7 @@ import type { IUpdateScalarFunctionParams } from './types';
 export async function updateScalarFunction(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   args: IUpdateScalarFunctionParams,
   lockHandle?: string,
 ): Promise<IAdtWireResponse> {
@@ -25,6 +26,6 @@ export async function updateScalarFunction(
     method: 'PUT',
     timeout: 0,
     data: args.source_code,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch),
   });
 }

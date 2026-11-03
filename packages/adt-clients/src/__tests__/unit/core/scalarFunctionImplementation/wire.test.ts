@@ -34,6 +34,7 @@ describe('scalarFunctionImplementation wire', () => {
     await updateScalarFunctionImplementation(
       conn,
       headersFor('AdtScalarFunctionImplementation.update'),
+      undefined,
       {
         implementation_name: 'ZOK_IMPL',
         source_code: 'x',
@@ -53,6 +54,7 @@ describe('scalarFunctionImplementation wire', () => {
     await updateScalarFunctionImplementationMetadata(
       conn,
       headersFor('AdtScalarFunctionImplementation.updateMetadata'),
+      undefined,
       {
         implementation_name: 'ZOK_IMPL',
         source_code: '<blues/>',

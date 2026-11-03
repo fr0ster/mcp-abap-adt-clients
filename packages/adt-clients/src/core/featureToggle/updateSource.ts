@@ -4,12 +4,13 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { FEATURE_TOGGLE, sourceUri } from '../../endpoints/objects';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 import type { IFeatureToggleSource } from './types';
 
 export async function uploadFeatureToggleSource(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   name: string,
   source: IFeatureToggleSource,
   lockHandle?: string,
@@ -25,7 +26,7 @@ export async function uploadFeatureToggleSource(
     method: 'PUT',
     url: `${sourceUri(FEATURE_TOGGLE.uri(name))}`,
     timeout: 0,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch),
     params,
     data: JSON.stringify(source),
   });

@@ -11,7 +11,7 @@ import type { HttpError } from '@mcp-abap-adt/interfaces-network';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { ENHANCEMENT } from '../../endpoints/objects';
 import { safeStringify } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 import {
   type EnhancementType,
   getEnhancementUri,
@@ -38,6 +38,7 @@ const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
 export async function update(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   // See the note in behaviorDefinition/update.ts: the handle is passed as given.
   args: Omit<IUpdateEnhancementParams, 'lock_handle'> & {
     lock_handle?: string;
@@ -83,7 +84,7 @@ export async function update(
       method: 'PUT',
       timeout: 0,
       data: args.source_code,
-      headers: requestHeaders(headers),
+      headers: updateRequestHeaders(headers, ifMatch),
     });
     return response;
   } catch (error: unknown) {
@@ -123,6 +124,7 @@ export async function update(
 export async function updateEnhancement(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   enhancementType: EnhancementType,
   enhancementName: string,
   sourceCode: string,
@@ -133,6 +135,7 @@ export async function updateEnhancement(
   return update(
     connection,
     headers,
+    ifMatch,
     {
       enhancement_name: enhancementName,
       enhancement_type: enhancementType,
@@ -148,6 +151,7 @@ export async function updateEnhancement(
 export async function updateEnhancementMetadata(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   type: EnhancementType,
   name: string,
   source: string,
@@ -163,6 +167,6 @@ export async function updateEnhancementMetadata(
     method: 'PUT',
     timeout: 0,
     data: source,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch),
   });
 }

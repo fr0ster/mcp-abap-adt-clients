@@ -30,6 +30,7 @@ import type {
   IAdtResponse,
   IAdtSystemContext,
   IAdtUpdatable,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
   IFunctionIncludeResults,
@@ -302,7 +303,7 @@ export class AdtFunctionInclude<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -316,6 +317,7 @@ export class AdtFunctionInclude<
         updateFunctionInclude(
           connection,
           options.headers,
+          options.ifMatch,
           params,
           options?.lockHandle,
           this.logger,
@@ -338,7 +340,7 @@ export class AdtFunctionInclude<
    */
   async update<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -356,6 +358,7 @@ export class AdtFunctionInclude<
         uploadFunctionIncludeSource(
           connection,
           options.headers,
+          options.ifMatch,
           group,
           include,
           source as string,

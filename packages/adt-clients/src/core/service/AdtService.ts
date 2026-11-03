@@ -20,6 +20,7 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtUpdatable,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IServiceBindingPublicationConfig,
   IServiceGroupParams,
@@ -600,7 +601,7 @@ export class AdtServiceBinding<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'serviceBinding', 'updateMetadata'>,
     config: Partial<IServiceBindingConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -610,6 +611,7 @@ export class AdtServiceBinding<
         writeObjectDocument(
           connection,
           options.headers,
+          options.ifMatch,
           SERVICE_BINDING.uri(this.name(config)),
           options?.source as string,
           options?.lockHandle,

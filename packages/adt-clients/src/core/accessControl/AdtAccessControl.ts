@@ -25,6 +25,7 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtUpdatable,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -265,7 +266,7 @@ export class AdtAccessControl<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IAccessControlConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -283,6 +284,7 @@ export class AdtAccessControl<
         updateAccessControl(
           connection,
           options.headers,
+          options.ifMatch,
           {
             access_control_name: name,
             source_code: source as string,
@@ -308,7 +310,7 @@ export class AdtAccessControl<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'accessControl', 'updateMetadata'>,
     config: Partial<IAccessControlConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -318,6 +320,7 @@ export class AdtAccessControl<
         writeObjectDocument(
           connection,
           options.headers,
+          options.ifMatch,
           ACCESS_CONTROL.uri(this.name(config)),
           options?.source as string,
           options?.lockHandle,

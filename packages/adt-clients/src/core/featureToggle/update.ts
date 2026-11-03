@@ -5,7 +5,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { FEATURE_TOGGLE } from '../../endpoints/objects';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 import type { ICreateFeatureToggleParams } from './types';
 import { buildFeatureToggleXml } from './xmlBuilder';
 
@@ -17,6 +17,7 @@ import { buildFeatureToggleXml } from './xmlBuilder';
 export async function updateFeatureToggle(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   params: ICreateFeatureToggleParams,
   lockHandle?: string,
   _logger?: ILogger,
@@ -29,7 +30,7 @@ export async function updateFeatureToggle(
     method: 'PUT',
     url: `${FEATURE_TOGGLE.uri(params.feature_toggle_name)}`,
     timeout: 0,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch),
     params: query,
     data: xml,
   });

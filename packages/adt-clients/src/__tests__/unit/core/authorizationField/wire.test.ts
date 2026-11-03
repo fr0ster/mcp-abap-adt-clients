@@ -79,6 +79,7 @@ describe('authorizationField wire', () => {
     await updateAuthorizationField(
       conn,
       headersFor('AdtAuthorizationField.updateMetadata'),
+      undefined,
       PARAMS,
       'LH/1',
     );

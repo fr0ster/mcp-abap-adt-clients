@@ -23,6 +23,7 @@ import type {
   IAdtResponse,
   IAdtSystemContext,
   IAdtUpdatable,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IFeatureToggleObject,
   IFeatureToggleResults,
@@ -266,7 +267,7 @@ export class AdtFeatureToggle<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -276,6 +277,7 @@ export class AdtFeatureToggle<
         updateFeatureToggle(
           connection,
           options.headers,
+          options.ifMatch,
           this.createParams(config as IFeatureToggleConfig),
           options?.lockHandle,
         ),
@@ -298,7 +300,7 @@ export class AdtFeatureToggle<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IFeatureToggleConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -311,6 +313,7 @@ export class AdtFeatureToggle<
         uploadFeatureToggleSource(
           connection,
           options.headers,
+          options.ifMatch,
           name,
           source as IFeatureToggleSource,
           options?.lockHandle,

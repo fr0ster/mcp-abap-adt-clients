@@ -12,7 +12,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { FUNCTION_INCLUDE, sourceUri } from '../../endpoints/objects';
 import { writeQuery } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Upload function include source code (low-level; uses an existing lockHandle).
@@ -23,6 +23,7 @@ import { requestHeaders } from '../../utils/requestHeaders';
 export async function uploadFunctionIncludeSource(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   groupName: string,
   includeName: string,
   sourceCode: string,
@@ -39,6 +40,6 @@ export async function uploadFunctionIncludeSource(
     method: 'PUT',
     timeout: 0,
     data: sourceCode,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch),
   });
 }

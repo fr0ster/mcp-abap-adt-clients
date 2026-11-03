@@ -4,7 +4,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { STRUCTURE, sourceUri } from '../../endpoints/objects';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 import type { IUpdateAppendStructureParams } from './types';
 
 /** *
@@ -15,6 +15,7 @@ import type { IUpdateAppendStructureParams } from './types';
 export async function updateAppendStructure(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   args: IUpdateAppendStructureParams,
   lockHandle: string,
 ): Promise<IAdtWireResponse> {
@@ -27,6 +28,6 @@ export async function updateAppendStructure(
     method: 'PUT',
     timeout: 0,
     data: args.source_code,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch),
   });
 }

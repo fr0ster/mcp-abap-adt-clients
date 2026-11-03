@@ -29,6 +29,7 @@ import type {
   IAdtResponse,
   IAdtSystemContext,
   IAdtUpdatable,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IIncludeConfig,
   IIncludeResults,
@@ -310,7 +311,7 @@ export class AdtInclude<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -330,6 +331,7 @@ export class AdtInclude<
         uploadIncludeSource(
           connection,
           options.headers,
+          options.ifMatch,
           includeName,
           source as string,
           options?.lockHandle,
@@ -353,7 +355,7 @@ export class AdtInclude<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'include', 'updateMetadata'>,
     config: Partial<IIncludeConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -363,6 +365,7 @@ export class AdtInclude<
         writeObjectDocument(
           connection,
           options.headers,
+          options.ifMatch,
           PROGRAM_INCLUDE.uri(requireName(config)),
           options?.source as string,
           options?.lockHandle,

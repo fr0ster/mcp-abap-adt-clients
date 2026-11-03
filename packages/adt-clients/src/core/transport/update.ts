@@ -15,7 +15,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { TRANSPORT_REQUEST } from '../../endpoints/objects';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Write the document the caller built.
@@ -33,6 +33,7 @@ import { requestHeaders } from '../../utils/requestHeaders';
 export async function updateTransport(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   transportNumber: string,
   document: string,
 ): Promise<IAdtWireResponse> {
@@ -43,6 +44,6 @@ export async function updateTransport(
     method: 'PUT',
     timeout: 0,
     data: document,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch),
   });
 }

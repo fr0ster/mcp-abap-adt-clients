@@ -9,7 +9,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { DATA_ELEMENT } from '../../endpoints/objects';
 import { writeQuery } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 import type { IUpdateDataElementParams } from './types';
 
 /**
@@ -28,6 +28,7 @@ import type { IUpdateDataElementParams } from './types';
 export async function updateDataElement(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   params: IUpdateDataElementParams,
   document: string,
   lockHandle?: string,
@@ -39,6 +40,6 @@ export async function updateDataElement(
     method: 'PUT',
     timeout: 0,
     data: document,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch),
   });
 }

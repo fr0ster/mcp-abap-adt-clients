@@ -12,7 +12,7 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AUTHORIZATION_FIELD } from '../../endpoints/objects';
 import { writeQuery } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 import type { ICreateAuthorizationFieldParams } from './types';
 import { buildAuthorizationFieldXml } from './xmlBuilder';
 
@@ -30,6 +30,7 @@ const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
 export async function updateAuthorizationField(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   params: ICreateAuthorizationFieldParams,
   lockHandle?: string,
   logger?: ILogger,
@@ -48,6 +49,6 @@ export async function updateAuthorizationField(
     method: 'PUT',
     timeout: 0,
     data: xmlBody,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch),
   });
 }
