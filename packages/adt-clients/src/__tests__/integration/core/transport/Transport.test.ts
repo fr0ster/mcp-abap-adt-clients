@@ -37,7 +37,12 @@ import {
   gateOn,
   missingCaseMessage,
 } from '../../../helpers/caseGate';
-import { expectResult, failureOf, releasing } from '../../../helpers/contract';
+import {
+  expectResult,
+  failureOf,
+  noteCleanupRefusal,
+  releasing,
+} from '../../../helpers/contract';
 import { judged } from '../../../helpers/judged';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import { presenceOf } from '../../../helpers/objectPresence';
@@ -396,7 +401,7 @@ describe('AdtRequest', () => {
     };
 
     gate('create_transport', 'builder_transport')(
-      'creates a task, frees an object name, and proves the entry is gone',
+      "creates a task, detaches a live object's entry, and proves the entry is gone",
       async () => {
         const label = 'AdtRequest - object list and tasks';
         logTestStart(testsLogger, label, {
@@ -412,6 +417,10 @@ describe('AdtRequest', () => {
         const domainName = 'ZAC_TRQ_DOMA01';
         let taskNumber: string | null = null;
         let transportNumber: string | null = null;
+        // The request this run created the domain in, from the moment its
+        // create succeeded until its own delete did: the cleanup on failure
+        // deletes only what the run made, through the request it made it in.
+        let domainCreatedIn: string | undefined;
 
         try {
           logTestStep('create the request this block works in', testsLogger);
@@ -564,7 +573,7 @@ describe('AdtRequest', () => {
           }
 
           logTestStep(
-            'create an object in the shared request, then delete it',
+            'create an object in the shared request, detach its entry, then delete it',
             testsLogger,
           );
           const domain = client.getDomain();
@@ -657,6 +666,7 @@ describe('AdtRequest', () => {
               `could not create ${domainName}: ${madeIt.getError().message}`,
             );
           }
+          domainCreatedIn = sharedRequest;
 
           // **The create makes a shell, and only the update gives it a type.**
           // `datatype` and `length` used to be passed to `create`, which does
@@ -733,25 +743,25 @@ describe('AdtRequest', () => {
             testsLogger,
           );
 
-          expectResult(
-            await domain.delete(
-              { domainName, transportRequest: sharedRequest },
-              {
-                analyse: judged(analyseDeletion),
-                headers: integrationHeadersOf(domain, 'delete'),
-              },
-            ),
-            `delete ${domainName}`,
+          // **`removeObject` is measured on the entry of a LIVE object.** It
+          // used to be measured on the entry a deletion left behind, and that
+          // entry is not there on every system: measured on the BTP ABAP
+          // trial, 2026-11-03, the request held no entry for the domain after
+          // its delete — the cloud detaches it by itself — so the member was
+          // never called. On premise the deletion leaves one. The entry a
+          // create registers is there on both, so that is the one detached
+          // here, and the domain is deleted after.
+          logTestStep(
+            `find the entry the create registered for ${domainName}`,
+            testsLogger,
           );
-
-          logTestStep('find the entry the deletion left behind', testsLogger);
           const entry = await findEntry(sharedRequest, domainName);
           if (entry === undefined) {
-            // The system detached it by itself; there is nothing to remove and
-            // nothing this member could be measured against. A failure, because
-            // `removeObject` was never called.
+            // The create named the request, so its entry belongs there. Without
+            // one there is nothing `removeObject` could be measured against —
+            // a failure, because the member was never called.
             throw new Error(
-              `${domainName} left no entry under ${sharedRequest} — nothing to remove`,
+              `${domainName} was created in ${sharedRequest} but no task of it lists an entry for it — nothing to remove`,
             );
           }
           logTestStep(
@@ -779,8 +789,12 @@ describe('AdtRequest', () => {
             ),
           ).toHaveLength(1);
           const resorted = await findEntry(sharedRequest, domainName);
-          expect(resorted).toBeDefined();
-          if (!resorted) return;
+          if (!resorted) {
+            // A throw, not a return: the domain below must still be deleted.
+            throw new Error(
+              `${domainName}'s entry was listed on ${entry.task} once after the sort, yet findEntry no longer finds it under ${sharedRequest}`,
+            );
+          }
 
           // **The removal, and then the proof.** `ok` here means the document
           // was understood, not that an entry went away — the re-read is what
@@ -805,9 +819,48 @@ describe('AdtRequest', () => {
           const after = await objectsOn(resorted.task);
           expect(after.find((o) => o.name === domainName)).toBeUndefined();
 
+          // **Then the domain goes, through the request, as every other delete
+          // in this suite.** Its entry was just detached, and the deletion may
+          // register one again (on premise it leaves one); that one sits in the
+          // shared request, where the next run's stale-entry step clears it.
+          // A refusal fails with SAP's own sentence.
+          logTestStep(
+            `delete ${domainName}, whose entry was detached`,
+            testsLogger,
+          );
+          expectResult(
+            await domain.delete(
+              { domainName, transportRequest: sharedRequest },
+              {
+                analyse: judged(analyseDeletion),
+                headers: integrationHeadersOf(domain, 'delete'),
+              },
+            ),
+            `delete ${domainName} after its entry was removed from ${sharedRequest}`,
+          );
+          domainCreatedIn = undefined;
+
           logTestSuccess(testsLogger, label);
         } catch (error: any) {
           logTestError(testsLogger, label, error);
+          // Only what this run created, and only when its own delete did not
+          // run: a refusal is added to the failure, never replaces it.
+          if (domainCreatedIn !== undefined) {
+            const transportRequest = domainCreatedIn;
+            const domain = client.getDomain();
+            await noteCleanupRefusal(
+              error,
+              () =>
+                domain.delete(
+                  { domainName, transportRequest },
+                  {
+                    analyse: judged(analyseDeletion),
+                    headers: integrationHeadersOf(domain, 'delete'),
+                  },
+                ),
+              `delete ${domainName}`,
+            );
+          }
           throw error;
         } finally {
           logTestEnd(testsLogger, label);
