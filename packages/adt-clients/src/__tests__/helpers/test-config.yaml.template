@@ -1940,6 +1940,10 @@ create_transport:
                                               #   package on a transport layer: `CTS_WBO_API 048`,
                                               #   "Request … does not have transport target /…/".
         # package_name: "ZAC_PKG01"
+    - name: "transport_object_list"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "A live object's entry in the request: created there, detached with removeObject, proven gone. Needs a default package that takes a transport: a local package records no entry (measured on the cloud trial, whose test package is local), so turn it off in that system's overlay."
 
 # Create Behavior Definition
 create_behavior_definition:

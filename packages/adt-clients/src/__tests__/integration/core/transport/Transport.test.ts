@@ -400,7 +400,7 @@ describe('AdtRequest', () => {
       return undefined;
     };
 
-    gate('create_transport', 'builder_transport')(
+    gate('create_transport', 'transport_object_list')(
       "creates a task, detaches a live object's entry, and proves the entry is gone",
       async () => {
         const label = 'AdtRequest - object list and tasks';
