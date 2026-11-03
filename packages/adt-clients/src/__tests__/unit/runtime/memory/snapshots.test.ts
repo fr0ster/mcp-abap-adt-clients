@@ -41,6 +41,20 @@ describe('runtime/memory/snapshots', () => {
     );
   });
 
+  // SAP keeps a user name in upper case, and the list's filters match it
+  // case-sensitively (measured on premise): a lower-case name lists nothing.
+  it('listSnapshots sends both user filters in upper case', async () => {
+    const connection = createConnectionMock();
+
+    await listSnapshots(connection, 'Developer', 'batch_user');
+
+    expect(connection.makeAdtRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: '/sap/bc/adt/runtime/memory/snapshots?user=DEVELOPER&originalUser=BATCH_USER',
+      }),
+    );
+  });
+
   it('getSnapshot builds the snapshot URL', async () => {
     const connection = createConnectionMock();
 

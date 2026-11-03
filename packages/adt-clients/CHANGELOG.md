@@ -24,6 +24,31 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [42.2.1] - 2026-11-03
+
+### Fixed
+
+- **`MemorySnapshots.list`: the `user` and `originalUser` filters go in upper
+  case.** SAP keeps a user name in upper case and matches these filters
+  case-sensitively. Measured on premise: a name in lower or mixed case listed
+  nothing, and the same name in upper case listed the user's snapshots. A
+  caller passing the user name as configured never found its own snapshots.
+
+### Tests
+
+- Every integration suite passes on premise and on the cloud trial:
+  - the where-used cases name `TABL/DT`, a code of the ADT type tables, as
+    the where-used requests take since 38.0.0;
+  - `readMetadata` expects its own refusal of an unknown type;
+  - the request's object list measures `removeObject` on a live object's
+    entry. It is its own case, `transport_object_list`, that a system whose
+    test package is local turns off, because a local package records no
+    entry;
+  - the package case may state `record_changes` per system. A local parent
+    takes none: `TR 434`, "No change recording for local packages";
+  - a full workflow test takes `timeouts.test` (200 s). On the cloud several
+    ran past the 60 s default, and a test past its timeout lost its cleanup.
+
 ## [42.2.0] - 2026-11-03
 
 ### Added

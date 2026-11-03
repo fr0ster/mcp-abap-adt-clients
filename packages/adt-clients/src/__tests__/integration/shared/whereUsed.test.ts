@@ -117,7 +117,7 @@ describe('Shared - getWhereUsed', () => {
       const params = resolver.getParams();
       const objectName =
         params.object_name || resolver.getObjectName('object_name', 'table');
-      const objectType = params.object_type || 'table';
+      const objectType = params.object_type || 'TABL/DT';
       if (!objectName) {
         throw new Error('No object configured');
       }
@@ -204,7 +204,7 @@ describe('Shared - getWhereUsed', () => {
       const params = resolver.getParams();
       const objectName =
         params.object_name || resolver.getObjectName('object_name', 'table');
-      const objectType = params.object_type || 'table';
+      const objectType = params.object_type || 'TABL/DT';
       if (!objectName) {
         throw new Error('No object configured');
       }
@@ -314,7 +314,7 @@ describe('Shared - getWhereUsed', () => {
       const params = resolver.getParams();
       const objectName =
         params.object_name || resolver.getObjectName('object_name', 'table');
-      const objectType = params.object_type || 'table';
+      const objectType = params.object_type || 'TABL/DT';
       if (!objectName) {
         throw new Error('No object configured');
       }
@@ -481,7 +481,7 @@ describe('Shared - getWhereUsed', () => {
       const params = resolver.getParams();
       const objectName =
         params.object_name || resolver.getObjectName('object_name', 'table');
-      const objectType = params.object_type || 'table';
+      const objectType = params.object_type || 'TABL/DT';
       const enableAllTypes = params.enable_all_types !== false;
       if (!objectName) {
         throw new Error('No object configured');
@@ -589,7 +589,7 @@ describe('Shared - getWhereUsed', () => {
       const params = resolver.getParams();
       const objectName =
         params.object_name || resolver.getObjectName('object_name', 'table');
-      const objectType = params.object_type || 'table';
+      const objectType = params.object_type || 'TABL/DT';
       if (!objectName) {
         throw new Error('No object configured');
       }
@@ -649,7 +649,7 @@ describe('Shared - getWhereUsed', () => {
       const params = resolver.getParams();
       const objectName =
         params.object_name || resolver.getObjectName('object_name', 'table');
-      const objectType = params.object_type || 'table';
+      const objectType = params.object_type || 'TABL/DT';
       const onlyTypes: string[] = params.enable_only_types || ['DDLS/DF'];
       if (!objectName) {
         throw new Error('No object configured');

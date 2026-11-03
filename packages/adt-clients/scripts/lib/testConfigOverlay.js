@@ -152,6 +152,9 @@ const ALLOWED_OVERLAY_KEYS = Object.freeze(
     [`${PACKAGE}.package_name`, { required: true }],
     [`${PACKAGE}.software_component`, { required: true }],
     [`${PACKAGE}.transport_layer`, { required: true, empty: true }],
+    // A local parent package takes no change recording (`TR 434`, measured on
+    // the cloud trial): such a system states false.
+    [`${PACKAGE}.record_changes`, { type: 'boolean' }],
     [`${TRANSPORT}.target_system`, { required: true, empty: true }],
     // Names that may collide with something on a particular system.
     [`${SCALAR}.scalar_function_name`, {}],
@@ -193,6 +196,9 @@ const ALLOWED_OVERLAY_KEYS = Object.freeze(
     [`${ATC_KINDS}.params.check_variant`, { empty: true }],
     // The generic ABAP Unit runner's live cases: off until turned on, each
     // with the local package its objects go into (a `$` package on premise).
+    // The request's object list needs a package that takes a transport; a
+    // system whose test package is local turns the case off.
+    ['create_transport.test_cases[transport_object_list].enabled', { type: 'boolean' }],
     [`${ABAP_UNIT}[adt_abap_unit_class_run].enabled`, { type: 'boolean' }],
     [`${ABAP_UNIT}[adt_abap_unit_class_run].params.package_name`, {}],
     [`${ABAP_UNIT}[adt_abap_unit_cds_run].enabled`, { type: 'boolean' }],

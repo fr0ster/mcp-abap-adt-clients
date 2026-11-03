@@ -110,6 +110,11 @@ function referencesParams(
 /**
  * The snapshots ADT lists. A snapshot written by the debugger appears here
  * only later — on the cloud a few minutes after it was written.
+ *
+ * Both filters go in upper case. SAP keeps a user name in upper case and
+ * matches these filters case-sensitively: measured on premise, a name in
+ * lower or mixed case lists nothing, the same name in upper case lists the
+ * user's snapshots.
  */
 export async function listSnapshots(
   connection: IAbapConnection,
@@ -117,8 +122,8 @@ export async function listSnapshots(
   originalUser?: string,
 ): Promise<IAdtWireResponse> {
   const params = new URLSearchParams();
-  if (user) params.append('user', user);
-  if (originalUser) params.append('originalUser', originalUser);
+  if (user) params.append('user', user.toUpperCase());
+  if (originalUser) params.append('originalUser', originalUser.toUpperCase());
   return get(connection, 'snapshots', params, MEMORY_SNAPSHOT_ACCEPT.list);
 }
 
