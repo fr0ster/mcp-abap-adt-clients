@@ -4,6 +4,16 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [0.6.1] - 2026-11-03
+
+### Changed
+
+- On `@mcp-abap-adt/adt-clients` `^42.1.0`. `docs/LEGACY.md` lists the ATC
+  results by Display ID it added (`getAtc().listResults`, `getResult`) among
+  the runtime families with no legacy variant: 7.40 SP04's discovery lists no
+  `/sap/bc/adt/atc/results`, and no run there has sent either request. Nothing
+  in this package's code changes.
+
 ## [0.6.0] - 2026-11-02
 
 On `@mcp-abap-adt/adt-clients` `^42.0.0`. A breaking change of a 0.x package,

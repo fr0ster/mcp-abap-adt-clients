@@ -334,6 +334,10 @@ export const ACCEPT_ATC_WORKLIST_XML =
   'application/atc.worklist.v1+xml, application/vnd.sap.atc.worklist.v1+xml';
 export const ACCEPT_ATC_CUSTOMIZING =
   'application/xml, application/vnd.sap.atc.customizing-v1+xml, application/vnd.sap.atc.customizing-v2+xml';
+// The results by Display ID: discovery declares no `app:accept` on either
+// collection, and both answered `application/xml` on premise and on the cloud
+// (2026-11-02).
+export const ACCEPT_ATC_RESULTS = 'application/xml';
 
 // Enhancement hosts
 export const ACCEPT_ENHANCEMENT_ELEMENTS =

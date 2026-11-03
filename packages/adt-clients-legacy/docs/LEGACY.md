@@ -328,6 +328,7 @@ So a legacy client lists and reads its user's requests and does nothing else wit
 | Application log | `getApplicationLog()` | `/sap/bc/adt/applicationlog/objects` | no |
 | ATC check variants, worklists, findings, logs | `getAtc()`, `getAtcLog()` | `/sap/bc/adt/atc/variants`, `/worklists`, `/checkfailures/logs`, `/results/{id}/log` | no |
 | ATC run, run status, check variant | `getAtc()` | `/sap/bc/adt/atc/runs`, `/atc/customizing` | yes — `/atc/customizing` answered `404` in the earlier BASIS 7.40 measurement |
+| ATC results by Display ID (`listResults`, `getResult`, adt-clients 42.1.0) | `getAtc()` | `/sap/bc/adt/atc/results`, `/atc/results/{displayId}` | no |
 | DDIC activation graph | `getDdicActivation()` | `/sap/bc/adt/ddic/logs/activationgraph` | no |
 | Profiler traces | `getProfiler()` | `/sap/bc/adt/runtime/traces/abaptraces/*` | yes |
 | Feeds | `getFeeds()` | `/sap/bc/adt/feeds` | yes |

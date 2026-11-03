@@ -24,6 +24,23 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [42.1.0] - 2026-11-03
+
+### Added
+
+- **ATC results by Display ID.** `getAtc()` implements `IAtcResultsReadable`
+  (`@mcp-abap-adt/interfaces-adt` 25.1.0): `listResults({ createdBy,
+  centralOnly?, ageMin?, ageMax? })` is one `GET /sap/bc/adt/atc/results` with
+  only the parameters given (`centralOnly: true` sends `centralResult=true`),
+  `getResult(displayId)` one `GET /sap/bc/adt/atc/results/{displayId}`, the
+  Display ID URI-encoded; both `Accept: application/xml`. An empty
+  `createdBy`, or one of spaces only, is refused before the request
+  (`ADT_VALIDATION_FAILED`). Measured on premise and on the cloud (2026-11-02).
+- `IAtcResults` gains two slots, `resultList` and `result`, both `rawDocument`
+  in `atcDocuments`. A consumer that wrote its own complete `IAtcResults` adds
+  them; one that spreads `atcDocuments` has them.
+- `@mcp-abap-adt/interfaces-adt` `^25.1.0`.
+
 ## [42.0.0] - 2026-11-02
 
 A create without a package no longer compiles, nor does a program or include

@@ -246,7 +246,7 @@ Classes under `src/runtime/`. Most are handed out by `AdtRuntimeClient`; a class
 
 ### AdtAtc
 - Source: `src/runtime/atc/AdtAtc.ts`
-- Public methods: `createWorklist`, `getFindings`, `getRunStatus`, `listCheckVariants`, `resolveCheckVariant`, `startRun`
+- Public methods: `createWorklist`, `getFindings`, `getResult`, `getRunStatus`, `listCheckVariants`, `listResults`, `resolveCheckVariant`, `startRun`
 
 ### AmdpDebugger
 - Source: `src/runtime/debugger/AmdpDebugger.ts`
