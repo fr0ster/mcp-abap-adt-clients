@@ -226,30 +226,40 @@ describe("If-Match: a function module's source (AdtFunctionModule.update)", () =
       }
       // Cleanup deletes only what this run created and reads the absence back.
       logTestStep('delete and read back (cleanup)', testsLogger);
-      // The module first, then the group that holds it.
+      // The module first, and its absence read back while its group still
+      // stands: a read of the module whose group is gone answered 500 (on premise,
+      // 2026-11-03), which says nothing about the module. The group is
+      // deleted only once the module is read back absent, else it is left in
+      // place and named; then the group's absence is read back.
       const refusals: string[] = [];
+      let moduleGone = !moduleCreated;
       if (moduleCreated) {
-        refusals.push(
-          await removeAndReadBack(
-            () =>
-              client.getFunctionModule().delete(config, {
-                analyse: judged(analyseDeletion),
-                headers: integrationHeadersOf(
-                  client.getFunctionModule(),
-                  'delete',
-                ),
+        const moduleRefusal = await removeAndReadBack(
+          () =>
+            client.getFunctionModule().delete(config, {
+              analyse: judged(analyseDeletion),
+              headers: integrationHeadersOf(
+                client.getFunctionModule(),
+                'delete',
+              ),
+            }),
+          () =>
+            client
+              .getFunctionModule()
+              .read({ functionGroupName, functionModuleName }, undefined, {
+                analyse: analyseException,
               }),
-            () =>
-              client
-                .getFunctionModule()
-                .read({ functionGroupName, functionModuleName }, undefined, {
-                  analyse: analyseException,
-                }),
-            `function module ${functionModuleName}`,
-          ),
+          `function module ${functionModuleName}`,
+        );
+        refusals.push(moduleRefusal);
+        moduleGone = moduleRefusal === '';
+      }
+      if (groupCreated && !moduleGone) {
+        refusals.push(
+          `function group ${functionGroupName} left in place: the absence of function module ${functionModuleName} was not read back`,
         );
       }
-      if (groupCreated) {
+      if (groupCreated && moduleGone) {
         refusals.push(
           await removeAndReadBack(
             () =>

@@ -42,12 +42,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   resolution of one second: a change made in the same second as the read is
   not detected. The ETag is a header of the read's answer (`wireItself` in the
   read's slot keeps it).
-- One place builds the header: `updateRequestHeaders`, beside
-  `requestHeaders`. 53 update members send through it; the low-level writers
-  take `ifMatch` after the caller's headers. The message class message's
+- One place builds the headers of an update: `updateRequestHeaders`, beside
+  `requestHeaders`; its writer states whether a guarded write keeps its
+  `charset` (`GuardedCharset`). 53 update members send through it; the
+  low-level writers take `ifMatch` after the caller's headers. The message class message's
   `update` sends it on the `PUT` of the class document only. The service
   binding's `update` is its publication job, writes no document, keeps
   `IAdtOperationOptions` and sends no `If-Match`. Reads and creates send none.
+- **A guarded write of a document whose ETag SAP builds with the media type
+  goes without `charset`.** SAP builds the ETag of an object's XML document and
+  of a DDIC source with the media type, and on a write compares it with the
+  write's `Content-Type`: a domain `PUT` of
+  `application/vnd.sap.adt.domains.v2+xml` with the read's ETag answered `200`,
+  the same with `; charset=utf-8` answered `412`; a structure's source read
+  answered an ETag ending `text/plain2`, and a write with
+  `text/plain; charset=utf-8` was refused where `text/plain` was not (measured
+  on premise, 2026-11-03). So, when `ifMatch` is given, every `updateMetadata`,
+  the message class message's `update` and the DDIC source `update`s
+  (structure, table, append structure) send their `Content-Type` without the
+  `charset` parameter (an XML document's declaration carries its encoding);
+  every other source keeps it — its ETag carries no media type, and a guarded
+  write with it was measured passing for a program, a class and a DDL source.
+  Without `ifMatch` every header goes byte for byte as before. Whether a DDIC
+  source with non-ASCII text survives a write without `charset` is what the
+  structure live suite checks; it has not run yet.
 - `ifMatch.test.ts`: every update row of the capability manifest, with and
   without `ifMatch`; the table is closed over every class method named
   `update` or `updateMetadata`; reads and creates handed an `ifMatch` send
@@ -59,7 +77,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   a class's local implementations include, a function module's source, a DDL
   source, a structure's source and a domain's document. Each creates its
   objects under fresh names, writes with the ETag read, is refused `412` with
-  the first one, writes with the new one, and deletes what it created.
+  the first one, writes with the new one, and deletes what it created. The
+  structure suite's last write carries a non-ASCII label (`'Größe Ü ж'`) and
+  reads it back intact. The function module suite deletes the module and reads
+  its absence back before it deletes the group. There is no table suite.
 - `@mcp-abap-adt/interfaces-adt` `^25.2.0`.
 
 ## [42.1.0] - 2026-11-03

@@ -7,7 +7,10 @@
  * on premise; on the cloud the test package that takes no transport), reads
  * its source and takes the ETag, writes with it (accepted), writes again
  * with that first ETag (refused `412` `ExceptionPreconditionFailed`), writes
- * with the new one (accepted), and deletes the structure and reads its
+ * with the new one (accepted) — that write's label is non-ASCII text
+ * (`'Größe Ü ж'`), and the source read back must hold it intact: the guarded
+ * write goes without `charset`, so this measures that no charset is safe —
+ * and deletes the structure and reads its
  * absence back — also when a step failed. Nothing is activated. The
  * sequence is `helpers/ifMatchProbes.ts`.
  *
@@ -86,8 +89,16 @@ const CASE = 'if_match_structure';
 const TITLE = 'IfMatch - a structure source written only if unchanged';
 
 /** The structure's source of write `n`: each differs from the others. */
+/**
+ * The label the third, guarded write carries: non-ASCII text. A guarded write
+ * of a DDIC source goes without `charset` (SAP builds its ETag with the media
+ * type), so reading it back intact is the measurement that this is safe.
+ */
+const NON_ASCII_LABEL = 'Größe Ü ж';
+
 function structureSource(structureName: string, n: number): string {
-  return `@EndUserText.label : 'If-Match probe, write ${n}'
+  const label = n === 3 ? NON_ASCII_LABEL : `If-Match probe, write ${n}`;
+  return `@EndUserText.label : '${label}'
 @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
 define structure ${structureName.toLowerCase()} {
   field1 : abap.int1;
@@ -190,6 +201,13 @@ describe("If-Match: a structure's DDIC source (AdtStructure.update)", () => {
           getOperationDelay('update', testCase),
           testsLogger,
         );
+
+        logTestStep('read back the non-ASCII label', testsLogger);
+        const readBack = expectResult(
+          await wired.read(config, 'inactive', { analyse: analyseException }),
+          `read structure ${structureName} back`,
+        );
+        expect(String(readBack.data)).toContain(`'${NON_ASCII_LABEL}'`);
         logTestSuccess(testsLogger, TITLE);
       } catch (error) {
         failed = { error };
