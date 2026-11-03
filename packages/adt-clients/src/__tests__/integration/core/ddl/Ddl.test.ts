@@ -309,7 +309,10 @@ describe('View (using AdtClient)', () => {
           },
         });
       },
-      getTimeout('test'),
+      // The full workflow is create, update, two activations, a metadata
+      // update and the delete, with the configured pause after each: on the
+      // cloud it ran past the default of 60 s.
+      getTimeout('long'),
     );
   });
 });
