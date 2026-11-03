@@ -1245,7 +1245,7 @@ create_package:
         updated_description: "AdtPackage workflow package - updated"  # Description for update operation
         package_type: "development"             # Optional: development, main, structure, etc.
         software_component: "HOME"              # ← CHANGE: on-prem "HOME", cloud "ZLOCAL"
-        record_changes: true                    # A package under a transportable parent MUST record
+        record_changes: true                    # false under a local parent: "No change recording for local packages" (`TR 434`). A package under a transportable parent MUST record
                                                 #   changes, or create is refused with `TR 432`,
                                                 #   "Change recording must be activated for package …"
                                                 #   — and the symptom is the package never becoming

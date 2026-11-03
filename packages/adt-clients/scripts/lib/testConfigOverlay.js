@@ -152,6 +152,9 @@ const ALLOWED_OVERLAY_KEYS = Object.freeze(
     [`${PACKAGE}.package_name`, { required: true }],
     [`${PACKAGE}.software_component`, { required: true }],
     [`${PACKAGE}.transport_layer`, { required: true, empty: true }],
+    // A local parent package takes no change recording (`TR 434`, measured on
+    // the cloud trial): such a system states false.
+    [`${PACKAGE}.record_changes`, { type: 'boolean' }],
     [`${TRANSPORT}.target_system`, { required: true, empty: true }],
     // Names that may collide with something on a particular system.
     [`${SCALAR}.scalar_function_name`, {}],
