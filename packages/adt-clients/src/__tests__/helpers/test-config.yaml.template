@@ -71,6 +71,9 @@ test_settings:
   # Timeouts for different operations (in milliseconds)
   timeouts:
     default: 60000
+    test: 200000  # A full workflow test (create … activate … delete, with the configured pause
+                  # after each step): on the cloud several ran past 60 s, and a test that runs
+                  # past its timeout loses its cleanup — the objects stay on the system.
     long: 200000  # Long timeout for complex operations (group deletion, etc.)
     shared_admin: 3600000  # shared:setup / shared:teardown — ~20 objects, each a
                            # lock/update/activate chain. Measured at 25+ minutes on
