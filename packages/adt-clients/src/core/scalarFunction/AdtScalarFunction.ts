@@ -24,6 +24,7 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtUpdatable,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
   IScalarFunctionResults,
@@ -268,7 +269,7 @@ export class AdtScalarFunction<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -286,6 +287,7 @@ export class AdtScalarFunction<
         updateScalarFunction(
           connection,
           options.headers,
+          options.ifMatch,
           {
             scalar_function_name: name,
             source_code: source as string,
@@ -311,7 +313,7 @@ export class AdtScalarFunction<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'scalarFunction', 'updateMetadata'>,
     config: Partial<IScalarFunctionConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -321,6 +323,7 @@ export class AdtScalarFunction<
         writeObjectDocument(
           connection,
           options.headers,
+          options.ifMatch,
           SCALAR_FUNCTION.uri(this.name(config)),
           options?.source as string,
           options?.lockHandle,

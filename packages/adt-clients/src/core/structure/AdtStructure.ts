@@ -27,6 +27,7 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtUpdatable,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
   IStructureResults,
@@ -265,7 +266,7 @@ export class AdtStructure<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IStructureConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -278,6 +279,7 @@ export class AdtStructure<
         upload(
           connection,
           options.headers,
+          options.ifMatch,
           {
             structureName: name,
             ddlCode: source as string,
@@ -303,7 +305,7 @@ export class AdtStructure<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'structure', 'updateMetadata'>,
     config: Partial<IStructureConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -313,6 +315,7 @@ export class AdtStructure<
         writeObjectDocument(
           connection,
           options.headers,
+          options.ifMatch,
           STRUCTURE.uri(this.name(config)),
           options?.source as string,
           options?.lockHandle,

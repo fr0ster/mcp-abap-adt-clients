@@ -11,7 +11,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { FUNCTION_GROUP, sourceUri } from '../../endpoints/objects';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 import type { IUpdateFunctionGroupParams } from './types';
 
 /**
@@ -30,6 +30,7 @@ import type { IUpdateFunctionGroupParams } from './types';
 export async function updateFunctionGroup(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   params: IUpdateFunctionGroupParams,
   document: string,
 ): Promise<IAdtWireResponse> {
@@ -41,7 +42,7 @@ export async function updateFunctionGroup(
     method: 'PUT',
     timeout: 0,
     data: document,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch, 'dropped'),
   });
 }
 
@@ -52,6 +53,7 @@ export async function updateFunctionGroup(
 export async function uploadFunctionGroupSource(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   functionGroupName: string,
   sourceCode: string,
   lockHandle: string,
@@ -67,6 +69,6 @@ export async function uploadFunctionGroupSource(
     method: 'PUT',
     timeout: 0,
     data: sourceCode,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch, 'kept'),
   });
 }

@@ -38,6 +38,7 @@ describe('scalarFunction wire', () => {
     await updateScalarFunction(
       conn,
       headersFor('AdtScalarFunction.update'),
+      undefined,
       {
         scalar_function_name: 'ZOK_TEST_FUNC',
         source_code: 'define scalar function ...',

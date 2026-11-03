@@ -109,6 +109,7 @@ const CHECK_RUN = 'check_run.test_cases[class_check]';
 const ATC_KINDS = 'atc_object_kinds.test_cases[adt_atc_object_kinds]';
 const ENHANCEMENT = 'enhancement.test_cases';
 const ABAP_UNIT = 'run_abap_unit.test_cases';
+const IF_MATCH = 'if_match.test_cases';
 
 /** `[path, rule]` → the frozen key rule the loader reads. */
 function overlayKey([keyPath, rule]) {
@@ -198,6 +199,23 @@ const ALLOWED_OVERLAY_KEYS = Object.freeze(
     [`${ABAP_UNIT}[adt_abap_unit_cds_run].params.package_name`, {}],
     [`${ABAP_UNIT}[adt_abap_unit_package_run].enabled`, { type: 'boolean' }],
     [`${ABAP_UNIT}[adt_abap_unit_package_run].params.package_name`, {}],
+    // The write guard's live cases (If-Match): off until turned on, each with
+    // the local package its objects go into ($TMP on premise; on the cloud the
+    // test package that takes no transport).
+    [`${IF_MATCH}[if_match_program].enabled`, { type: 'boolean' }],
+    [`${IF_MATCH}[if_match_program].params.package_name`, {}],
+    [`${IF_MATCH}[if_match_class].enabled`, { type: 'boolean' }],
+    [`${IF_MATCH}[if_match_class].params.package_name`, {}],
+    [`${IF_MATCH}[if_match_class_include].enabled`, { type: 'boolean' }],
+    [`${IF_MATCH}[if_match_class_include].params.package_name`, {}],
+    [`${IF_MATCH}[if_match_function_module].enabled`, { type: 'boolean' }],
+    [`${IF_MATCH}[if_match_function_module].params.package_name`, {}],
+    [`${IF_MATCH}[if_match_ddl].enabled`, { type: 'boolean' }],
+    [`${IF_MATCH}[if_match_ddl].params.package_name`, {}],
+    [`${IF_MATCH}[if_match_structure].enabled`, { type: 'boolean' }],
+    [`${IF_MATCH}[if_match_structure].params.package_name`, {}],
+    [`${IF_MATCH}[if_match_domain].enabled`, { type: 'boolean' }],
+    [`${IF_MATCH}[if_match_domain].params.package_name`, {}],
     // Standard objects the enhancement hosts expect, if the system lacks them.
     [`${ENHANCEMENT}[program_host].params.program_name`, {}],
     [`${ENHANCEMENT}[function_group_host].params.function_group_name`, {}],

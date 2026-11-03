@@ -9,7 +9,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { STRUCTURE, sourceUri } from '../../endpoints/objects';
 import { writeQuery } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 import type { IUpdateStructureParams } from './types';
 
 /**
@@ -20,6 +20,7 @@ import type { IUpdateStructureParams } from './types';
 export async function upload(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   params: IUpdateStructureParams,
   lockHandle?: string,
 ): Promise<IAdtWireResponse> {
@@ -30,7 +31,7 @@ export async function upload(
     method: 'PUT',
     timeout: 0,
     data: params.ddlCode,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch, 'dropped'),
   });
 }
 
@@ -44,7 +45,8 @@ export async function upload(
 export async function updateStructure(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   params: IUpdateStructureParams & { lockHandle: string },
 ): Promise<IAdtWireResponse> {
-  return upload(connection, headers, params, params.lockHandle);
+  return upload(connection, headers, ifMatch, params, params.lockHandle);
 }

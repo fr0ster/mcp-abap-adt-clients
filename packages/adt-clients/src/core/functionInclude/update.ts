@@ -14,7 +14,7 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { FUNCTION_INCLUDE } from '../../endpoints/objects';
 import { writeQuery } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 import type { ICreateFunctionIncludeParams } from './types';
 import { buildFunctionIncludeXml } from './xmlBuilder';
 
@@ -30,6 +30,7 @@ const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
 export async function updateFunctionInclude(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   params: ICreateFunctionIncludeParams,
   lockHandle?: string,
   logger?: ILogger,
@@ -51,6 +52,6 @@ export async function updateFunctionInclude(
     method: 'PUT',
     timeout: 0,
     data: xmlBody,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch, 'dropped'),
   });
 }

@@ -30,6 +30,7 @@ it('lets the refusal through with its response attached', async () => {
     updateTableType(
       refusingTheWrite(),
       headersFor('AdtDdicTableType.updateMetadata'),
+      undefined,
       { tabletype_name: 'ZOK_TT' } as never,
       DOCUMENT,
     ),

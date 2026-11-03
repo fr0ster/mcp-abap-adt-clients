@@ -39,6 +39,7 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtUpdatable,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
   IProgramResults,
@@ -306,7 +307,7 @@ export class AdtProgram<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -325,6 +326,7 @@ export class AdtProgram<
         uploadProgramSource(
           connection,
           options.headers,
+          options.ifMatch,
           name,
           source as string,
           options?.lockHandle as string,
@@ -349,7 +351,7 @@ export class AdtProgram<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'program', 'updateMetadata'>,
     config: Partial<IProgramConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -359,6 +361,7 @@ export class AdtProgram<
         writeObjectDocument(
           connection,
           options.headers,
+          options.ifMatch,
           PROGRAM.uri(config.programName as string),
           options?.source as string,
           options?.lockHandle,

@@ -35,6 +35,7 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtUpdatable,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
   IFunctionModuleResults,
@@ -287,7 +288,7 @@ export class AdtFunctionModule<
    */
   async update<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -302,7 +303,7 @@ export class AdtFunctionModule<
 
     return answering(
       () =>
-        update(connection, options.headers, {
+        update(connection, options.headers, options.ifMatch, {
           functionModuleName: module,
           functionGroupName: group,
           sourceCode: source as string,
@@ -328,7 +329,7 @@ export class AdtFunctionModule<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionModule', 'updateMetadata'>,
     config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -340,6 +341,7 @@ export class AdtFunctionModule<
         writeObjectDocument(
           connection,
           options.headers,
+          options.ifMatch,
           FUNCTION_MODULE.uri(group, module),
           options?.source as string,
           options?.lockHandle,

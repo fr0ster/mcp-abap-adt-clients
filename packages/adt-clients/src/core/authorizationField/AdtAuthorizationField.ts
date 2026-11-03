@@ -22,6 +22,7 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IAdtSystemContext,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IAuthorizationFieldResults,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -222,7 +223,7 @@ export class AdtAuthorizationField<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IAuthorizationFieldConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -234,6 +235,7 @@ export class AdtAuthorizationField<
         updateAuthorizationField(
           connection,
           options.headers,
+          options.ifMatch,
           {
             authorization_field_name: name,
             description: config.description,

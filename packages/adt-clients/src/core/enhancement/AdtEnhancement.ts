@@ -30,6 +30,7 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtUpdatable,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
   IEnhancementResults,
@@ -324,7 +325,7 @@ export class AdtEnhancement<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IEnhancementConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
@@ -332,6 +333,7 @@ export class AdtEnhancement<
         updateEnhancementMetadata(
           connection,
           options.headers,
+          options.ifMatch,
           this.enhancementType(config),
           this.name(config),
           options?.source as string,
@@ -383,7 +385,7 @@ export class AdtEnhancement<
     config: Partial<IEnhancementConfig> & {
       enhancementType: EnhancementTypeWith<V, 'update'>;
     },
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -402,6 +404,7 @@ export class AdtEnhancement<
         updateEnhancement(
           connection,
           options.headers,
+          options.ifMatch,
           type,
           name,
           source as string,

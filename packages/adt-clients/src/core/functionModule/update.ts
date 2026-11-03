@@ -8,7 +8,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { FUNCTION_MODULE, sourceUri } from '../../endpoints/objects';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 import type { IUpdateFunctionModuleParams } from './types';
 
 /**
@@ -23,6 +23,7 @@ import type { IUpdateFunctionModuleParams } from './types';
 export async function update(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   params: IUpdateFunctionModuleParams,
 ): Promise<IAdtWireResponse> {
   let url = `${sourceUri(FUNCTION_MODULE.uri(params.functionGroupName, params.functionModuleName))}?lockHandle=${encodeURIComponent(params.lockHandle)}`;
@@ -35,7 +36,7 @@ export async function update(
     method: 'PUT',
     timeout: 0,
     data: params.sourceCode,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch, 'kept'),
   });
 
   return response;

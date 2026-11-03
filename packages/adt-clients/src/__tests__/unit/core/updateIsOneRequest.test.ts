@@ -47,6 +47,7 @@ describe('the five DDIC-shaped updates', () => {
     await updateDomain(
       connection,
       headersFor('AdtDomain.updateMetadata'),
+      undefined,
       { domain_name: 'ZOK_DOM' } as never,
       DOCUMENT,
     );
@@ -59,6 +60,7 @@ describe('the five DDIC-shaped updates', () => {
     await updatePackage(
       connection,
       headersFor('AdtPackage.updateMetadata'),
+      undefined,
       { package_name: 'ZOK_PKG' } as never,
       DOCUMENT,
       'LOCK',
@@ -72,6 +74,7 @@ describe('the five DDIC-shaped updates', () => {
     await updateDataElement(
       connection,
       headersFor('AdtDataElement.updateMetadata'),
+      undefined,
       { data_element_name: 'ZOK_DTEL' } as never,
       DOCUMENT,
     );
@@ -84,6 +87,7 @@ describe('the five DDIC-shaped updates', () => {
     await updateTableType(
       connection,
       headersFor('AdtDdicTableType.updateMetadata'),
+      undefined,
       { tabletype_name: 'ZOK_TT' } as never,
       DOCUMENT,
     );
@@ -96,6 +100,7 @@ describe('the five DDIC-shaped updates', () => {
     await updateTransport(
       connection,
       headersFor('AdtRequest.updateMetadata'),
+      undefined,
       'ZOKK900001',
       DOCUMENT,
     );

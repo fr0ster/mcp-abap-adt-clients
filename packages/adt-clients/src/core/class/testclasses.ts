@@ -11,7 +11,7 @@ import { ACTIVATION_HEADERS } from '../../constants/contentTypes';
 import { CLASS, CLASS_INCLUDE } from '../../endpoints/objects';
 import { activateObjectInSession } from '../../utils/activationUtils';
 import { encodeSapObjectName, writeQuery } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Upload ABAP Unit test classes for an existing class (low-level function).
@@ -20,6 +20,7 @@ import { requestHeaders } from '../../utils/requestHeaders';
 export async function updateClassTestInclude(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   className: string,
   testClassSource: string,
   lockHandle?: string,
@@ -35,7 +36,7 @@ export async function updateClassTestInclude(
     method: 'PUT',
     timeout: 0,
     data: testClassSource,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch, 'kept'),
   });
 }
 

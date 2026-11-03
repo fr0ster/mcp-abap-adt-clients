@@ -9,7 +9,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { sourceUri, TABLE } from '../../endpoints/objects';
 import { writeQuery } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 import type { IUpdateTableParams } from './types';
 
 /**
@@ -22,6 +22,7 @@ import type { IUpdateTableParams } from './types';
 export async function updateTable(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   params: IUpdateTableParams,
   lockHandle?: string,
 ): Promise<IAdtWireResponse> {
@@ -33,6 +34,6 @@ export async function updateTable(
     method: 'PUT',
     timeout: 0,
     data: params.ddl_code,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch, 'dropped'),
   });
 }

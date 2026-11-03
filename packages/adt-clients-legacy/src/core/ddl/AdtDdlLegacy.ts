@@ -29,6 +29,7 @@ import type {
   IAdtHeaders,
   IAdtOperationOptions,
   IAdtResponse,
+  IAdtUpdateOptions,
   IDdlConfig,
 } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
@@ -111,7 +112,7 @@ export class AdtDdlLegacy<
   override async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'ddl', 'updateMetadata'>,
     _config: Partial<IDdlConfig>,
-    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     return legacyNotMeasuredRefusal<T['metadataUpdated'], E>(
       'updateMetadata',

@@ -9,7 +9,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { DDL_SOURCE, sourceUri } from '../../endpoints/objects';
 import { writeQuery } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Update view DDL source code
@@ -23,6 +23,7 @@ import { requestHeaders } from '../../utils/requestHeaders';
 export async function updateDdl(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   ddlName: string,
   ddlSource: string,
   lockHandle?: string,
@@ -35,6 +36,6 @@ export async function updateDdl(
     method: 'PUT',
     timeout: 0,
     data: ddlSource,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch, 'kept'),
   });
 }

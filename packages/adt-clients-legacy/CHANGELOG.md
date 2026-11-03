@@ -4,6 +4,22 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [0.6.2] - 2026-11-03
+
+### Changed
+
+- On `@mcp-abap-adt/adt-clients` `^42.2.0` and `@mcp-abap-adt/interfaces-adt`
+  `^25.2.0`. The legacy classes override no update that writes, so a legacy
+  `update` given `ifMatch` sends `If-Match` as the root member does; the
+  `updateMetadata` refusals take `IAdtUpdateOptions` and still send nothing
+  (`legacyIfMatch.test.ts` holds both).
+- **7.40 does not act on `If-Match`** (measured over RFC, 2026-11-03): a source
+  read answers an ETag and a source write answers none; a source `PUT` with a
+  stale `If-Match`, and one with an arbitrary `If-Match`, each answered `200`
+  and the write took place. `docs/LEGACY.md` lists the write guard among what
+  the legacy system lacks. Nothing strips the header: the request is the
+  caller's, and SAP's answer is the verdict.
+
 ## [0.6.1] - 2026-11-03
 
 ### Changed

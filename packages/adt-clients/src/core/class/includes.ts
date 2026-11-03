@@ -9,7 +9,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { CLASS_INCLUDE } from '../../endpoints/objects';
 import { writeQuery } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Update class local types include (implementations)
@@ -27,6 +27,7 @@ import { requestHeaders } from '../../utils/requestHeaders';
 export async function updateClassLocalTypes(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   className: string,
   localTypesSource: string,
   lockHandle?: string,
@@ -35,6 +36,7 @@ export async function updateClassLocalTypes(
   return updateClassInclude(
     connection,
     headers,
+    ifMatch,
     className,
     localTypesSource,
     'implementations',
@@ -59,6 +61,7 @@ export async function updateClassLocalTypes(
 export async function updateClassDefinitions(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   className: string,
   definitionsSource: string,
   lockHandle?: string,
@@ -67,6 +70,7 @@ export async function updateClassDefinitions(
   return updateClassInclude(
     connection,
     headers,
+    ifMatch,
     className,
     definitionsSource,
     'definitions',
@@ -92,6 +96,7 @@ export async function updateClassDefinitions(
 export async function updateClassMacros(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   className: string,
   macrosSource: string,
   lockHandle?: string,
@@ -100,6 +105,7 @@ export async function updateClassMacros(
   return updateClassInclude(
     connection,
     headers,
+    ifMatch,
     className,
     macrosSource,
     'macros',
@@ -122,6 +128,7 @@ export async function updateClassMacros(
 async function updateClassInclude(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   className: string,
   includeSource: string,
   includeType: 'implementations' | 'definitions' | 'macros',
@@ -138,6 +145,6 @@ async function updateClassInclude(
     method: 'PUT',
     timeout: 0,
     data: includeSource,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch, 'kept'),
   });
 }

@@ -18,11 +18,12 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { writeQuery } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 
 export async function writeObjectDocument(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   objectUri: string,
   document: string,
   lockHandle: string | undefined,
@@ -33,6 +34,6 @@ export async function writeObjectDocument(
     method: 'PUT',
     timeout: 0,
     data: document,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch, 'dropped'),
   });
 }

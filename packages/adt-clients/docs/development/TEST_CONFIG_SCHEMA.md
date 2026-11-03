@@ -80,6 +80,7 @@ appear; anything else is refused by name. The list:
 | `atc_run…[adt_atc_run].enabled`, `.params.check_variant`, `.params.expected_message_id`, `.params.expected_priority`; `atc_object_kinds…[adt_atc_object_kinds].enabled`, `.params.check_variant` | optional |
 | `enhancement.test_cases[program_host].params.program_name`, `[function_group_host].params.function_group_name`, `[include_host].params.include_name`, `.main_program` | optional |
 | `run_abap_unit.test_cases[adt_abap_unit_class_run]`, `[adt_abap_unit_cds_run]`, `[adt_abap_unit_package_run]`: `.enabled`, `.params.package_name` — the generic ABAP Unit runner's live cases, off by default; the package is a local one (on premise a `$` package: a transportable one makes SAP generate a change-recording request) | optional |
+| `if_match.test_cases[if_match_program]`, `[if_match_class]`, `[if_match_class_include]`, `[if_match_function_module]`, `[if_match_ddl]`, `[if_match_structure]`, `[if_match_domain]`: `.enabled`, `.params.package_name` — the write guard's live cases (`ifMatch`, sent as `If-Match`), one per write path, off by default; the package is `$TMP` on premise and, on the cloud, the test package that takes no transport. The program case is on premise only, the class case cloud only | optional |
 
 **Required** keys are those whose base line carries `# ← CHANGE` and holds only a
 placeholder: the overlay must state them (an empty string is a statement), and the

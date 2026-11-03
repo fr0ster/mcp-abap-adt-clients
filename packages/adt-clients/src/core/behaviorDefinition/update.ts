@@ -9,7 +9,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { BEHAVIOR_DEFINITION, sourceUri } from '../../endpoints/objects';
 import { writeQuery } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 import type { IUpdateBehaviorDefinitionParams } from './types';
 
 /**
@@ -55,6 +55,7 @@ import type { IUpdateBehaviorDefinitionParams } from './types';
 export async function update(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   // The handle is accepted as given, including not at all. The params type in
   // the interfaces package still requires one; whether a write without a lock
   // is allowed is ADT's judgement, so this function does not add its own.
@@ -69,6 +70,6 @@ export async function update(
     method: 'PUT',
     timeout: 0,
     data: params.sourceCode,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch, 'kept'),
   });
 }

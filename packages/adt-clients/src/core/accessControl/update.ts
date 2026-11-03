@@ -5,7 +5,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCESS_CONTROL, sourceUri } from '../../endpoints/objects';
 import { writeQuery } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 import type { IUpdateAccessControlParams } from './types';
 
 /**
@@ -19,6 +19,7 @@ import type { IUpdateAccessControlParams } from './types';
 export async function updateAccessControl(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   args: IUpdateAccessControlParams,
   lockHandle?: string,
 ): Promise<IAdtWireResponse> {
@@ -29,6 +30,6 @@ export async function updateAccessControl(
     method: 'PUT',
     timeout: 0,
     data: args.source_code,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch, 'kept'),
   });
 }

@@ -94,3 +94,16 @@
 # "run_abap_unit.test_cases[adt_abap_unit_cds_run].params.package_name": "<LOCAL_PACKAGE>"
 # "run_abap_unit.test_cases[adt_abap_unit_package_run].enabled": true
 # "run_abap_unit.test_cases[adt_abap_unit_package_run].params.package_name": "<LOCAL_PACKAGE>"
+# The write guard's live cases (If-Match; off by default): turn each on and name the package its objects go into — the test package that takes no transport (there is no $TMP on the cloud). Each creates its objects under fresh names and deletes them.
+# "if_match.test_cases[if_match_class].enabled": true
+# "if_match.test_cases[if_match_class].params.package_name": "<LOCAL_PACKAGE>"
+# "if_match.test_cases[if_match_class_include].enabled": true
+# "if_match.test_cases[if_match_class_include].params.package_name": "<LOCAL_PACKAGE>"
+# "if_match.test_cases[if_match_function_module].enabled": true
+# "if_match.test_cases[if_match_function_module].params.package_name": "<LOCAL_PACKAGE>"
+# "if_match.test_cases[if_match_ddl].enabled": true
+# "if_match.test_cases[if_match_ddl].params.package_name": "<LOCAL_PACKAGE>"
+# "if_match.test_cases[if_match_structure].enabled": true
+# "if_match.test_cases[if_match_structure].params.package_name": "<LOCAL_PACKAGE>"
+# "if_match.test_cases[if_match_domain].enabled": true
+# "if_match.test_cases[if_match_domain].params.package_name": "<LOCAL_PACKAGE>"

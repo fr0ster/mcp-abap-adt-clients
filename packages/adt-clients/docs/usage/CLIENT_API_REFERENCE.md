@@ -35,7 +35,9 @@ class's type parameter is the values its slots answer
 ([MIGRATION-41.md](MIGRATION-41.md)).
 
 **Every member issues one ADT request.** `create` is the POST, `update` is the
-write and carries `options.lockHandle` as given, `delete` is the DELETE,
+write and carries `options.lockHandle` as given (and, since 42.2.0,
+`options.ifMatch` as `If-Match` —
+[below](#update-writes-only-if-unchanged-when-given-ifmatch)), `delete` is the DELETE,
 `checkDeletion` is the approval ADT wants first — both on `IAdtDeletable`, since
 anything that can be deleted can be asked whether it can be deleted *now* — and
 `lock`/`unlock` are the window. You compose them — see
@@ -1102,6 +1104,73 @@ short document — which is exactly why a caller has to know the rule.
 One read-modify-write stays, and it is the one no endpoint can replace:
 `AdtMessageClassMessage` writes a message that is a row inside its class's
 document.
+
+### `update()` writes only if unchanged, when given `ifMatch`
+
+Since 42.2.0 (`@mcp-abap-adt/interfaces-adt` 25.2.0, `IAdtUpdateOptions`) every
+`update` and `updateMetadata` that writes a document takes `options.ifMatch`:
+the ETag a read answered for that document. The write carries it as
+`If-Match: <ifMatch>`, the value as given; without it no `If-Match` is sent.
+One place builds the header (`updateRequestHeaders`, beside `requestHeaders`),
+so every such member sends it the same way. Reads and creates never send it,
+and the service binding's `update` — its publication job, which writes no
+document — keeps `IAdtOperationOptions` and sends none. The message class
+message's `update` sends it on the `PUT` of the class document, not on the
+chain's read, locks or unlocks.
+
+The ETag is a header of the read's answer (`etag`): read with a result strategy
+that keeps the answer (`wireItself` in the slot), then pass it on.
+
+```typescript
+const domain = client.getDomain({ ...domainDocuments, metadata: wireItself });
+const doc = await domain.readMetadata({ domainName: 'ZD' }, { version: 'inactive' });
+if (!doc.ok) throw new Error(doc.getError().message);
+const etag = doc.getResult().value.headers.etag;
+const patched = patchTheDescription(String(doc.getResult().value.data), 'new');
+
+const domainLock = await domain.lock({ domainName: 'ZD' });
+if (!domainLock.ok) throw new Error(domainLock.getError().message);
+const lock = domainLock.getResult().value;
+const written = await domain.updateMetadata(
+  { domainName: 'ZD' },
+  {
+    headers,
+    source: patched,
+    lockHandle: lock,
+    ifMatch: typeof etag === 'string' ? etag : undefined,
+  },
+);
+await domain.unlock({ domainName: 'ZD' }, lock);
+// !written.ok with status 412 (ExceptionPreconditionFailed): the domain
+// changed after the read, and nothing was written.
+```
+
+What SAP answers (measured on premise and on the cloud, 2026-11-03, for a
+program's and a class's source and a domain's document): a stale or an
+arbitrary `If-Match` is refused `412` `ExceptionPreconditionFailed` and nothing
+is written; the current ETag, or no `If-Match`, is accepted. SAP compares with
+the newest version — the inactive one when it exists, else the active one. The
+ETag has a resolution of one second: two writes within one second answered the
+same ETag, so a change made in the same second as the read is not detected. A
+source write answers its own ETag. The other write paths — a class include, a
+function module, a DDL source, a structure's source — have live suites
+(`src/__tests__/integration/core/*/IfMatch*.test.ts`) that send the same
+header; that SAP refuses a stale one there is what those suites check.
+**The charset of a guarded write.** SAP builds the ETag of an object's XML
+document and of a DDIC source with the media type and compares it with the
+write's `Content-Type`: a domain write with `; charset=utf-8` was refused `412`
+with the read's ETag and accepted without it, and a structure's source the same
+with `text/plain` (measured on premise, 2026-11-03). So, when `ifMatch` is
+given, every `updateMetadata`, the message class message's `update` and the
+DDIC source `update`s (structure, table, append structure) send their
+`Content-Type` without `charset`; the other sources keep it, as their ETags
+carry no media type. The writer states which (`GuardedCharset`, `'kept'` or
+`'dropped'`, passed to `updateRequestHeaders`). Without `ifMatch` every header
+goes byte for byte as given. That a DDIC source's non-ASCII text survives the
+write without `charset` is what the structure live suite checks (not yet run).
+
+SAP_BASIS 7.40 does not act on `If-Match` (see `@mcp-abap-adt/adt-clients-legacy`,
+`docs/LEGACY.md`).
 
 ### What `activate()` answers, and who judges it
 

@@ -12,7 +12,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { DOMAIN } from '../../endpoints/objects';
 import { writeQuery } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 import type { IUpdateDomainParams } from './types';
 
 /**
@@ -34,6 +34,7 @@ import type { IUpdateDomainParams } from './types';
 export async function updateDomain(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   args: IUpdateDomainParams,
   document: string,
   lockHandle?: string,
@@ -45,6 +46,6 @@ export async function updateDomain(
     method: 'PUT',
     timeout: 0,
     data: document,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch, 'dropped'),
   });
 }

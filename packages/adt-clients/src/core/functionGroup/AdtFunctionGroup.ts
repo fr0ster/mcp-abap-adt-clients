@@ -36,6 +36,7 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtUpdatable,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IFunctionGroupResults,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -319,7 +320,7 @@ export class AdtFunctionGroup<
   async update<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionGroup', 'update'>,
     config: Partial<IFunctionGroupConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -329,6 +330,7 @@ export class AdtFunctionGroup<
         uploadFunctionGroupSource(
           connection,
           options.headers,
+          options.ifMatch,
           config.functionGroupName as string,
           options?.source as string,
           options?.lockHandle as string,
@@ -352,7 +354,7 @@ export class AdtFunctionGroup<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionGroup', 'updateMetadata'>,
     config: Partial<IFunctionGroupConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -364,11 +366,12 @@ export class AdtFunctionGroup<
         updateFunctionGroup(
           connection,
           options.headers,
+          options.ifMatch,
           {
             function_group_name: name,
             lock_handle: options?.lockHandle as string,
             transport_request: config.transportRequest,
-          } as Parameters<typeof updateFunctionGroup>[2],
+          } as Parameters<typeof updateFunctionGroup>[3],
           // The document the caller built, from the options — see
           // `AdtDomain.updateMetadata` for why that is the only channel.
           //

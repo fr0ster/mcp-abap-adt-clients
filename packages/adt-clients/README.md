@@ -751,6 +751,79 @@ readings and verdicts that became strategies. Every
 sequence 19.0.0 handed back to the consumer is written out under
 [`examples/`](examples), one file per removed member.
 
+### Writing only if the object is unchanged
+
+`update` and `updateMetadata` take `ifMatch` (since **42.2.0**,
+`IAdtUpdateOptions` of `@mcp-abap-adt/interfaces-adt` 25.2.0): the ETag a read
+answered for the document the write replaces. The write then carries it as
+`If-Match`, and SAP refuses it — `412`, `ExceptionPreconditionFailed` — when the
+document changed since that read: by a person in ADT, another session, a job.
+Without `ifMatch` no `If-Match` is sent and the write is the one it always was.
+Reads and creates never send it.
+
+The ETag is a header of the read's answer, so build the handler with a result
+strategy that keeps the answer whole (`wireItself`), and take it from there:
+
+```typescript
+import { classDocuments, wireItself } from '@mcp-abap-adt/adt-clients';
+
+const cls = client.getClass({ ...classDocuments, source: wireItself });
+const target = { className: 'ZCL_TEST' };
+
+const read = await cls.read(target, 'inactive');
+if (!read.ok) throw new Error(read.getError().message);
+const etag = read.getResult().value.headers.etag;
+const edited = addAMethod(String(read.getResult().value.data));
+
+const locked = await cls.lock(target);
+if (!locked.ok) throw new Error(locked.getError().message);
+const lockHandle = locked.getResult().value;
+const written = await cls.update(target, {
+  headers: SOURCE,
+  source: edited,
+  lockHandle,
+  ifMatch: typeof etag === 'string' ? etag : undefined,
+});
+await cls.unlock(target, lockHandle);
+// A 412 means the class changed after the read: read it again.
+```
+
+What SAP does with it (measured on premise and on the cloud, 2026-11-03, for a
+program's and a class's source and a domain's metadata document):
+
+- **It compares with the newest version**: the inactive one when there is one,
+  else the active one. Read `inactive` to write over a pending inactive change.
+- **The ETag has a resolution of one second.** Two writes within one second
+  answered the same ETag: a change made in the same second as your read is not
+  detected.
+- **A write answers its own ETag** for a source, so a second write can be
+  guarded without a read; for a metadata document that was not measured.
+- Every update that writes a document sends it the same way (one request
+  builder, `updateRequestHeaders`); live suites for a class include, a function
+  module, a DDL source, a structure's source and a domain's document are in
+  `src/__tests__/integration/core/*/IfMatch*.test.ts`. The service binding's
+  `update` is its publication job and writes no document: it sends no
+  `If-Match`.
+- **A guarded write of a document whose ETag SAP builds with the media type
+  goes without `charset`.** SAP builds the ETag of an object's XML document and
+  of a DDIC source with the media type, and on a write compares it with the
+  write's `Content-Type`: a domain `PUT` of
+  `application/vnd.sap.adt.domains.v2+xml` with the read's ETag answered `200`,
+  the same with `; charset=utf-8` answered `412`; a structure's source read
+  answered an ETag ending `text/plain2`, and a write with
+  `text/plain; charset=utf-8` was refused where `text/plain` was not (measured
+  on premise, 2026-11-03). So, when `ifMatch` is given, every `updateMetadata`,
+  the message class message's `update` and the DDIC source `update`s
+  (structure, table, append structure) send their `Content-Type` without the
+  `charset` parameter (an XML document's declaration carries its encoding);
+  every other source keeps it — its ETag carries no media type, and a guarded
+  write with it was measured passing for a program, a class and a DDL source.
+  Without `ifMatch` every header goes byte for byte as before. Whether a DDIC
+  source with non-ASCII text survives a write without `charset` is what the
+  structure live suite checks; it has not run yet.
+- **SAP_BASIS 7.40 does not act on it**: a stale `If-Match` answered `200` and
+  the write took place (`@mcp-abap-adt/adt-clients-legacy`, `docs/LEGACY.md`).
+
 ### Creating Behavior Implementation Classes
 
 ```typescript

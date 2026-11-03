@@ -36,6 +36,7 @@ import type {
   IAdtReadable,
   IAdtResponse,
   IAdtUpdatable,
+  IAdtUpdateOptions,
   IMessageClassMessageResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
@@ -46,7 +47,7 @@ import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { beginCriticalSection } from '../../utils/criticalSection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 import type {
   ResultStrategiesOf,
   ResultValuesOf,
@@ -165,7 +166,7 @@ export class AdtMessageClassMessage<
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<T['written'], E>> {
-    return this.writeClass(config, false, options);
+    return this.writeClass(config, false, options, undefined);
   }
 
   /** Update the message — see `create`. *
@@ -175,9 +176,9 @@ export class AdtMessageClassMessage<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IMessageClassMessageConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['written'], E>> {
-    return this.writeClass(config, false, options);
+    return this.writeClass(config, false, options, options.ifMatch);
   }
 
   /**
@@ -192,7 +193,7 @@ export class AdtMessageClassMessage<
     config: Partial<IMessageClassMessageConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deleted'], E>> {
-    return this.writeClass(config, true, options) as Promise<
+    return this.writeClass(config, true, options, undefined) as Promise<
       IAdtResponse<T['deleted'], E>
     >;
   }
@@ -209,6 +210,9 @@ export class AdtMessageClassMessage<
     config: Partial<IMessageClassMessageConfig>,
     deleting: boolean,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    // The update's: the ETag of the class document the caller read, sent on
+    // the PUT that replaces it. A create or a delete has none.
+    ifMatch: string | undefined,
   ): Promise<IAdtResponse<T['written'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -317,9 +321,14 @@ export class AdtMessageClassMessage<
               method: 'PUT',
               timeout: 0,
               data: xmlBody,
-              // The main write carries the caller's pair; the chain's read,
-              // locks and unlocks keep their own.
-              headers: requestHeaders(options.headers),
+              // The main write carries the caller's pair, and `If-Match`
+              // when the update was given `ifMatch`; the chain's read, locks
+              // and unlocks keep their own.
+              headers: updateRequestHeaders(
+                options.headers,
+                ifMatch,
+                'dropped',
+              ),
             }),
           this.results.written,
           options?.analyse,

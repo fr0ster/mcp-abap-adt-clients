@@ -5,12 +5,13 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { SCALAR_FUNCTION_IMPLEMENTATION } from '../../endpoints/objects';
 import { writeQuery } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 import type { IUpdateScalarFunctionImplementationParams } from './types';
 
 export async function updateScalarFunctionImplementationMetadata(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   args: IUpdateScalarFunctionImplementationParams,
   lockHandle?: string,
 ): Promise<IAdtWireResponse> {
@@ -20,6 +21,6 @@ export async function updateScalarFunctionImplementationMetadata(
     method: 'PUT',
     timeout: 0,
     data: args.source_code,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch, 'dropped'),
   });
 }

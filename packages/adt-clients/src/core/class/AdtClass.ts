@@ -43,6 +43,7 @@ import type {
   IAdtReadable,
   IAdtResponse,
   IAdtUpdatable,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -262,7 +263,7 @@ export class AdtClass<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -289,6 +290,7 @@ export class AdtClass<
         updateClass(
           connection,
           options.headers,
+          options.ifMatch,
           config.className as string,
           source as string,
           options?.lockHandle,
@@ -312,7 +314,7 @@ export class AdtClass<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'class', 'updateMetadata'>,
     config: Partial<IClassConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -322,6 +324,7 @@ export class AdtClass<
         writeObjectDocument(
           connection,
           options.headers,
+          options.ifMatch,
           CLASS.uri(config.className as string),
           options?.source as string,
           options?.lockHandle,

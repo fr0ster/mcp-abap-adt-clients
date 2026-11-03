@@ -2164,6 +2164,76 @@ run_abap_unit:
         package_name: "<LOCAL_PACKAGE>"   # optional: the local package (see above)
         transport_request: ""
 
+# Write only if unchanged (`ifMatch`, sent as `If-Match`; adt-clients 42.2.0).
+# One live case per write path (src/__tests__/integration/core/*/IfMatch*.test.ts,
+# helpers/ifMatchProbes.ts): each creates its objects under fresh names, reads
+# the document (version inactive) and takes the ETag, writes with it, writes
+# again with the first ETag (SAP refuses: 412 ExceptionPreconditionFailed),
+# writes with the new one, then deletes what it created and reads the absence
+# back. Measured on premise and on the cloud, 2026-11-03, for a program's and a
+# class's source and a domain's document; the other paths are what these cases
+# measure.
+#
+# The objects go into a LOCAL package, named per case in package_name:
+#   ON-PREM: "$TMP".
+#   CLOUD:   the test package that takes no transport (no $TMP on the cloud,
+#            and no programs: the main source there is a class's).
+# transport_request stays "" for a local package. The cases are off until the
+# overlay turns each on and names its package (both keys optional). The first
+# write waits operation_delays.update after the create: the ETag has a
+# resolution of one second (measured).
+if_match:
+  test_cases:
+    - name: "if_match_program"
+      enabled: false                # optional: true once package_name is set
+      available_in: ["onprem"]
+      description: "A program's source: written with the ETag read, refused with a stale one, written with the new one"
+      params:
+        package_name: "<LOCAL_PACKAGE>"   # optional: the local package (see above)
+        transport_request: ""
+    - name: "if_match_class"
+      enabled: false                # optional: true once package_name is set
+      available_in: ["cloud"]
+      description: "A class's main source: written with the ETag read, refused with a stale one, written with the new one"
+      params:
+        package_name: "<LOCAL_PACKAGE>"   # optional: the local package (see above)
+        transport_request: ""
+    - name: "if_match_class_include"
+      enabled: false                # optional: true once package_name is set
+      available_in: ["onprem", "cloud"]
+      description: "A class's local implementations include: written with the ETag read, refused with a stale one, written with the new one"
+      params:
+        package_name: "<LOCAL_PACKAGE>"   # optional: the local package (see above)
+        transport_request: ""
+    - name: "if_match_function_module"
+      enabled: false                # optional: true once package_name is set
+      available_in: ["onprem", "cloud"]
+      description: "A function module's source: written with the ETag read, refused with a stale one, written with the new one"
+      params:
+        package_name: "<LOCAL_PACKAGE>"   # optional: the local package (see above)
+        transport_request: ""
+    - name: "if_match_ddl"
+      enabled: false                # optional: true once package_name is set
+      available_in: ["onprem", "cloud"]
+      description: "A DDL source: written with the ETag read, refused with a stale one, written with the new one"
+      params:
+        package_name: "<LOCAL_PACKAGE>"   # optional: the local package (see above)
+        transport_request: ""
+    - name: "if_match_structure"
+      enabled: false                # optional: true once package_name is set
+      available_in: ["onprem", "cloud"]
+      description: "A structure's DDIC source: written with the ETag read, refused with a stale one, written with the new one"
+      params:
+        package_name: "<LOCAL_PACKAGE>"   # optional: the local package (see above)
+        transport_request: ""
+    - name: "if_match_domain"
+      enabled: false                # optional: true once package_name is set
+      available_in: ["onprem", "cloud"]
+      description: "A domain's metadata document: written with the ETag read, refused with a stale one, written with the new one"
+      params:
+        package_name: "<LOCAL_PACKAGE>"   # optional: the local package (see above)
+        transport_request: ""
+
 # Create CDS Unit Test
 # NOTE: run_program_unit_test and run_function_group_unit_test were added to the
 # template after many local configs were made from it. A config without them

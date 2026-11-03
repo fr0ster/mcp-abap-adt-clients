@@ -25,6 +25,7 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtUpdatable,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
   IAppendStructureResults,
@@ -277,7 +278,7 @@ export class AdtAppendStructure<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -295,6 +296,7 @@ export class AdtAppendStructure<
         updateAppendStructure(
           connection,
           options.headers,
+          options.ifMatch,
           {
             append_structure_name: name,
             source_code: source as string,

@@ -8,12 +8,13 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { writeQuery } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 import { includeUrl } from './lock';
 
 export async function uploadIncludeSource(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   includeName: string,
   sourceCode: string,
   lockHandle?: string,
@@ -24,6 +25,6 @@ export async function uploadIncludeSource(
     method: 'PUT',
     timeout: 0,
     data: sourceCode,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch, 'kept'),
   });
 }

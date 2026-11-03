@@ -24,6 +24,7 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtUpdatable,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
   IMetadataExtensionResults,
@@ -272,7 +273,7 @@ export class AdtMetadataExtension<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IMetadataExtensionConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -290,6 +291,7 @@ export class AdtMetadataExtension<
         updateMetadataExtension(
           connection,
           options.headers,
+          options.ifMatch,
           name,
           source as string,
           options?.lockHandle,
@@ -314,7 +316,7 @@ export class AdtMetadataExtension<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'metadataExtension', 'updateMetadata'>,
     config: Partial<IMetadataExtensionConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -324,6 +326,7 @@ export class AdtMetadataExtension<
         writeObjectDocument(
           connection,
           options.headers,
+          options.ifMatch,
           METADATA_EXTENSION.uri(this.name(config)),
           options?.source as string,
           options?.lockHandle,

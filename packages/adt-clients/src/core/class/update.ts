@@ -10,7 +10,7 @@ import type {
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { CLASS, CLASS_INCLUDE, sourceUri } from '../../endpoints/objects';
 import { writeQuery } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 
 /**
  * Update class source code (low-level function)
@@ -25,6 +25,7 @@ import { requestHeaders } from '../../utils/requestHeaders';
 export async function updateClass(
   connection: IAbapConnection,
   headers: IAdtHeaders,
+  ifMatch: string | undefined,
   className: string,
   sourceCode: string,
   lockHandle?: string,
@@ -41,7 +42,7 @@ export async function updateClass(
     method: 'PUT',
     timeout: 0,
     data: sourceCode,
-    headers: requestHeaders(headers),
+    headers: updateRequestHeaders(headers, ifMatch, 'kept'),
   });
 }
 

@@ -29,6 +29,7 @@ import type {
   IAdtResponse,
   IAdtSystemContext,
   IAdtTransportAware,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IPackageResults,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -240,7 +241,7 @@ export class AdtPackage<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: Partial<IPackageConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -273,6 +274,7 @@ export class AdtPackage<
         updatePackage(
           connection,
           options.headers,
+          options.ifMatch,
           fields,
           // The document the caller built, from the options — see
           // `AdtDomain.updateMetadata`; the fields above describe a create.

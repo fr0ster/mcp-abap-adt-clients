@@ -24,6 +24,7 @@ import type {
   IAdtSystemContext,
   IAdtTransportAware,
   IAdtUpdatable,
+  IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
   IServiceDefinitionResults,
@@ -267,7 +268,7 @@ export class AdtServiceDefinition<
    */
   async update<E extends IAdtError = IAdtError>(
     config: Partial<IServiceDefinitionConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -285,6 +286,7 @@ export class AdtServiceDefinition<
         updateServiceDefinition(
           connection,
           options.headers,
+          options.ifMatch,
           {
             service_definition_name: name,
             source_code: source as string,
@@ -310,7 +312,7 @@ export class AdtServiceDefinition<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'serviceDefinition', 'updateMetadata'>,
     config: Partial<IServiceDefinitionConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -320,6 +322,7 @@ export class AdtServiceDefinition<
         writeObjectDocument(
           connection,
           options.headers,
+          options.ifMatch,
           SERVICE_DEFINITION.uri(this.name(config)),
           options?.source as string,
           options?.lockHandle,

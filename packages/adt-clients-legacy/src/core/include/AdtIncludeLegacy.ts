@@ -26,6 +26,7 @@ import type {
   IAdtHeaders,
   IAdtOperationOptions,
   IAdtResponse,
+  IAdtUpdateOptions,
   IIncludeConfig,
   IIncludeResults,
   IResultStrategy,
@@ -56,7 +57,7 @@ export class AdtIncludeLegacy<
   override async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'include', 'updateMetadata'>,
     _config: Partial<IIncludeConfig>,
-    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     return legacyNotMeasuredRefusal<T['metadataUpdated'], E>(
       'updateMetadata',

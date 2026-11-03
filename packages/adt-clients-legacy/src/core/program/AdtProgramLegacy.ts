@@ -22,6 +22,7 @@ import type {
   IAdtHeaders,
   IAdtOperationOptions,
   IAdtResponse,
+  IAdtUpdateOptions,
   IProgramConfig,
 } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
@@ -89,7 +90,7 @@ export class AdtProgramLegacy<
   override async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'program', 'updateMetadata'>,
     _config: Partial<IProgramConfig>,
-    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     return legacyNotMeasuredRefusal<T['metadataUpdated'], E>(
       'updateMetadata',
