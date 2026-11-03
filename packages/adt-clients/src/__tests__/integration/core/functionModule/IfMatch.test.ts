@@ -243,12 +243,16 @@ describe("If-Match: a function module's source (AdtFunctionModule.update)", () =
                 'delete',
               ),
             }),
+          // Its metadata, not its source: for a deleted module whose group
+          // stands, the metadata read answers 404 ExceptionResourceNotFound
+          // and the source read 500 (measured on premise, 2026-11-03).
           () =>
             client
               .getFunctionModule()
-              .read({ functionGroupName, functionModuleName }, undefined, {
-                analyse: analyseException,
-              }),
+              .readMetadata(
+                { functionGroupName, functionModuleName },
+                { analyse: analyseException },
+              ),
           `function module ${functionModuleName}`,
         );
         refusals.push(moduleRefusal);
