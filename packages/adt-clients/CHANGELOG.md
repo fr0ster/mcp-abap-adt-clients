@@ -24,6 +24,44 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [42.2.0] - 2026-11-03
+
+### Added
+
+- **A write that requires the object unchanged.** Every `update` and
+  `updateMetadata` that writes a document takes `IAdtUpdateOptions`
+  (`@mcp-abap-adt/interfaces-adt` 25.2.0) and with it `ifMatch`: the ETag a
+  read answered for that document. The write sends it as `If-Match`, the value
+  as given, exactly when it is given; without it no `If-Match` is sent and the
+  write is the one it was. SAP refuses a write whose `If-Match` is not the
+  document's current ETag — `412`, `ExceptionPreconditionFailed`, nothing
+  written — and the refusal reaches the caller through `analyse` like any
+  other. Measured on premise and on the cloud (2026-11-03) for a program's and
+  a class's source and a domain's metadata document. SAP compares with the
+  newest version (the inactive one when it exists), and the ETag has a
+  resolution of one second: a change made in the same second as the read is
+  not detected. The ETag is a header of the read's answer (`wireItself` in the
+  read's slot keeps it).
+- One place builds the header: `updateRequestHeaders`, beside
+  `requestHeaders`. 53 update members send through it; the low-level writers
+  take `ifMatch` after the caller's headers. The message class message's
+  `update` sends it on the `PUT` of the class document only. The service
+  binding's `update` is its publication job, writes no document, keeps
+  `IAdtOperationOptions` and sends no `If-Match`. Reads and creates send none.
+- `ifMatch.test.ts`: every update row of the capability manifest, with and
+  without `ifMatch`; the table is closed over every class method named
+  `update` or `updateMetadata`; reads and creates handed an `ifMatch` send
+  none.
+- Live suites, one per write path, written and not yet run (cases of the new
+  `if_match` section, off by default; the overlay turns each on and names its
+  package — `$TMP` on premise, on the cloud the test package that takes no
+  transport): a program's source (on premise), a class's main source (cloud),
+  a class's local implementations include, a function module's source, a DDL
+  source, a structure's source and a domain's document. Each creates its
+  objects under fresh names, writes with the ETag read, is refused `412` with
+  the first one, writes with the new one, and deletes what it created.
+- `@mcp-abap-adt/interfaces-adt` `^25.2.0`.
+
 ## [42.1.0] - 2026-11-03
 
 ### Added

@@ -117,6 +117,7 @@ A measurement overrides the discovery catalogue both ways: `/deletion/*` is not 
 | Deletion check | `POST /sap/bc/adt/deletion/check` | refused: 7.40 has no deletion API |
 | Transport | `/sap/bc/adt/cts/transportrequests` | `/sap/bc/cts/transportrequests` — list and read only |
 | Source content type | `text/plain; charset=utf-8` | `text/plain` (requires `SAP_UNICODE=false` in the session file `MCP_ENV_PATH` names) |
+| Write guard (`ifMatch`, sent as `If-Match`; adt-clients 42.2.0) | SAP refuses a write whose `If-Match` is not the document's current ETag (`412`; measured on premise and on the cloud for a program's and a class's source and a domain's metadata, 2026-11-03) | **none**: 7.40 does not act on `If-Match` — the write takes place whatever it says ([measured](#measured-on-basis-740-support-package-not-recorded)) |
 
 ## Delete: lock, delete with the handle, unlock
 
@@ -431,6 +432,12 @@ On premise, BASIS 7.40, 2026-10-01, over RFC and over HTTP. **These measurements
 - **A group activation answers `200` with an empty body on success** — no
   checklist, no messages, no run id. Six objects activated that way; the
   inactive-objects list read afterwards named none of them.
+- **No write guard** (2026-11-03, over RFC). A source read answers an `ETag`;
+  a source write answers none. A source `PUT` with a stale `If-Match`, and one
+  with an arbitrary `If-Match`, each answered `200`, and the write took place:
+  7.40 does not act on `If-Match`. A legacy `update` given `ifMatch` sends the
+  header all the same — the request is the root member's, inherited — and
+  nothing guards the write; a caller that needs the guard has none on 7.40.
 - **`/sap/bc/adt/core/discovery`** answers `404` "No application class found
   for URI" over RFC and `200 text/html`, empty, over HTTP — see
   [Overview](#overview).
