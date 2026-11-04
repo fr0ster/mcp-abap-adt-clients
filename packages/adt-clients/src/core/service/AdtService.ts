@@ -41,14 +41,18 @@ import { TYPE_CODE } from '../../constants/typeCodes';
 import { SERVICE_BINDING } from '../../endpoints/objects';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
-import { buildQueryString } from '../../utils/internalUtils';
+import { buildQueryString, limitDescription } from '../../utils/internalUtils';
 import { lockHandleOf } from '../../utils/lockHandle';
-import { requestHeaders } from '../../utils/requestHeaders';
+import {
+  createRequestHeaders,
+  requestHeaders,
+} from '../../utils/requestHeaders';
 import {
   nothing,
   type ResultStrategiesOf,
   type ResultValuesOf,
 } from '../../utils/resultStrategy';
+import { escapeXmlAttr, languageAttributes } from '../../utils/xml';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { writeObjectDocument } from '../shared/documentWrite';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
@@ -133,24 +137,28 @@ export class AdtServiceBinding<
   ): string {
     const { bindingType, bindingVersion, bindingCategory } =
       resolveBindingVariant(params.bindingVariant);
-    const masterLanguage = params.masterLanguage ?? 'EN';
-    const masterSystem = params.masterSystem as string;
+    const masterSystem = params.masterSystem;
     const responsible = params.responsible;
-    const escapedDescription = params.description.replace(/"/g, '&quot;');
-    const escapedBindingName = params.bindingName.toUpperCase();
-    const escapedPackageName = params.packageName.toUpperCase();
-    const escapedServiceName = params.serviceName.toUpperCase();
-    const escapedServiceVersion = params.serviceVersion as string;
-    const escapedServiceDefinition = params.serviceDefinitionName.toUpperCase();
+    // Cut first, escaped after: an entity is never cut in two.
+    const escapedDescription = escapeXmlAttr(
+      limitDescription(params.description),
+    );
+    const escapedBindingName = escapeXmlAttr(params.bindingName.toUpperCase());
+    const escapedPackageName = escapeXmlAttr(params.packageName.toUpperCase());
+    const escapedServiceName = escapeXmlAttr(params.serviceName.toUpperCase());
+    const escapedServiceVersion = escapeXmlAttr(params.serviceVersion);
+    const escapedServiceDefinition = escapeXmlAttr(
+      params.serviceDefinitionName.toUpperCase(),
+    );
 
     const masterSystemAttr = masterSystem
-      ? ` adtcore:masterSystem="${masterSystem}"`
+      ? ` adtcore:masterSystem="${escapeXmlAttr(masterSystem)}"`
       : '';
     const responsibleAttr = responsible
-      ? ` adtcore:responsible="${responsible}"`
+      ? ` adtcore:responsible="${escapeXmlAttr(responsible)}"`
       : '';
 
-    return `<?xml version="1.0" encoding="UTF-8"?><srvb:serviceBinding xmlns:srvb="http://www.sap.com/adt/ddic/ServiceBindings" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${escapedDescription}" adtcore:language="${masterLanguage}" adtcore:name="${escapedBindingName}" adtcore:type="${TYPE_CODE.serviceBinding}" adtcore:masterLanguage="${masterLanguage}"${masterSystemAttr}${responsibleAttr}>
+    return `<?xml version="1.0" encoding="UTF-8"?><srvb:serviceBinding xmlns:srvb="http://www.sap.com/adt/ddic/ServiceBindings" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${escapedDescription}"${languageAttributes(params.masterLanguage)} adtcore:name="${escapedBindingName}" adtcore:type="${TYPE_CODE.serviceBinding}"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${escapedPackageName}"/>
   <srvb:services srvb:name="${escapedServiceName}">
     <srvb:content srvb:version="${escapedServiceVersion}">
@@ -166,7 +174,7 @@ export class AdtServiceBinding<
   private buildTransportCheckXml(
     params: ITransportCheckServiceBindingParams,
   ): string {
-    const description = (params.description ?? '').replace(/"/g, '&quot;');
+    const description = escapeXmlAttr(params.description ?? '');
     return `<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><PGMID>R3TR</PGMID><OBJECT>SRVB</OBJECT><OBJECTNAME>${params.objectName.toUpperCase()}</OBJECTNAME><OPERATION>${params.operation ?? 'I'}</OPERATION><DEVCLASS>${params.packageName.toUpperCase()}</DEVCLASS><CTEXT>${description}</CTEXT></DATA></asx:values></asx:abap>`;
   }
 
@@ -818,8 +826,10 @@ export class AdtServiceBinding<
     // fallback could silently be no value at all.
     const createParams: ICreateServiceBindingParams = {
       ...params,
+      // No language invented: without one, neither the body nor the header
+      // states one, and SAP takes the logon language.
       masterLanguage:
-        params.masterLanguage ?? this.systemContext.masterLanguage ?? 'EN',
+        params.masterLanguage ?? this.systemContext.masterLanguage,
       masterSystem: params.masterSystem ?? this.systemContext.masterSystem,
       responsible: params.responsible ?? this.systemContext.responsible,
     };
@@ -833,7 +843,7 @@ export class AdtServiceBinding<
       method: 'POST',
       timeout: 0,
       data: this.buildServiceBindingCreateXml(createParams),
-      headers: requestHeaders(headers),
+      headers: createRequestHeaders(headers, createParams.masterLanguage),
       params: queryParams,
     });
   }

@@ -159,7 +159,8 @@ export async function getUnitTestRunStatus(
 ): Promise<IAdtWireResponse> {
   const query = withLongPolling ? '?withLongPolling=true' : '';
   return connection.makeAdtRequest({
-    url: `/sap/bc/adt/abapunit/runs/${runId}${query}`,
+    // The run id is one path segment, whatever it holds.
+    url: `/sap/bc/adt/abapunit/runs/${encodeURIComponent(runId)}${query}`,
     method: 'GET',
     timeout: 0,
     headers: {
@@ -184,7 +185,7 @@ export async function getUnitTestRunResult(
     format === 'junit' ? ACCEPT_JUNIT_RESULT : ACCEPT_UNIT_TEST_RESULT;
 
   return connection.makeAdtRequest({
-    url: `/sap/bc/adt/abapunit/results/${runId}${query}`,
+    url: `/sap/bc/adt/abapunit/results/${encodeURIComponent(runId)}${query}`,
     method: 'GET',
     timeout: 0,
     headers: {

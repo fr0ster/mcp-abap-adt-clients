@@ -10,7 +10,8 @@ import type {
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { BEHAVIOR_DEFINITION } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { createRequestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr, languageAttributes } from '../../utils/xml';
 import type { IBehaviorDefinitionCreateParams } from './types';
 
 /**
@@ -41,25 +42,24 @@ export async function create(
   headers: IAdtHeaders,
   params: IBehaviorDefinitionCreateParams,
 ): Promise<IAdtWireResponse> {
-  const language = params.language || 'EN';
-
   const masterSystem = params.masterSystem || '';
   const responsible = params.responsible || '';
 
   // Description is limited to 60 characters in SAP ADT
-  const description = limitDescription(params.description);
+  // Cut first, escaped after: an entity is never cut in two.
+  const description = escapeXmlAttr(limitDescription(params.description));
   const masterSystemAttr = masterSystem
-    ? ` adtcore:masterSystem="${masterSystem}"`
+    ? ` adtcore:masterSystem="${escapeXmlAttr(masterSystem)}"`
     : '';
   const responsibleAttr = responsible
-    ? ` adtcore:responsible="${responsible}"`
+    ? ` adtcore:responsible="${escapeXmlAttr(responsible)}"`
     : '';
 
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${language}" adtcore:name="${params.name}" adtcore:type="${TYPE_CODE.behaviorDefinition}" adtcore:masterLanguage="${language}"${masterSystemAttr}${responsibleAttr}>
+  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}"${languageAttributes(params.language)} adtcore:name="${escapeXmlAttr(params.name)}" adtcore:type="${TYPE_CODE.behaviorDefinition}"${masterSystemAttr}${responsibleAttr}>
     <adtcore:adtTemplate>
         <adtcore:adtProperty adtcore:key="implementation_type">${params.implementationType}</adtcore:adtProperty>
     </adtcore:adtTemplate>
-    <adtcore:packageRef adtcore:name="${params.package}"/>
+    <adtcore:packageRef adtcore:name="${escapeXmlAttr(params.package)}"/>
 </blue:blueSource>`;
 
   const url = `${BEHAVIOR_DEFINITION.collection}${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
@@ -72,6 +72,6 @@ export async function create(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers: requestHeaders(headers),
+    headers: createRequestHeaders(headers, params.language),
   });
 }

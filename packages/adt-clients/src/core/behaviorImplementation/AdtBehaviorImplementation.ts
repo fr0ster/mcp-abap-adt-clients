@@ -46,6 +46,7 @@ import type { ClassValues } from '../class/AdtClassMemberBase';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import type { IReadOptions } from '../shared/types';
 import {
+  getBehaviorImplementationImplementations,
   getBehaviorImplementationMetadata,
   getBehaviorImplementationSource,
   getBehaviorImplementationTransport,
@@ -229,6 +230,39 @@ export class AdtBehaviorImplementation<
     return answering(
       () =>
         getBehaviorImplementationSource(
+          connection,
+          name,
+          version,
+          options,
+          this.logger,
+        ),
+      this.results.source,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Read the pool's implementations include (CCIMP) — where the behaviour
+   * itself lives: the handler (`lhc_…`) and saver (`lsc_…`) classes. The
+   * main source (`read`) holds only the `FOR BEHAVIOR OF` shell.
+   *
+   * One GET of `/sap/bc/adt/oo/classes/<pool>/includes/implementations`, with
+   * the version asked; answered through the result set's `source` slot, the
+   * text as it came by default.
+   */
+  async readImplementations<E extends IAdtError = IAdtError>(
+    config: Partial<IBehaviorImplementationConfig>,
+    version?: AdtReadVersion,
+    options?: IReadOptions & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<T['source'], E>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
+
+    const name = this.name(config);
+
+    return answering(
+      () =>
+        getBehaviorImplementationImplementations(
           connection,
           name,
           version,

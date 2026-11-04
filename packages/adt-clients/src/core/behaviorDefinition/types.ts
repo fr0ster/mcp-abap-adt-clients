@@ -144,14 +144,14 @@ export interface IBehaviorDefinitionCreateParams {
 export interface IBehaviorDefinitionValidationParams {
   /** Name of the behavior definition object */
   objname: string;
-  /** Root entity name */
-  rootEntity: string;
-  /** Description of the behavior definition */
-  description: string;
+  /** Root entity name; not sent when not given */
+  rootEntity: string | undefined;
+  /** Description of the behavior definition; not sent when not given */
+  description: string | undefined;
   /** Package name where the object will be created */
   package: string;
-  /** Implementation type (Managed, Unmanaged, Abstract, Projection) */
-  implementationType: BehaviorDefinitionImplementationType;
+  /** Implementation type (Managed, Unmanaged, Abstract, Projection); not sent when not given */
+  implementationType: BehaviorDefinitionImplementationType | undefined;
 }
 
 export interface IUpdateBehaviorDefinitionParams {

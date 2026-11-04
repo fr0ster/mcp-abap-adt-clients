@@ -9,6 +9,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { TRANSPORT_REQUEST } from '../../endpoints/objects';
 import { requestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr } from '../../utils/xml';
 import type { ICreateTransportParams } from './types';
 
 /**
@@ -18,7 +19,12 @@ function buildCreateTransportXml(
   args: ICreateTransportParams,
   username: string,
 ): string {
-  const transportType = args.transport_type === 'customizing' ? 'T' : 'K';
+  // The request type is CTS's code (DD07T of domain TRFUNCTION, read on
+  // premise): K Workbench Request, W Customizing Request, T Transport of
+  // Copies. `customizing` used to be T, which SAP refuses without a real
+  // target (SCTS_ADT_MSG 009 with target LOCAL, measured); W with LOCAL or
+  // an empty target answered 201.
+  const transportType = args.transport_type === 'customizing' ? 'W' : 'K';
   const description = args.description || 'Transport request created via MCP';
   // SAP user names are upper case, and CTS compares them as given: a lower
   // case owner was refused, measured on premise, with SCTS_ADT_MSG 009 "User …
@@ -30,8 +36,8 @@ function buildCreateTransportXml(
 
   return `<?xml version="1.0" encoding="ASCII"?>
 <tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:useraction="newrequest">
-  <tm:request tm:desc="${description}" tm:type="${transportType}" tm:target="${target}" tm:cts_project="">
-    <tm:task tm:owner="${owner}"/>
+  <tm:request tm:desc="${escapeXmlAttr(description)}" tm:type="${transportType}" tm:target="${escapeXmlAttr(target)}" tm:cts_project="">
+    <tm:task tm:owner="${escapeXmlAttr(owner)}"/>
   </tm:request>
 </tm:root>`;
 }

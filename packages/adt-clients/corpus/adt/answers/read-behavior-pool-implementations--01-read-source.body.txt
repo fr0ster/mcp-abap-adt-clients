@@ -1,0 +1,62 @@
+CLASS ltc_a_costcenter DEFINITION DEFERRED FOR TESTING.
+CLASS lhc_costcenter DEFINITION INHERITING FROM cl_abap_behavior_handler FRIENDS ltc_a_costcenter.
+
+  PRIVATE SECTION.
+
+    METHODS augment_create FOR MODIFY
+      IMPORTING entities FOR CREATE costcenter.
+    METHODS augment_cba_costcentertext FOR MODIFY
+      IMPORTING entities FOR CREATE costcenter\_costcentertext.
+
+ENDCLASS.
+
+CLASS lhc_costcenter IMPLEMENTATION.
+
+  METHOD augment_create.
+    DATA lt_costcenter_create TYPE TABLE FOR CREATE r_costcentertp.
+    LOOP AT entities ASSIGNING FIELD-SYMBOL(<fs_entity_create>).
+      APPEND VALUE #(
+        %cid        = <fs_entity_create>-%cid
+        %key        = VALUE #( controllingarea  = <fs_entity_create>-%key-controllingarea
+                               costcenter       = <fs_entity_create>-%key-costcenter
+                               validityenddate  = <fs_entity_create>-%key-validityenddate )
+        controllingareaforedit  = COND #( WHEN <fs_entity_create>-%key-controllingarea IS NOT INITIAL
+                                            THEN <fs_entity_create>-%key-controllingarea
+                                            ELSE COND #(
+                                              WHEN cl_fco_r_cost_center_factory=>create_service( )->is_controlling_area_unique( ) EQ abap_true
+                                                THEN cl_fco_r_cost_center_factory=>create_dao( )->determ_unique_controlling_area( )
+                                                ELSE <fs_entity_create>-%key-controllingarea ) )
+        costcenterforedit = <fs_entity_create>-%key-costcenter
+        validityenddateforedit        = <fs_entity_create>-validityenddate
+        %control-controllingareaforedit = if_abap_behv=>mk-on
+        %control-costcenterforedit = if_abap_behv=>mk-on
+        %control-validityenddateforedit = if_abap_behv=>mk-on
+      ) TO lt_costcenter_create.
+    ENDLOOP.
+
+    MODIFY AUGMENTING ENTITY r_costcentertp
+     CREATE AUTO FILL CID WITH lt_costcenter_create.
+  ENDMETHOD.
+
+  METHOD augment_cba_costcentertext.
+    DATA lt_costcentertext_create TYPE TABLE FOR CREATE r_costcentertp\_costcentertexttp.
+    LOOP AT entities ASSIGNING FIELD-SYMBOL(<fs_entity_create>).
+      APPEND INITIAL LINE TO lt_costcentertext_create ASSIGNING FIELD-SYMBOL(<fs_new>).
+      <fs_new>-%cid_ref  = <fs_entity_create>-%cid_ref.
+      <fs_new>-%key = <fs_entity_create>-%key.
+      LOOP AT <fs_entity_create>-%target ASSIGNING FIELD-SYMBOL(<fs_target>).
+        append INITIAL LINE TO <fs_new>-%target ASSIGNING FIELD-SYMBOL(<fs_target_new>).
+        <fs_target_new>-%cid = <fs_target>-%cid.
+        <fs_target_new>-%key = <fs_target>-%key.
+        <fs_target_new>-languageforedit = <fs_target>-language.
+        <fs_target_new>-%control-languageforedit = if_abap_behv=>mk-on.
+      ENDLOOP.
+    ENDLOOP.
+
+    MODIFY AUGMENTING ENTITIES OF r_costcentertp
+      ENTITY costcenter
+      CREATE BY \_costcentertexttp
+      AUTO FILL CID WITH lt_costcentertext_create.
+  ENDMETHOD.
+
+ENDCLASS.

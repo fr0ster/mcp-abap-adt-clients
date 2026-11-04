@@ -128,7 +128,7 @@ export class AdtDataElement<
         validateDataElementName(
           connection,
           name,
-          config.description as string,
+          config.description,
           config.packageName,
         ),
       this.results.validation,

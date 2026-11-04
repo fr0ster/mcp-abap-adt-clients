@@ -10,7 +10,8 @@ import type {
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { DOMAIN } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { createRequestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr, languageAttributes } from '../../utils/xml';
 import type { ICreateDomainParams } from './types';
 
 /**
@@ -32,14 +33,19 @@ export async function create(
   const masterSystem = args.masterSystem || '';
   const username = args.responsible || '';
 
-  const description = limitDescription(args.description || args.domain_name);
+  // Cut first, escaped after: an entity is never cut in two.
+  const description = escapeXmlAttr(
+    limitDescription(args.description || args.domain_name),
+  );
 
   const masterSystemAttr = masterSystem
-    ? ` adtcore:masterSystem="${masterSystem}"`
+    ? ` adtcore:masterSystem="${escapeXmlAttr(masterSystem)}"`
     : '';
-  const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${args.masterLanguage || 'EN'}" adtcore:name="${args.domain_name.toUpperCase()}" adtcore:type="${TYPE_CODE.domain}" adtcore:masterLanguage="${args.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr}>
-  <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
+  const responsibleAttr = username
+    ? ` adtcore:responsible="${escapeXmlAttr(username)}"`
+    : '';
+  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}"${languageAttributes(args.masterLanguage)} adtcore:name="${escapeXmlAttr(args.domain_name.toUpperCase())}" adtcore:type="${TYPE_CODE.domain}"${masterSystemAttr}${responsibleAttr}>
+  <adtcore:packageRef adtcore:name="${escapeXmlAttr(args.package_name.toUpperCase())}"/>
 </doma:domain>`;
 
   return await connection.makeAdtRequest({
@@ -47,6 +53,6 @@ export async function create(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers: requestHeaders(headers),
+    headers: createRequestHeaders(headers, args.masterLanguage),
   });
 }

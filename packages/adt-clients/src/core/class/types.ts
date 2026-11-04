@@ -116,6 +116,8 @@ export interface ICreateClassParams {
   masterLanguage?: string;
   superclass?: string;
   final?: boolean;
+  /** Written as `class:abstract` when given; nothing when not. */
+  abstract?: boolean;
   create_protected?: boolean;
   template_xml?: string;
 }

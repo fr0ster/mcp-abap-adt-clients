@@ -232,9 +232,11 @@ export async function getTraceStatements(
     params.set('withDetails', withDetails);
   }
   if (options.autoDrillDownThreshold !== undefined) {
+    // As given: the threshold is a percentage, and a fraction (0.1) is a
+    // threshold of its own — truncated, it went out as 0.
     params.set(
       'autoDrillDownThreshold',
-      String(Math.trunc(options.autoDrillDownThreshold)),
+      String(options.autoDrillDownThreshold),
     );
   }
   const withSystemEvents = boolToQueryValue(options.withSystemEvents);

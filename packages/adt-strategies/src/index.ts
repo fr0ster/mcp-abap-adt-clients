@@ -114,6 +114,14 @@ export {
   type ISystemMessageEntry,
 } from './results/feeds';
 export {
+  type IObjectOutline,
+  type IOutlineElement,
+  type IOutlineLink,
+  type IOutlinePoint,
+  objectOutline,
+  readObjectOutline,
+} from './results/outline';
+export {
   compareRecordedAt,
   type IAbapTraceAccessTime,
   type IAbapTraceDbAccess,

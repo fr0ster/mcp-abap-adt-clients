@@ -24,7 +24,7 @@ import { AUTHORIZATION_FIELD } from '../../endpoints/objects';
 export async function validateAuthorizationFieldName(
   connection: IAbapConnection,
   name: string,
-  description: string,
+  description: string | undefined,
   packageName?: string,
 ): Promise<IAdtWireResponse> {
   const url = AUTHORIZATION_FIELD.validation;
@@ -34,7 +34,12 @@ export async function validateAuthorizationFieldName(
   if (packageName) {
     queryParams.append('packagename', packageName);
   }
-  queryParams.append('description', description);
+  // A description not given is not sent: the endpoint answers its own 400
+  // ("The description is missing for VALIDATION") rather than validating the
+  // word "undefined".
+  if (description !== undefined) {
+    queryParams.append('description', description);
+  }
 
   return connection.makeAdtRequest({
     url: `${url}?${queryParams.toString()}`,

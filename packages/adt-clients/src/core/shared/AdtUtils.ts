@@ -126,7 +126,11 @@ import type { AdtLoggedOptions } from './handlerOptions';
 import { getInclude as getIncludeUtil } from './include';
 import { fetchNodeStructure as fetchNodeStructureUtil } from './nodeStructure';
 import { getObjectProperties as getObjectPropertiesUtil } from './objectProperties';
-import { getObjectStructure as getObjectStructureUtil } from './objectStructure';
+import {
+  type AdtOutlineCode,
+  getObjectOutline as getObjectOutlineUtil,
+  getObjectStructure as getObjectStructureUtil,
+} from './objectStructure';
 import {
   getObjectMetadataUri,
   getObjectSourceUri,
@@ -902,6 +906,47 @@ export class AdtUtils<
     return answering(
       () => getObjectStructureUtil(this.connection, objectType, objectName),
       this.results.objectStructure,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * An object's outline — `GET <object uri>/objectstructure`, one request:
+   * its components (types, attributes, methods, events, local classes,
+   * forms, includes, modules), each with its kind, name, visibility where SAP
+   * gives one, and the links to where it is defined and implemented; for a
+   * class and an interface each link names a source position.
+   *
+   * The kinds are the ones SAP serves an outline for (`AdtOutlineCode`):
+   * class, interface, program, include and function group — measured on
+   * premise and on ABAP cloud, the program and the include on premise
+   * only. `@mcp-abap-adt/adt-strategies`' `readObjectOutline` reads the
+   * answer into a tree.
+   *
+   * **The document as it came, always.** `IUtilResults` of interfaces-adt has
+   * no slot for this member, so no reading can be given for it, as for
+   * `getTypeStructure`. It joins the set when the contract package names it.
+   *
+   * @param options.version - Sent as `version`; SAP changes only the
+   *   answer's `xml:base` with it (measured)
+   * @param options.accept - The Accept to send; the one every kind answers
+   *   is `application/vnd.sap.adt.objectstructure.v2+xml`, the default
+   */
+  async getObjectOutline<E extends IAdtError = IAdtError>(
+    objectType: AdtOutlineCode,
+    objectName: string,
+    options?: {
+      version?: AdtReadVersion;
+      accept?: string;
+    } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
+    return answering(
+      () =>
+        getObjectOutlineUtil(this.connection, objectType, objectName, {
+          version: options?.version,
+          accept: options?.accept,
+        }),
+      rawDocument,
       options?.analyse,
     );
   }

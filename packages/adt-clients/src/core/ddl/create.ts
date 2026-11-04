@@ -10,7 +10,8 @@ import type {
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { DDL_SOURCE } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { createRequestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr, languageAttributes } from '../../utils/xml';
 import type { ICreateDdlParams } from './types';
 
 /**
@@ -22,7 +23,10 @@ async function createDDLSObject(
   args: ICreateDdlParams,
 ): Promise<IAdtWireResponse> {
   // Description is limited to 60 characters in SAP ADT
-  const description = limitDescription(args.description || args.ddl_name);
+  // Cut first, escaped after: an entity is never cut in two.
+  const description = escapeXmlAttr(
+    limitDescription(args.description || args.ddl_name),
+  );
   // Check if transport_request is provided and not empty
   // Handle both string and undefined/null cases safely
   const transportRequest = args.transport_request?.trim();
@@ -33,14 +37,14 @@ async function createDDLSObject(
   const responsible = args.responsible || '';
 
   const masterSystemAttr = masterSystem
-    ? ` adtcore:masterSystem="${masterSystem}"`
+    ? ` adtcore:masterSystem="${escapeXmlAttr(masterSystem)}"`
     : '';
   const responsibleAttr = responsible
-    ? ` adtcore:responsible="${responsible}"`
+    ? ` adtcore:responsible="${escapeXmlAttr(responsible)}"`
     : '';
 
-  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><ddl:ddlSource xmlns:ddl="http://www.sap.com/adt/ddic/ddlsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${args.masterLanguage || 'EN'}" adtcore:name="${args.ddl_name}" adtcore:type="${TYPE_CODE.ddl}" adtcore:masterLanguage="${args.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr}>
-  <adtcore:packageRef adtcore:name="${args.package_name}"/>
+  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><ddl:ddlSource xmlns:ddl="http://www.sap.com/adt/ddic/ddlsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}"${languageAttributes(args.masterLanguage)} adtcore:name="${escapeXmlAttr(args.ddl_name)}" adtcore:type="${TYPE_CODE.ddl}"${masterSystemAttr}${responsibleAttr}>
+  <adtcore:packageRef adtcore:name="${escapeXmlAttr(args.package_name)}"/>
 </ddl:ddlSource>`;
 
   return connection.makeAdtRequest({
@@ -48,7 +52,7 @@ async function createDDLSObject(
     method: 'POST',
     timeout: 0,
     data: metadataXml,
-    headers: requestHeaders(headers),
+    headers: createRequestHeaders(headers, args.masterLanguage),
   });
 }
 

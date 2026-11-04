@@ -179,11 +179,12 @@ export class AdtMessageClass<
           name,
           description: config.description as string,
           package_name: config.packageName,
-          // config → global systemContext → 'EN', like class/domain/package.
+          // config → global systemContext; none invented: without one SAP
+          // takes the logon language.
           master_language:
             config.masterLanguage?.trim() ||
             this.systemContext.masterLanguage?.trim() ||
-            'EN',
+            undefined,
           // The message class config has no such fields: the client's context.
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,

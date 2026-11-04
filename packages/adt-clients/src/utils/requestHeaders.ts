@@ -8,12 +8,39 @@
  */
 
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+import { givenLanguage } from './xml';
 
 export function requestHeaders(headers: IAdtHeaders): {
   Accept: string;
   'Content-Type': string;
 } {
   return { Accept: headers.accept, 'Content-Type': headers.contentType };
+}
+
+/**
+ * A create's headers: the caller's pair, and `sap-language` when the create
+ * was given a language — the same value its body writes as
+ * `adtcore:masterLanguage` (`languageAttributes`), one value, never two.
+ *
+ * SAP takes a new object's original language from the request's logon
+ * language and ignores the body's attribute. Measured on ABAP cloud,
+ * 2026-11-04: logon EN with a body in DE made an EN object, and
+ * `sap-language: DE` on the create's POST alone made a DE one, though the
+ * session was logged on in EN. Without a language no header is sent and
+ * nothing is invented. (An on-premise system whose ICF node fixes the logon
+ * language answers in that language whatever is sent.)
+ */
+export function createRequestHeaders(
+  headers: IAdtHeaders,
+  language: string | undefined,
+): {
+  Accept: string;
+  'Content-Type': string;
+  'sap-language'?: string;
+} {
+  const pair = requestHeaders(headers);
+  const given = givenLanguage(language);
+  return given === undefined ? pair : { ...pair, 'sap-language': given };
 }
 
 /**

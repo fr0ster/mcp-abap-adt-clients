@@ -161,11 +161,10 @@ export class AdtBehaviorDefinition<
       () =>
         validateBehaviorDefinition(connection, {
           objname: name,
-          rootEntity: config.rootEntity as string,
-          description: config.description as string,
+          rootEntity: config.rootEntity,
+          description: config.description,
           package: config.packageName ?? '',
-          implementationType:
-            config.implementationType as BehaviorDefinitionImplementationType,
+          implementationType: config.implementationType,
         }),
       this.results.validation,
       options?.analyse,

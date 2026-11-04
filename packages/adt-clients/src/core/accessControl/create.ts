@@ -6,8 +6,8 @@ import type {
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { ACCESS_CONTROL } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
-import { escapeXmlAttr } from '../../utils/xml';
+import { createRequestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr, languageAttributes } from '../../utils/xml';
 import type { ICreateAccessControlParams } from './types';
 
 /**
@@ -25,10 +25,13 @@ export async function create(
   const masterSystem = escapeXmlAttr(args.masterSystem || '');
 
   // Description is limited to 60 characters in SAP ADT
-  const description = limitDescription(
-    args.description || args.access_control_name,
+  // Cut first, escaped after: an entity is never cut in two.
+  const description = escapeXmlAttr(
+    limitDescription(args.description || args.access_control_name),
   );
-  const accessControlName = args.access_control_name.toUpperCase();
+  const accessControlName = escapeXmlAttr(
+    args.access_control_name.toUpperCase(),
+  );
 
   // Absent means absent: an empty attribute is not "no responsible person".
   const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
@@ -36,8 +39,8 @@ export async function create(
     ? ` adtcore:masterSystem="${masterSystem}"`
     : '';
 
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><dcl:dclSource xmlns:dcl="http://www.sap.com/adt/acm/dclsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${args.masterLanguage || 'EN'}" adtcore:name="${accessControlName}" adtcore:type="${TYPE_CODE.accessControl}" adtcore:masterLanguage="${args.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr}>
-  <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
+  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><dcl:dclSource xmlns:dcl="http://www.sap.com/adt/acm/dclsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}"${languageAttributes(args.masterLanguage)} adtcore:name="${accessControlName}" adtcore:type="${TYPE_CODE.accessControl}"${masterSystemAttr}${responsibleAttr}>
+  <adtcore:packageRef adtcore:name="${escapeXmlAttr(args.package_name.toUpperCase())}"/>
 </dcl:dclSource>`;
 
   return connection.makeAdtRequest({
@@ -45,6 +48,6 @@ export async function create(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers: requestHeaders(headers),
+    headers: createRequestHeaders(headers, args.masterLanguage),
   });
 }

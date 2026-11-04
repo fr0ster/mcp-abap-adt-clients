@@ -165,9 +165,17 @@ export class AdtFunctionModule<
     };
   }
 
-  /** Validate a function module name before creating it. */
+  /**
+   * Validate a function module name before creating it.
+   *
+   * The description is required: the endpoint answers 400 without one
+   * (measured), so a validation without it is no validation.
+   */
   async validate<E extends IAdtError = IAdtError>(
-    config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
+    config: AdtObjectIdentity<
+      IFunctionModuleConfig,
+      'functionGroupName' | 'description'
+    >,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.

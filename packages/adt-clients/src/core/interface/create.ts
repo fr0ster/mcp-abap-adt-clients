@@ -14,7 +14,8 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { INTERFACE } from '../../endpoints/objects';
 import { limitDescription, safeStringify } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { createRequestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr, languageAttributes } from '../../utils/xml';
 import type { ICreateInterfaceParams } from './types';
 
 /**
@@ -49,19 +50,22 @@ export async function create(
   const finalResponsible = params.responsible || '';
 
   // Description is limited to 60 characters in SAP ADT
-  const limitedDescription = limitDescription(params.description);
+  // Cut first, escaped after: an entity is never cut in two.
+  const limitedDescription = escapeXmlAttr(
+    limitDescription(params.description),
+  );
   const masterSystemAttr = finalMasterSystem
-    ? ` adtcore:masterSystem="${finalMasterSystem}"`
+    ? ` adtcore:masterSystem="${escapeXmlAttr(finalMasterSystem)}"`
     : '';
   const responsibleAttr = finalResponsible
-    ? ` adtcore:responsible="${finalResponsible}"`
+    ? ` adtcore:responsible="${escapeXmlAttr(finalResponsible)}"`
     : '';
 
-  const payload = `<?xml version="1.0" encoding="UTF-8"?><intf:abapInterface xmlns:intf="http://www.sap.com/adt/oo/interfaces" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:language="${params.masterLanguage || 'EN'}" adtcore:name="${params.interfaceName}" adtcore:type="${TYPE_CODE.interface}" adtcore:masterLanguage="${params.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr}>
+  const payload = `<?xml version="1.0" encoding="UTF-8"?><intf:abapInterface xmlns:intf="http://www.sap.com/adt/oo/interfaces" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}"${languageAttributes(params.masterLanguage)} adtcore:name="${escapeXmlAttr(params.interfaceName)}" adtcore:type="${TYPE_CODE.interface}"${masterSystemAttr}${responsibleAttr}>
 
 
 
-  <adtcore:packageRef adtcore:name="${params.packageName}"/>
+  <adtcore:packageRef adtcore:name="${escapeXmlAttr(params.packageName)}"/>
 
 
 
@@ -75,7 +79,7 @@ export async function create(
       method: 'POST',
       timeout: 0,
       data: payload,
-      headers: requestHeaders(headers),
+      headers: createRequestHeaders(headers, params.masterLanguage),
     });
 
     // No status test here: a non-2xx already arrives as the transport's

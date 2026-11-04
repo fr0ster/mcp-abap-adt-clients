@@ -11,7 +11,8 @@ import type {
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { STRUCTURE } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { createRequestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr, languageAttributes } from '../../utils/xml';
 import type { ICreateStructureParams } from './types';
 
 /**
@@ -29,16 +30,19 @@ export async function create(
   const responsible = params.responsible || '';
 
   // Description is limited to 60 characters in SAP ADT
-  const limitedDescription = limitDescription(params.description);
+  // Cut first, escaped after: an entity is never cut in two.
+  const limitedDescription = escapeXmlAttr(
+    limitDescription(params.description),
+  );
   const masterSystemAttr = masterSystem
-    ? ` adtcore:masterSystem="${masterSystem}"`
+    ? ` adtcore:masterSystem="${escapeXmlAttr(masterSystem)}"`
     : '';
   const responsibleAttr = responsible
-    ? ` adtcore:responsible="${responsible}"`
+    ? ` adtcore:responsible="${escapeXmlAttr(responsible)}"`
     : '';
 
-  const structureXml = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:language="${params.masterLanguage || 'EN'}" adtcore:name="${params.structureName.toUpperCase()}" adtcore:type="${TYPE_CODE.structure}" adtcore:masterLanguage="${params.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr}>
-  <adtcore:packageRef adtcore:name="${params.packageName.toUpperCase()}"/>
+  const structureXml = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}"${languageAttributes(params.masterLanguage)} adtcore:name="${escapeXmlAttr(params.structureName.toUpperCase())}" adtcore:type="${TYPE_CODE.structure}"${masterSystemAttr}${responsibleAttr}>
+  <adtcore:packageRef adtcore:name="${escapeXmlAttr(params.packageName.toUpperCase())}"/>
 </blue:blueSource>`;
 
   return connection.makeAdtRequest({
@@ -46,6 +50,6 @@ export async function create(
     method: 'POST',
     timeout: 0,
     data: structureXml,
-    headers: requestHeaders(headers),
+    headers: createRequestHeaders(headers, params.masterLanguage),
   });
 }

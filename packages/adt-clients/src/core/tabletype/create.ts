@@ -10,7 +10,8 @@ import type {
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { TABLE_TYPE } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { createRequestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr, languageAttributes } from '../../utils/xml';
 import type { ICreateTableTypeParams } from './types';
 
 /**
@@ -27,23 +28,24 @@ export async function createTableType(
   const responsible = params.responsible || '';
 
   // Description is limited to 60 characters in SAP ADT
-  const description = limitDescription(
-    params.description || params.tabletype_name,
+  // Cut first, escaped after: an entity is never cut in two.
+  const description = escapeXmlAttr(
+    limitDescription(params.description || params.tabletype_name),
   );
   const masterSystemAttr = masterSystem
-    ? ` adtcore:masterSystem="${masterSystem}"`
+    ? ` adtcore:masterSystem="${escapeXmlAttr(masterSystem)}"`
     : '';
   const responsibleAttr = responsible
-    ? ` adtcore:responsible="${responsible}"`
+    ? ` adtcore:responsible="${escapeXmlAttr(responsible)}"`
     : '';
 
   // Create empty table type with POST using XML format (ttyp:tableType)
   const createUrl = `${TABLE_TYPE.collection}${params.transport_request ? `?corrNr=${params.transport_request}` : ''}`;
 
   // Empty table type XML (rowType added via update)
-  const tableTypeXml = `<?xml version="1.0" encoding="UTF-8"?><ttyp:tableType xmlns:ttyp="http://www.sap.com/dictionary/tabletype" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${params.masterLanguage || 'EN'}" adtcore:name="${params.tabletype_name.toUpperCase()}" adtcore:type="${TYPE_CODE.tableType}" adtcore:masterLanguage="${params.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr}>
+  const tableTypeXml = `<?xml version="1.0" encoding="UTF-8"?><ttyp:tableType xmlns:ttyp="http://www.sap.com/dictionary/tabletype" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}"${languageAttributes(params.masterLanguage)} adtcore:name="${escapeXmlAttr(params.tabletype_name.toUpperCase())}" adtcore:type="${TYPE_CODE.tableType}"${masterSystemAttr}${responsibleAttr}>
 
-  <adtcore:packageRef adtcore:name="${params.package_name.toUpperCase()}"/>
+  <adtcore:packageRef adtcore:name="${escapeXmlAttr(params.package_name.toUpperCase())}"/>
 
 </ttyp:tableType>`;
 
@@ -55,6 +57,6 @@ export async function createTableType(
     method: 'POST',
     timeout: 0,
     data: tableTypeXml,
-    headers: requestHeaders(headers),
+    headers: createRequestHeaders(headers, params.masterLanguage),
   });
 }

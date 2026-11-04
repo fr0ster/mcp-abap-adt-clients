@@ -126,8 +126,10 @@ export async function removeObjectFromTransport(
  * **target**. That is how Eclipse ADT 3.60.3 sent it on premise (BASIS 816),
  * 2026-10-12: `POST <source>/moveobjects`, `text/plain`, one
  * `tm:abap_object` carrying the entry's `tm:position` in the source, and the
- * answer echoed the entry under the source's number. Each entry is identified
- * by its position, as for {@link removeObjectFromTransport}.
+ * answer echoed the entry under the source's number. Each entry carries its
+ * `tm:position` as Eclipse sends it, but SAP moves the entry by its name and
+ * does not check the position (measured on premise): a wrong position moves
+ * the named entry all the same.
  */
 export async function moveObjectsBetweenTransports(
   connection: IAbapConnection,

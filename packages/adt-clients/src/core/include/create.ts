@@ -19,8 +19,8 @@ import type {
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { PROGRAM_INCLUDE } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
-import { escapeXmlAttr } from '../../utils/xml';
+import { createRequestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr, languageAttributes } from '../../utils/xml';
 import type { ICreateIncludeParams } from './types';
 
 /** Measured on the includes collection; the programs one advertises a different type. */
@@ -40,7 +40,6 @@ export async function create(
   );
   const name = escapeXmlAttr(args.includeName);
   const pkg = escapeXmlAttr(args.packageName);
-  const lang = escapeXmlAttr(args.masterLanguage || 'EN');
   const masterSystemAttr = args.masterSystem
     ? ` adtcore:masterSystem="${escapeXmlAttr(args.masterSystem)}"`
     : '';
@@ -49,7 +48,7 @@ export async function create(
     : '';
   const url = `${PROGRAM_INCLUDE.collection}${args.transportRequest ? `?corrNr=${args.transportRequest}` : ''}`;
 
-  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><include:abapInclude xmlns:include="http://www.sap.com/adt/programs/includes" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${lang}" adtcore:name="${name}" adtcore:type="${TYPE_CODE.include}" adtcore:masterLanguage="${lang}"${masterSystemAttr}${responsibleAttr}>
+  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><include:abapInclude xmlns:include="http://www.sap.com/adt/programs/includes" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}"${languageAttributes(args.masterLanguage)} adtcore:name="${name}" adtcore:type="${TYPE_CODE.include}"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${pkg}"/>
 </include:abapInclude>`;
   return connection.makeAdtRequest({
@@ -57,6 +56,6 @@ export async function create(
     method: 'POST',
     timeout: 0,
     data: metadataXml,
-    headers: requestHeaders(headers),
+    headers: createRequestHeaders(headers, args.masterLanguage),
   });
 }

@@ -10,8 +10,8 @@ import type {
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { SCALAR_FUNCTION } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
-import { escapeXmlAttr } from '../../utils/xml';
+import { createRequestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr, languageAttributes } from '../../utils/xml';
 import type { ICreateScalarFunctionParams } from './types';
 
 export async function create(
@@ -30,7 +30,6 @@ export async function create(
     transport ? `?corrNr=${encodeURIComponent(transport)}` : ''
   }`;
 
-  const lang = args.masterLanguage || 'EN';
   const name = escapeXmlAttr(args.scalar_function_name.toUpperCase());
   const pkg = escapeXmlAttr(args.package_name.toUpperCase());
   const description = escapeXmlAttr(
@@ -43,7 +42,7 @@ export async function create(
     ? ` adtcore:responsible="${escapeXmlAttr(args.responsible)}"`
     : '';
 
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${lang}" adtcore:name="${name}" adtcore:type="${TYPE_CODE.scalarFunction}" adtcore:masterLanguage="${lang}"${masterSystemAttr}${responsibleAttr}>
+  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}"${languageAttributes(args.masterLanguage)} adtcore:name="${name}" adtcore:type="${TYPE_CODE.scalarFunction}"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${pkg}"/>
 </blue:blueSource>`;
 
@@ -52,6 +51,6 @@ export async function create(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers: requestHeaders(headers),
+    headers: createRequestHeaders(headers, args.masterLanguage),
   });
 }

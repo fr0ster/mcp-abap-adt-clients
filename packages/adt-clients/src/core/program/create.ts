@@ -10,7 +10,8 @@ import type {
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { PROGRAM } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { createRequestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr, languageAttributes } from '../../utils/xml';
 import type { ICreateProgramParams } from './types';
 
 /**
@@ -30,15 +31,24 @@ function convertProgramType(programType?: string): string {
     );
   }
 
+  // SAP's words, as its own program metadata states them (read on premise,
+  // 2026-11-04): `executableProgram`, `modulePool`, `subroutinePool`. A
+  // function group's, class pool's or interface pool's main program is no
+  // `programs/programs` resource there (its metadata read answers 404 or
+  // 500), so no word was read for those three; they keep the letters sent
+  // before. Measured on the same system: the create took none of these — a
+  // program created with `modulePool`, `subroutinePool`, `M` or `F` read back
+  // `executableProgram` (TRDIR-SUBC 1). Which type a create makes is SAP's.
   const typeMap: Record<string, string> = {
-    executable: '1',
-    module_pool: 'M',
+    executable: 'executableProgram',
+    module_pool: 'modulePool',
+    subroutine_pool: 'subroutinePool',
     function_group: 'F',
     class_pool: 'K',
     interface_pool: 'J',
   };
 
-  return typeMap[programType || 'executable'] || '1';
+  return typeMap[programType || 'executable'] || 'executableProgram';
 }
 
 /**
@@ -83,22 +93,26 @@ export async function create(
   args: ICreateProgramParams,
 ): Promise<IAdtWireResponse> {
   // Description is limited to 60 characters in SAP ADT
-  const description = limitDescription(args.description || args.programName);
+  // Cut first, escaped after: an entity is never cut in two.
+  const description = escapeXmlAttr(
+    limitDescription(args.description || args.programName),
+  );
   const programType = convertProgramType(args.programType);
   const application = args.application || '*';
   const url = `${PROGRAM.collection}${args.transportRequest ? `?corrNr=${args.transportRequest}` : ''}`;
 
   const masterSystem = args.masterSystem || '';
   const username = args.responsible || '';
-  const lang = args.masterLanguage || 'EN';
 
   const masterSystemAttr = masterSystem
-    ? ` adtcore:masterSystem="${masterSystem}"`
+    ? ` adtcore:masterSystem="${escapeXmlAttr(masterSystem)}"`
     : '';
-  const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
+  const responsibleAttr = username
+    ? ` adtcore:responsible="${escapeXmlAttr(username)}"`
+    : '';
 
-  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><program:abapProgram xmlns:program="http://www.sap.com/adt/programs/programs" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${lang}" adtcore:name="${args.programName}" adtcore:type="${TYPE_CODE.program}" adtcore:masterLanguage="${lang}"${masterSystemAttr}${responsibleAttr} program:programType="${programType}" program:application="${application}">
-  <adtcore:packageRef adtcore:name="${args.packageName}"/>
+  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><program:abapProgram xmlns:program="http://www.sap.com/adt/programs/programs" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}"${languageAttributes(args.masterLanguage)} adtcore:name="${escapeXmlAttr(args.programName)}" adtcore:type="${TYPE_CODE.program}"${masterSystemAttr}${responsibleAttr} program:programType="${escapeXmlAttr(programType)}" program:application="${escapeXmlAttr(application)}">
+  <adtcore:packageRef adtcore:name="${escapeXmlAttr(args.packageName)}"/>
 </program:abapProgram>`;
 
   return connection.makeAdtRequest({
@@ -106,6 +120,6 @@ export async function create(
     method: 'POST',
     timeout: 0,
     data: metadataXml,
-    headers: requestHeaders(headers),
+    headers: createRequestHeaders(headers, args.masterLanguage),
   });
 }

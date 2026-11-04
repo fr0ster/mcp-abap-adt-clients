@@ -418,7 +418,9 @@ export class AdtTable<
           options.headers,
           'abapCheckRun',
           name,
-          undefined,
+          // The given source, as the structure check sends it: a check of
+          // what the caller holds, not only of what is saved.
+          config.source,
           version,
         ),
       this.results.check,

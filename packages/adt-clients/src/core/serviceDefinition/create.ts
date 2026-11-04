@@ -11,8 +11,8 @@ import type {
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { SERVICE_DEFINITION } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
-import { escapeXmlAttr } from '../../utils/xml';
+import { createRequestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr, languageAttributes } from '../../utils/xml';
 import type { ICreateServiceDefinitionParams } from './types';
 
 /**
@@ -30,10 +30,13 @@ export async function create(
   const masterSystem = escapeXmlAttr(args.masterSystem || '');
 
   // Description is limited to 60 characters in SAP ADT
-  const description = limitDescription(
-    args.description || args.service_definition_name,
+  // Cut first, escaped after: an entity is never cut in two.
+  const description = escapeXmlAttr(
+    limitDescription(args.description || args.service_definition_name),
   );
-  const serviceDefinitionName = args.service_definition_name.toUpperCase();
+  const serviceDefinitionName = escapeXmlAttr(
+    args.service_definition_name.toUpperCase(),
+  );
 
   // Absent means absent: an empty attribute is not "no responsible person".
   const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
@@ -41,8 +44,8 @@ export async function create(
     ? ` adtcore:masterSystem="${masterSystem}"`
     : '';
 
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><srvd:srvdSource xmlns:srvd="http://www.sap.com/adt/ddic/srvdsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${args.masterLanguage || 'EN'}" adtcore:name="${serviceDefinitionName}" adtcore:type="${TYPE_CODE.serviceDefinition}" adtcore:masterLanguage="${args.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr} srvd:srvdSourceType="S">
-  <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
+  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><srvd:srvdSource xmlns:srvd="http://www.sap.com/adt/ddic/srvdsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}"${languageAttributes(args.masterLanguage)} adtcore:name="${serviceDefinitionName}" adtcore:type="${TYPE_CODE.serviceDefinition}"${masterSystemAttr}${responsibleAttr} srvd:srvdSourceType="S">
+  <adtcore:packageRef adtcore:name="${escapeXmlAttr(args.package_name.toUpperCase())}"/>
 </srvd:srvdSource>`;
 
   return connection.makeAdtRequest({
@@ -50,6 +53,6 @@ export async function create(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers: requestHeaders(headers),
+    headers: createRequestHeaders(headers, args.masterLanguage),
   });
 }
