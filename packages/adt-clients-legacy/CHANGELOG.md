@@ -4,6 +4,15 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [0.7.1] - 2026-11-05
+
+### Changed
+
+- **On `@mcp-abap-adt/interfaces-adt` `^26.0.0`** (was `^25.2.0`), which it
+  depends on directly, and on `@mcp-abap-adt/adt-clients` `^43.0.1`, so a
+  consumer installs one copy of interfaces-adt. The adt-strategies dev range
+  moves to `^0.19.0`. No member changes.
+
 ## [0.7.0] - 2026-11-04
 
 On `@mcp-abap-adt/adt-clients` `^43.0.0`. A breaking change of a 0.x package,

@@ -24,6 +24,20 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [43.0.1] - 2026-11-05
+
+### Changed
+
+- **On `@mcp-abap-adt/interfaces-adt` `^26.0.0`** (was `^25.2.0`), so a
+  consumer on interfaces-adt 26 installs one copy of it. With 43.0.0 such a
+  consumer got a nested 25.2 copy under this package, and TypeScript failed
+  on the duplicate types (TS2883, measured in the MCP server). interfaces-adt
+  26 removed `IClassConfig.abstract` and `IProgramConfig.programType`, which
+  43.0.0's creates already refused; `AdtClass.create` and
+  `AdtProgram.create` keep `abstract?: never` / `programType?: never`, so the
+  contract is unchanged. The adt-strategies dev range moves to `^0.19.0` with
+  it. The README's dependency table names the range.
+
 ## [43.0.0] - 2026-11-04
 
 Issue #297. [MIGRATION-43.md](docs/usage/MIGRATION-43.md) says what a consumer

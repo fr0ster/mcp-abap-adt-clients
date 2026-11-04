@@ -14,6 +14,15 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.19.1] - 2026-11-05
+
+### Changed
+
+- **On `@mcp-abap-adt/interfaces-adt` `^26.0.0`** (was `^25.2.0`), the range
+  adt-clients 43.0.1 declares, so a consumer installs one copy of it: two
+  copies are two types to TypeScript (TS2883 with 0.19.0 beside
+  interfaces-adt 26). No reading changes.
+
 ## [0.19.0] - 2026-11-04
 
 Released with `@mcp-abap-adt/adt-clients` 43.0.0, whose `getObjectOutline`
