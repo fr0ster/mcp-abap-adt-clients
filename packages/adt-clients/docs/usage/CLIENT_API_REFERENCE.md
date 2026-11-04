@@ -536,9 +536,9 @@ Contract notes:
 - The return type offers create/read/update/delete, validate, activate, lock and
   unlock — and nothing else. It is not versionable, checkable or
   transport-aware, because nothing measured says an include is.
-- `programType: 'include'` on `getProgram()` now **throws**. It used to map to
-  `'I'` and post a `program:abapProgram` document with `adtcore:type="PROG/P"`
-  to the programs collection — the wrong object, not a wrong parameter.
+- An include is created with `getInclude().create(…)`, never through
+  `getProgram()`: a program create takes no program type since 43.0.0 (SAP
+  ignores one on create, measured), so it cannot make an include.
 
 ### Feature Toggle — environment-specific behavior
 
