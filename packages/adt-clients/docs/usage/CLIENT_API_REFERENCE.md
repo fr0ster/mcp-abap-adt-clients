@@ -300,7 +300,11 @@ and ignores the body's attribute (measured on ABAP cloud, 2026-11-04: logon EN
 with a body in DE made an EN object; `sap-language: DE` on the create alone
 made a DE one). A create given no language writes neither attribute and sends
 no header, and SAP uses the logon language; no `EN` is invented. The language
-comes from the config, else from the client's system context.
+comes from the config, else from the client's system context; a blank value
+counts as none.
+
+A class create takes no `abstract` and a program create no program type: SAP
+ignores both on create (measured on premise, 2026-11-04). Set them afterwards.
 
 ### A behaviour pool's implementations
 

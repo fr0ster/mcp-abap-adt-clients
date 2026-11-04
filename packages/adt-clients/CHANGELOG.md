@@ -24,9 +24,10 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-11-04
+## [43.0.0] - 2026-11-04
 
-Issue #297. The version is the owner's to set.
+Issue #297. [MIGRATION-43.md](docs/usage/MIGRATION-43.md) says what a consumer
+on 42.x does.
 
 ### Breaking
 
@@ -52,15 +53,22 @@ Issue #297. The version is the owner's to set.
   answers `400` without one (measured), so the config type now requires it and
   the request always carries it. **Migration:** pass the description you will
   create the module with.
-- **`program:programType` carries SAP's words**, as SAP's own program metadata
-  states them (read on premise): `executable` → `executableProgram`,
-  `module_pool` → `modulePool`, and `subroutine_pool` → `subroutinePool`
-  (new). A function group's, class pool's or interface pool's main program is
-  no `programs/programs` resource (its read answers `404`/`500`), so no word
-  was read for those three; they keep the letters. Measured on the same
-  system: the create took none of these — a program created with
-  `modulePool`, `subroutinePool`, `M` or `F` read back `executableProgram`;
-  which type a create makes is SAP's.
+- **Class create no longer takes `abstract`, and program create no longer
+  takes a program type; SAP ignores both on create (measured). Set them
+  afterwards.** Measured on premise (2026-11-04): a class create carrying
+  `class:abstract="true"` answered `200` and left the class not abstract
+  (SEOCLASSDF-CLSABSTRCT blank) while `class:final` in the same body was
+  taken; programs created with `modulePool`, `subroutinePool`, `M` or `F` all
+  read back `executableProgram`, and a program create with no
+  `program:programType` answered `200` and read back the same. `AdtClass.create`
+  takes `abstract?: never`, `AdtProgram.create` takes `programType?: never`,
+  and the program body carries no `program:programType` (the letter mapping is
+  gone).
+- **A language given as blank is no language**, in the config and in the
+  system context alike: every create resolves its language one way — the
+  config's, else the context's, else none (`createLanguage`). A blank config
+  falls through to the context; the metadata extension's create now takes the
+  context's language too (it read the config only).
 
 ### Added
 
@@ -77,10 +85,6 @@ Issue #297. The version is the owner's to set.
   `…/oo/classes/<pool>/includes/implementations`, answered through the
   `source` slot. A standard pool's CCIMP is in the corpus
   (`answers/read-behavior-pool-implementations`).
-- `class:abstract` on a class create, from `IClassConfig.abstract` — written
-  only when given. Measured on premise: SAP answered `200` and left the class
-  not abstract (the source's `ABSTRACT` decides there), while `class:final`
-  in the same body was taken.
 
 ### Fixed
 
@@ -101,7 +105,9 @@ Issue #297. The version is the owner's to set.
 - **Profiler `getTraceStatements` sends `autoDrillDownThreshold` as given**:
   `0.1` went out as `0`.
 - **The ABAP Unit run id is percent-encoded** in the run status and result
-  URLs: an id with `/`, `?`, `#` or `%` addressed another resource.
+  URLs: an id with `/`, `?`, `#` or `%` addressed another resource. A run id
+  of exactly `.` or `..` — a path step encoding cannot keep in its segment —
+  is refused before anything is sent, in fixed words.
 - **Validation sends no parameter it was not given**: the domain, data
   element, authorization field and behaviour definition validations sent
   `description=undefined` (and `rootEntity` / `implementationType` alike).

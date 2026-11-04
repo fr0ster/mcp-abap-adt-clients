@@ -14,9 +14,10 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
-## [Unreleased] - 2026-11-04
+## [0.19.0] - 2026-11-04
 
-The version is the owner's to set.
+Released with `@mcp-abap-adt/adt-clients` 43.0.0, whose `getObjectOutline`
+this reads.
 
 ### Added
 

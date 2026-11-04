@@ -4,10 +4,11 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
-## [Unreleased] - 2026-11-04
+## [0.7.0] - 2026-11-04
 
-The version is the owner's to set; it follows the adt-clients release of the
-same changes.
+On `@mcp-abap-adt/adt-clients` `^43.0.0`. A breaking change of a 0.x package,
+so a minor: the creates it inherits take no `abstract` / `programType` and
+invent no language (adt-clients' MIGRATION-43.md).
 
 ### Changed
 

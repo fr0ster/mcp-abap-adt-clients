@@ -16,6 +16,13 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 > **From 18.x?** Read [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md)
 > first: 19.0.0 is where members became one endpoint call each.
 >
+> **From 42.x?** 43.0.0: a create invents no language — it writes and sends
+> (`sap-language`) the one given, from the config else the system context,
+> and nothing without one; `AdtFunctionModule.validate` requires a
+> description; class create takes no `abstract` and program create no program
+> type (SAP ignores both on create). See
+> [`docs/usage/MIGRATION-43.md`](docs/usage/MIGRATION-43.md).
+>
 > **From 41.x?** 42.0.0 requires `packageName` in the config type of every
 > `create` whose request needs a package (`AdtClass`, `AdtProgram`,
 > `AdtDomain`, … — the list is in the migration note) and of
@@ -1634,6 +1641,7 @@ See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-a
 One document per breaking release, each written for a consumer on the contract
 before it:
 
+- **[42.x → 43.0.0](docs/usage/MIGRATION-43.md)** — a create invents no language: given one, it writes `adtcore:language` / `adtcore:masterLanguage` and sends `sap-language`, one value, from the config else the system context; given none, neither (no `EN` default); `AdtFunctionModule.validate` requires `description`; class create takes no `abstract` and program create no program type (SAP ignores both on create); a run id of `.` or `..` is refused before anything is sent.
 - **[41.x → 42.0.0](docs/usage/MIGRATION-42.md)** — `create` of every handler whose request needs a package, and `validate` of `AdtProgram` / `AdtInclude`, take `packageName: string`, required, in the config type (SAP creates nothing without a package; program validation refuses an empty one); any other `validate` without a package sends `packagename` empty, never `undefined`; a call that passes a package sends the same request.
 - **[40.x → 41.0.0](docs/usage/MIGRATION-41.md)** — every handler class is generic over the values its result slots answer (`AdtClass<ResultValuesOf<typeof classDocuments>>`), not over the strategies (`AdtClass<typeof classDocuments>`); code that names a class's type parameter wraps it in `ResultValuesOf<…>`, and `getX()` / `getX(results)` calls and every request are unchanged.
 - **[39.x → 40.0.0](docs/usage/MIGRATION-40.md)** — every read (source, metadata, `readObjectSource`, `getObjectSourceUri`, the feature toggle's source, the application log) takes `AdtReadVersion` of interfaces-adt 25 and sends exactly the version it is given, and none without one; the reads that dropped, rewrote or defaulted it on 39.x send a changed request (MIGRATION-40 lists them).
