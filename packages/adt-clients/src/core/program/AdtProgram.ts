@@ -201,7 +201,7 @@ export class AdtProgram<
 
   /** Create the program. */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IProgramConfig, 'source' | 'programType'> & {
+    config: Omit<IProgramConfig, 'source'> & {
       source?: never;
       /** Not taken: SAP ignores a program type on create (measured). */
       programType?: never;
