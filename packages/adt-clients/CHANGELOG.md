@@ -24,6 +24,94 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-11-04
+
+Issue #297. The version is the owner's to set.
+
+### Breaking
+
+- **A create states its language once, and invents none**
+  (fr0ster/mcp-abap-adt#348). SAP takes a new object's original language from
+  the request's logon language and ignores `adtcore:masterLanguage` in the
+  body: measured on ABAP cloud (2026-11-04), logon EN with a body in DE made an
+  EN object, and `sap-language: DE` on the create's POST alone made a DE one.
+  Every create that writes a language — class, interface, program, include,
+  function group, domain, data element, DDL, structure, table, table type,
+  behaviour definition, metadata extension, service definition, service
+  binding, access control, transformation, package, message class,
+  enhancement, append structure, scalar function and its implementation —
+  now writes `adtcore:language` and `adtcore:masterLanguage` and sends
+  `sap-language`, all the one language given (config, else the client's
+  system context). With none given it writes neither attribute and sends no
+  header: the `EN` default is gone, and SAP uses the logon language (measured
+  on ABAP cloud: a class create with neither attribute answered `200`, and
+  the class read back in the logon language). **Migration:** a caller that
+  relied on `EN` without saying so passes `masterLanguage: 'EN'` (or sets it
+  in the client's system context).
+- **`AdtFunctionModule.validate` requires `description`.** The endpoint
+  answers `400` without one (measured), so the config type now requires it and
+  the request always carries it. **Migration:** pass the description you will
+  create the module with.
+- **`program:programType` carries SAP's words**, as SAP's own program metadata
+  states them (read on premise): `executable` → `executableProgram`,
+  `module_pool` → `modulePool`, and `subroutine_pool` → `subroutinePool`
+  (new). A function group's, class pool's or interface pool's main program is
+  no `programs/programs` resource (its read answers `404`/`500`), so no word
+  was read for those three; they keep the letters. Measured on the same
+  system: the create took none of these — a program created with
+  `modulePool`, `subroutinePool`, `M` or `F` read back `executableProgram`;
+  which type a create makes is SAP's.
+
+### Added
+
+- `AdtUtils.getObjectOutline(objectType, objectName, options?)`: an object's
+  outline, one GET of `<object uri>/objectstructure` with `Accept:
+  application/vnd.sap.adt.objectstructure.v2+xml`, for the kinds SAP serves
+  one (`AdtOutlineCode`: `CLAS/OC`, `INTF/OI`, `PROG/P`, `PROG/I`, `FUGR/F`;
+  measured on premise and on ABAP cloud). It answers the document as it came
+  (no `IUtilResults` slot yet); adt-strategies' `readObjectOutline` reads it.
+  The outlines recorded on premise are in the corpus
+  (`answers/read-outline-*`).
+- `AdtBehaviorImplementation.readImplementations(config, version?, options?)`:
+  the pool's implementations include (CCIMP), one GET of
+  `…/oo/classes/<pool>/includes/implementations`, answered through the
+  `source` slot. A standard pool's CCIMP is in the corpus
+  (`answers/read-behavior-pool-implementations`).
+- `class:abstract` on a class create, from `IClassConfig.abstract` — written
+  only when given. Measured on premise: SAP answered `200` and left the class
+  not abstract (the source's `ABSTRACT` decides there), while `class:final`
+  in the same body was taken.
+
+### Fixed
+
+- **Every create escapes every value it writes into an attribute**: the
+  description (cut to 60 characters first, then escaped, so an entity is never
+  cut in two), the object's name, its package, what it refers to (superclass,
+  function group, service definition), the responsible person and the master
+  system — class, interface, program, function group, function module, domain,
+  data element, DDL, structure, table, table type, behaviour definition,
+  metadata extension, service definition, service binding, access control,
+  transformation and transport request. A description such as `R&D` or one
+  with `<` or a quote made a body SAP could not parse. `escapeXmlAttr` no
+  longer uses regular expressions.
+- **`CreateTransport` `customizing` is a Customizing Request, `tm:type="W"`.**
+  It was `T`, a Transport of Copies, which SAP refuses without a real target
+  (SCTS_ADT_MSG 009 with target `LOCAL`, measured); `W` with `LOCAL` or an
+  empty target answered `201`. `workbench` stays `K`.
+- **Profiler `getTraceStatements` sends `autoDrillDownThreshold` as given**:
+  `0.1` went out as `0`.
+- **The ABAP Unit run id is percent-encoded** in the run status and result
+  URLs: an id with `/`, `?`, `#` or `%` addressed another resource.
+- **Validation sends no parameter it was not given**: the domain, data
+  element, authorization field and behaviour definition validations sent
+  `description=undefined` (and `rootEntity` / `implementationType` alike).
+- **`AdtTable.check` sends the given source**, as the structure check does; it
+  checked only what was saved.
+- Doc comments: `moveObjects` — SAP moves an entry by its name and does not
+  check its `position` (measured on premise); `getActivationRun` — a running
+  run reads `runs:status="running"`, its progress in `progressMessage` and
+  `progressPercentage`.
+
 ## [42.2.1] - 2026-11-03
 
 ### Fixed

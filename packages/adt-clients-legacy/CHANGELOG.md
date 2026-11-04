@@ -4,6 +4,20 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [Unreleased] - 2026-11-04
+
+The version is the owner's to set; it follows the adt-clients release of the
+same changes.
+
+### Changed
+
+- The creates the legacy client inherits carry adt-clients' fixes: escaped
+  attribute values, and the language written and sent as `sap-language` only
+  when one is given (no `EN` default).
+- `getUtils().getObjectOutline` is inherited and sent as on the modern client
+  (not measured on 7.40); `getBehaviorImplementation().readImplementations`
+  is refused without a request, like every member of that absent type.
+
 ## [0.6.2] - 2026-11-03
 
 ### Changed
