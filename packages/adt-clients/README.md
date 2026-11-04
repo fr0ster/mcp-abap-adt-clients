@@ -1420,7 +1420,7 @@ everything else is not.
 
 ### Single Definition Site: the contract packages
 
-Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^23.1.1`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^3.0.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the result-set contracts a factory accepts (`IClassResults`, …, since 38.0.0), the option and response types and the cross-cutting shared types all live there.
+Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^26.0.0`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^3.0.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the result-set contracts a factory accepts (`IClassResults`, …, since 38.0.0), the option and response types and the cross-cutting shared types all live there.
 
 **Import them from the package that owns them:**
 

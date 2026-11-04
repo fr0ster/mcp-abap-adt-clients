@@ -12,7 +12,7 @@ The repository of three packages, each with its README and CHANGELOG in its dire
   `^38.0.0`; `adt-clients` holds no legacy code, and the consumer declares the system type by
   constructing `AdtClientLegacy` from it.
 
-All three are typed by the ADT type tables of `@mcp-abap-adt/interfaces-adt` (`^23.0.4`), one per
+All three are typed by the ADT type tables of `@mcp-abap-adt/interfaces-adt` (`^26.0.0`), one per
 release variant: on premise, ABAP cloud and SAP_BASIS 7.40.
 
 This root is private and holds only the tools that build, check and publish the packages.
