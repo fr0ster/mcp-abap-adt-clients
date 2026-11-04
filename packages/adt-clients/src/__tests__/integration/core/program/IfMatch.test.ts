@@ -149,7 +149,6 @@ describe('If-Match: a program source (AdtProgram.update)', () => {
               packageName: place.packageName,
               transportRequest: place.transportRequest,
               description: 'If-Match probe',
-              programType: 'executable',
             },
             {
               analyse: analyseException,

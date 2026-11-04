@@ -51,6 +51,7 @@ import {
   type ResultStrategiesOf,
   type ResultValuesOf,
 } from '../../utils/resultStrategy';
+import { createLanguage } from '../../utils/xml';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
@@ -229,8 +230,10 @@ export class AdtFunctionGroup<
             masterSystem:
               config.masterSystem ?? this.systemContext.masterSystem,
             responsible: config.responsible ?? this.systemContext.responsible,
-            masterLanguage:
-              config.masterLanguage ?? this.systemContext.masterLanguage,
+            masterLanguage: createLanguage(
+              config.masterLanguage,
+              this.systemContext.masterLanguage,
+            ),
           },
           this.logger,
         ),

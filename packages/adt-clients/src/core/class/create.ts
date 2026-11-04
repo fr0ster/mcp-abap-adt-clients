@@ -42,17 +42,6 @@ export async function create(
   const masterSystem = args.master_system || '';
 
   const finalAttr = args.final ? 'true' : 'false';
-  // `class:abstract` is the attribute SAP's own class metadata carries
-  // (corpus: `class:abstract="false"`; a standard abstract class reads
-  // `class:abstract="true"`). Written only when the caller says. Measured on
-  // premise (2026-11-04): a create carrying `class:abstract="true"` answered
-  // 200 and left the class not abstract (SEOCLASSDF-CLSABSTRCT blank), while
-  // `class:final="true"` in the same body was taken — the system decides; the
-  // source's ABSTRACT is what makes a class abstract there.
-  const abstractAttr =
-    args.abstract === undefined
-      ? ''
-      : ` class:abstract="${args.abstract ? 'true' : 'false'}"`;
   const visibilityAttr = args.create_protected ? 'protected' : 'public';
 
   const superClassXml = args.superclass
@@ -74,7 +63,7 @@ export async function create(
     ? `\n\n  ${args.template_xml}\n\n`
     : '\n\n';
 
-  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><class:abapClass xmlns:class="http://www.sap.com/adt/oo/classes" xmlns:adtcore="http://www.sap.com/adt/core"${abapSourceNamespace} adtcore:description="${description}"${languageAttributes(args.masterLanguage)} adtcore:name="${name}" adtcore:type="${TYPE_CODE.class}"${masterSystemAttr} class:final="${finalAttr}"${abstractAttr} class:visibility="${visibilityAttr}">
+  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><class:abapClass xmlns:class="http://www.sap.com/adt/oo/classes" xmlns:adtcore="http://www.sap.com/adt/core"${abapSourceNamespace} adtcore:description="${description}"${languageAttributes(args.masterLanguage)} adtcore:name="${name}" adtcore:type="${TYPE_CODE.class}"${masterSystemAttr} class:final="${finalAttr}" class:visibility="${visibilityAttr}">
 
 
 

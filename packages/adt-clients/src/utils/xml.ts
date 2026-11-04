@@ -45,6 +45,18 @@ export function givenLanguage(
 }
 
 /**
+ * The language a create states: the config's when it gives one, else the
+ * client's system context's, else none — one rule for every create. A blank
+ * value is no value, so a blank config falls through to the context.
+ */
+export function createLanguage(
+  configured: string | undefined,
+  context: string | undefined,
+): string | undefined {
+  return givenLanguage(configured) ?? givenLanguage(context);
+}
+
+/**
  * A create body's language attributes: `adtcore:language` and
  * `adtcore:masterLanguage`, both the given language, with a leading space —
  * or nothing when no language was given.

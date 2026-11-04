@@ -56,6 +56,7 @@ import {
   type ResultStrategiesOf,
   type ResultValuesOf,
 } from '../../utils/resultStrategy';
+import { createLanguage } from '../../utils/xml';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { writeObjectDocument } from '../shared/documentWrite';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
@@ -200,8 +201,10 @@ export class AdtProgram<
 
   /** Create the program. */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IProgramConfig, 'source'> & {
+    config: Omit<IProgramConfig, 'source' | 'programType'> & {
       source?: never;
+      /** Not taken: SAP ignores a program type on create (measured). */
+      programType?: never;
       packageName: string;
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
@@ -231,7 +234,6 @@ export class AdtProgram<
           packageName: config.packageName,
           transportRequest: config.transportRequest,
           description: config.description,
-          programType: config.programType,
           application: config.application,
           // No `sourceCode` here. `create` is the POST that makes the
           // program, and it sends metadata only — the source is a PUT to
@@ -244,8 +246,10 @@ export class AdtProgram<
           // create contract so the compiler says this instead of a comment.
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,
-          masterLanguage:
-            config.masterLanguage ?? this.systemContext.masterLanguage,
+          masterLanguage: createLanguage(
+            config.masterLanguage,
+            this.systemContext.masterLanguage,
+          ),
         }),
       this.results.created,
       options?.analyse,

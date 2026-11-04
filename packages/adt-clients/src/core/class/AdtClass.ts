@@ -55,6 +55,7 @@ import type {
   ResultStrategiesOf,
   ResultValuesOf,
 } from '../../utils/resultStrategy';
+import { createLanguage } from '../../utils/xml';
 import { writeObjectDocument } from '../shared/documentWrite';
 import type { IReadOptions } from '../shared/types';
 import { AdtClassMemberBase, type ClassValues } from './AdtClassMemberBase';
@@ -163,8 +164,14 @@ export class AdtClass<
    * Create class with full operation chain
    */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IClassConfig, 'source'> & {
+    config: Omit<IClassConfig, 'source' | 'abstract'> & {
       source?: never;
+      /**
+       * Not taken: SAP ignores `class:abstract` on create (measured on
+       * premise — the class stayed not abstract). The source's `ABSTRACT`
+       * makes a class abstract, set afterwards.
+       */
+      abstract?: never;
       packageName: string;
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
@@ -208,14 +215,15 @@ export class AdtClass<
             description: config.description,
             superclass: config.superclass,
             final: config.final,
-            abstract: config.abstract,
             create_protected: config.createProtected,
             master_system:
               config.masterSystem ?? this.systemContext.masterSystem,
             // config.responsible is not sent: see create.ts — SAP would record
             // it as the creator, not as the responsible person.
-            masterLanguage:
-              config.masterLanguage ?? this.systemContext.masterLanguage,
+            masterLanguage: createLanguage(
+              config.masterLanguage,
+              this.systemContext.masterLanguage,
+            ),
             template_xml: config.classTemplate,
           },
           this.logger,

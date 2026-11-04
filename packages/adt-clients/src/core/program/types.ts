@@ -105,7 +105,6 @@ export interface ICreateProgramParams {
   masterSystem?: string;
   responsible?: string;
   masterLanguage?: string;
-  programType?: string;
   application?: string;
 }
 

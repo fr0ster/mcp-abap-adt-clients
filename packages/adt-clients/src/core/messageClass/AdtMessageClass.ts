@@ -40,6 +40,7 @@ import {
   type ResultStrategiesOf,
   type ResultValuesOf,
 } from '../../utils/resultStrategy';
+import { createLanguage } from '../../utils/xml';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
@@ -181,10 +182,10 @@ export class AdtMessageClass<
           package_name: config.packageName,
           // config → global systemContext; none invented: without one SAP
           // takes the logon language.
-          master_language:
-            config.masterLanguage?.trim() ||
-            this.systemContext.masterLanguage?.trim() ||
-            undefined,
+          master_language: createLanguage(
+            config.masterLanguage,
+            this.systemContext.masterLanguage,
+          ),
           // The message class config has no such fields: the client's context.
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,

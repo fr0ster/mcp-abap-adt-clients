@@ -52,7 +52,11 @@ import {
   type ResultStrategiesOf,
   type ResultValuesOf,
 } from '../../utils/resultStrategy';
-import { escapeXmlAttr, languageAttributes } from '../../utils/xml';
+import {
+  createLanguage,
+  escapeXmlAttr,
+  languageAttributes,
+} from '../../utils/xml';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { writeObjectDocument } from '../shared/documentWrite';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
@@ -828,8 +832,10 @@ export class AdtServiceBinding<
       ...params,
       // No language invented: without one, neither the body nor the header
       // states one, and SAP takes the logon language.
-      masterLanguage:
-        params.masterLanguage ?? this.systemContext.masterLanguage,
+      masterLanguage: createLanguage(
+        params.masterLanguage,
+        this.systemContext.masterLanguage,
+      ),
       masterSystem: params.masterSystem ?? this.systemContext.masterSystem,
       responsible: params.responsible ?? this.systemContext.responsible,
     };

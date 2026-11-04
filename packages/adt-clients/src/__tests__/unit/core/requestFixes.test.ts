@@ -11,7 +11,6 @@ import { authorizationFieldDocuments } from '../../../core/authorizationField/ty
 import { AdtBehaviorDefinition } from '../../../core/behaviorDefinition/AdtBehaviorDefinition';
 import { behaviorDefinitionDocuments } from '../../../core/behaviorDefinition/types';
 import { AdtBehaviorImplementation } from '../../../core/behaviorImplementation/AdtBehaviorImplementation';
-import { AdtClass } from '../../../core/class/AdtClass';
 import { classDocuments } from '../../../core/class/types';
 import { AdtDataElement } from '../../../core/dataElement/AdtDataElement';
 import { dataElementDocuments } from '../../../core/dataElement/types';
@@ -19,7 +18,8 @@ import { AdtDomain } from '../../../core/domain/AdtDomain';
 import { domainDocuments } from '../../../core/domain/types';
 import { AdtFunctionModule } from '../../../core/functionModule/AdtFunctionModule';
 import { functionModuleDocuments } from '../../../core/functionModule/types';
-import { create as createProgram } from '../../../core/program/create';
+import { AdtProgram } from '../../../core/program/AdtProgram';
+import { programDocuments } from '../../../core/program/types';
 import {
   getUnitTestRunResult,
   getUnitTestRunStatus,
@@ -113,6 +113,26 @@ describe('ABAP Unit: the run id is one path segment', () => {
   });
 });
 
+describe('ABAP Unit: a run id that is a path step is refused', () => {
+  it.each(['.', '..'])('%s: no status request', async (runId) => {
+    const connection = new RecordingConnection();
+    await expect(
+      getUnitTestRunStatus(connection, runId, false),
+    ).rejects.toThrow(
+      `An ABAP Unit run id of "${runId}" is a path step, not a run: nothing was sent.`,
+    );
+    expect(connection.sent).toHaveLength(0);
+  });
+
+  it.each(['.', '..'])('%s: no result request', async (runId) => {
+    const connection = new RecordingConnection();
+    await expect(getUnitTestRunResult(connection, runId)).rejects.toThrow(
+      `An ABAP Unit run id of "${runId}" is a path step, not a run: nothing was sent.`,
+    );
+    expect(connection.sent).toHaveLength(0);
+  });
+});
+
 describe('Validation sends no parameter it was not given', () => {
   const noUndefined = (request: IAbapRequestOptions): void => {
     const query = new URL(request.url, 'http://host').searchParams;
@@ -163,6 +183,20 @@ describe('Validation sends no parameter it was not given', () => {
     noUndefined(only(connection));
   });
 
+  it('function module: an explicitly empty description goes out as given', async () => {
+    const connection = new RecordingConnection();
+    await new AdtFunctionModule(connection, {
+      results: functionModuleDocuments,
+    }).validate({
+      functionGroupName: 'ZFG',
+      functionModuleName: 'Z_FM',
+      description: '',
+    });
+    const query = new URL(only(connection).url, 'http://host').searchParams;
+    expect(query.has('description')).toBe(true);
+    expect(query.get('description')).toBe('');
+  });
+
   it('function module: the description SAP requires goes out', async () => {
     // Measured: the function-module validation answers 400 without a
     // description, so the member's config requires one.
@@ -198,50 +232,16 @@ describe('Table check sends the given source', () => {
   });
 });
 
-describe('Class create: abstract', () => {
-  it.each([
-    [true, 'true'],
-    [false, 'false'],
-  ])('abstract %s is class:abstract="%s"', async (abstract, written) => {
+describe('Program create writes no program type', () => {
+  it('sends no program:programType', async () => {
+    // SAP ignores it on create; a create without it answered 200 and read
+    // back `executableProgram` (measured on premise).
     const connection = new RecordingConnection();
-    await new AdtClass(connection, { results: classDocuments }).create(
-      { className: 'ZCL_X', packageName: 'ZPKG', description: 'd', abstract },
+    await new AdtProgram(connection, { results: programDocuments }).create(
+      { programName: 'ZPROG', packageName: 'ZPKG', description: 'd' },
       { headers: TEST_HEADERS },
     );
-    expect(attribute(bodyOf(only(connection)), 'class:abstract')).toBe(written);
-  });
-
-  it('none given: no class:abstract', async () => {
-    const connection = new RecordingConnection();
-    await new AdtClass(connection, { results: classDocuments }).create(
-      { className: 'ZCL_X', packageName: 'ZPKG', description: 'd' },
-      { headers: TEST_HEADERS },
-    );
-    expect(
-      attribute(bodyOf(only(connection)), 'class:abstract'),
-    ).toBeUndefined();
-  });
-});
-
-describe('Program create: SAP’s program-type words', () => {
-  // Read from SAP's own program metadata on premise: an executable program
-  // reads `executableProgram`, a module pool `modulePool`, a subroutine pool
-  // `subroutinePool`.
-  it.each([
-    [undefined, 'executableProgram'],
-    ['executable', 'executableProgram'],
-    ['module_pool', 'modulePool'],
-    ['subroutine_pool', 'subroutinePool'],
-  ])('%s is program:programType="%s"', async (programType, word) => {
-    const connection = new RecordingConnection();
-    await createProgram(connection, TEST_HEADERS, {
-      programName: 'ZPROG',
-      packageName: 'ZPKG',
-      programType,
-    });
-    expect(attribute(bodyOf(only(connection)), 'program:programType')).toBe(
-      word,
-    );
+    expect(bodyOf(only(connection))).not.toContain('programType');
   });
 });
 
