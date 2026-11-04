@@ -164,7 +164,7 @@ export class AdtClass<
    * Create class with full operation chain
    */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IClassConfig, 'source' | 'abstract'> & {
+    config: Omit<IClassConfig, 'source'> & {
       source?: never;
       /**
        * Not taken: SAP ignores `class:abstract` on create (measured on
