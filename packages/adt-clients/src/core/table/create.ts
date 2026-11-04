@@ -10,7 +10,8 @@ import type {
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { TABLE } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { createRequestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr, languageAttributes } from '../../utils/xml';
 import type { ICreateTableParams } from './types';
 
 /**
@@ -27,20 +28,21 @@ export async function createTable(
   const responsible = params.responsible || '';
 
   // Description is limited to 60 characters in SAP ADT
-  const description = limitDescription(params.table_name);
+  // Cut first, escaped after: an entity is never cut in two.
+  const description = escapeXmlAttr(limitDescription(params.table_name));
   const masterSystemAttr = masterSystem
-    ? ` adtcore:masterSystem="${masterSystem}"`
+    ? ` adtcore:masterSystem="${escapeXmlAttr(masterSystem)}"`
     : '';
   const responsibleAttr = responsible
-    ? ` adtcore:responsible="${responsible}"`
+    ? ` adtcore:responsible="${escapeXmlAttr(responsible)}"`
     : '';
 
   // Create empty table with POST
   const createUrl = `${TABLE.collection}${params.transport_request ? `?corrNr=${params.transport_request}` : ''}`;
 
-  const tableXml = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${params.masterLanguage || 'EN'}" adtcore:name="${params.table_name.toUpperCase()}" adtcore:type="${TYPE_CODE.table}" adtcore:masterLanguage="${params.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr}>
+  const tableXml = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}"${languageAttributes(params.masterLanguage)} adtcore:name="${escapeXmlAttr(params.table_name.toUpperCase())}" adtcore:type="${TYPE_CODE.table}"${masterSystemAttr}${responsibleAttr}>
 
-  <adtcore:packageRef adtcore:name="${params.package_name.toUpperCase()}"/>
+  <adtcore:packageRef adtcore:name="${escapeXmlAttr(params.package_name.toUpperCase())}"/>
 
 </blue:blueSource>`;
 
@@ -52,6 +54,6 @@ export async function createTable(
     method: 'POST',
     timeout: 0,
     data: tableXml,
-    headers: requestHeaders(headers),
+    headers: createRequestHeaders(headers, params.masterLanguage),
   });
 }

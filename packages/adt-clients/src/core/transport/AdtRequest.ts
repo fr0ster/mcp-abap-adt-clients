@@ -471,8 +471,9 @@ export class AdtRequest<
    * ADT's `moveobjects`.
    *
    * Addressed at the **source** task, with the **target** named in the
-   * document; each entry is identified by its `position` in the source, read
-   * from {@link readObjects}, as for {@link removeObject}. Captured from
+   * document; each entry carries its `position` in the source, read from
+   * {@link readObjects}, as Eclipse sends it — but SAP moves the entry by its
+   * name and does not check the position (measured on premise). Captured from
    * Eclipse ADT 3.60.3 on premise (BASIS 816), 2026-10-12.
    *
    * The answer echoes the entries under the source's number, so a `200` is

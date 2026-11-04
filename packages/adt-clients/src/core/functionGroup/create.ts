@@ -12,7 +12,8 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { FUNCTION_GROUP } from '../../endpoints/objects';
 import { limitDescription, safeStringify } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { createRequestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr, languageAttributes } from '../../utils/xml';
 import type { ICreateFunctionGroupParams } from './types';
 
 const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
@@ -41,10 +42,10 @@ export async function create(
   // Don't escape masterSystem and responsible - they are identifiers (like "SID", "DEVELOPER")
   // Escaping them may cause SAP to fail parsing and trigger Kerberos errors
   const masterSystemAttr = finalMasterSystem
-    ? ` adtcore:masterSystem="${finalMasterSystem}"`
+    ? ` adtcore:masterSystem="${escapeXmlAttr(finalMasterSystem)}"`
     : '';
   const responsibleAttr = finalResponsible
-    ? ` adtcore:responsible="${finalResponsible}"`
+    ? ` adtcore:responsible="${escapeXmlAttr(finalResponsible)}"`
     : '';
 
   // Log to help diagnose Kerberos errors
@@ -60,11 +61,14 @@ export async function create(
   }
 
   // Description is limited to 60 characters in SAP ADT
-  const limitedDescription = limitDescription(params.description);
+  // Cut first, escaped after: an entity is never cut in two.
+  const limitedDescription = escapeXmlAttr(
+    limitDescription(params.description),
+  );
   // Build XML payload - no escaping (same as old working code)
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
-<group:abapFunctionGroup xmlns:group="http://www.sap.com/adt/functions/groups" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:language="${params.masterLanguage || 'EN'}" adtcore:name="${params.functionGroupName}" adtcore:type="${TYPE_CODE.functionGroup}" adtcore:masterLanguage="${params.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr}>
-  <adtcore:packageRef adtcore:name="${params.packageName}"/>
+<group:abapFunctionGroup xmlns:group="http://www.sap.com/adt/functions/groups" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}"${languageAttributes(params.masterLanguage)} adtcore:name="${escapeXmlAttr(params.functionGroupName)}" adtcore:type="${TYPE_CODE.functionGroup}"${masterSystemAttr}${responsibleAttr}>
+  <adtcore:packageRef adtcore:name="${escapeXmlAttr(params.packageName)}"/>
 </group:abapFunctionGroup>`;
 
   // Log request details for debugging authorization issues (same as class/create.ts)
@@ -85,7 +89,7 @@ export async function create(
       method: 'POST',
       timeout: 0,
       data: xmlPayload,
-      headers: requestHeaders(headers),
+      headers: createRequestHeaders(headers, params.masterLanguage),
     });
     return response;
   } catch (error: unknown) {

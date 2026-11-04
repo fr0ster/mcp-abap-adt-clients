@@ -291,6 +291,30 @@ measurement behind each and what is not measured: the
 [package README](../../../adt-clients-legacy/README.md) and
 [LEGACY.md](../../../adt-clients-legacy/docs/LEGACY.md).
 
+### A create states its language once
+
+A create given a language writes it as `adtcore:language` and
+`adtcore:masterLanguage` and sends it as the header `sap-language` — one value.
+SAP takes a new object's original language from the request's logon language
+and ignores the body's attribute (measured on ABAP cloud, 2026-11-04: logon EN
+with a body in DE made an EN object; `sap-language: DE` on the create alone
+made a DE one). A create given no language writes neither attribute and sends
+no header, and SAP uses the logon language; no `EN` is invented. The language
+comes from the config, else from the client's system context; a blank value
+counts as none.
+
+A class create takes no `abstract` and a program create no program type: SAP
+ignores both on create (measured on premise, 2026-11-04). Set them afterwards.
+
+### A behaviour pool's implementations
+
+`getBehaviorImplementation().readImplementations(config, version?, options?)`
+is one GET of `/sap/bc/adt/oo/classes/<pool>/includes/implementations` — the
+pool's CCIMP, where the handler (`lhc_…`) and saver (`lsc_…`) classes live.
+`read` answers the main source, which holds only the `FOR BEHAVIOR OF` shell.
+It answers through the result set's `source` slot: the text as it came by
+default.
+
 ### More factories
 
 Additional factory methods follow the same shape — a config in, an answer back:
@@ -512,9 +536,9 @@ Contract notes:
 - The return type offers create/read/update/delete, validate, activate, lock and
   unlock — and nothing else. It is not versionable, checkable or
   transport-aware, because nothing measured says an include is.
-- `programType: 'include'` on `getProgram()` now **throws**. It used to map to
-  `'I'` and post a `program:abapProgram` document with `adtcore:type="PROG/P"`
-  to the programs collection — the wrong object, not a wrong parameter.
+- An include is created with `getInclude().create(…)`, never through
+  `getProgram()`: a program create takes no program type since 43.0.0 (SAP
+  ignores one on create, measured), so it cannot make an include.
 
 ### Feature Toggle — environment-specific behavior
 
@@ -1826,6 +1850,41 @@ if (answer.ok) {
 
 On a legacy system (`AdtClientLegacy` of `@mcp-abap-adt/adt-clients-legacy`) the endpoint is absent and the member
 answers a refusal (`UNSUPPORTED_OPERATION`) without a request.
+
+### AdtUtils (Object outline)
+
+`getObjectOutline(objectType, objectName, options?)` is one GET of the
+object's `<object uri>/objectstructure`, `Accept:
+application/vnd.sap.adt.objectstructure.v2+xml` — the structure Eclipse's
+Outline view reads. `objectType` is one of the kinds SAP serves an outline for
+(`AdtOutlineCode`): `CLAS/OC`, `INTF/OI`, `PROG/P`, `PROG/I` and `FUGR/F`
+(measured on premise and on ABAP cloud, 2026-11-04; the program and the include
+on premise only — the cloud has none). A function module, a structure, a
+service definition and a class's local includes answer `404`; a program, an
+include and a function group answer `406` to any other Accept.
+`options.version` is sent as `version` (it changes only the answer's
+`xml:base`), `options.accept` replaces the Accept.
+
+The answer is nested `abapsource:objectStructureElement`s — each with its
+`adtcore:type`, `adtcore:name`, visibility where SAP gives one, and
+`atom:link`s to where it is defined and implemented. For a class and an
+interface each link names a position, `<include>#start=l,c;end=l,c` (lines from
+1, columns from 0, `end` exclusive); a program's links name their target, a
+function group's a source URI. No element carries a signature.
+
+`IUtilResults` of interfaces-adt has no slot for this member, so it answers the
+document as it came, as `getTypeStructure` does; `readObjectOutline` /
+`objectOutline` of `@mcp-abap-adt/adt-strategies` read it into a tree.
+
+```typescript
+import { readObjectOutline } from '@mcp-abap-adt/adt-strategies';
+
+const answer = await client.getUtils().getObjectOutline('CLAS/OC', 'ZCL_X');
+if (answer.ok) {
+  const { root } = readObjectOutline(answer.getResult().value);
+  root?.children.map((c) => [c.name, c.visibility, c.links[0]?.start]);
+}
+```
 
 ### AdtUtils (Where-used)
 

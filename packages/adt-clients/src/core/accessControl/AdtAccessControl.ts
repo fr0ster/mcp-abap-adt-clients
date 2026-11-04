@@ -41,6 +41,7 @@ import {
   type ResultStrategiesOf,
   type ResultValuesOf,
 } from '../../utils/resultStrategy';
+import { createLanguage } from '../../utils/xml';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { writeObjectDocument } from '../shared/documentWrite';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
@@ -190,8 +191,10 @@ export class AdtAccessControl<
           transport_request: config.transportRequest,
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,
-          masterLanguage:
-            config.masterLanguage ?? this.systemContext.masterLanguage,
+          masterLanguage: createLanguage(
+            config.masterLanguage,
+            this.systemContext.masterLanguage,
+          ),
         }),
       this.results.created,
       options?.analyse,

@@ -12,7 +12,8 @@ import type {
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { METADATA_EXTENSION } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { createRequestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr, languageAttributes } from '../../utils/xml';
 import type { IMetadataExtensionCreateParams } from './types';
 
 /**
@@ -40,25 +41,24 @@ export async function createMetadataExtension(
 ): Promise<IAdtWireResponse> {
   const url = METADATA_EXTENSION.collection;
 
-  const masterLanguage = params.masterLanguage || 'EN';
-
   const masterSystem = params.masterSystem || '';
   const responsible = params.responsible || '';
 
   // Description is limited to 60 characters in SAP ADT
-  const description = limitDescription(params.description);
+  // Cut first, escaped after: an entity is never cut in two.
+  const description = escapeXmlAttr(limitDescription(params.description));
   // Build XML with conditional attributes
   const masterSystemAttr = masterSystem
-    ? ` adtcore:masterSystem="${masterSystem}"`
+    ? ` adtcore:masterSystem="${escapeXmlAttr(masterSystem)}"`
     : '';
   const responsibleAttr = responsible
-    ? ` adtcore:responsible="${responsible}"`
+    ? ` adtcore:responsible="${escapeXmlAttr(responsible)}"`
     : '';
 
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><ddlxsources:ddlxSource xmlns:ddlxsources="http://www.sap.com/adt/ddic/ddlxsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${masterLanguage}" adtcore:name="${params.name}" adtcore:type="${TYPE_CODE.metadataExtension}" adtcore:masterLanguage="${masterLanguage}"${masterSystemAttr}${responsibleAttr}>
+  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><ddlxsources:ddlxSource xmlns:ddlxsources="http://www.sap.com/adt/ddic/ddlxsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}"${languageAttributes(params.masterLanguage)} adtcore:name="${escapeXmlAttr(params.name)}" adtcore:type="${TYPE_CODE.metadataExtension}"${masterSystemAttr}${responsibleAttr}>
     ${
       params.transportRequest
-        ? `<adtcore:packageRef adtcore:name="${params.packageName}">
+        ? `<adtcore:packageRef adtcore:name="${escapeXmlAttr(params.packageName)}">
     <adtcore:properties>
       <adtcore:property adtcore:name="abapLanguageVersion" adtcore:value=""/>
     </adtcore:properties>
@@ -66,7 +66,7 @@ export async function createMetadataExtension(
   <adtcore:transportInfo>
     <adtcore:localObject/>
   </adtcore:transportInfo>`
-        : `<adtcore:packageRef adtcore:name="${params.packageName}"/>`
+        : `<adtcore:packageRef adtcore:name="${escapeXmlAttr(params.packageName)}"/>`
     }
 
 </ddlxsources:ddlxSource>`;
@@ -80,7 +80,7 @@ export async function createMetadataExtension(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers: requestHeaders(headers),
+    headers: createRequestHeaders(headers, params.masterLanguage),
     params: queryParams,
   });
 }

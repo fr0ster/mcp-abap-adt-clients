@@ -47,6 +47,7 @@ import {
   type ResultStrategiesOf,
   type ResultValuesOf,
 } from '../../utils/resultStrategy';
+import { createLanguage } from '../../utils/xml';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { checkDeletionByUri } from '../shared/deletionCheckByUri';
 import { writeObjectDocument } from '../shared/documentWrite';
@@ -252,8 +253,10 @@ export class AdtInclude<
           description: config.description,
           packageName: config.packageName,
           transportRequest: config.transportRequest,
-          masterLanguage:
-            config.masterLanguage ?? this.systemContext.masterLanguage,
+          masterLanguage: createLanguage(
+            config.masterLanguage,
+            this.systemContext.masterLanguage,
+          ),
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,
         }),

@@ -14,6 +14,22 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.19.0] - 2026-11-04
+
+Released with `@mcp-abap-adt/adt-clients` 43.0.0, whose `getObjectOutline`
+this reads.
+
+### Added
+
+- `readObjectOutline(xml)` and its strategy `objectOutline`: what
+  adt-clients' `getObjectOutline` answers (`<object uri>/objectstructure`),
+  read into a tree — each element's code (`answeredObject`), name,
+  visibility, level, `clif_name`, include, description, constant / read-only
+  / final flags, its links (rel, source, fragment, and the `start` / `end`
+  position a class's or interface's link names) and its children in document
+  order. A document that is not an outline reads as no root. Tested against
+  the outlines recorded on premise (`answers/read-outline-*`).
+
 ## [0.18.3] - 2026-11-03
 
 ### Changed

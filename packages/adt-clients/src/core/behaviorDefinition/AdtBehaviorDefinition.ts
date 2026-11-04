@@ -41,6 +41,7 @@ import {
   type ResultStrategiesOf,
   type ResultValuesOf,
 } from '../../utils/resultStrategy';
+import { createLanguage } from '../../utils/xml';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { writeObjectDocument } from '../shared/documentWrite';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
@@ -161,11 +162,10 @@ export class AdtBehaviorDefinition<
       () =>
         validateBehaviorDefinition(connection, {
           objname: name,
-          rootEntity: config.rootEntity as string,
-          description: config.description as string,
+          rootEntity: config.rootEntity,
+          description: config.description,
           package: config.packageName ?? '',
-          implementationType:
-            config.implementationType as BehaviorDefinitionImplementationType,
+          implementationType: config.implementationType,
         }),
       this.results.validation,
       options?.analyse,
@@ -207,7 +207,10 @@ export class AdtBehaviorDefinition<
           implementationType:
             config.implementationType as BehaviorDefinitionImplementationType,
           transportRequest: config.transportRequest,
-          language: config.masterLanguage ?? this.systemContext.masterLanguage,
+          language: createLanguage(
+            config.masterLanguage,
+            this.systemContext.masterLanguage,
+          ),
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,
         }),

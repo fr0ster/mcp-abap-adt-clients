@@ -8,7 +8,8 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { MESSAGE_CLASS } from '../../endpoints/objects';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { createRequestHeaders } from '../../utils/requestHeaders';
+import { givenLanguage } from '../../utils/xml';
 import type { ICreateMessageClassParams } from './types';
 import { buildMessageClassXml } from './xml';
 
@@ -25,9 +26,10 @@ export async function createMessageClass(
   headers: IAdtHeaders,
   params: ICreateMessageClassParams,
 ): Promise<IAdtWireResponse> {
-  // Emit BOTH adtcore:language and adtcore:masterLanguage (like domain/class),
-  // both set to the resolved language.
-  const lang = params.master_language ?? 'EN';
+  // Both adtcore:language and adtcore:masterLanguage, set to the language
+  // given — and sent as `sap-language`, which is what SAP takes. Without a
+  // language neither is written and SAP uses the logon language.
+  const lang = givenLanguage(params.master_language);
   const xmlBody = buildMessageClassXml({
     name: params.name.toUpperCase(),
     description: params.description,
@@ -49,6 +51,6 @@ export async function createMessageClass(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers: requestHeaders(headers),
+    headers: createRequestHeaders(headers, lang),
   });
 }

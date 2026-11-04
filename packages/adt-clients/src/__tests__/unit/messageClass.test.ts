@@ -185,7 +185,7 @@ describe('AdtMessageClass', () => {
     expect(seen.url).toContain('description=Desc');
   });
 
-  it('create POST body contains adtcore:masterLanguage="EN" by default', async () => {
+  it('create POST body carries no language when none is given', async () => {
     let seen: any;
     const mc = new AdtMessageClass(
       conn(async (o) => {
@@ -198,9 +198,11 @@ describe('AdtMessageClass', () => {
       { name: 'ZT', description: 'D', packageName: 'ZP' },
       { headers: headersOf(mc, 'create') },
     );
-    // both adtcore:language and adtcore:masterLanguage default to EN
-    expect(String(seen.data)).toContain('adtcore:language="EN"');
-    expect(String(seen.data)).toContain('adtcore:masterLanguage="EN"');
+    // Neither attribute and no header: SAP takes the logon language
+    // (fr0ster/mcp-abap-adt#348).
+    expect(String(seen.data)).not.toContain('adtcore:language=');
+    expect(String(seen.data)).not.toContain('adtcore:masterLanguage=');
+    expect(seen.headers['sap-language']).toBeUndefined();
   });
 
   it('create POST body uses the masterLanguage from config when provided', async () => {

@@ -12,7 +12,8 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { CLASS } from '../../endpoints/objects';
 import { limitDescription, safeStringify } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { createRequestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr, languageAttributes } from '../../utils/xml';
 import type { ICreateClassParams } from './types';
 
 const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
@@ -30,9 +31,12 @@ export async function create(
   logger?: ILogger,
 ): Promise<IAdtWireResponse> {
   // Description is limited to 60 characters in SAP ADT
-  const description = limitDescription(
-    args.description || args.class_name || '',
+  // Cut first, escaped after: an entity is never cut in two.
+  const description = escapeXmlAttr(
+    limitDescription(args.description || args.class_name || ''),
   );
+  const name = escapeXmlAttr(args.class_name);
+  const packageName = escapeXmlAttr(args.package_name);
   const url = `${CLASS.collection}${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 
   const masterSystem = args.master_system || '';
@@ -41,11 +45,11 @@ export async function create(
   const visibilityAttr = args.create_protected ? 'protected' : 'public';
 
   const superClassXml = args.superclass
-    ? `<class:superClassRef adtcore:name="${args.superclass}"/>`
+    ? `<class:superClassRef adtcore:name="${escapeXmlAttr(args.superclass)}"/>`
     : '<class:superClassRef/>';
 
   const masterSystemAttr = masterSystem
-    ? ` adtcore:masterSystem="${masterSystem}"`
+    ? ` adtcore:masterSystem="${escapeXmlAttr(masterSystem)}"`
     : '';
   // No adtcore:responsible: a class create stores that attribute as the
   // class's creator (createdBy), while the responsible person is always the
@@ -59,11 +63,11 @@ export async function create(
     ? `\n\n  ${args.template_xml}\n\n`
     : '\n\n';
 
-  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><class:abapClass xmlns:class="http://www.sap.com/adt/oo/classes" xmlns:adtcore="http://www.sap.com/adt/core"${abapSourceNamespace} adtcore:description="${description}" adtcore:language="${args.masterLanguage || 'EN'}" adtcore:name="${args.class_name}" adtcore:type="${TYPE_CODE.class}" adtcore:masterLanguage="${args.masterLanguage || 'EN'}"${masterSystemAttr} class:final="${finalAttr}" class:visibility="${visibilityAttr}">
+  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><class:abapClass xmlns:class="http://www.sap.com/adt/oo/classes" xmlns:adtcore="http://www.sap.com/adt/core"${abapSourceNamespace} adtcore:description="${description}"${languageAttributes(args.masterLanguage)} adtcore:name="${name}" adtcore:type="${TYPE_CODE.class}"${masterSystemAttr} class:final="${finalAttr}" class:visibility="${visibilityAttr}">
 
 
 
-  <adtcore:packageRef adtcore:name="${args.package_name}"/>
+  <adtcore:packageRef adtcore:name="${packageName}"/>
 
 
 
@@ -99,7 +103,7 @@ export async function create(
       method: 'POST',
       timeout: 0,
       data: metadataXml,
-      headers: requestHeaders(headers),
+      headers: createRequestHeaders(headers, args.masterLanguage),
     });
     return response;
   } catch (error: unknown) {

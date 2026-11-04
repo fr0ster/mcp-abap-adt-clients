@@ -22,7 +22,7 @@ import { FUNCTION_GROUP } from '../../endpoints/objects';
  * - objtype: FUGR/FF
  * - objname: function module name
  * - fugrname: function group name
- * - description: optional description
+ * - description: required — the endpoint answers 400 without one (measured)
  *
  * Response format:
  * - Success: <SEVERITY>OK</SEVERITY>
@@ -32,7 +32,7 @@ export async function validateFunctionModuleName(
   connection: IAbapConnection,
   functionGroupName: string,
   functionModuleName: string,
-  description?: string,
+  description: string,
 ): Promise<IAdtWireResponse> {
   const url = FUNCTION_GROUP.validation;
   const queryParams = new URLSearchParams({
@@ -41,9 +41,7 @@ export async function validateFunctionModuleName(
     fugrname: functionGroupName,
   });
 
-  if (description) {
-    queryParams.append('description', description);
-  }
+  queryParams.append('description', description);
 
   return connection.makeAdtRequest({
     url: `${url}?${queryParams.toString()}`,

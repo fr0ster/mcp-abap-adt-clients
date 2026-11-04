@@ -138,7 +138,6 @@ describe('Program (using AdtClient)', () => {
             packageName,
             transportRequest,
             description: params.description,
-            programType: params.program_type,
             source: params.source_code,
           };
         },
@@ -227,7 +226,6 @@ describe('Program (using AdtClient)', () => {
             programName: config.programName,
             packageName: config.packageName,
             description: config.description || '',
-            programType: config.programType,
             source: updateSourceCode,
           },
         });

@@ -20,8 +20,10 @@ import type { IAdtGroupReference } from './codeSets';
  * answering immediately, which is how a caller waits without a tight loop.
  *
  * **The reading is the caller's.** The document carries `runs:status` —
- * `finished`, `error`, `failed`, or a progress percentage while it runs — and
- * which of those ends a wait is their decision. This package used to loop here
+ * `finished`, `error`, `failed`, or `running` while it runs, with its
+ * progress in the separate attributes `progressMessage` and
+ * `progressPercentage` (measured on premise and on the cloud) — and which of
+ * those ends a wait is their decision. This package used to loop here
  * with a sixty-second ceiling and a one-second interval, treat `error` and
  * `failed` as a thrown exception, and answer nothing about the rest.
  */

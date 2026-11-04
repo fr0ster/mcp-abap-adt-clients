@@ -43,6 +43,7 @@ import {
   type ResultStrategiesOf,
   type ResultValuesOf,
 } from '../../utils/resultStrategy';
+import { createLanguage } from '../../utils/xml';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
@@ -183,10 +184,10 @@ export class AdtPackage<
           application_component: config.applicationComponent,
           responsible: config.responsible ?? this.systemContext.responsible,
           master_system: this.systemContext.masterSystem,
-          master_language:
-            config.masterLanguage?.trim() ||
-            this.systemContext.masterLanguage?.trim() ||
-            undefined,
+          master_language: createLanguage(
+            config.masterLanguage,
+            this.systemContext.masterLanguage,
+          ),
           record_changes: config.recordChanges ?? false,
         }),
       this.results.created,

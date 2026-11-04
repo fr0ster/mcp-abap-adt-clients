@@ -4,6 +4,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
 import { BEHAVIOR_DEFINITION } from '../../endpoints/objects';
+import { buildQueryString } from '../../utils/internalUtils';
 import type { IBehaviorDefinitionValidationParams } from './types';
 
 /**
@@ -41,7 +42,9 @@ export async function validate(
   // object arrived as a message naming nothing, and `analyse` had no document
   // to read. `answering` keeps the response off the thrown error; leaving the
   // throw alone is what lets it.
-  const queryParams = new URLSearchParams({
+  // A value not given is not sent: SAP answers for what is missing, rather
+  // than validating the word "undefined".
+  const query = buildQueryString({
     objname: params.objname,
     rootEntity: params.rootEntity,
     description: params.description,
@@ -49,7 +52,7 @@ export async function validate(
     implementationType: params.implementationType,
   });
 
-  const url = `${BEHAVIOR_DEFINITION.validation}?${queryParams.toString()}`;
+  const url = `${BEHAVIOR_DEFINITION.validation}?${query}`;
 
   const response = await connection.makeAdtRequest({
     url,

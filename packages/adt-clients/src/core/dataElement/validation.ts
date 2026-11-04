@@ -30,7 +30,7 @@ import { DATA_ELEMENT } from '../../endpoints/objects';
 export async function validateDataElementName(
   connection: IAbapConnection,
   dataElementName: string,
-  description: string,
+  description: string | undefined,
   packageName?: string,
 ): Promise<IAdtWireResponse> {
   const url = DATA_ELEMENT.validation;
@@ -43,7 +43,12 @@ export async function validateDataElementName(
     queryParams.append('packagename', packageName);
   }
 
-  queryParams.append('description', description);
+  // A description not given is not sent: the endpoint answers its own 400
+  // ("The description is missing for VALIDATION") rather than validating the
+  // word "undefined".
+  if (description !== undefined) {
+    queryParams.append('description', description);
+  }
 
   return connection.makeAdtRequest({
     url: `${url}?${queryParams.toString()}`,

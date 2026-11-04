@@ -15,7 +15,8 @@ import type {
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { DATA_ELEMENT } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { createRequestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr, languageAttributes } from '../../utils/xml';
 import type { ICreateDataElementParams } from './types';
 
 /**
@@ -33,16 +34,19 @@ export async function create(
   const username = args.responsible || '';
   const masterSystem = args.masterSystem || '';
 
-  const description = limitDescription(
-    args.description || args.data_element_name,
+  // Cut first, escaped after: an entity is never cut in two.
+  const description = escapeXmlAttr(
+    limitDescription(args.description || args.data_element_name),
   );
 
   const masterSystemAttr = masterSystem
-    ? ` adtcore:masterSystem="${masterSystem}"`
+    ? ` adtcore:masterSystem="${escapeXmlAttr(masterSystem)}"`
     : '';
-  const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><blue:wbobj xmlns:blue="http://www.sap.com/wbobj/dictionary/dtel" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${args.masterLanguage || 'EN'}" adtcore:name="${args.data_element_name.toUpperCase()}" adtcore:type="${TYPE_CODE.dataElement}" adtcore:masterLanguage="${args.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr}>
-  <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
+  const responsibleAttr = username
+    ? ` adtcore:responsible="${escapeXmlAttr(username)}"`
+    : '';
+  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><blue:wbobj xmlns:blue="http://www.sap.com/wbobj/dictionary/dtel" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}"${languageAttributes(args.masterLanguage)} adtcore:name="${escapeXmlAttr(args.data_element_name.toUpperCase())}" adtcore:type="${TYPE_CODE.dataElement}"${masterSystemAttr}${responsibleAttr}>
+  <adtcore:packageRef adtcore:name="${escapeXmlAttr(args.package_name.toUpperCase())}"/>
 </blue:wbobj>`;
 
   return connection.makeAdtRequest({
@@ -50,6 +54,6 @@ export async function create(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers: requestHeaders(headers),
+    headers: createRequestHeaders(headers, args.masterLanguage),
   });
 }

@@ -10,8 +10,8 @@ import type {
 import type { HttpError } from '@mcp-abap-adt/interfaces-network';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { limitDescription, safeStringify } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
-import { escapeXmlAttr } from '../../utils/xml';
+import { createRequestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr, languageAttributes } from '../../utils/xml';
 import {
   ENHANCEMENT_TYPE_CODES,
   getEnhancementBaseUrl,
@@ -50,11 +50,9 @@ function buildCreateXml(
   }
   return `<?xml version="1.0" encoding="UTF-8"?>
 <${prefix}:${root} xmlns:${prefix}="http://www.sap.com/adt/enhancements/${prefix}" xmlns:adtcore="http://www.sap.com/adt/core" xmlns:enhcore="http://www.sap.com/abapsource/enhancementscore"
- adtcore:description="${esc(limitDescription(args.description || args.enhancement_name || ''))}"
- adtcore:language="${esc(args.masterLanguage || 'EN')}"
+ adtcore:description="${esc(limitDescription(args.description || args.enhancement_name || ''))}"${languageAttributes(args.masterLanguage)}
  adtcore:name="${esc(args.enhancement_name)}"
- adtcore:type="${esc(ENHANCEMENT_TYPE_CODES[args.enhancement_type])}"
- adtcore:masterLanguage="${esc(args.masterLanguage || 'EN')}"${masterSystemAttr}${responsibleAttr}>
+ adtcore:type="${esc(ENHANCEMENT_TYPE_CODES[args.enhancement_type])}"${masterSystemAttr}${responsibleAttr}>
  <adtcore:packageRef adtcore:name="${esc(args.package_name)}"/>
  ${content}
 </${prefix}:${root}>`;
@@ -95,7 +93,7 @@ export async function create(
       method: 'POST',
       timeout: 0,
       data: metadataXml,
-      headers: requestHeaders(headers),
+      headers: createRequestHeaders(headers, args.masterLanguage),
     });
     return response;
   } catch (error: unknown) {

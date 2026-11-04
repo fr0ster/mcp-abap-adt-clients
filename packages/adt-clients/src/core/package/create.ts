@@ -10,7 +10,8 @@ import type {
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { PACKAGE } from '../../endpoints/objects';
 import { buildQueryString, limitDescription } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { createRequestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr, languageAttributes } from '../../utils/xml';
 import type { ICreatePackageParams } from './types';
 
 /**
@@ -24,12 +25,7 @@ export async function createPackage(
   const url = PACKAGE.collection;
 
   const escapeXml = (str: string | undefined): string =>
-    (str || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;');
+    escapeXmlAttr(str || '');
 
   // Description is limited to 60 characters in SAP ADT
   const description = escapeXml(
@@ -38,7 +34,6 @@ export async function createPackage(
   const packageType = params.package_type || 'development';
 
   const masterSystem = params.master_system as string;
-  const lang = params.master_language?.trim() || 'EN';
   const responsibleUser = params.responsible || '';
 
   // Software component is required for package creation
@@ -64,7 +59,7 @@ export async function createPackage(
     : '';
 
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
-<pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${lang}" adtcore:name="${escapeXml(params.package_name)}" adtcore:type="${TYPE_CODE.package}" adtcore:version="active" adtcore:masterLanguage="${lang}"${masterSystemAttr}${responsibleAttr}>
+<pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}"${languageAttributes(params.master_language)} adtcore:name="${escapeXml(params.package_name)}" adtcore:type="${TYPE_CODE.package}" adtcore:version="active"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${escapeXml(params.package_name)}"/>
   <pak:attributes pak:isEncapsulated="false" pak:packageType="${packageType}" pak:recordChanges="${params.record_changes ? 'true' : 'false'}"/>
   ${superPackageXml}
@@ -88,6 +83,6 @@ export async function createPackage(
     method: 'POST',
     timeout: 0,
     data: xmlBody,
-    headers: requestHeaders(headers),
+    headers: createRequestHeaders(headers, params.master_language),
   });
 }

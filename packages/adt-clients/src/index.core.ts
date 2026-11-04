@@ -156,6 +156,7 @@ export type {
   AdtShippedOptions,
   IAdtHandlerContext,
 } from './core/shared/handlerOptions';
+export type { AdtOutlineCode } from './core/shared/objectStructure';
 export {
   AdtStructure,
   type StructureValues,

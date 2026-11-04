@@ -151,6 +151,24 @@ export async function startUnitTestRunByTarget(
   );
 }
 
+/**
+ * The run id as one path segment.
+ *
+ * Percent-encoding keeps `/`, `?`, `#` and `%` inside the segment, but not a
+ * segment that is all dots: URL parsing resolves `.` and `..` (and their
+ * encoded forms) as path steps, so a run id of exactly `.` or `..` would
+ * address another resource. Such an id is refused here, before anything is
+ * sent, in fixed words.
+ */
+function runIdSegment(runId: string): string {
+  if (runId === '.' || runId === '..') {
+    throw new Error(
+      `An ABAP Unit run id of "${runId}" is a path step, not a run: nothing was sent.`,
+    );
+  }
+  return encodeURIComponent(runId);
+}
+
 /** Poll a run. */
 export async function getUnitTestRunStatus(
   connection: IAbapConnection,
@@ -159,7 +177,8 @@ export async function getUnitTestRunStatus(
 ): Promise<IAdtWireResponse> {
   const query = withLongPolling ? '?withLongPolling=true' : '';
   return connection.makeAdtRequest({
-    url: `/sap/bc/adt/abapunit/runs/${runId}${query}`,
+    // The run id is one path segment, whatever it holds.
+    url: `/sap/bc/adt/abapunit/runs/${runIdSegment(runId)}${query}`,
     method: 'GET',
     timeout: 0,
     headers: {
@@ -184,7 +203,7 @@ export async function getUnitTestRunResult(
     format === 'junit' ? ACCEPT_JUNIT_RESULT : ACCEPT_UNIT_TEST_RESULT;
 
   return connection.makeAdtRequest({
-    url: `/sap/bc/adt/abapunit/results/${runId}${query}`,
+    url: `/sap/bc/adt/abapunit/results/${runIdSegment(runId)}${query}`,
     method: 'GET',
     timeout: 0,
     headers: {

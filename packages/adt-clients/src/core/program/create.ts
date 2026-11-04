@@ -10,36 +10,9 @@ import type {
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { PROGRAM } from '../../endpoints/objects';
 import { limitDescription } from '../../utils/internalUtils';
-import { requestHeaders } from '../../utils/requestHeaders';
+import { createRequestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr, languageAttributes } from '../../utils/xml';
 import type { ICreateProgramParams } from './types';
-
-/**
- * Convert readable program type to SAP internal code
- */
-function convertProgramType(programType?: string): string {
-  if (programType === 'include') {
-    // This mapped to 'I' and then posted a `program:abapProgram` document with
-    // `adtcore:type="PROG/P"` to the programs collection. A standalone include
-    // is a different resource: `include:abapInclude`, its own namespace,
-    // `PROG/I`, its own collection, and a different accepted content type. The
-    // mapping was not a parameter that needed correcting; it was the wrong
-    // object. Measured against a captured Eclipse create.
-    throw new Error(
-      "programType 'include' is not a program. A standalone PROG/I include is " +
-        'a separate resource — use AdtClient.getInclude() (src/core/include).',
-    );
-  }
-
-  const typeMap: Record<string, string> = {
-    executable: '1',
-    module_pool: 'M',
-    function_group: 'F',
-    class_pool: 'K',
-    interface_pool: 'J',
-  };
-
-  return typeMap[programType || 'executable'] || '1';
-}
 
 /**
  * Generate minimal program source code if not provided
@@ -77,28 +50,37 @@ START-OF-SELECTION.
  * Low-level: Create program object with metadata (POST)
  * Does NOT lock/upload/activate - just creates the object
  */
+/**
+ * No `program:programType`: SAP ignores it on create (measured on premise,
+ * 2026-11-04 — a create carrying `modulePool`, `subroutinePool`, `M` or `F`
+ * read back `executableProgram`, and one without the attribute answered `200`
+ * and read back the same). A program's type is set afterwards.
+ */
 export async function create(
   connection: IAbapConnection,
   headers: IAdtHeaders,
   args: ICreateProgramParams,
 ): Promise<IAdtWireResponse> {
   // Description is limited to 60 characters in SAP ADT
-  const description = limitDescription(args.description || args.programName);
-  const programType = convertProgramType(args.programType);
+  // Cut first, escaped after: an entity is never cut in two.
+  const description = escapeXmlAttr(
+    limitDescription(args.description || args.programName),
+  );
   const application = args.application || '*';
   const url = `${PROGRAM.collection}${args.transportRequest ? `?corrNr=${args.transportRequest}` : ''}`;
 
   const masterSystem = args.masterSystem || '';
   const username = args.responsible || '';
-  const lang = args.masterLanguage || 'EN';
 
   const masterSystemAttr = masterSystem
-    ? ` adtcore:masterSystem="${masterSystem}"`
+    ? ` adtcore:masterSystem="${escapeXmlAttr(masterSystem)}"`
     : '';
-  const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
+  const responsibleAttr = username
+    ? ` adtcore:responsible="${escapeXmlAttr(username)}"`
+    : '';
 
-  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><program:abapProgram xmlns:program="http://www.sap.com/adt/programs/programs" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${lang}" adtcore:name="${args.programName}" adtcore:type="${TYPE_CODE.program}" adtcore:masterLanguage="${lang}"${masterSystemAttr}${responsibleAttr} program:programType="${programType}" program:application="${application}">
-  <adtcore:packageRef adtcore:name="${args.packageName}"/>
+  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><program:abapProgram xmlns:program="http://www.sap.com/adt/programs/programs" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}"${languageAttributes(args.masterLanguage)} adtcore:name="${escapeXmlAttr(args.programName)}" adtcore:type="${TYPE_CODE.program}"${masterSystemAttr}${responsibleAttr} program:application="${escapeXmlAttr(application)}">
+  <adtcore:packageRef adtcore:name="${escapeXmlAttr(args.packageName)}"/>
 </program:abapProgram>`;
 
   return connection.makeAdtRequest({
@@ -106,6 +88,6 @@ export async function create(
     method: 'POST',
     timeout: 0,
     data: metadataXml,
-    headers: requestHeaders(headers),
+    headers: createRequestHeaders(headers, args.masterLanguage),
   });
 }

@@ -92,7 +92,7 @@ describe('runtime/traces/profiler', () => {
     expect(connection.makeAdtRequest).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        url: '/sap/bc/adt/runtime/traces/abaptraces/ABCDEF1234567890/statements?id=3&withDetails=false&autoDrillDownThreshold=10&withSystemEvents=true',
+        url: '/sap/bc/adt/runtime/traces/abaptraces/ABCDEF1234567890/statements?id=3&withDetails=false&autoDrillDownThreshold=10.7&withSystemEvents=true',
         method: 'GET',
       }),
     );

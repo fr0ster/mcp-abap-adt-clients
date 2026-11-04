@@ -491,7 +491,7 @@ const ABSENT = {
     'validate',
   ],
   getBehaviorDefinition: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
-  getBehaviorImplementation: [...SOURCE_OBJECT_MEMBERS],
+  getBehaviorImplementation: [...SOURCE_OBJECT_MEMBERS, 'readImplementations'],
   getDataElement: [
     'activate',
     'check',
@@ -1248,6 +1248,12 @@ export const LEGACY_SENDS: Record<string, Rows<SendsRow>> = {
         '§10.2 recorded on 7.40 SP04: 200, 464 types',
         [post('/sap/bc/adt/repository/typestructure')],
         calling('getTypeStructure', (h) => [h('getTypeStructure')]),
+      ),
+      utils.sends(
+        'getObjectOutline',
+        '§10.2 inherited, not measured on 7.40: sent as the modern client sends it',
+        [get('/sap/bc/adt/oo/classes/zcl_guard/objectstructure')],
+        calling('getObjectOutline', () => ['CLAS/OC', 'ZCL_GUARD']),
       ),
     ]),
     ...METADATA.sends,
