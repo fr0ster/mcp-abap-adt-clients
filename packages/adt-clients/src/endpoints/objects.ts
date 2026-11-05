@@ -142,6 +142,10 @@ export const STRUCTURE = {
   collection: '/sap/bc/adt/ddic/structures',
   validation: '/sap/bc/adt/ddic/structures/validation',
   uri: (name: string) => `/sap/bc/adt/ddic/structures/${seg(name)}`,
+  /** The DDIC element info: every component, includes and appends marked. */
+  elementInfoCollection: '/sap/bc/adt/ddic/elementinfo',
+  elementInfo: (name: string) =>
+    `${STRUCTURE.elementInfoCollection}?path=${seg(name)}`,
 } as const;
 
 export const DOMAIN = {
@@ -172,6 +176,10 @@ export const SERVICE_DEFINITION = {
   collection: '/sap/bc/adt/ddic/srvd/sources',
   validation: '/sap/bc/adt/ddic/srvd/sources/validation',
   uri: (name: string) => `/sap/bc/adt/ddic/srvd/sources/${seg(name)}`,
+  /** The service definition's element info: its exposed entities. */
+  elementInfoCollection: '/sap/bc/adt/ddic/srvd/elementinfo',
+  elementInfo: (name: string) =>
+    `${SERVICE_DEFINITION.elementInfoCollection}?path=${seg(name)}`,
 } as const;
 
 export const SERVICE_BINDING = {

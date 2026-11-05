@@ -115,6 +115,10 @@ import {
 } from '../../utils/resultStrategy';
 import { getAllTypes as getAllTypesUtil } from './allTypes';
 import { getDiscovery as getDiscoveryUtil } from './discovery';
+import {
+  getServiceDefinitionElementInfo as getServiceDefinitionElementInfoUtil,
+  getStructureElementInfo as getStructureElementInfoUtil,
+} from './elementInfo';
 import { fetchInactiveObjects } from './getInactiveObjects';
 import {
   activateObjectsGroup,
@@ -946,6 +950,67 @@ export class AdtUtils<
           version: options?.version,
           accept: options?.accept,
         }),
+      rawDocument,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * A structure's element info — `GET /sap/bc/adt/ddic/elementinfo?path=`,
+   * one request: every component in order, each include and append as an
+   * `.include` / `.append` element naming the included structure
+   * (`ddicIncludeName`) and its URI, every field with its data element, type
+   * and length and, inside an include, the include it is part of and its
+   * level. Measured on premise and on ABAP cloud.
+   * `@mcp-abap-adt/adt-strategies`' `readStructureElementInfo` reads it.
+   *
+   * **The document as it came, always**, as for `getObjectOutline`:
+   * `IUtilResults` of interfaces-adt has no slot for this member. A name
+   * that does not exist answers `200` with an element info naming nothing.
+   *
+   * @param options.accept - The Accept to send; SAP answers only
+   *   `application/vnd.sap.adt.elementinfo+xml`, the default
+   */
+  async getStructureElementInfo<E extends IAdtError = IAdtError>(
+    structureName: string,
+    options?: { accept?: string } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
+    return answering(
+      () =>
+        getStructureElementInfoUtil(this.connection, structureName, {
+          accept: options?.accept,
+        }),
+      rawDocument,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * A service definition's element info —
+   * `GET /sap/bc/adt/ddic/srvd/elementinfo?path=`, one request: its exposed
+   * entities, each with its name, its DDL source URI and its alias (absent
+   * when the `expose` has no `as`), those of its extensions included, and a
+   * link to each extension. Measured on premise and on ABAP cloud.
+   * `@mcp-abap-adt/adt-strategies`' `readServiceDefinitionElementInfo` reads
+   * it.
+   *
+   * **The document as it came, always**, as for `getObjectOutline`. A name
+   * that does not exist answers `200` with an element info naming nothing.
+   *
+   * @param options.accept - The Accept to send; SAP answers only
+   *   `application/vnd.sap.adt.elementinfo+xml`, the default
+   */
+  async getServiceDefinitionElementInfo<E extends IAdtError = IAdtError>(
+    serviceDefinitionName: string,
+    options?: { accept?: string } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
+    return answering(
+      () =>
+        getServiceDefinitionElementInfoUtil(
+          this.connection,
+          serviceDefinitionName,
+          { accept: options?.accept },
+        ),
       rawDocument,
       options?.analyse,
     );

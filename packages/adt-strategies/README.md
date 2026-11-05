@@ -135,7 +135,8 @@ a `403` on a service binding's LOCK that is to be ignored
 | `AdtMessage`, `AdtRefusal`, `IAdtMessageFailure` | the shapes those produce |
 
 **The result axis** — each a `IResultStrategy` for one slot of an `adt-clients`
-result set:
+result set, except the readings of members that have no slot yet (the table
+after this one):
 
 | export | slot it fills | answers |
 |---|---|---|
@@ -150,6 +151,39 @@ result set:
 | `profilerTraceEntries`, `profilerHitList`, `profilerStatements`, `profilerDbAccesses`, `compareRecordedAt` | `getProfiler`: `list`, `hitlist`, `statements`, `dbAccesses` | trace entries and the three views; an ordering by recorded time |
 | `traceSchedulingTypes`, `traceSchedulingRequests`, `traceSchedulingProfilerId` | executors: `types`, `requests`, `scheduled` | the catalogue, the requests, the profiler id |
 | `feedDescriptors`, `feedVariants`, `feedEntries`, `feedSystemMessages`, `feedGatewayErrors`, `feedGatewayErrorDetail` | `getFeeds` | the Atom feeds, read |
+
+**Readings of members with no slot.** `IUtilResults` of interfaces-adt names no
+slot for these `getUtils()` members, so the member answers the document as it
+came (`IAdtResponse<string>`) and you read it with the pure function — or pass
+the strategy to your own code over the wire answer. `options.analyse` is still
+yours to set on the member: the reading judges nothing, it only reads a
+document.
+
+| export | reads what this member answers | answers |
+|---|---|---|
+| `readObjectOutline`, `objectOutline` | `getObjectOutline` (`<object uri>/objectstructure`) | `IObjectOutline`: the root element and its children, with visibility, level and the links' positions |
+| `readStructureElementInfo`, `structureElementInfo` | `getStructureElementInfo` (`/sap/bc/adt/ddic/elementinfo?path=`) | `IStructureElementInfo`: the structure's code, name, URI and short text; `components` in document order (name — a field's, or `.include` / `.append` —, `includeName`, `partOfInclude`, `includeLevel`, `dataElement`, `dataType`, `length`, `decimals`, `isKey`, every property as written); `includes`, the components naming a structure; the package |
+| `readServiceDefinitionElementInfo`, `serviceDefinitionElementInfo` | `getServiceDefinitionElementInfo` (`/sap/bc/adt/ddic/srvd/elementinfo?path=`) | `IServiceDefinitionElementInfo`: the definition's code, name, URI and short text; `entities` (name, URI, `alias` — absent when the `expose` has no `as`), in document order, not the source's; `links` (an extension's); the package |
+
+**An unknown name is not a `404`.** Both element-info endpoints answer `200`
+with an element info that names nothing (measured on premise and on ABAP cloud,
+2026-11-05), so the answer is `ok`. The reading answers `name === undefined`
+with empty `components` / `entities`: that is the object being absent — decide
+it there, or with your own `analyse`.
+
+```typescript
+import { readStructureElementInfo } from '@mcp-abap-adt/adt-strategies';
+
+const answer = await client.getUtils().getStructureElementInfo('/DMO/S_TRAVELX');
+if (answer.ok) {
+  const info = readStructureElementInfo(answer.getResult().value);
+  if (info.name === undefined) {
+    // no such structure
+  } else {
+    info.includes.map((c) => [c.name, c.includeName, c.partOfInclude]);
+  }
+}
+```
 
 **A code read from an answer is an `IAdtAnsweredObject`** (since 0.16.0). The
 readings that take a type code from an answer — `readSearchHits` /

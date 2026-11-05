@@ -313,6 +313,7 @@ So a legacy client lists and reads its user's requests and does nothing else wit
 | `getActivationRun`, `getActivationResults` | refused: a legacy group activation yields no run id; `/activation/runs` is not advertised |
 | `checkDeletionGroup`, `deleteObjectsGroup` | refused — measured (no deletion API) |
 | `getTableColumns`, `getTableContents`, `getSqlQuery`, `getObjectProperties` | refused (`/datapreview/*`, `objectproperties/values` absent) |
+| `getStructureElementInfo`, `getServiceDefinitionElementInfo` | refused without a request — the 7.40 discovery lists neither `/sap/bc/adt/ddic/elementinfo` nor `/sap/bc/adt/ddic/srvd/elementinfo`, and 7.40 serves neither structures (`TABL/DS`) nor service definitions |
 | `supportsSourceCode`, `getObjectSourceUri` | kept: pure, send nothing |
 
 ## The clients' own members

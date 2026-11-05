@@ -1,0 +1,22 @@
+{
+  "case": "read-elementinfo-structure",
+  "step": 1,
+  "stepTag": "elementinfo",
+  "capturedAt": "2026-11-05T00:00:00.000Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/ddic/elementinfo?path=%2fdmo%2fs_booking_supplement_key",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.elementinfo+xml"
+    },
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.elementinfo+xml; charset=utf-8"
+    },
+    "bodyFile": "read-elementinfo-structure--01-elementinfo.body.xml"
+  }
+}

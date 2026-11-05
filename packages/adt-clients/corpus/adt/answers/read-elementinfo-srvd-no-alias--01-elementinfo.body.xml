@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<abapsource:elementInfo adtcore:uri="/sap/bc/adt/ddic/srvd/sources/%2fdmo%2fui_agency_2" adtcore:type="SRVD/SRV" adtcore:name="/DMO/UI_AGENCY_2" xmlns:abapsource="http://www.sap.com/adt/abapsource" xmlns:adtcore="http://www.sap.com/adt/core">
+  <abapsource:properties/>
+  <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">02</abapsource:documentation>
+  <abapsource:elementInfo adtcore:uri="/sap/bc/adt/ddic/ddl/sources/%2fdmo%2fr_agencytp" adtcore:type="DDLS/STOB" adtcore:name="/DMO/R_AgencyTP">
+    <abapsource:properties/>
+    <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">Agency</abapsource:documentation>
+  </abapsource:elementInfo>
+  <abapsource:elementInfo adtcore:uri="/sap/bc/adt/packages/%2fdmo%2fflight_reuse_agency" adtcore:type="DEVC/K" adtcore:name="/DMO/FLIGHT_REUSE_AGENCY">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="parentName">/DMO/FLIGHT_REUSE_AGENCY</abapsource:entry>
+    </abapsource:properties>
+  </abapsource:elementInfo>
+</abapsource:elementInfo>

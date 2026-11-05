@@ -850,6 +850,16 @@ export const LEGACY_REFUSED: Record<string, Rows<RefusedRow>> = {
         '§10.2 unchanged',
         calling('getObjectProperties', () => [PROGRAM_URI]),
       ),
+      utils.refused(
+        'getStructureElementInfo',
+        '§10.2 not advertised: no /sap/bc/adt/ddic/elementinfo in the 7.40 discovery',
+        calling('getStructureElementInfo', () => ['ZGUARD_STRU']),
+      ),
+      utils.refused(
+        'getServiceDefinitionElementInfo',
+        '§10.2 not advertised: no /sap/bc/adt/ddic/srvd/elementinfo in the 7.40 discovery',
+        calling('getServiceDefinitionElementInfo', () => ['ZGUARD_SRVD']),
+      ),
     ]),
     ...METADATA.refused,
     ...SOURCE.refused,

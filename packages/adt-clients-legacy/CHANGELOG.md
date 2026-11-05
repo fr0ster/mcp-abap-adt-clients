@@ -4,6 +4,19 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [0.7.2] - 2026-11-05
+
+On `@mcp-abap-adt/adt-clients` `^43.1.0`.
+
+### Changed
+
+- `getUtils().getStructureElementInfo` and
+  `getUtils().getServiceDefinitionElementInfo`, new in adt-clients 43.1.0,
+  are refused without a request (`UNSUPPORTED_OPERATION`): the 7.40 discovery
+  lists neither `/sap/bc/adt/ddic/elementinfo` nor
+  `/sap/bc/adt/ddic/srvd/elementinfo`. The adt-strategies dev range moves to
+  `^0.20.0`.
+
 ## [0.7.1] - 2026-11-05
 
 ### Changed

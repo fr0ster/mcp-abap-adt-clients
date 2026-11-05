@@ -26,14 +26,19 @@ describe('AdtUtils readings', () => {
   });
 
   /**
-   * `getObjectOutline` and `getTypeStructure` are the members whose reading
-   * cannot be injected yet: `IUtilResults` of interfaces-adt has no slot for
+   * `getObjectOutline`, the two element-info reads and `getTypeStructure` are
+   * the members whose reading cannot be injected yet: `IUtilResults` of interfaces-adt has no slot for
    * them, and a slot added here would make `getUtils` take a wider set than
    * the one a consumer composes from the contract package. They answer the
    * document as it came until the contract names the slot; every other
    * member stays held.
    */
-  const AWAITING_ITS_SLOT = ['getObjectOutline', 'getTypeStructure'];
+  const AWAITING_ITS_SLOT = [
+    'getObjectOutline',
+    'getStructureElementInfo',
+    'getServiceDefinitionElementInfo',
+    'getTypeStructure',
+  ];
 
   it('reads every answer through the injected set, never a fixed strategy', () => {
     const members = source.split('\n  async ').slice(1);

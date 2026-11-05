@@ -319,7 +319,9 @@ Served: `search`, `fetchNodeStructure`, `getObjectStructure`, `discovery`,
 `getInactiveObjects` (7.40 answers the older `adtcore:objectReferences`
 document), `readObjectMetadata` / `readObjectSource` for the served types,
 `getTypeStructure`, and `getObjectOutline` (sent as on the modern client; not
-measured on 7.40). `readObjectMetadata`, `readObjectSource`,
+measured on 7.40). `getStructureElementInfo` and
+`getServiceDefinitionElementInfo` are refused without a request: the 7.40
+discovery lists no element info for either. `readObjectMetadata`, `readObjectSource`,
 `fetchNodeStructure`, `getObjectStructure` and `activateObjectsGroup` take
 7.40's codes (`ADT_TYPES_BASIS_740`, and `DEVC/K` for the structure reads;
 `VIEW/DV` too for the group activation, `ADT_UTILITY_CODES_BASIS_740`) and

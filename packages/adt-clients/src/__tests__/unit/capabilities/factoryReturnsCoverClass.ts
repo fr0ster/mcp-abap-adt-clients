@@ -96,12 +96,18 @@ type ServiceBindingAtoms = LifecycleAtoms &
 /**
  * The members of `AdtUtils` no atom of interfaces-adt declares:
  * `getTypeStructure`, added for the conformance check of the ADT type tables,
- * which calls it on the class, and `getObjectOutline`, an object's outline
- * (`<object uri>/objectstructure`). Named here, not hidden: until the
+ * which calls it on the class, `getObjectOutline`, an object's outline
+ * (`<object uri>/objectstructure`), and the element infos of a structure and
+ * of a service definition (`getStructureElementInfo`,
+ * `getServiceDefinitionElementInfo`). Named here, not hidden: until the
  * contract package carries their atoms, a consumer's composed contract cannot
  * reach them. Any other uncovered method still fails below.
  */
-type AwaitingItsAtom = 'getTypeStructure' | 'getObjectOutline';
+type AwaitingItsAtom =
+  | 'getTypeStructure'
+  | 'getObjectOutline'
+  | 'getStructureElementInfo'
+  | 'getServiceDefinitionElementInfo';
 
 export type _UtilsCovered = Assert<
   [Exclude<Uncovered<typeof utils, UtilsAtoms>, AwaitingItsAtom>] extends [

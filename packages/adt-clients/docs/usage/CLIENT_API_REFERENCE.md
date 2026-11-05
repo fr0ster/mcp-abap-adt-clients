@@ -1886,6 +1886,48 @@ if (answer.ok) {
 }
 ```
 
+### AdtUtils (Element info)
+
+Two members, one GET each, both with `Accept:
+application/vnd.sap.adt.elementinfo+xml` — the only one SAP answers (`406` to
+`application/xml`, `application/json` and any other; measured on premise and on
+ABAP cloud, 2026-11-05). `options.accept` replaces it.
+
+- `getStructureElementInfo(structureName, options?)` —
+  `GET /sap/bc/adt/ddic/elementinfo?path=<structure>`: every component of the
+  structure in order, flat. An include or an append is an element named
+  `.include` / `.append` with `ddicIncludeName` (the included structure) and
+  that structure's source URI; each field inside one carries
+  `ddicIsPartOfInclude` and `ddicIncludeHierarchyLevel`, a nested include too.
+  A named include (`_x : include s`) is an `.include` as well — its group name
+  is not stated. An append made by `extend type` is listed as `.append`, with
+  its fields.
+- `getServiceDefinitionElementInfo(serviceDefinitionName, options?)` —
+  `GET /sap/bc/adt/ddic/srvd/elementinfo?path=<service definition>`: one
+  element per exposed entity, with the entity's name as its DDL source writes
+  it, its DDL source URI and an `alias` entry when the `expose` has an `as`
+  (none without); not in source order. An extension's entities are listed too,
+  and the extension is linked.
+
+A name that does not exist answers `200` with an element info that names
+nothing. Both answer the document as it came (`IUtilResults` has no slot for
+them); `readStructureElementInfo` / `structureElementInfo` and
+`readServiceDefinitionElementInfo` / `serviceDefinitionElementInfo` of
+`@mcp-abap-adt/adt-strategies` read it.
+
+```typescript
+import { readStructureElementInfo } from '@mcp-abap-adt/adt-strategies';
+
+const answer = await client.getUtils().getStructureElementInfo('/DMO/S_TRAVELX');
+if (answer.ok) {
+  const { includes } = readStructureElementInfo(answer.getResult().value);
+  includes.map((c) => [c.name, c.includeName, c.partOfInclude]);
+}
+```
+
+On a legacy system (`AdtClientLegacy`) both are refused without a request: the
+7.40 discovery lists neither endpoint.
+
 ### AdtUtils (Where-used)
 
 Where-used is two requests, and both are yours:

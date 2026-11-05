@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<abapsource:elementInfo adtcore:uri="/sap/bc/adt/ddic/srvd/sources/zzz_no_such_srvd_x" adtcore:type="SRVD/SRV" xmlns:abapsource="http://www.sap.com/adt/abapsource" xmlns:adtcore="http://www.sap.com/adt/core">
+  <abapsource:properties/>
+</abapsource:elementInfo>
