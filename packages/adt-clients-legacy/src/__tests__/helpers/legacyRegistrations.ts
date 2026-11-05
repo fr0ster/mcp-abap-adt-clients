@@ -182,6 +182,9 @@ export const REFUSED_WITHOUT_REQUEST: [IHandlerClass, string[]][] = [
       // Refused on legacy before this change, and still (spec §10.2).
       'getTableColumns',
       'getObjectProperties',
+      // Not in the 7.40 discovery: no DDIC or SRVD element info.
+      'getStructureElementInfo',
+      'getServiceDefinitionElementInfo',
     ],
   ],
   // No deletion API on 7.40 (spec §4.3, §5); updateMetadata not measured there.

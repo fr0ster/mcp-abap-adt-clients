@@ -11,6 +11,8 @@ import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
  * - getTableContents → /sap/bc/adt/datapreview/ddic
  * - getSqlQuery → /sap/bc/adt/datapreview/freestyle
  * - getObjectProperties → /sap/bc/adt/repository/informationsystem/objectproperties/values
+ * - getStructureElementInfo → /sap/bc/adt/ddic/elementinfo
+ * - getServiceDefinitionElementInfo → /sap/bc/adt/ddic/srvd/elementinfo
  *
  * Measured over RFC on SAP_BASIS 7.40 SP04 — the endpoint answered `404` —
  * refused:
@@ -330,6 +332,37 @@ ${objectReferences}
     return this.refuse(
       'Object properties',
       '/sap/bc/adt/repository/informationsystem/objectproperties/values',
+    );
+  }
+
+  /**
+   * Refused without a request: the 7.40 discovery lists no DDIC element info
+   * (adt-clients' `corpus/adt/discovery/`, basis-740), and 7.40 has no
+   * structure type to read it for (`TABL/DS` is not in its table).
+   */
+  override async getStructureElementInfo<E extends IAdtError = IAdtError>(
+    _structureName: string,
+    _options?: { accept?: string } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
+    return this.refuse(
+      'Structure element info',
+      '/sap/bc/adt/ddic/elementinfo',
+    );
+  }
+
+  /**
+   * Refused without a request: the 7.40 discovery lists no service definition
+   * element info, and 7.40 has no service definitions.
+   */
+  override async getServiceDefinitionElementInfo<
+    E extends IAdtError = IAdtError,
+  >(
+    _serviceDefinitionName: string,
+    _options?: { accept?: string } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E>> {
+    return this.refuse(
+      'Service definition element info',
+      '/sap/bc/adt/ddic/srvd/elementinfo',
     );
   }
 
