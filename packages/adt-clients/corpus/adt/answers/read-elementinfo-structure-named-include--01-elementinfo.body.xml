@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<abapsource:elementInfo adtcore:uri="/sap/bc/adt/ddic/structures/%2fdmo%2fs_travelx" adtcore:type="TABL/DS" adtcore:name="/dmo/s_travelx" xmlns:abapsource="http://www.sap.com/adt/abapsource" xmlns:adtcore="http://www.sap.com/adt/core">
+  <abapsource:properties/>
+  <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">Internal flag structure for Travel data</abapsource:documentation>
+  <abapsource:elementInfo adtcore:uri="/sap/bc/adt/ddic/structures/%2fdmo%2fs_travel_key/source/main" adtcore:type="TABL/DS" adtcore:name=".include">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="ddicIncludeName">/dmo/s_travel_key</abapsource:entry>
+    </abapsource:properties>
+    <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">Key structure of Travel</abapsource:documentation>
+  </abapsource:elementInfo>
+  <abapsource:elementInfo adtcore:type="TABL/DTF" adtcore:name="travel_id">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="ddicIsKey">false</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataElement">/dmo/travel_id</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataType">numc</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicLength">000008</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIsPartOfInclude">/dmo/s_travel_key</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIncludeHierarchyLevel">1</abapsource:entry>
+    </abapsource:properties>
+    <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">Flight Reference Scenario: Travel ID</abapsource:documentation>
+  </abapsource:elementInfo>
+  <abapsource:elementInfo adtcore:type="TABL/DTF" adtcore:name="action_code">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="ddicIsKey">false</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataElement">/dmo/action_code</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataType">char</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicLength">000001</abapsource:entry>
+    </abapsource:properties>
+    <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">Flight Reference Scenario: Action Code</abapsource:documentation>
+  </abapsource:elementInfo>
+  <abapsource:elementInfo adtcore:uri="/sap/bc/adt/ddic/structures/%2fdmo%2fs_travel_intx/source/main" adtcore:type="TABL/DS" adtcore:name=".include">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="ddicIncludeName">/dmo/s_travel_intx</abapsource:entry>
+    </abapsource:properties>
+    <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">Flag structure for Travel data</abapsource:documentation>
+  </abapsource:elementInfo>
+  <abapsource:elementInfo adtcore:type="TABL/DTF" adtcore:name="agency_id">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="ddicIsKey">false</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataElement">xsdboolean</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataType">char</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicLength">000001</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIsPartOfInclude">/dmo/s_travel_intx</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIncludeHierarchyLevel">1</abapsource:entry>
+    </abapsource:properties>
+    <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">XSD Truth Value: True/False [ext.]</abapsource:documentation>
+  </abapsource:elementInfo>
+  <abapsource:elementInfo adtcore:type="TABL/DTF" adtcore:name="customer_id">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="ddicIsKey">false</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataElement">xsdboolean</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataType">char</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicLength">000001</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIsPartOfInclude">/dmo/s_travel_intx</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIncludeHierarchyLevel">1</abapsource:entry>
+    </abapsource:properties>
+    <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">XSD Truth Value: True/False [ext.]</abapsource:documentation>
+  </abapsource:elementInfo>
+  <abapsource:elementInfo adtcore:type="TABL/DTF" adtcore:name="begin_date">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="ddicIsKey">false</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataElement">xsdboolean</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataType">char</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicLength">000001</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIsPartOfInclude">/dmo/s_travel_intx</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIncludeHierarchyLevel">1</abapsource:entry>
+    </abapsource:properties>
+    <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">XSD Truth Value: True/False [ext.]</abapsource:documentation>
+  </abapsource:elementInfo>
+  <abapsource:elementInfo adtcore:type="TABL/DTF" adtcore:name="end_date">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="ddicIsKey">false</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataElement">xsdboolean</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataType">char</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicLength">000001</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIsPartOfInclude">/dmo/s_travel_intx</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIncludeHierarchyLevel">1</abapsource:entry>
+    </abapsource:properties>
+    <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">XSD Truth Value: True/False [ext.]</abapsource:documentation>
+  </abapsource:elementInfo>
+  <abapsource:elementInfo adtcore:type="TABL/DTF" adtcore:name="booking_fee">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="ddicIsKey">false</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataElement">xsdboolean</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataType">char</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicLength">000001</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIsPartOfInclude">/dmo/s_travel_intx</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIncludeHierarchyLevel">1</abapsource:entry>
+    </abapsource:properties>
+    <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">XSD Truth Value: True/False [ext.]</abapsource:documentation>
+  </abapsource:elementInfo>
+  <abapsource:elementInfo adtcore:type="TABL/DTF" adtcore:name="total_price">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="ddicIsKey">false</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataElement">xsdboolean</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataType">char</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicLength">000001</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIsPartOfInclude">/dmo/s_travel_intx</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIncludeHierarchyLevel">1</abapsource:entry>
+    </abapsource:properties>
+    <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">XSD Truth Value: True/False [ext.]</abapsource:documentation>
+  </abapsource:elementInfo>
+  <abapsource:elementInfo adtcore:type="TABL/DTF" adtcore:name="currency_code">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="ddicIsKey">false</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataElement">xsdboolean</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataType">char</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicLength">000001</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIsPartOfInclude">/dmo/s_travel_intx</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIncludeHierarchyLevel">1</abapsource:entry>
+    </abapsource:properties>
+    <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">XSD Truth Value: True/False [ext.]</abapsource:documentation>
+  </abapsource:elementInfo>
+  <abapsource:elementInfo adtcore:type="TABL/DTF" adtcore:name="description">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="ddicIsKey">false</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataElement">xsdboolean</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataType">char</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicLength">000001</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIsPartOfInclude">/dmo/s_travel_intx</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIncludeHierarchyLevel">1</abapsource:entry>
+    </abapsource:properties>
+    <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">XSD Truth Value: True/False [ext.]</abapsource:documentation>
+  </abapsource:elementInfo>
+  <abapsource:elementInfo adtcore:type="TABL/DTF" adtcore:name="status">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="ddicIsKey">false</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataElement">xsdboolean</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataType">char</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicLength">000001</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIsPartOfInclude">/dmo/s_travel_intx</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIncludeHierarchyLevel">1</abapsource:entry>
+    </abapsource:properties>
+    <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">XSD Truth Value: True/False [ext.]</abapsource:documentation>
+  </abapsource:elementInfo>
+  <abapsource:elementInfo adtcore:uri="/sap/bc/adt/packages/%2fdmo%2fflight_legacy" adtcore:type="DEVC/K" adtcore:name="/DMO/FLIGHT_LEGACY">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="parentName">/DMO/FLIGHT_LEGACY</abapsource:entry>
+    </abapsource:properties>
+  </abapsource:elementInfo>
+</abapsource:elementInfo>

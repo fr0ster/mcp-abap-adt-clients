@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<abapsource:elementInfo adtcore:uri="/sap/bc/adt/ddic/structures/%2fdmo%2fs_ext_incl_agency" adtcore:type="TABL/DS" adtcore:name="/dmo/s_ext_incl_agency" xmlns:abapsource="http://www.sap.com/adt/abapsource" xmlns:adtcore="http://www.sap.com/adt/core">
+  <abapsource:properties/>
+  <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">Extension Include</abapsource:documentation>
+  <abapsource:elementInfo adtcore:type="TABL/DTF" adtcore:name="dummy_field">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="ddicIsKey">false</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataType">char</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicLength">000001</abapsource:entry>
+    </abapsource:properties>
+  </abapsource:elementInfo>
+  <abapsource:elementInfo adtcore:uri="/sap/bc/adt/ddic/structures/%2fdmo%2fzz_s_ext_agency_slogan/source/main" adtcore:type="TABL/DS" adtcore:name=".append">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="ddicIncludeName">/dmo/zz_s_ext_agency_slogan</abapsource:entry>
+    </abapsource:properties>
+    <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">Extend structure</abapsource:documentation>
+  </abapsource:elementInfo>
+  <abapsource:elementInfo adtcore:type="TABL/DTF" adtcore:name="/dmo/zzsloganzag">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="ddicIsKey">false</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataElement">/dmo/zz_slogan</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataType">char</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicLength">000255</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIsPartOfInclude">/dmo/zz_s_ext_agency_slogan</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIncludeHierarchyLevel">1</abapsource:entry>
+    </abapsource:properties>
+    <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">Agency Slogan: Slogan</abapsource:documentation>
+  </abapsource:elementInfo>
+  <abapsource:elementInfo adtcore:uri="/sap/bc/adt/packages/%2fdmo%2fflight_reuse_agency" adtcore:type="DEVC/K" adtcore:name="/DMO/FLIGHT_REUSE_AGENCY">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="parentName">/DMO/FLIGHT_REUSE_AGENCY</abapsource:entry>
+    </abapsource:properties>
+  </abapsource:elementInfo>
+</abapsource:elementInfo>

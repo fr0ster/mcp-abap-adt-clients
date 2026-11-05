@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<abapsource:elementInfo adtcore:uri="/sap/bc/adt/ddic/structures/%2fdmo%2fs_booking_supplement_key" adtcore:type="TABL/DS" adtcore:name="/dmo/s_booking_supplement_key" xmlns:abapsource="http://www.sap.com/adt/abapsource" xmlns:adtcore="http://www.sap.com/adt/core">
+  <abapsource:properties/>
+  <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">Key structure of Booking Supplements</abapsource:documentation>
+  <abapsource:elementInfo adtcore:uri="/sap/bc/adt/ddic/structures/%2fdmo%2fs_booking_key/source/main" adtcore:type="TABL/DS" adtcore:name=".include">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="ddicIncludeName">/dmo/s_booking_key</abapsource:entry>
+    </abapsource:properties>
+    <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">Key structure of Booking</abapsource:documentation>
+  </abapsource:elementInfo>
+  <abapsource:elementInfo adtcore:uri="/sap/bc/adt/ddic/structures/%2fdmo%2fs_travel_key/source/main" adtcore:type="TABL/DS" adtcore:name=".include">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="ddicIsPartOfInclude">/dmo/s_booking_key</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIncludeHierarchyLevel">1</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIncludeName">/dmo/s_travel_key</abapsource:entry>
+    </abapsource:properties>
+    <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">Key structure of Travel</abapsource:documentation>
+  </abapsource:elementInfo>
+  <abapsource:elementInfo adtcore:type="TABL/DTF" adtcore:name="travel_id">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="ddicIsKey">false</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataElement">/dmo/travel_id</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataType">numc</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicLength">000008</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIsPartOfInclude">/dmo/s_travel_key</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIncludeHierarchyLevel">2</abapsource:entry>
+    </abapsource:properties>
+    <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">Flight Reference Scenario: Travel ID</abapsource:documentation>
+  </abapsource:elementInfo>
+  <abapsource:elementInfo adtcore:type="TABL/DTF" adtcore:name="booking_id">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="ddicIsKey">false</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataElement">/dmo/booking_id</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataType">numc</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicLength">000004</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIsPartOfInclude">/dmo/s_booking_key</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicIncludeHierarchyLevel">1</abapsource:entry>
+    </abapsource:properties>
+    <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">Flight Reference Scenario: Booking ID</abapsource:documentation>
+  </abapsource:elementInfo>
+  <abapsource:elementInfo adtcore:type="TABL/DTF" adtcore:name="booking_supplement_id">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="ddicIsKey">false</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataElement">/dmo/booking_supplement_id</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicDataType">numc</abapsource:entry>
+      <abapsource:entry abapsource:key="ddicLength">000002</abapsource:entry>
+    </abapsource:properties>
+    <abapsource:documentation abapsource:rel="shorttext" abapsource:type="text/plain">Flight Reference Scenario: Booking Supplement ID</abapsource:documentation>
+  </abapsource:elementInfo>
+  <abapsource:elementInfo adtcore:uri="/sap/bc/adt/packages/%2fdmo%2fflight_legacy" adtcore:type="DEVC/K" adtcore:name="/DMO/FLIGHT_LEGACY">
+    <abapsource:properties>
+      <abapsource:entry abapsource:key="parentName">/DMO/FLIGHT_LEGACY</abapsource:entry>
+    </abapsource:properties>
+  </abapsource:elementInfo>
+</abapsource:elementInfo>
