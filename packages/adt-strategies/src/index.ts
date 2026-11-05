@@ -88,6 +88,19 @@ export {
   type IAtcWaitingRun,
 } from './results/atc';
 export {
+  type IElementInfoLink,
+  type IElementInfoObject,
+  type IElementInfoPackage,
+  type IExposedEntity,
+  type IServiceDefinitionElementInfo,
+  type IStructureComponent,
+  type IStructureElementInfo,
+  readServiceDefinitionElementInfo,
+  readStructureElementInfo,
+  serviceDefinitionElementInfo,
+  structureElementInfo,
+} from './results/elementInfo';
+export {
   type FeatureToggleState,
   featureToggleCheckState,
   featureToggleRuntimeState,
