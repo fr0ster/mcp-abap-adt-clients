@@ -24,6 +24,36 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [43.1.0] - 2026-11-05
+
+Issue #300.
+
+### Added
+
+- **`AdtUtils.getStructureElementInfo(structureName, options?)`**: one GET of
+  `/sap/bc/adt/ddic/elementinfo?path=<structure>` — the structure's
+  components in order, each include and append as an `.include` / `.append`
+  element naming the included structure (`ddicIncludeName`) and its source
+  URI, every field with its data element, type, length and, inside an
+  include, `ddicIsPartOfInclude` and `ddicIncludeHierarchyLevel`.
+- **`AdtUtils.getServiceDefinitionElementInfo(serviceDefinitionName,
+  options?)`**: one GET of `/sap/bc/adt/ddic/srvd/elementinfo?path=<name>` —
+  the exposed entities, each with its name, DDL source URI and `alias` (none
+  when the `expose` has no `as`), an extension's included, and a link to each
+  extension.
+- Both send `Accept: application/vnd.sap.adt.elementinfo+xml`, the only one
+  SAP answers (`406` to any other), replaced by `options.accept`; both answer
+  the document as it came (`IUtilResults` has no slot for them), which
+  adt-strategies 0.20.0 reads. Measured on premise and on ABAP cloud
+  (2026-11-05): an unknown name answers `200` with an element info naming
+  nothing; a named include is an `.include` like an anonymous one; an
+  `extend type` append is listed as `.append`. Recorded in
+  `corpus/adt/answers/read-elementinfo-*`.
+
+### Changed
+
+- The adt-strategies dev range moves to `^0.20.0`.
+
 ## [43.0.1] - 2026-11-05
 
 ### Changed

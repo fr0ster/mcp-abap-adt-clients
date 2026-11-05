@@ -14,6 +14,29 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.20.0] - 2026-11-05
+
+Released with `@mcp-abap-adt/adt-clients` 43.1.0, whose element-info members
+this reads.
+
+### Added
+
+- `readStructureElementInfo(xml)` and its strategy `structureElementInfo`:
+  what adt-clients' `getStructureElementInfo` answers, read — the structure's
+  code, name, URI and short text; every component in document order (its
+  code, name, URI, short text, `includeName`, `partOfInclude`,
+  `includeLevel`, `dataElement`, `dataType`, `length`, `decimals`, `isKey`
+  and every property entry as written); `includes`, the components that name
+  a structure (each `.include` and `.append`); and the package.
+- `readServiceDefinitionElementInfo(xml)` and its strategy
+  `serviceDefinitionElementInfo`: what `getServiceDefinitionElementInfo`
+  answers, read — the definition's code, name, URI and short text, its
+  exposed entities in document order (code, name, URI, `alias`, short text),
+  its links (an extension's) and the package.
+- An answer naming nothing (an unknown name) or an empty document reads as no
+  name and no components or entities. Tested against the answers recorded on
+  premise and on ABAP cloud (`answers/read-elementinfo-*`).
+
 ## [0.19.1] - 2026-11-05
 
 ### Changed
