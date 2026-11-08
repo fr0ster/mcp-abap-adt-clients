@@ -198,6 +198,20 @@ describe('getConfig over HTTP', () => {
     expect(refusal()).toContain('Missing or invalid SAP_URL');
   });
 
+  it('refuses a SAP_URL that is not http(s), naming the key and never the value', () => {
+    state({ SAP_URL: `ftp://${SENTINEL}` });
+    expect(refusal()).toBe(
+      'Missing or invalid SAP_URL: state the http(s) URL of the system in .env',
+    );
+  });
+
+  it('refuses an unknown SAP_AUTH_TYPE, naming the key and never the value', () => {
+    state({ SAP_URL: 'https://system.example', SAP_AUTH_TYPE: SENTINEL });
+    expect(refusal()).toBe(
+      'SAP_AUTH_TYPE is not one of basic, jwt, xsuaa — fix it in .env',
+    );
+  });
+
   it('builds the HTTP config from SAP_URL, with no RFC key', () => {
     state({ SAP_URL: 'https://system.example', SAP_CLIENT: '100' });
     expect(getConfig()).toStrictEqual({

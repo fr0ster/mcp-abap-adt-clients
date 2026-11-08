@@ -274,7 +274,7 @@ export function getConfig(): SapConfig {
   }
   if (!['basic', 'jwt', 'xsuaa'].includes(authType)) {
     throw new Error(
-      `SAP_AUTH_TYPE is "${rawAuthType}", which is not one of basic, jwt, xsuaa — fix it in .env`,
+      'SAP_AUTH_TYPE is not one of basic, jwt, xsuaa — fix it in .env',
     );
   }
 
@@ -293,7 +293,9 @@ export function getConfig(): SapConfig {
     url === undefined ||
     !(url.startsWith('http://') || url.startsWith('https://'))
   ) {
-    throw new Error(`Missing or invalid SAP_URL: ${url}`);
+    throw new Error(
+      'Missing or invalid SAP_URL: state the http(s) URL of the system in .env',
+    );
   }
   const client = statedEnv('SAP_CLIENT');
 

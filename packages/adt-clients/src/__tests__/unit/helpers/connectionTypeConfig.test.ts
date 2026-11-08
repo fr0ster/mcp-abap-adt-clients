@@ -58,18 +58,24 @@ describe('getConfig: the authentication type', () => {
   });
 
   it('refuses a stated value outside basic, jwt, xsuaa, naming the key', () => {
-    process.env.SAP_AUTH_TYPE = 'jwtt';
+    process.env.SAP_AUTH_TYPE = 'Sentinel-jwtt';
     process.env.SAP_USERNAME = 'U';
     process.env.SAP_PASSWORD = 'P';
-    expect(() => getConfig()).toThrow(/SAP_AUTH_TYPE is "jwtt"/);
+    expect(() => getConfig()).toThrow(
+      'SAP_AUTH_TYPE is not one of basic, jwt, xsuaa',
+    );
+    expect(() => getConfig()).not.toThrow('Sentinel');
   });
 
   it('refuses it on the RFC wire too', () => {
     mockEnvironment = () => ({ connection_type: 'rfc' });
-    process.env.SAP_AUTH_TYPE = 'basik';
+    process.env.SAP_AUTH_TYPE = 'Sentinel-basik';
     process.env.SAP_USERNAME = 'U';
     process.env.SAP_PASSWORD = 'P';
-    expect(() => getConfig()).toThrow(/SAP_AUTH_TYPE is "basik"/);
+    expect(() => getConfig()).toThrow(
+      'SAP_AUTH_TYPE is not one of basic, jwt, xsuaa',
+    );
+    expect(() => getConfig()).not.toThrow('Sentinel');
   });
 
   it('takes a stated type as stated', () => {
