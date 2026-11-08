@@ -176,6 +176,23 @@ describe('SAP configuration at registration', () => {
     ).toBe(expected);
   });
 
+  it('registers an RFC address without SAP_URL: an RFC destination has no URL', () => {
+    delete process.env.SAP_URL;
+    const original = process.env.SAP_ASHOST;
+    process.env.SAP_ASHOST = 'host';
+    try {
+      expect(
+        registrationGate('enhancement', 'enhoxhh', () => config(), {
+          loadEnv: () => {},
+          templateInUse: () => false,
+        }),
+      ).toBe(it);
+    } finally {
+      if (original === undefined) delete process.env.SAP_ASHOST;
+      else process.env.SAP_ASHOST = original;
+    }
+  });
+
   it('skips without SAP before reading even broken configuration', () => {
     delete process.env.SAP_URL;
     expect(

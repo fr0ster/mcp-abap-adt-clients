@@ -24,14 +24,14 @@ const sessionConfigPath = path.resolve(
   __dirname,
   '../src/__tests__/helpers/sessionConfig',
 );
-const { getConfig } = require(sessionConfigPath);
+const { getConfig, targetOf } = require(sessionConfigPath);
 
 const ENDPOINTS = ['/sap/bc/adt/core/discovery', '/sap/bc/adt/discovery'];
 
 async function main() {
   const config = getConfig();
 
-  console.log(`Connecting to ${config.url} (client ${config.client})...`);
+  console.log(`Connecting to ${targetOf(config)} (client ${config.client})...`);
 
   const connection = await createTestConnection(createConnectionLogger());
   // Already open: `createTestConnection` connects before returning.

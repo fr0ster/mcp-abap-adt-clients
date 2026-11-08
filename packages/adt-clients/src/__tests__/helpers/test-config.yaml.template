@@ -158,7 +158,12 @@ environment:
                                               #   (/sap/bc/adt/xslt/validation). On: any refusal (404 included)
                                               #   fails. Off: not sent, and the run says so. false where the
                                               #   system has no such resource (404, measured on premise).
-  # connection_type: "rfc"  # Transport mechanism: "rfc" or "http". RFC works on any system type. Set in the overlay.
+  # connection_type: "rfc"  # Transport mechanism: "rfc" or "http". RFC works on any on-prem system. Set in the overlay.
+                            #   Over RFC the session .env states the address and no SAP_URL:
+                            #   SAP_ASHOST + SAP_SYSNR (one application server), or SAP_MSHOST with
+                            #   SAP_MSSERV and/or SAP_SYSID and SAP_GROUP (a message server);
+                            #   SAP_CLIENT and SAP_LANGUAGE are required; SAP_SAPROUTER optional.
+                            #   Nothing is derived from a URL and nothing is defaulted.
 
 # Shared dependencies — persistent Lego library for integration tests
 # Objects are lazily created on first ensureSharedDependency() call, never deleted.

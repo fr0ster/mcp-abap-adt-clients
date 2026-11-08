@@ -10,10 +10,12 @@ const { loadTestEnv } = require('./test-helper');
 
 import * as fs from 'node:fs';
 import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces-adt-connection';
+import { sapIsConfigured } from './sapConfigured';
 import {
   createTestConnection,
   getConfig,
   getTargetSystem,
+  targetOf,
 } from './sessionConfig';
 import { forgetSessionMaterial, publishSessionMaterial } from './sharedSession';
 
@@ -138,7 +140,8 @@ function say(message: string): void {
 export default async function globalSetup(globalConfig?: JestGlobalConfig) {
   loadTestEnv();
 
-  // No SAP_URL → skip preflight, tests will self-skip via hasConfig=false
+  // No system named (no SAP_URL, no RFC address) → skip preflight; tests
+  // self-skip via hasConfig=false.
   // Whatever a previous run left behind. A stale session is worse than none:
   // every file would adopt cookies the server has long since released and then
   // fail on a session that is not there.
@@ -159,8 +162,10 @@ export default async function globalSetup(globalConfig?: JestGlobalConfig) {
     }
   }
 
-  if (!process.env.SAP_URL) {
-    say('[globalSetup] SAP_URL not configured — skipping preflight');
+  if (!sapIsConfigured()) {
+    say(
+      '[globalSetup] no SAP system configured (no SAP_URL, no RFC address) — skipping preflight',
+    );
     return;
   }
 
@@ -185,7 +190,7 @@ export default async function globalSetup(globalConfig?: JestGlobalConfig) {
   // suite's testTimeout is 15 minutes, so a wait with no explanation is
   // indistinguishable from a hang.
   say(
-    `[globalSetup] Checking SAP connectivity: ${config.url} (${system}) ` +
+    `[globalSetup] Checking SAP connectivity: ${targetOf(config)} (${system}) ` +
       `(up to ${PREFLIGHT_TIMEOUT_MS}ms; SKIP_SAP_PREFLIGHT=1 to skip, ` +
       `SAP_PREFLIGHT_TIMEOUT_MS to change) ...`,
   );
@@ -222,7 +227,7 @@ export default async function globalSetup(globalConfig?: JestGlobalConfig) {
     const msg = error instanceof Error ? error.message : String(error);
     throw new Error(
       `[globalSetup] SAP is unreachable — aborting all tests.\n` +
-        `  URL: ${config.url}\n` +
+        `  System: ${targetOf(config)}\n` +
         `  Error: ${msg}\n\n` +
         `Fix SAP connection before running integration tests.`,
     );

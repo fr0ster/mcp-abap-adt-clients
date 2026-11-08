@@ -45,7 +45,8 @@
 "create_transport.test_cases[builder_transport].params.target_system": "<TRANSPORT_TARGET>"
 
 # --- Optional: uncomment to override the base default ---
-# Transport mechanism: "rfc" or "http".
+# Transport mechanism: "rfc" or "http". RFC: the session .env states SAP_ASHOST + SAP_SYSNR
+# (or SAP_MSHOST, SAP_MSSERV/SAP_SYSID, SAP_GROUP), SAP_CLIENT, SAP_LANGUAGE and no SAP_URL.
 # "environment.connection_type": "rfc"
 # Name of the scalar function the test creates, if the base name collides.
 # "create_scalar_function.test_cases[adt_scalar_function].params.scalar_function_name": "<NAME>"

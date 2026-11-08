@@ -1,3 +1,4 @@
+import { sapIsConfigured } from './sapConfigured';
 import { TestConfigResolver } from './TestConfigResolver';
 
 const { loadTestConfig, loadTestEnv, isTestConfigTemplate } =
@@ -61,7 +62,7 @@ function preflight(
 ): Preflight {
   // Reuse the helper loader in this Jest context; globalSetup is separate.
   (dependencies.loadEnv ?? loadTestEnv)();
-  if (!(dependencies.sapConfigured ?? (() => !!process.env.SAP_URL?.trim()))())
+  if (!(dependencies.sapConfigured ?? sapIsConfigured)())
     return { register: it.skip };
 
   let config: ReturnType<ConfigLoader>;

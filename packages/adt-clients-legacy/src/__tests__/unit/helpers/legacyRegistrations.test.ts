@@ -122,13 +122,25 @@ describe('a legacy session through the seams', () => {
   });
 
   it('gives a legacy configuration the wire it had: legacy-http on premise over HTTP, rfc and cloud as they were', () => {
-    const config = { url: 'https://seam.example', authType: 'basic' as const };
+    // The harness's own config type: connection is adt-clients' devDependency.
+    type TestConfig = Parameters<typeof connectionSpec>[0];
+    const config: TestConfig = {
+      url: 'https://seam.example',
+      authType: 'basic',
+    };
+    const rfcConfig: TestConfig = {
+      connectionType: 'rfc',
+      authType: 'basic',
+      ashost: 'seam-host',
+      sysnr: '00',
+      client: '100',
+      language: 'EN',
+    };
     const credential = {} as IAuthProvider;
     const { onPremHttpTransport } = legacyConnectionOptions(() => true);
     const base = { config, credential, logger, wireLogger: logger };
     expect(
       connectionSpec(config, 'onprem', credential, logger, {
-        connectionType: 'http',
         onPremHttpTransport,
       }),
     ).toEqual({
@@ -138,14 +150,17 @@ describe('a legacy session through the seams', () => {
       agentOptions: expect.any(Function),
     });
     expect(
-      connectionSpec(config, 'onprem', credential, logger, {
-        connectionType: 'rfc',
+      connectionSpec(rfcConfig, 'onprem', credential, logger, {
         onPremHttpTransport,
       }),
-    ).toEqual({ ...base, system: 'onprem', transport: 'rfc' });
+    ).toEqual({
+      ...base,
+      config: rfcConfig,
+      system: 'onprem',
+      transport: 'rfc',
+    });
     expect(
       connectionSpec(config, 'cloud', credential, logger, {
-        connectionType: 'http',
         onPremHttpTransport,
       }),
     ).toEqual({

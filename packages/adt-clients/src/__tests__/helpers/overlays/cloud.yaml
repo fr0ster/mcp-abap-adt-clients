@@ -45,8 +45,8 @@
 "create_transport.test_cases[builder_transport].params.target_system": ""
 
 # --- Optional: uncomment to override the base default ---
-# Transport mechanism: "rfc" or "http".
-# "environment.connection_type": "rfc"
+# The transport is HTTP: ABAP Cloud is not reached over RFC, and
+# environment.connection_type "rfc" is refused for a cloud system.
 # Name of the scalar function the test creates, if the base name collides.
 # "create_scalar_function.test_cases[adt_scalar_function].params.scalar_function_name": "<NAME>"
 # Name of its implementation, if the base name collides.
