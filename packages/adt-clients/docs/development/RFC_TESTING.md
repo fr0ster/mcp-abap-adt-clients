@@ -55,8 +55,9 @@ Without a usable binding every RFC run stops in `globalSetup`:
 
 ### test-config.overlay.yaml
 
-Set `environment.connection_type` in your overlay (an optional key; keys are
-written flat, see [Test Config Schema](TEST_CONFIG_SCHEMA.md)):
+Set `environment.connection_type` in your overlay (keys are written flat, see
+[Test Config Schema](TEST_CONFIG_SCHEMA.md)). The key is optional: absent, or
+any value but `"rfc"`, is HTTP; an RFC run states `"rfc"`:
 
 ```yaml
 "environment.system": "onprem"          # Which system. Stated, never inferred
@@ -65,7 +66,7 @@ written flat, see [Test Config Schema](TEST_CONFIG_SCHEMA.md)):
 "environment.default_master_system": "SID"
 ```
 
-`SAP_AUTH_TYPE` is required in every session file (`basic`, `jwt` or `xsuaa`): a missing or other value is refused, naming the key, and the mode is never read off the credentials. When `connection_type` is `"rfc"`, the test session config then overrides `authType` to `"rfc"`.
+`SAP_AUTH_TYPE` is required in every session file (`basic`, `jwt` or `xsuaa`): a missing or other value is refused, naming the key, and the mode is never read off the credentials. When `connection_type` is `"rfc"`, the helper builds an RFC config — `connectionType: 'rfc'` with `authType: 'basic'` — that logs on with `SAP_USERNAME` and `SAP_PASSWORD`, whichever of the three `SAP_AUTH_TYPE` states.
 
 **A legacy run needs `connection_type: "rfc"`.** The legacy client
 (`@mcp-abap-adt/adt-clients-legacy`) is supported, and measured on SAP_BASIS 7.40
@@ -74,10 +75,11 @@ live checks skip, each with the reason "the legacy client is supported over RFC
 only" (`describeLegacyRfc` in the legacy package; see
 [LIVE_TESTING.md](../../../adt-clients-legacy/docs/LIVE_TESTING.md)).
 
-`system` is separate from `connection_type` and both are required: the first says
-which system is on the other end, the second says how to reach it. RFC is an
-on-prem transport, but stating one does not state the other — the helper builds
-the connection from both.
+`system` is separate from `connection_type`: the first says which system is on
+the other end and is required; the second says how to reach it, and an RFC run
+states it (absent is HTTP). RFC is an on-prem transport, but stating one does
+not state the other — the helper builds the connection from both, and refuses
+`system: "cloud"` with `connection_type: "rfc"`.
 
 ### Session files
 
