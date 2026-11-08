@@ -14,6 +14,18 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.21.0] - 2026-11-09
+
+Released with `@mcp-abap-adt/adt-clients` 44.0.0.
+
+### Changed
+
+- **On `@mcp-abap-adt/interfaces-adt-connection` `^4.0.0`** (was `^3.0.0`),
+  the range adt-clients 44 declares: v3 is no longer accepted. The plan
+  widened it to `^3.0.0 || ^4.0.0`; the owner chose the identical range so one
+  copy of the contract is installed. No strategy reads `getBaseUrl()`, and no
+  reading or verdict changes.
+
 ## [0.20.0] - 2026-11-05
 
 Released with `@mcp-abap-adt/adt-clients` 43.1.0, whose element-info members

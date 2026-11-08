@@ -109,13 +109,15 @@ more, not less. Set in your overlay, `src/__tests__/helpers/test-config.overlay.
 
 | field | value |
 |---|---|
-| `system` | `"onprem"` — this picks the connector, and it is stated, never inferred from `SAP_URL` |
+| `system` | `"onprem"` — this picks the connector, and it is stated, never inferred from `SAP_URL` or an RFC address |
 | `default_master_system` | the system ID, e.g. `SID` |
 | `transport_layer` | e.g. `ZSID` — on-prem package tests need it |
 | `default_package`, `default_transport` | yours; the package must exist already |
 
 Then name the system's session file with `MCP_ENV_PATH=~/.config/mcp-abap-adt/sessions/<system>.env` (on Windows `~/Documents/mcp-abap-adt/sessions/<system>.env`) and run as above. A legacy system (SAP_BASIS 7.40, measured on 7.40 SP04) needs
-the RFC transport instead — see [RFC_TESTING.md](RFC_TESTING.md), and the legacy
+the RFC transport instead (`connection_type: "rfc"`; its session file states
+`SAP_ASHOST` + `SAP_SYSNR` or the message-server keys, `SAP_CLIENT` and
+`SAP_LANGUAGE`, and no `SAP_URL`) — see [RFC_TESTING.md](RFC_TESTING.md), and the legacy
 package's live checks in
 [LIVE_TESTING.md](../../../adt-clients-legacy/docs/LIVE_TESTING.md); note that
 `SAPNWRFC_HOME` and `LD_LIBRARY_PATH` must be passed at launch because `dotenv`

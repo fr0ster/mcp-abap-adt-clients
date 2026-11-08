@@ -24,6 +24,48 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [44.0.0] - 2026-11-09
+
+Released with `@mcp-abap-adt/adt-strategies` 0.21.0 and
+`@mcp-abap-adt/adt-clients-legacy` 0.8.0. Migration:
+[MIGRATION-44](docs/usage/MIGRATION-44.md).
+
+### Changed — breaking
+
+- **On `@mcp-abap-adt/interfaces-adt-connection` `^4.0.0`** (was `^3.0.0`),
+  where `IAbapConnection.getBaseUrl()` answers `Promise<string | undefined>`:
+  an RFC connection has no HTTP origin. `AdtBatchConnection.getBaseUrl()`
+  answers `Promise<string | undefined>` and hands on what the wrapped
+  connection answers, `undefined` included. **Migration:** a caller reading
+  `getBaseUrl()` narrows (`if (origin !== undefined)`); install
+  interfaces-adt-connection 4 beside this package so one copy is installed. A
+  connection answering a string still conforms. No request changes.
+- `isCloudEnvironment(connection)` is unchanged in behaviour: without a URL it
+  asks `systeminformation`, as it did for an empty one (pinned by
+  `connectionWithoutUrl.test.ts`).
+
+### Changed — the test harness
+
+- **`@mcp-abap-adt/connection` `^20.0.0` and `@mcp-abap-adt/interfaces-auth-sap`
+  `^4.0.0`** (devDependencies; were `^19.0.0`, `^3.3.0`): an RFC config has no
+  URL and states its address.
+- **The RFC test configuration states its address.** `getConfig` reads the
+  wire first (`environment.connection_type`), then that wire's keys. Over RFC:
+  `SAP_ASHOST` + `SAP_SYSNR`, or `SAP_MSHOST` with `SAP_MSSERV` and/or
+  `SAP_SYSID` and `SAP_GROUP`; `SAP_CLIENT` and `SAP_LANGUAGE`, required;
+  `SAP_SAPROUTER` when stated; no `SAP_URL`. Refused, naming keys and never a
+  value: an RFC configuration stating `SAP_URL`, two addresses, none, an
+  incomplete one, no client or language; an HTTP configuration stating an RFC
+  address key; ABAP Cloud over RFC (`connectionSpec`). Nothing is derived from
+  a URL and nothing is defaulted. **Migration:** an RFC session file drops
+  `SAP_URL=http://host:80NN` and states `SAP_ASHOST=host`, `SAP_SYSNR=NN`,
+  `SAP_CLIENT` and `SAP_LANGUAGE`.
+- `connectionSpec` builds each spec's config in the branch that narrowed it;
+  `ITestWire` has no `connectionType` (the config's discriminant decides).
+  A stated `SAP_URL` or any RFC address key counts as a configured system
+  (`sapIsConfigured`, the case gate, `globalSetup`); `globalSetup` names the
+  RFC address instead of a URL.
+
 ## [43.1.0] - 2026-11-05
 
 Issue #300.
