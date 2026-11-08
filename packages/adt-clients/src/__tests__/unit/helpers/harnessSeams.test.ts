@@ -13,7 +13,11 @@
  * the harness knows here.
  */
 
-import type { ConnectionSpec } from '@mcp-abap-adt/connection';
+import type {
+  ConnectionSpec,
+  SapHttpConfig,
+  SapRfcConfig,
+} from '@mcp-abap-adt/connection';
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
@@ -191,14 +195,23 @@ describe('the client factory', () => {
 });
 
 describe('the connection spec', () => {
-  const config = { url: 'https://seam.example', authType: 'basic' as const };
+  const config: SapHttpConfig = {
+    url: 'https://seam.example',
+    authType: 'basic',
+  };
+  const rfcConfig: SapRfcConfig = {
+    connectionType: 'rfc',
+    authType: 'basic',
+    ashost: 'seam-host',
+    sysnr: '00',
+    client: '100',
+    language: 'EN',
+  };
   const credential = {} as IAuthProvider;
   const base = { config, credential, logger, wireLogger: logger };
 
   it('keeps the modern on-premise HTTP session: plain http, agent options', () => {
-    const spec = connectionSpec(config, 'onprem', credential, logger, {
-      connectionType: 'http',
-    });
+    const spec = connectionSpec(config, 'onprem', credential, logger, {});
     expect(spec).toEqual({
       ...base,
       system: 'onprem',
@@ -211,9 +224,7 @@ describe('the connection spec', () => {
   });
 
   it('keeps the cloud session: http, agent options', () => {
-    const spec = connectionSpec(config, 'cloud', credential, logger, {
-      connectionType: 'http',
-    });
+    const spec = connectionSpec(config, 'cloud', credential, logger, {});
     expect(spec).toEqual({
       ...base,
       system: 'cloud',
@@ -222,14 +233,27 @@ describe('the connection spec', () => {
     });
   });
 
-  it('keeps the RFC session: no agent options', () => {
+  it('takes the wire from the config: an RFC config is the RFC session, no agent options', () => {
     const spec: ConnectionSpec = connectionSpec(
-      config,
+      rfcConfig,
       'onprem',
       credential,
       logger,
-      { connectionType: 'rfc' },
+      {},
     );
-    expect(spec).toEqual({ ...base, system: 'onprem', transport: 'rfc' });
+    expect(spec).toEqual({
+      ...base,
+      config: rfcConfig,
+      system: 'onprem',
+      transport: 'rfc',
+    });
+  });
+
+  it('refuses ABAP Cloud over RFC, in its own words', () => {
+    expect(() =>
+      connectionSpec(rfcConfig, 'cloud', credential, logger, {}),
+    ).toThrow(
+      'The test configuration is ABAP Cloud over RFC, which ABAP Cloud does not offer',
+    );
   });
 });

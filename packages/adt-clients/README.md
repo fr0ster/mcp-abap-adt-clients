@@ -157,7 +157,7 @@ This package interacts with external packages **ONLY through interfaces**:
   | package | what this package takes from it |
   |---|---|
   | [`@mcp-abap-adt/interfaces-adt`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt) `^26.0.0` | the ADT type tables (`ADT_TYPES_ONPREM`, `ADT_TYPES_CLOUD`, `ADT_TYPES_BASIS_740`) and their code types (`AdtTypeCode`, …), the ABAP Unit run registry (`ABAP_UNIT_RUN_TYPES`, `AbapUnitRunObjectType`, `AbapUnitRunTarget`), the capability atoms, every object's config, the result-set contracts, `IAdtAnsweredObject`, `IAdtResponse`, `IAnalyse`, `IAdtAnalyseOptions`, `IAdtHeaders`, `IResultStrategy`, `ADT_NO_FAILURE`, `ADT_TASK_TYPE` |
-  | [`@mcp-abap-adt/interfaces-adt-connection`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt-connection) `^3.0.0` | `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions`, the connection capability atoms, `ADT_SESSION_ERROR` |
+  | [`@mcp-abap-adt/interfaces-adt-connection`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt-connection) `^4.0.0` | `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions`, the connection capability atoms, `ADT_SESSION_ERROR` |
   | [`@mcp-abap-adt/interfaces-network`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-network) `^2.0.1` | `IWebSocketTransport` and its four companions, `HttpError` |
   | [`@mcp-abap-adt/interfaces-utils`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-utils) `^1.1.1` | `ILogger`, `LogLevel`, `XmlNode` |
   | [`@mcp-abap-adt/interfaces-auth`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-auth) `^7.5.0` — **dev only** | `IAuthProvider`, for the test helpers that open a session |
@@ -891,12 +891,12 @@ npm run discovery:markdown -- --env /path/to/.env
 
 **Environment Variables:**
 The script uses the same environment variables as the main package:
-- `SAP_URL` - SAP system URL (required)
+- `SAP_URL` - SAP system URL (required over HTTP). The wire is the test configuration's required `environment.connection_type` (`"http"` or `"rfc"`, never guessed). Over RFC there is no URL: the address is stated instead — `SAP_ASHOST` and `SAP_SYSNR`, or `SAP_MSHOST` with `SAP_MSSERV` and/or `SAP_SYSID` and `SAP_GROUP` — with `SAP_LANGUAGE`, and `SAP_SAPROUTER` when needed; a `SAP_URL` beside it is refused
 - `SAP_AUTH_TYPE` - Authentication type: `'basic'`, `'jwt'` or `'xsuaa'` (required: a missing or other value is refused, naming the key)
 - `SAP_USERNAME` - Username for basic auth
 - `SAP_PASSWORD` - Password for basic auth
 - `SAP_JWT_TOKEN` - JWT token for JWT auth
-- `SAP_CLIENT` - Client number (optional)
+- `SAP_CLIENT` - Client number (optional over HTTP, required over RFC)
 
 **When to use:**
 - To explore available ADT API endpoints on your SAP system
@@ -1420,7 +1420,7 @@ everything else is not.
 
 ### Single Definition Site: the contract packages
 
-Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^26.0.0`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^3.0.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the result-set contracts a factory accepts (`IClassResults`, …, since 38.0.0), the option and response types and the cross-cutting shared types all live there.
+Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^26.0.0`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^4.0.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the result-set contracts a factory accepts (`IClassResults`, …, since 38.0.0), the option and response types and the cross-cutting shared types all live there.
 
 **Import them from the package that owns them:**
 
@@ -1641,6 +1641,7 @@ See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-a
 One document per breaking release, each written for a consumer on the contract
 before it:
 
+- **[43.x → 44.0.0](docs/usage/MIGRATION-44.md)** — `@mcp-abap-adt/interfaces-adt-connection` 4: `getBaseUrl()` answers `Promise<string | undefined>` (`undefined` over RFC), `AdtBatchConnection` hands it on and `isCloudEnvironment` asks `systeminformation` without a URL; adt-strategies 0.21.0 and adt-clients-legacy 0.8.0 declare the same range. The test configuration states `environment.connection_type` (required, `"http"` or `"rfc"`); over RFC it states `SAP_ASHOST` + `SAP_SYSNR` (or the message-server keys), `SAP_CLIENT` and `SAP_LANGUAGE`, and no `SAP_URL`.
 - **[42.x → 43.0.0](docs/usage/MIGRATION-43.md)** — a create invents no language: given one, it writes `adtcore:language` / `adtcore:masterLanguage` and sends `sap-language`, one value, from the config else the system context; given none, neither (no `EN` default); `AdtFunctionModule.validate` requires `description`; class create takes no `abstract` and program create no program type (SAP ignores both on create); a run id of `.` or `..` is refused before anything is sent.
 - **[41.x → 42.0.0](docs/usage/MIGRATION-42.md)** — `create` of every handler whose request needs a package, and `validate` of `AdtProgram` / `AdtInclude`, take `packageName: string`, required, in the config type (SAP creates nothing without a package; program validation refuses an empty one); any other `validate` without a package sends `packagename` empty, never `undefined`; a call that passes a package sends the same request.
 - **[40.x → 41.0.0](docs/usage/MIGRATION-41.md)** — every handler class is generic over the values its result slots answer (`AdtClass<ResultValuesOf<typeof classDocuments>>`), not over the strategies (`AdtClass<typeof classDocuments>`); code that names a class's type parameter wraps it in `ResultValuesOf<…>`, and `getX()` / `getX(results)` calls and every request are unchanged.

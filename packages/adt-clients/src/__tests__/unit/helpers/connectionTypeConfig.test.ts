@@ -16,12 +16,26 @@ import {
 } from '../../helpers/sessionConfig';
 
 describe('getConnectionType', () => {
-  it('answers the configured wire', () => {
+  it('answers the stated wire', () => {
     mockEnvironment = () => ({ connection_type: 'rfc' });
     expect(getConnectionType()).toBe('rfc');
-    mockEnvironment = () => ({});
+    mockEnvironment = () => ({ connection_type: 'http' });
     expect(getConnectionType()).toBe('http');
   });
+
+  it.each([
+    ['absent', {}],
+    ['unknown', { connection_type: 'Sentinel-wire' }],
+  ])(
+    'refuses an %s connection_type by its key, never guessing HTTP',
+    (_case, environment) => {
+      mockEnvironment = () => environment;
+      expect(() => getConnectionType()).toThrow(
+        'environment.connection_type is not "http" or "rfc"',
+      );
+      expect(() => getConnectionType()).not.toThrow('Sentinel');
+    },
+  );
 
   it('throws when the configuration cannot be read', () => {
     mockEnvironment = () => {
@@ -48,7 +62,7 @@ describe('getConfig: the authentication type', () => {
       delete process.env[key];
     }
     process.env.SAP_URL = 'https://example';
-    mockEnvironment = () => ({});
+    mockEnvironment = () => ({ connection_type: 'http' });
   });
   afterEach(() => {
     for (const key of KEYS) {
@@ -58,18 +72,24 @@ describe('getConfig: the authentication type', () => {
   });
 
   it('refuses a stated value outside basic, jwt, xsuaa, naming the key', () => {
-    process.env.SAP_AUTH_TYPE = 'jwtt';
+    process.env.SAP_AUTH_TYPE = 'Sentinel-jwtt';
     process.env.SAP_USERNAME = 'U';
     process.env.SAP_PASSWORD = 'P';
-    expect(() => getConfig()).toThrow(/SAP_AUTH_TYPE is "jwtt"/);
+    expect(() => getConfig()).toThrow(
+      'SAP_AUTH_TYPE is not one of basic, jwt, xsuaa',
+    );
+    expect(() => getConfig()).not.toThrow('Sentinel');
   });
 
   it('refuses it on the RFC wire too', () => {
     mockEnvironment = () => ({ connection_type: 'rfc' });
-    process.env.SAP_AUTH_TYPE = 'basik';
+    process.env.SAP_AUTH_TYPE = 'Sentinel-basik';
     process.env.SAP_USERNAME = 'U';
     process.env.SAP_PASSWORD = 'P';
-    expect(() => getConfig()).toThrow(/SAP_AUTH_TYPE is "basik"/);
+    expect(() => getConfig()).toThrow(
+      'SAP_AUTH_TYPE is not one of basic, jwt, xsuaa',
+    );
+    expect(() => getConfig()).not.toThrow('Sentinel');
   });
 
   it('takes a stated type as stated', () => {

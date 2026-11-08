@@ -129,7 +129,8 @@ const ALLOWED_OVERLAY_KEYS = Object.freeze(
     ['environment.default_package', { required: true }],
     ['environment.default_transport', { required: true, empty: true }],
     ['environment.default_master_system', { required: true, empty: true }],
-    ['environment.connection_type', { values: ['rfc', 'http'] }],
+    // The wire: stated, never guessed (absent was HTTP until 44.0.0).
+    ['environment.connection_type', { required: true, values: ['rfc', 'http'] }],
     // Checks whose outcome depends on how the system routes sessions: stated
     // per system, required, never defaulted. On, any refusal fails; off, the
     // check is not made and the run says so.

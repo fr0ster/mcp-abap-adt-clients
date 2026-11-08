@@ -51,7 +51,7 @@ export class AdtBatchConnection implements IAbapConnection {
   connect(): Promise<void> {
     return this.connection.connect();
   }
-  getBaseUrl(): Promise<string> {
+  getBaseUrl(): Promise<string | undefined> {
     return this.connection.getBaseUrl();
   }
   getSessionId(): string | null {

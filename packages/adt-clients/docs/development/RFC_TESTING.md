@@ -55,8 +55,10 @@ Without a usable binding every RFC run stops in `globalSetup`:
 
 ### test-config.overlay.yaml
 
-Set `environment.connection_type` in your overlay (an optional key; keys are
-written flat, see [Test Config Schema](TEST_CONFIG_SCHEMA.md)):
+Set `environment.connection_type` in your overlay (keys are written flat, see
+[Test Config Schema](TEST_CONFIG_SCHEMA.md)). The key is required: `"http"` or
+`"rfc"`, stated, never guessed — absent or another value is refused, naming the
+key. An RFC run states `"rfc"`:
 
 ```yaml
 "environment.system": "onprem"          # Which system. Stated, never inferred
@@ -65,7 +67,7 @@ written flat, see [Test Config Schema](TEST_CONFIG_SCHEMA.md)):
 "environment.default_master_system": "SID"
 ```
 
-`SAP_AUTH_TYPE` is required in every session file (`basic`, `jwt` or `xsuaa`): a missing or other value is refused, naming the key, and the mode is never read off the credentials. When `connection_type` is `"rfc"`, the test session config then overrides `authType` to `"rfc"`.
+`SAP_AUTH_TYPE` is required in every session file (`basic`, `jwt` or `xsuaa`): a missing or other value is refused, naming the key, and the mode is never read off the credentials. When `connection_type` is `"rfc"`, the helper builds an RFC config — `connectionType: 'rfc'` with `authType: 'basic'` — that logs on with `SAP_USERNAME` and `SAP_PASSWORD`, whichever of the three `SAP_AUTH_TYPE` states.
 
 **A legacy run needs `connection_type: "rfc"`.** The legacy client
 (`@mcp-abap-adt/adt-clients-legacy`) is supported, and measured on SAP_BASIS 7.40
@@ -74,23 +76,45 @@ live checks skip, each with the reason "the legacy client is supported over RFC
 only" (`describeLegacyRfc` in the legacy package; see
 [LIVE_TESTING.md](../../../adt-clients-legacy/docs/LIVE_TESTING.md)).
 
-`system` is separate from `connection_type` and both are required: the first says
-which system is on the other end, the second says how to reach it. RFC is an
-on-prem transport, but stating one does not state the other — the helper builds
-the connection from both.
+`system` is separate from `connection_type` and both are required: the first
+says which system is on the other end, the second how to reach it. RFC is an on-prem transport, but stating one does
+not state the other — the helper builds the connection from both, and refuses
+`system: "cloud"` with `connection_type: "rfc"`.
 
 ### Session files
 
-System-specific session files (`~/.config/mcp-abap-adt/sessions/<system>.env` on Linux/macOS, `~/Documents/mcp-abap-adt/sessions/<system>.env` on Windows) contain SAP credentials. The repository holds no `.env`; a run names its file with `MCP_ENV_PATH` (the helpers read the repository's `.env` only when it is unset). The file must carry `SAP_URL`, `SAP_USERNAME` (not `SAP_LOGIN`), `SAP_PASSWORD` and `SAP_CLIENT`; keep it in the session directory, mode 600:
+System-specific session files (`~/.config/mcp-abap-adt/sessions/<system>.env` on Linux/macOS, `~/Documents/mcp-abap-adt/sessions/<system>.env` on Windows) contain SAP credentials. The repository holds no `.env`; a run names its file with `MCP_ENV_PATH` (the helpers read the repository's `.env` only when it is unset). Over RFC the file states the system's address and no `SAP_URL`: `SAP_ASHOST` and `SAP_SYSNR` (one application server), or `SAP_MSHOST` with `SAP_MSSERV` and/or `SAP_SYSID` and `SAP_GROUP` (a message server); `SAP_CLIENT` and `SAP_LANGUAGE`; `SAP_SAPROUTER` when a router is in the way; and `SAP_USERNAME` (not `SAP_LOGIN`), `SAP_PASSWORD`. Keep it in the session directory, mode 600:
 
 ```env
-SAP_URL=http://saphost:8000
+SAP_ASHOST=saphost
+SAP_SYSNR=00
+SAP_CLIENT=100
+SAP_LANGUAGE=EN
 SAP_USERNAME=DEVELOPER
 SAP_PASSWORD=secret
-SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 SAP_UNICODE=false          # Set to false for non-unicode legacy systems
 ```
+
+The helper (`getConfig` in `src/__tests__/helpers/sessionConfig.ts`) reads the
+wire first (`environment.connection_type`), then that wire's keys, and refuses
+before any connection opens, naming keys and never a value:
+
+- an RFC configuration stating `SAP_URL` (an RFC destination takes no URL);
+- keys of both addresses (`SAP_ASHOST` or `SAP_SYSNR` beside any message-server key);
+- no address key at all;
+- an incomplete address: the other of `SAP_ASHOST` / `SAP_SYSNR`; beside
+  `SAP_MSHOST`, `SAP_GROUP` and `SAP_MSSERV` or `SAP_SYSID`; `SAP_MSHOST` beside
+  the other message-server keys;
+- no `SAP_CLIENT` or no `SAP_LANGUAGE`;
+- an HTTP configuration stating any RFC address key (`SAP_SAPROUTER` included);
+- `environment.system: "cloud"` with `connection_type: "rfc"`: ABAP Cloud is
+  not reached over RFC.
+
+Nothing is derived from a URL and nothing is defaulted: a session file that
+used to state `SAP_URL=http://saphost:80NN` now states `SAP_ASHOST=saphost` and
+`SAP_SYSNR=NN`, plus `SAP_CLIENT` and `SAP_LANGUAGE` if it relied on `000` and
+`EN`.
 
 #### SAP_UNICODE
 
@@ -110,7 +134,7 @@ MCP_ENV_PATH=~/.config/mcp-abap-adt/sessions/<system>.env npm test -- <path>
 Or pass variables inline:
 ```bash
 SAPNWRFC_HOME='C:\nwrfcsdk\nwrfcsdk' PATH='C:\nwrfcsdk\nwrfcsdk\lib;'"$PATH" \
-  SAP_URL=http://saphost:8000 SAP_USERNAME=DEV SAP_PASSWORD=secret SAP_CLIENT=100 SAP_AUTH_TYPE=basic \
+  SAP_ASHOST=saphost SAP_SYSNR=00 SAP_CLIENT=100 SAP_LANGUAGE=EN SAP_USERNAME=DEV SAP_PASSWORD=secret SAP_AUTH_TYPE=basic \
   npm test
 ```
 

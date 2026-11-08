@@ -21,7 +21,7 @@ import {
   CloudHttpTransport,
   LegacyOnPremHttpTransport,
   OnPremHttpTransport,
-  type SapConfig,
+  type SapHttpConfig,
 } from '@mcp-abap-adt/connection';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -79,7 +79,7 @@ export function resolveTarget(spec: string): ITarget {
   return { label: path.basename(name, '.env'), file, kind, env };
 }
 
-export function configOf(target: ITarget): SapConfig {
+export function configOf(target: ITarget): SapHttpConfig {
   const { env } = target;
   const url = clean(env.SAP_URL);
   if (!url || !/^https?:\/\//.test(url)) {
@@ -95,12 +95,12 @@ export function configOf(target: ITarget): SapConfig {
   }
   if (!['basic', 'jwt', 'xsuaa'].includes(authType)) {
     fail(
-      `${target.file}: SAP_AUTH_TYPE is "${authType}", which is not one of basic, jwt, xsuaa`,
+      `${target.file}: SAP_AUTH_TYPE is not one of basic, jwt, xsuaa`,
     );
   }
   const jwt = authType === 'jwt' || authType === 'xsuaa';
 
-  const config: SapConfig = { url, authType: jwt ? 'jwt' : 'basic' };
+  const config: SapHttpConfig = { url, authType: jwt ? 'jwt' : 'basic' };
   const client = clean(env.SAP_CLIENT);
   if (client) config.client = client;
 

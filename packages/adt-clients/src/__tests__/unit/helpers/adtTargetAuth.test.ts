@@ -33,13 +33,19 @@ describe('configOf: the authentication type', () => {
     expect(said()).toMatch(/SAP_AUTH_TYPE is not set/);
   });
 
-  it('stops on a value outside the set', () => {
+  it('stops on a value outside the set, naming the key and never the value', () => {
     expect(() =>
       configOf(
-        target({ SAP_AUTH_TYPE: 'jwtt', SAP_USERNAME: 'U', SAP_PASSWORD: 'P' }),
+        target({
+          SAP_AUTH_TYPE: 'Sentinel-jwtt',
+          SAP_USERNAME: 'U',
+          SAP_PASSWORD: 'P',
+        }),
       ),
     ).toThrow('exit 2');
-    expect(said()).toMatch(/SAP_AUTH_TYPE is "jwtt"/);
+    expect(said()).toContain('SAP_AUTH_TYPE is not one of basic, jwt, xsuaa');
+    // The script lower-cases the value before it is checked.
+    expect(said().toLowerCase()).not.toContain('sentinel');
   });
 
   it('takes a stated type as stated', () => {

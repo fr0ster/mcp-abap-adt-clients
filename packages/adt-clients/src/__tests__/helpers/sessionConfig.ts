@@ -14,6 +14,8 @@ import {
   createConnection,
   type OnPremHttpSpec,
   type SapConfig,
+  type SapHttpConfig,
+  type SapRfcConfig,
 } from '@mcp-abap-adt/connection';
 import type { IAdtClientOptions } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -21,9 +23,18 @@ import type {
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
+import type { ISapRfcLogon } from '@mcp-abap-adt/interfaces-auth-sap';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtClient } from '../../clients/AdtClient';
 import { getSystemInformation } from '../../utils/systemInfo';
+import {
+  RFC_ADDRESS_KEYS,
+  RFC_APPLICATION_SERVER_KEYS,
+  RFC_MESSAGE_SERVER_KEYS,
+  sapIsConfigured,
+  statedEnv,
+  statedTarget,
+} from './sapConfigured';
 import {
   type ISessionMaterial,
   type ISessionSharing,
@@ -34,19 +45,7 @@ import {
 import { createConnectionLogger, createRunIntegrityLogger } from './testLogger';
 import { withWireLog } from './wireLog';
 
-/**
- * Whether this machine has SAP configured at all.
- *
- * The one legitimate reason a test file may skip its whole suite: a checkout
- * with no `.env`, where nothing could possibly run. Everything else — a missing
- * `environment.system`, an unparseable `test-config.yaml`, an expired token, a
- * host that refuses the session — is a fault, and a fault that skips is a fault
- * nobody sees.
- */
-export function sapIsConfigured(): boolean {
-  const url = process.env.SAP_URL?.split('#')[0].trim();
-  return !!url && /^https?:\/\//.test(url);
-}
+export { sapIsConfigured };
 
 /**
  * What a test's `beforeAll` does when setup threw.
@@ -68,13 +67,13 @@ export function sapIsConfigured(): boolean {
 export function skipUnlessConfigured(error: unknown, logger: ILogger): false {
   if (!sapIsConfigured()) {
     logger.warn?.(
-      '⚠️ Skipping tests: SAP_URL is not set — no system to run against.',
+      '⚠️ Skipping tests: neither SAP_URL nor an RFC address is set — no system to run against.',
     );
     return false;
   }
   const reason = error instanceof Error ? error.message : String(error);
   throw new Error(
-    `Test setup failed against ${process.env.SAP_URL} — this is a failure, not a skip.\n` +
+    `Test setup failed against ${statedTarget()} — this is a failure, not a skip.\n` +
       `  ${reason}\n\n` +
       'SAP is configured on this machine, so the setup was expected to work. ' +
       'Check test-config.yaml (environment.system must be "onprem" or "cloud"), ' +
@@ -84,8 +83,10 @@ export function skipUnlessConfigured(error: unknown, logger: ILogger): false {
 }
 
 /**
- * Get connection_type from test-config.yaml environment section.
- * Returns 'http' (default) or 'rfc'.
+ * The wire, `environment.connection_type`: `'http'` or `'rfc'`, as stated.
+ * Required: absent or any other value is refused naming the key — the
+ * configuration comes from outside the type system, and the wire is never
+ * guessed.
  *
  * Exported because a suite occasionally has to know. `available_in` gates on the
  * kind of system; this gates on the wire.
@@ -94,8 +95,11 @@ export function getConnectionType(): 'http' | 'rfc' {
   const { getEnvironmentConfig } = require('./test-helper');
   // A configuration that cannot be read throws: reading it as "http" would
   // run a test on a wire nobody configured.
-  const envConfig = getEnvironmentConfig();
-  return envConfig.connection_type === 'rfc' ? 'rfc' : 'http';
+  const stated = getEnvironmentConfig()?.connection_type;
+  if (stated === 'http' || stated === 'rfc') return stated;
+  throw new Error(
+    'environment.connection_type is not "http" or "rfc": state the wire in test-config.overlay.yaml — it is never guessed',
+  );
 }
 
 /**
@@ -114,23 +118,158 @@ export function requiredEnvironmentFlag(name: string): boolean {
   return value;
 }
 
+/** How an RFC refusal of the test configuration starts. */
+const RFC_CONFIG =
+  'The test configuration is RFC (environment.connection_type "rfc")';
+
+/** Where an RFC address is stated, said the same way in every refusal. */
+const RFC_ADDRESS_HINT =
+  'set SAP_ASHOST and SAP_SYSNR, or SAP_MSHOST with SAP_MSSERV or SAP_SYSID and SAP_GROUP';
+
+/** The keys of `keys` that the environment states. */
+function statedKeys(keys: readonly string[]): string[] {
+  return keys.filter((key) => statedEnv(key) !== undefined);
+}
+
 /**
- * Get SAP configuration from environment variables
- * Used in tests to create connections
+ * The RFC address the environment states, read as given: one application
+ * server, or one message server with its service and group. Refused, naming
+ * keys only, when two addresses, none, or an incomplete one is stated.
+ */
+type StatedRfcAddress =
+  | { kind: 'application-server'; ashost: string; sysnr: string }
+  | {
+      kind: 'message-server';
+      mshost: string;
+      group: string;
+      msserv: string;
+      sysid: string | undefined;
+    }
+  | {
+      kind: 'message-server-by-sysid';
+      mshost: string;
+      group: string;
+      sysid: string;
+    };
+
+function statedRfcAddress(): StatedRfcAddress {
+  const application = statedKeys(RFC_APPLICATION_SERVER_KEYS);
+  const message = statedKeys(RFC_MESSAGE_SERVER_KEYS);
+  if (application.length > 0 && message.length > 0) {
+    throw new Error(
+      `${RFC_CONFIG} and states two addresses — an application server and a message server: ${[...application, ...message].join(', ')}`,
+    );
+  }
+  if (application.length === 0 && message.length === 0) {
+    throw new Error(`${RFC_CONFIG} and states no address: ${RFC_ADDRESS_HINT}`);
+  }
+  const lacks = (missing: string[]) =>
+    new Error(`${RFC_CONFIG} and its address lacks: ${missing.join(', ')}`);
+  if (application.length > 0) {
+    const ashost = statedEnv('SAP_ASHOST');
+    const sysnr = statedEnv('SAP_SYSNR');
+    if (ashost === undefined || sysnr === undefined) {
+      throw lacks([
+        ...(ashost === undefined ? ['SAP_ASHOST'] : []),
+        ...(sysnr === undefined ? ['SAP_SYSNR'] : []),
+      ]);
+    }
+    return { kind: 'application-server', ashost, sysnr };
+  }
+  const mshost = statedEnv('SAP_MSHOST');
+  const msserv = statedEnv('SAP_MSSERV');
+  const sysid = statedEnv('SAP_SYSID');
+  const group = statedEnv('SAP_GROUP');
+  const missing = [
+    ...(mshost === undefined ? ['SAP_MSHOST'] : []),
+    ...(msserv === undefined && sysid === undefined
+      ? ['SAP_MSSERV or SAP_SYSID']
+      : []),
+    ...(group === undefined ? ['SAP_GROUP'] : []),
+  ];
+  if (mshost === undefined || group === undefined) throw lacks(missing);
+  if (msserv !== undefined) {
+    return { kind: 'message-server', mshost, group, msserv, sysid };
+  }
+  if (sysid !== undefined) {
+    return { kind: 'message-server-by-sysid', mshost, group, sysid };
+  }
+  // Host and group stated, neither service: `missing` names the service.
+  throw lacks(missing);
+}
+
+/**
+ * The RFC configuration: the address, the client and the logon language as
+ * stated — no URL, nothing derived, nothing defaulted. The RFC wire logs on
+ * with a user and a password.
+ */
+function rfcConfigFromEnv(): SapRfcConfig {
+  if (statedEnv('SAP_URL') !== undefined) {
+    throw new Error(
+      `${RFC_CONFIG} and states SAP_URL, which an RFC destination does not take: ${RFC_ADDRESS_HINT}`,
+    );
+  }
+  const address = statedRfcAddress();
+  const client = statedEnv('SAP_CLIENT');
+  const language = statedEnv('SAP_LANGUAGE');
+  if (client === undefined || language === undefined) {
+    const missing = [
+      ...(client === undefined ? ['SAP_CLIENT'] : []),
+      ...(language === undefined ? ['SAP_LANGUAGE'] : []),
+    ];
+    throw new Error(`${RFC_CONFIG} and lacks: ${missing.join(', ')}`);
+  }
+  const username = process.env.SAP_USERNAME;
+  const password = process.env.SAP_PASSWORD;
+  if (!username || !password) {
+    throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for RFC connection');
+  }
+  const saprouter = statedEnv('SAP_SAPROUTER');
+  const logon: ISapRfcLogon = {
+    connectionType: 'rfc',
+    authType: 'basic',
+    client,
+    language,
+    username,
+    password,
+    ...(saprouter === undefined ? {} : { saprouter }),
+  };
+  switch (address.kind) {
+    case 'application-server':
+      return { ...logon, ashost: address.ashost, sysnr: address.sysnr };
+    case 'message-server':
+      return {
+        ...logon,
+        mshost: address.mshost,
+        group: address.group,
+        msserv: address.msserv,
+        ...(address.sysid === undefined ? {} : { sysid: address.sysid }),
+      };
+    case 'message-server-by-sysid':
+      return {
+        ...logon,
+        mshost: address.mshost,
+        group: address.group,
+        sysid: address.sysid,
+      };
+  }
+}
+
+/**
+ * The SAP configuration the tests connect with, from the environment.
+ *
+ * The boundary where the environment enters the type system: the wire is
+ * read first (`environment.connection_type`), then each wire's keys. HTTP
+ * requires an http(s) `SAP_URL` and takes no RFC address key; RFC takes no
+ * URL and states its address, `SAP_CLIENT` and `SAP_LANGUAGE`. A refusal
+ * names keys, never a value.
  */
 export function getConfig(): SapConfig {
-  const rawUrl = process.env.SAP_URL;
-  const url = rawUrl ? rawUrl.split('#')[0].trim() : rawUrl;
-  const rawClient = process.env.SAP_CLIENT;
-  const client = rawClient ? rawClient.split('#')[0].trim() : rawClient;
+  const connectionType = getConnectionType();
   const rawAuthType = process.env.SAP_AUTH_TYPE;
   const authType = rawAuthType
     ? rawAuthType.split('#')[0].trim().toLowerCase()
     : '';
-
-  if (!url || !/^https?:\/\//.test(url)) {
-    throw new Error(`Missing or invalid SAP_URL: ${url}`);
-  }
   // SAP_AUTH_TYPE is required and taken as stated: absent, or a value
   // outside the set, is refused — the mode is never read off the credentials.
   if (!authType) {
@@ -140,35 +279,35 @@ export function getConfig(): SapConfig {
   }
   if (!['basic', 'jwt', 'xsuaa'].includes(authType)) {
     throw new Error(
-      `SAP_AUTH_TYPE is "${rawAuthType}", which is not one of basic, jwt, xsuaa — fix it in .env`,
+      'SAP_AUTH_TYPE is not one of basic, jwt, xsuaa — fix it in .env',
     );
   }
 
-  // RFC transport overrides auth type — RFC connections use username/password
-  // but route through SADT_REST_RFC_ENDPOINT instead of HTTP
-  const connectionType = getConnectionType();
-  if (connectionType === 'rfc') {
-    const username = process.env.SAP_USERNAME;
-    const password = process.env.SAP_PASSWORD;
-    if (!username || !password) {
-      throw new Error(
-        'Missing SAP_USERNAME or SAP_PASSWORD for RFC connection',
-      );
-    }
-    return {
-      url,
-      authType: 'basic',
-      connectionType: 'rfc',
-      client: client || undefined,
-      username,
-      password,
-    };
+  // RFC routes through SADT_REST_RFC_ENDPOINT and logs on with a user and a
+  // password, whatever the HTTP auth type says.
+  if (connectionType === 'rfc') return rfcConfigFromEnv();
+
+  const rfcKeys = statedKeys(RFC_ADDRESS_KEYS);
+  if (rfcKeys.length > 0) {
+    throw new Error(
+      `The test configuration is HTTP (environment.connection_type "http") and states RFC address keys, which HTTP does not take: ${rfcKeys.join(', ')}`,
+    );
   }
+  const url = statedEnv('SAP_URL');
+  if (
+    url === undefined ||
+    !(url.startsWith('http://') || url.startsWith('https://'))
+  ) {
+    throw new Error(
+      'Missing or invalid SAP_URL: state the http(s) URL of the system in .env',
+    );
+  }
+  const client = statedEnv('SAP_CLIENT');
 
   const effectiveAuthType: 'basic' | 'jwt' =
     authType === 'basic' ? 'basic' : 'jwt';
 
-  const config: SapConfig = {
+  const config: SapHttpConfig = {
     url,
     authType: effectiveAuthType,
   };
@@ -211,6 +350,24 @@ export function getConfig(): SapConfig {
   }
 
   return config;
+}
+
+/**
+ * The system a config dials, for a message: its URL over HTTP, its address
+ * over RFC. Address fields only — no credential.
+ */
+export function targetOf(config: SapConfig): string {
+  if (config.connectionType !== 'rfc') return config.url;
+  const router =
+    config.saprouter === undefined ? '' : ` saprouter=${config.saprouter}`;
+  if (config.ashost !== undefined) {
+    return `rfc ashost=${config.ashost} sysnr=${config.sysnr}${router}`;
+  }
+  const service = [
+    ...(config.msserv === undefined ? [] : [`msserv=${config.msserv}`]),
+    ...(config.sysid === undefined ? [] : [`sysid=${config.sysid}`]),
+  ].join(' ');
+  return `rfc mshost=${config.mshost} ${service} group=${config.group}${router}`;
 }
 
 /**
@@ -357,7 +514,6 @@ export async function createTestConnection(
     withWireLogOn(
       createConnection(
         connectionSpec(config, system, credential, logger, {
-          connectionType: getConnectionType(),
           onPremHttpTransport: options.onPremHttpTransport,
         }),
       ),
@@ -569,10 +725,12 @@ function credentialFor(config: SapConfig): IAuthProvider {
   );
 }
 
-/** The wire a session takes: from the configuration, and from the caller. */
+/**
+ * The wire a session takes beyond what the configuration states: HTTP or RFC
+ * is the config's own discriminant (`connectionType`), read from
+ * `environment.connection_type` by {@link getConfig}.
+ */
 export interface ITestWire {
-  /** `environment.connection_type`. */
-  connectionType: 'http' | 'rfc';
   /** The on-premise HTTP wire the caller named. Absent: plain `http`. */
   onPremHttpTransport?: OnPremHttpSpec['transport'] | undefined;
 }
@@ -598,16 +756,40 @@ export function connectionSpec(
   logger: ILogger,
   wire: ITestWire,
 ): ConnectionSpec {
-  const base = { config, credential, logger, wireLogger: logger };
+  // Each spec's config is built inside the branch that narrowed it: an RFC
+  // spec takes an RFC config, an HTTP spec an HTTP one.
+  if (config.connectionType === 'rfc') {
+    if (system === 'cloud') {
+      throw new Error(
+        'The test configuration is ABAP Cloud over RFC, which ABAP Cloud does not offer: environment.system "cloud" with environment.connection_type "rfc" — state connection_type "http" for a cloud system',
+      );
+    }
+    return {
+      config,
+      credential,
+      logger,
+      wireLogger: logger,
+      system: 'onprem',
+      transport: 'rfc',
+    };
+  }
   const agentOptions = (): AgentOptions => ({});
   if (system === 'cloud') {
-    return { ...base, system: 'cloud', transport: 'http', agentOptions };
-  }
-  if (wire.connectionType === 'rfc') {
-    return { ...base, system: 'onprem', transport: 'rfc' };
+    return {
+      config,
+      credential,
+      logger,
+      wireLogger: logger,
+      system: 'cloud',
+      transport: 'http',
+      agentOptions,
+    };
   }
   return {
-    ...base,
+    config,
+    credential,
+    logger,
+    wireLogger: logger,
     system: 'onprem',
     transport: wire.onPremHttpTransport ?? 'http',
     agentOptions,

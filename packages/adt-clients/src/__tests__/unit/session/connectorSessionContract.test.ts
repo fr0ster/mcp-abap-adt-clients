@@ -34,7 +34,7 @@ import type {
   ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces-adt-connection';
-import type { ISapConfig } from '@mcp-abap-adt/interfaces-auth-sap';
+import type { ISapHttpConfig } from '@mcp-abap-adt/interfaces-auth-sap';
 import { type AdtStub, startAdtStub } from './adtStubServer';
 
 // These tests talk to a local stub and finish in well under a second. The suite
@@ -44,7 +44,7 @@ import { type AdtStub, startAdtStub } from './adtStubServer';
 // test and where.
 jest.setTimeout(20_000);
 
-const configFor = (baseUrl: string): ISapConfig => ({
+const configFor = (baseUrl: string): ISapHttpConfig => ({
   url: baseUrl,
   client: '100',
   authType: 'basic',

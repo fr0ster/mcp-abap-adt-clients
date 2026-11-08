@@ -4,6 +4,27 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [0.8.0] - 2026-11-09
+
+On `@mcp-abap-adt/adt-clients` `^44.0.0`: legacy 0.8.0 requires adt-clients
+44.
+
+### Changed — breaking (a 0.x minor)
+
+- **The `@mcp-abap-adt/adt-clients` peer range moves to `^44.0.0`** (was
+  `^43.1.0`; the devDependency moves to `^44.0.0` too). Every legacy class
+  extends an adt-clients class and hands its superclass the connection it was
+  given, typed by interfaces-adt-connection 4 (`getBaseUrl(): Promise<string |
+  undefined>`). adt-clients 43 types that parameter by contract v3
+  (`Promise<string>`), which a v4 connection does not satisfy, so legacy 0.8.0
+  works only over adt-clients 44.
+  **Migration:** install adt-clients 44 with legacy 0.8.0.
+- **On `@mcp-abap-adt/interfaces-adt-connection` `^4.0.0`** (was `^3.0.0`), as
+  adt-clients 44 and adt-strategies 0.21.0, so one copy of the contract is
+  installed (where `getBaseUrl()` may answer `undefined`); v3 is no longer
+  accepted. No legacy class reads `getBaseUrl()`. The adt-strategies dev range
+  moves to `^0.21.0`. No member changes.
+
 ## [0.7.2] - 2026-11-05
 
 On `@mcp-abap-adt/adt-clients` `^43.1.0`.

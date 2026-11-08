@@ -44,7 +44,7 @@ export LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:$LD_LIBRARY_PATH
 RFC transport is provided by `@mcp-abap-adt/sap-rfc-lite`, which is pulled in automatically as a dependency of `@mcp-abap-adt/connection`. Nothing needs to be added to `package.json` — `adt-clients` consumes the `IAbapConnection` interface and does not depend on any RFC library directly.
 
 It is an **optional** dependency with no install script (sap-rfc-lite 0.3.x,
-`@mcp-abap-adt/connection` 19 and later): `npm install` compiles nothing and needs
+`@mcp-abap-adt/connection` 19 and later; this package's tests use 20): `npm install` compiles nothing and needs
 no SDK. It ships prebuilt bindings for linux-x64 (glibc), win32-x64 and
 darwin-arm64. On any other platform the install succeeds without a binding and
 the RFC connection fails when it loads sap-rfc-lite; build the binding from
@@ -61,10 +61,13 @@ The SAP user needs `S_RFC` authorization for function module `SADT_REST_RFC_ENDP
 
 ### Connection Layer (`@mcp-abap-adt/connection`)
 
-RFC is a **transport**, not an auth type. `RfcAbapConnection` and
-`connectionType: 'rfc'` were both removed in `@mcp-abap-adt/connection` 6.0.0:
-the wire an on-prem system is reached over is now an argument, because that is
-what it always was.
+RFC is a **transport**, not an auth type: the wire an on-prem system is
+reached over is an argument (`RfcTransport`), as it has been since
+`@mcp-abap-adt/connection` 6.0.0. `connectionType: 'rfc'` is the config's
+discriminant since `@mcp-abap-adt/interfaces-auth-sap` 4 /
+`@mcp-abap-adt/connection` 20: `ISapConfig` is a union, and an RFC config
+(`SapRfcConfig`) states its own address, client and logon language and has no
+`url`.
 
 ```typescript
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
@@ -72,29 +75,41 @@ import {
   AdtOnPremConnector,
   RfcTransport,
   rfcConversationFrom,
+  type SapRfcConfig,
 } from '@mcp-abap-adt/connection';
 
-const config = {
-  url: 'http://saphost:8000',   // hostname and port derive the RFC parameters
-  authType: 'basic' as const,
+const config: SapRfcConfig = {
+  connectionType: 'rfc',
+  ashost: 'saphost',  // the application server
+  sysnr: '00',        // its system number
   client: '100',
+  language: 'EN',
+  authType: 'basic',
   username: 'DEVELOPER',
   password: 'secret',
 };
 
 const connection = new AdtOnPremConnector(
   config,
-  new BasicAuthProvider(config.username, config.password),
+  new BasicAuthProvider('DEVELOPER', 'secret'),
   new RfcTransport(rfcConversationFrom(config)),
 );
 
 await connection.connect();
 ```
 
-`rfcConversationFrom(config)` derives the connection parameters from the URL:
-- `ashost` — parsed from URL hostname
-- `sysnr` — derived from port (80XX -> XX, e.g. 8000 -> 00, 8001 -> 01)
-- `client`, `user`, `passwd` — from config
+`rfcConversationFrom(config)` takes the address as stated:
+- an application server: `ashost` and `sysnr`;
+- or a message server: `mshost`, its service as `msserv`, `sysid` or both, and
+  the logon `group`;
+- `client` and `language` (sent as the SDK's `lang`), and `saprouter` when the
+  config states it;
+- the provider's logon parameters (`user`, `passwd`, or SNC) are spread over
+  that address at each open.
+
+Nothing is derived from a URL, nothing is defaulted (no `000`, `EN` or
+`PUBLIC`), and `SAP_SYSNR` is not read from the environment. An RFC
+connection's `getBaseUrl()` answers `undefined`: it has no HTTP origin.
 
 ### ADT Clients Layer (`@mcp-abap-adt/adt-clients`)
 

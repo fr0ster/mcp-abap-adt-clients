@@ -13,6 +13,8 @@
 # --- Required ---
 # Which kind of system. Stated, never guessed.
 "environment.system": "cloud"
+# The wire: "http" — ABAP Cloud is not reached over RFC ("rfc" is refused for a cloud system).
+"environment.connection_type": "http"
 # Your dev package (Z*/Y*) or "$TMP" for local objects. Create it by hand first; tests only create objects inside it.
 "environment.default_package": "<DEV_PACKAGE>"
 # The ONE transport request every run reuses and never releases ("" for $TMP/local packages).
@@ -45,8 +47,6 @@
 "create_transport.test_cases[builder_transport].params.target_system": ""
 
 # --- Optional: uncomment to override the base default ---
-# Transport mechanism: "rfc" or "http".
-# "environment.connection_type": "rfc"
 # Name of the scalar function the test creates, if the base name collides.
 # "create_scalar_function.test_cases[adt_scalar_function].params.scalar_function_name": "<NAME>"
 # Name of its implementation, if the base name collides.

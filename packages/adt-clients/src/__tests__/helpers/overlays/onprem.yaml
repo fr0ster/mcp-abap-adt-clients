@@ -13,6 +13,9 @@
 # --- Required ---
 # Which kind of system. Stated, never guessed.
 "environment.system": "onprem"
+# The wire: "http", or "rfc" (the session .env then states SAP_ASHOST + SAP_SYSNR, or SAP_MSHOST with
+# SAP_MSSERV/SAP_SYSID and SAP_GROUP, plus SAP_CLIENT and SAP_LANGUAGE, and no SAP_URL). Stated, never guessed.
+"environment.connection_type": "<http or rfc>"
 # Your dev package (Z*/Y*) or "$TMP" for local objects. Create it by hand first; tests only create objects inside it.
 "environment.default_package": "<DEV_PACKAGE>"
 # The ONE transport request every run reuses and never releases ("" for $TMP/local packages).
@@ -45,8 +48,6 @@
 "create_transport.test_cases[builder_transport].params.target_system": "<TRANSPORT_TARGET>"
 
 # --- Optional: uncomment to override the base default ---
-# Transport mechanism: "rfc" or "http".
-# "environment.connection_type": "rfc"
 # Name of the scalar function the test creates, if the base name collides.
 # "create_scalar_function.test_cases[adt_scalar_function].params.scalar_function_name": "<NAME>"
 # Name of its implementation, if the base name collides.

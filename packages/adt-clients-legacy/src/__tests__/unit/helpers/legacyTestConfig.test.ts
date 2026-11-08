@@ -29,6 +29,7 @@ const EXTENSIONS = [LEGACY_TEST_CONFIG];
 /** Every required key, with a value of its own. */
 const FULL_OVERLAY: Record<string, string | boolean> = {
   'environment.system': 'cloud',
+  'environment.connection_type': 'http',
   'environment.default_package': 'ZPKG',
   'environment.default_transport': 'TRK900001',
   'environment.default_master_system': 'SID',
