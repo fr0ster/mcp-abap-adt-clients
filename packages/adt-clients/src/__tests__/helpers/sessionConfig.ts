@@ -83,8 +83,10 @@ export function skipUnlessConfigured(error: unknown, logger: ILogger): false {
 }
 
 /**
- * Get connection_type from test-config.yaml environment section.
- * Returns 'http' (default) or 'rfc'.
+ * The wire, `environment.connection_type`: `'http'` or `'rfc'`, as stated.
+ * Required: absent or any other value is refused naming the key — the
+ * configuration comes from outside the type system, and the wire is never
+ * guessed.
  *
  * Exported because a suite occasionally has to know. `available_in` gates on the
  * kind of system; this gates on the wire.
@@ -93,8 +95,11 @@ export function getConnectionType(): 'http' | 'rfc' {
   const { getEnvironmentConfig } = require('./test-helper');
   // A configuration that cannot be read throws: reading it as "http" would
   // run a test on a wire nobody configured.
-  const envConfig = getEnvironmentConfig();
-  return envConfig.connection_type === 'rfc' ? 'rfc' : 'http';
+  const stated = getEnvironmentConfig()?.connection_type;
+  if (stated === 'http' || stated === 'rfc') return stated;
+  throw new Error(
+    'environment.connection_type is not "http" or "rfc": state the wire in test-config.overlay.yaml — it is never guessed',
+  );
 }
 
 /**
@@ -285,7 +290,7 @@ export function getConfig(): SapConfig {
   const rfcKeys = statedKeys(RFC_ADDRESS_KEYS);
   if (rfcKeys.length > 0) {
     throw new Error(
-      `The test configuration is HTTP (environment.connection_type is not "rfc") and states RFC address keys, which HTTP does not take: ${rfcKeys.join(', ')}`,
+      `The test configuration is HTTP (environment.connection_type "http") and states RFC address keys, which HTTP does not take: ${rfcKeys.join(', ')}`,
     );
   }
   const url = statedEnv('SAP_URL');

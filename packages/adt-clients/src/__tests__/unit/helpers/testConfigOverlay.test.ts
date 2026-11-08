@@ -69,6 +69,7 @@ const BASE = [
 /** Every required key, with a value of its own. */
 const FULL_OVERLAY: Record<string, string | boolean> = {
   'environment.system': 'cloud',
+  'environment.connection_type': 'http',
   'environment.default_package': 'ZPKG',
   'environment.default_transport': 'TRK900001',
   'environment.default_master_system': 'SID',
@@ -366,6 +367,7 @@ describe('migrating the old full config', () => {
   function oldConfig(): string {
     const config = yaml.parse(BASE);
     config.environment.system = 'onprem';
+    config.environment.connection_type = 'http';
     config.environment.default_package = 'ZMIGRATED';
     config.environment.default_transport = 'TRK1';
     config.environment.default_master_system = 'SID';
@@ -381,6 +383,15 @@ describe('migrating the old full config', () => {
     config.create_transport.test_cases[0].params.target_system = 'TGT';
     return yaml.stringify(config);
   }
+
+  it('refuses an old config that states no connection_type, naming the key', () => {
+    const config = yaml.parse(oldConfig());
+    delete config.environment.connection_type;
+    put(OLD_FULL_FILE, yaml.stringify(config));
+    expect(() => migrateFullConfig(directory)).toThrow(
+      'has no valid value for environment.connection_type',
+    );
+  });
 
   it('writes only the allowed keys, and the overlay then loads', () => {
     put(OLD_FULL_FILE, oldConfig());

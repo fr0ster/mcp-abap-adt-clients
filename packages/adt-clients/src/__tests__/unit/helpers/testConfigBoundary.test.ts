@@ -190,7 +190,7 @@ describe('getConfig over RFC', () => {
 
 describe('getConfig over HTTP', () => {
   beforeEach(() => {
-    mockEnvironment = () => ({});
+    mockEnvironment = () => ({ connection_type: 'http' });
     state({ SAP_AUTH_TYPE: 'basic', SAP_USERNAME: 'U', SAP_PASSWORD: 'P' });
   });
 
@@ -235,7 +235,7 @@ describe('getConfig over HTTP', () => {
     state({ SAP_URL: 'https://system.example', [key]: SENTINEL });
     expectEnds(
       refusal(),
-      `is HTTP (environment.connection_type is not "rfc") and states RFC address keys, which HTTP does not take: ${key}`,
+      `is HTTP (environment.connection_type "http") and states RFC address keys, which HTTP does not take: ${key}`,
     );
   });
 });

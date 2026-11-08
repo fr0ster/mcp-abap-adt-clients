@@ -49,6 +49,12 @@ Released with `@mcp-abap-adt/adt-strategies` 0.21.0 and
 - **`@mcp-abap-adt/connection` `^20.0.0` and `@mcp-abap-adt/interfaces-auth-sap`
   `^4.0.0`** (devDependencies; were `^19.0.0`, `^3.3.0`): an RFC config has no
   URL and states its address.
+- **`environment.connection_type` is required** in the test overlay: `"http"`
+  or `"rfc"`, stated, never guessed. Absent or another value is refused naming
+  the key (`getConnectionType`, `check:config`, the migration); until now an
+  absent one was HTTP. Every overlay form states it (on-prem: a placeholder to
+  fill, cloud: `"http"`). **Migration:** add
+  `"environment.connection_type": "http"` (or `"rfc"`) to your overlay.
 - **The RFC test configuration states its address.** `getConfig` reads the
   wire first (`environment.connection_type`), then that wire's keys. Over RFC:
   `SAP_ASHOST` + `SAP_SYSNR`, or `SAP_MSHOST` with `SAP_MSSERV` and/or

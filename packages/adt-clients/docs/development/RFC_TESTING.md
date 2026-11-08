@@ -56,8 +56,9 @@ Without a usable binding every RFC run stops in `globalSetup`:
 ### test-config.overlay.yaml
 
 Set `environment.connection_type` in your overlay (keys are written flat, see
-[Test Config Schema](TEST_CONFIG_SCHEMA.md)). The key is optional: absent, or
-any value but `"rfc"`, is HTTP; an RFC run states `"rfc"`:
+[Test Config Schema](TEST_CONFIG_SCHEMA.md)). The key is required: `"http"` or
+`"rfc"`, stated, never guessed — absent or another value is refused, naming the
+key. An RFC run states `"rfc"`:
 
 ```yaml
 "environment.system": "onprem"          # Which system. Stated, never inferred
@@ -75,9 +76,8 @@ live checks skip, each with the reason "the legacy client is supported over RFC
 only" (`describeLegacyRfc` in the legacy package; see
 [LIVE_TESTING.md](../../../adt-clients-legacy/docs/LIVE_TESTING.md)).
 
-`system` is separate from `connection_type`: the first says which system is on
-the other end and is required; the second says how to reach it, and an RFC run
-states it (absent is HTTP). RFC is an on-prem transport, but stating one does
+`system` is separate from `connection_type` and both are required: the first
+says which system is on the other end, the second how to reach it. RFC is an on-prem transport, but stating one does
 not state the other — the helper builds the connection from both, and refuses
 `system: "cloud"` with `connection_type: "rfc"`.
 

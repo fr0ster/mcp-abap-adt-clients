@@ -110,6 +110,7 @@ more, not less. Set in your overlay, `src/__tests__/helpers/test-config.overlay.
 | field | value |
 |---|---|
 | `system` | `"onprem"` — this picks the connector, and it is stated, never inferred from `SAP_URL` or an RFC address |
+| `connection_type` | `"http"` or `"rfc"` — the wire; required, never guessed |
 | `default_master_system` | the system ID, e.g. `SID` |
 | `transport_layer` | e.g. `ZSID` — on-prem package tests need it |
 | `default_package`, `default_transport` | yours; the package must exist already |

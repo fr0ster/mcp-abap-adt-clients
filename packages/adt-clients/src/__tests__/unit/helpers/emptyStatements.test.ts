@@ -19,6 +19,7 @@ const COMPETING = {
 
 const EMPTY_STATEMENTS: Record<string, string | boolean> = {
   'environment.system': 'cloud',
+  'environment.connection_type': 'http',
   'environment.default_package': 'ZPKG',
   'environment.default_transport': '',
   'environment.default_master_system': '',

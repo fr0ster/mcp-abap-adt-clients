@@ -56,9 +56,15 @@ SAP_LANGUAGE=EN
 `SAP_GROUP`. `SAP_SAPROUTER` is taken when stated. Nothing is derived from a URL
 and nothing is defaulted.
 
+`environment.connection_type` is required in the overlay: `"http"` or `"rfc"`,
+stated. Absent or another value is refused, naming the key; until 44.0.0 an
+absent one was read as HTTP.
+
 ### What to do
 
-Remove `SAP_URL` from an RFC session file and add `SAP_ASHOST`, `SAP_SYSNR`,
+State `"environment.connection_type": "http"` (or `"rfc"`) in your
+`test-config.overlay.yaml`; an old full `test-config.yaml` that states none is
+not migrated (`npm run test-config:migrate` names the key). Remove `SAP_URL` from an RFC session file and add `SAP_ASHOST`, `SAP_SYSNR`,
 `SAP_CLIENT` and `SAP_LANGUAGE` (`000` and `EN` were the old defaults). The
 helper refuses, naming the keys, an RFC file that states `SAP_URL`, two
 addresses, none, an incomplete one, or no client or language; an HTTP file

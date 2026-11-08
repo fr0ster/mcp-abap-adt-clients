@@ -3,7 +3,7 @@
 # overlay file, named by MCP_TEST_OVERLAY, holds both. Every line is optional.
 # A legacy system (SAP_BASIS 7.40): the legacy client and its live checks, over RFC only. Also SAP_UNICODE=false in the session .env for a non-unicode system.
 # "environment.is_legacy": true
-# "environment.connection_type": "rfc"
+# The root form's "environment.connection_type" is "rfc" for a legacy system.
 # Software component of the transportable package ZLG7_TEST the legacy test environment creates (npm run legacy:setup).
 # "legacy_env.software_component": "<SOFTWARE_COMPONENT>"
 # Transport layer of that package (up to 4 characters).

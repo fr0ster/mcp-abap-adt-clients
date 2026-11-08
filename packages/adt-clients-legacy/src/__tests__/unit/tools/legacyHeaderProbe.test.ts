@@ -350,6 +350,7 @@ describe('the legacy entry reads the overlay the live tests read', () => {
       file,
       [
         '"environment.system": "onprem"',
+        '"environment.connection_type": "rfc"',
         '"environment.default_package": "ZPKG"',
         '"environment.default_transport": "SYSK900001"',
         '"environment.default_master_system": "SYS"',

@@ -16,12 +16,26 @@ import {
 } from '../../helpers/sessionConfig';
 
 describe('getConnectionType', () => {
-  it('answers the configured wire', () => {
+  it('answers the stated wire', () => {
     mockEnvironment = () => ({ connection_type: 'rfc' });
     expect(getConnectionType()).toBe('rfc');
-    mockEnvironment = () => ({});
+    mockEnvironment = () => ({ connection_type: 'http' });
     expect(getConnectionType()).toBe('http');
   });
+
+  it.each([
+    ['absent', {}],
+    ['unknown', { connection_type: 'Sentinel-wire' }],
+  ])(
+    'refuses an %s connection_type by its key, never guessing HTTP',
+    (_case, environment) => {
+      mockEnvironment = () => environment;
+      expect(() => getConnectionType()).toThrow(
+        'environment.connection_type is not "http" or "rfc"',
+      );
+      expect(() => getConnectionType()).not.toThrow('Sentinel');
+    },
+  );
 
   it('throws when the configuration cannot be read', () => {
     mockEnvironment = () => {
@@ -48,7 +62,7 @@ describe('getConfig: the authentication type', () => {
       delete process.env[key];
     }
     process.env.SAP_URL = 'https://example';
-    mockEnvironment = () => ({});
+    mockEnvironment = () => ({ connection_type: 'http' });
   });
   afterEach(() => {
     for (const key of KEYS) {
