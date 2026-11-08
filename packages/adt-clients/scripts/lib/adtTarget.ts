@@ -95,7 +95,7 @@ export function configOf(target: ITarget): SapHttpConfig {
   }
   if (!['basic', 'jwt', 'xsuaa'].includes(authType)) {
     fail(
-      `${target.file}: SAP_AUTH_TYPE is "${authType}", which is not one of basic, jwt, xsuaa`,
+      `${target.file}: SAP_AUTH_TYPE is not one of basic, jwt, xsuaa`,
     );
   }
   const jwt = authType === 'jwt' || authType === 'xsuaa';
