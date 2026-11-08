@@ -139,13 +139,15 @@ async function stateOf(
 function reportFor(
   c: IPublicationCase,
   state: { published?: string; allowedAction?: string },
-  baseUrl: string,
+  baseUrl: string | undefined,
 ): void {
+  // An RFC connection has no HTTP origin: the path alone is what it read.
+  const origin = baseUrl ?? '';
   const path = `/sap/bc/adt/businessservices/bindings/${c.bindingName.toLowerCase()}`;
   const lines = [
     '',
     '─── check it in Eclipse ADT ───────────────────────────────────────────',
-    `  system            ${baseUrl}`,
+    `  system            ${baseUrl ?? '(RFC: no URL)'}`,
     `  service binding   ${c.bindingName}      (Ctrl+Shift+A → ${c.bindingName})`,
     `  service           ${c.serviceName}, version ${c.serviceVersion}, ${c.serviceType}`,
     '',
@@ -156,7 +158,7 @@ function reportFor(
     '  published, and the button reads Unpublish; when it is not, the button',
     '  reads Publish and no endpoint is shown.',
     '',
-    `  the document this test read:  ${baseUrl}${path}`,
+    `  the document this test read:  ${origin}${path}`,
     '─────────────────────────────────────────────────────────────────────',
   ];
   for (const line of lines) testsLogger.info?.(line);
@@ -165,7 +167,7 @@ function reportFor(
 describe('Service binding publication (deliberate runs)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let baseUrl = '';
+  let baseUrl: string | undefined;
   /**
    * Every request this test's client makes, in order.
    *
