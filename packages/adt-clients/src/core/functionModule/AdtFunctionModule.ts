@@ -18,6 +18,7 @@ import type {
   AdtObjectIdentity,
   AdtVariant,
   IAdtActivatable,
+  IAdtActivationOptions,
   IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtContentTypes,
@@ -416,7 +417,7 @@ export class AdtFunctionModule<
   /** Activate the function module. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -424,7 +425,14 @@ export class AdtFunctionModule<
     const { group, module } = this.names(config);
 
     return answering(
-      () => activateFunctionModule(connection, options.headers, group, module),
+      () =>
+        activateFunctionModule(
+          connection,
+          options.headers,
+          group,
+          module,
+          options.preauditRequested ?? true,
+        ),
       this.results.activation,
       options?.analyse,
     );

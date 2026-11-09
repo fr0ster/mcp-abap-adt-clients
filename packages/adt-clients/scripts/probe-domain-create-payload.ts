@@ -225,7 +225,7 @@ async function main(): Promise<void> {
       const started = Date.now();
       report(
         'POST /sap/bc/adt/activation (A)',
-        await activateDomain(connection, headersFor('AdtDomain.activate'), A),
+        await activateDomain(connection, headersFor('AdtDomain.activate'), A, true),
         Date.now() - started,
       );
     } catch (error) {
@@ -265,7 +265,7 @@ async function main(): Promise<void> {
       const started = Date.now();
       report(
         'POST /sap/bc/adt/activation (B)',
-        await activateDomain(connection, headersFor('AdtDomain.activate'), B),
+        await activateDomain(connection, headersFor('AdtDomain.activate'), B, true),
         Date.now() - started,
       );
     } catch (error) {

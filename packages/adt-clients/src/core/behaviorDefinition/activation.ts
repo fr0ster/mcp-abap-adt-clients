@@ -15,12 +15,12 @@ import { activateObjectInSession } from '../../utils/activationUtils';
  *
  * Makes behavior definition active and usable in SAP system
  *
- * Endpoint: POST /sap/bc/adt/activation?method=activate&preauditRequested=true
+ * Endpoint: POST /sap/bc/adt/activation?method=activate&preauditRequested=…
  *
  * @param connection - ABAP connection instance
  * @param name - Behavior definition name
  * @param sessionId - Session ID for request tracking
- * @param preauditRequested - Request preaudit (default: true)
+ * @param preauditRequested - Sent as `preauditRequested`; the member decides it
  * @returns Axios response with activation result
  *
  * @example
@@ -32,7 +32,7 @@ export async function activate(
   connection: IAbapConnection,
   headers: IAdtHeaders,
   name: string,
-  preauditRequested: boolean = true,
+  preauditRequested: boolean,
 ): Promise<IAdtWireResponse> {
   const objectUri = `${BEHAVIOR_DEFINITION.uri(name)}`;
   return await activateObjectInSession(

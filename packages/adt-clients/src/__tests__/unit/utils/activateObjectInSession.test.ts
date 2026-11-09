@@ -62,6 +62,7 @@ describe('activateObjectInSession hands the answer on, whatever it says', () => 
       TEST_HEADERS,
       OBJECT_URI,
       OBJECT_NAME,
+      true,
     );
     expect(res.status).toBe(200);
   });
@@ -74,6 +75,7 @@ describe('activateObjectInSession hands the answer on, whatever it says', () => 
       TEST_HEADERS,
       OBJECT_URI,
       OBJECT_NAME,
+      true,
     );
 
     // Whole, including the sentence a caller acts on. A throw here would leave
@@ -89,6 +91,7 @@ describe('activateObjectInSession hands the answer on, whatever it says', () => 
       TEST_HEADERS,
       OBJECT_URI,
       OBJECT_NAME,
+      true,
     );
     expect(res.status).toBe(200);
   });
@@ -100,6 +103,7 @@ describe('activateObjectInSession hands the answer on, whatever it says', () => 
       TEST_HEADERS,
       OBJECT_URI,
       OBJECT_NAME,
+      true,
     );
     expect(res.status).toBe(200);
   });
@@ -111,6 +115,7 @@ describe('activateObjectInSession hands the answer on, whatever it says', () => 
       TEST_HEADERS,
       OBJECT_URI,
       OBJECT_NAME,
+      true,
     );
     expect(res.status).toBe(200);
   });

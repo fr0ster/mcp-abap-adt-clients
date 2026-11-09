@@ -107,7 +107,8 @@ export function buildObjectUri<C extends AdtAddressableCode>(
  * @param objectUri - ADT URI of the object (e.g., '/sap/bc/adt/oo/classes/zcl_test')
  * @param objectName - Object name in uppercase (e.g., 'ZCL_TEST')
  * @param sessionId - Session ID for stateful operations
- * @param preaudit - Request pre-audit before activation (default: true)
+ * @param preaudit - Sent as `preauditRequested`. No default: the member
+ *   decides it, once, from its option
  * @returns Axios response with activation result
  */
 export async function activateObjectInSession(
@@ -115,7 +116,7 @@ export async function activateObjectInSession(
   headers: IAdtHeaders,
   objectUri: string,
   objectName: string,
-  preaudit: boolean = true,
+  preaudit: boolean,
 ): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/activation?method=activate&preauditRequested=${preaudit}`;
 

@@ -122,6 +122,7 @@ describe('metadata extension namespace URL encoding', () => {
       connection,
       headersFor('AdtMetadataExtension.activate'),
       NS_NAME,
+      true,
     );
     const body = String(
       (connection.makeAdtRequest as jest.Mock).mock.calls[0][0].data,

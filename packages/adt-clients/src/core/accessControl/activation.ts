@@ -27,8 +27,9 @@ export async function activateAccessControl(
   connection: IAbapConnection,
   headers: IAdtHeaders,
   accessControlName: string,
+  preauditRequested: boolean,
 ): Promise<IAdtWireResponse> {
-  const url = '/sap/bc/adt/activation?method=activate&preauditRequested=true';
+  const url = `/sap/bc/adt/activation?method=activate&preauditRequested=${preauditRequested}`;
   const xmlBody = buildActivationXml(accessControlName);
 
   const response = await connection.makeAdtRequest({

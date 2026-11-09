@@ -82,63 +82,88 @@ const rows: Row[] = [
     'CLAS/OC',
     'ZCL_X',
     undefined,
-    (c) => activateClass(c, headersFor('AdtClassMemberBase.activate'), 'ZCL_X'),
+    (c) =>
+      activateClass(
+        c,
+        headersFor('AdtClassMemberBase.activate'),
+        'ZCL_X',
+        true,
+      ),
   ],
   [
     'PROG/P',
     'ZPROG_X',
     undefined,
-    (c) => activateProgram(c, headersFor('AdtProgram.activate'), 'ZPROG_X'),
+    (c) =>
+      activateProgram(c, headersFor('AdtProgram.activate'), 'ZPROG_X', true),
   ],
   [
     'PROG/I',
     'ZINCL_X',
     undefined,
-    (c) => activateInclude(c, headersFor('AdtInclude.activate'), 'ZINCL_X'),
+    (c) =>
+      activateInclude(c, headersFor('AdtInclude.activate'), 'ZINCL_X', true),
   ],
   [
     'INTF/OI',
     'ZIF_X',
     undefined,
-    (c) => activateInterface(c, headersFor('AdtInterface.activate'), 'ZIF_X'),
+    (c) =>
+      activateInterface(c, headersFor('AdtInterface.activate'), 'ZIF_X', true),
   ],
   [
     'DDLS/DF',
     'ZDDL_X',
     undefined,
-    (c) => activateDDLS(c, headersFor('AdtDdl.activate'), 'ZDDL_X'),
+    (c) => activateDDLS(c, headersFor('AdtDdl.activate'), 'ZDDL_X', true),
   ],
   [
     'DOMA/DD',
     'ZDOM_X',
     undefined,
-    (c) => activateDomain(c, headersFor('AdtDomain.activate'), 'ZDOM_X'),
+    (c) => activateDomain(c, headersFor('AdtDomain.activate'), 'ZDOM_X', true),
   ],
   [
     'DTEL/DE',
     'ZDTEL_X',
     undefined,
     (c) =>
-      activateDataElement(c, headersFor('AdtDataElement.activate'), 'ZDTEL_X'),
+      activateDataElement(
+        c,
+        headersFor('AdtDataElement.activate'),
+        'ZDTEL_X',
+        true,
+      ),
   ],
   [
     'TABL/DT',
     'ZTAB_X',
     undefined,
-    (c) => activateTable(c, headersFor('AdtTable.activate'), 'ZTAB_X'),
+    (c) => activateTable(c, headersFor('AdtTable.activate'), 'ZTAB_X', true),
   ],
   [
     'TABL/DS',
     'ZSTRU_X',
     undefined,
-    (c) => activateStructure(c, headersFor('AdtStructure.activate'), 'ZSTRU_X'),
+    (c) =>
+      activateStructure(
+        c,
+        headersFor('AdtStructure.activate'),
+        'ZSTRU_X',
+        true,
+      ),
   ],
   [
     'TTYP/DA',
     'ZTTYP_X',
     undefined,
     (c) =>
-      activateTableType(c, headersFor('AdtDdicTableType.activate'), 'ZTTYP_X'),
+      activateTableType(
+        c,
+        headersFor('AdtDdicTableType.activate'),
+        'ZTTYP_X',
+        true,
+      ),
   ],
   [
     'SRVD/SRV',
@@ -149,6 +174,7 @@ const rows: Row[] = [
         c,
         headersFor('AdtServiceDefinition.activate'),
         'ZSRVD_X',
+        true,
       ),
   ],
   [
@@ -160,6 +186,7 @@ const rows: Row[] = [
         c,
         headersFor('AdtMetadataExtension.activate'),
         'ZDDLX_X',
+        true,
       ),
   ],
   [
@@ -171,6 +198,7 @@ const rows: Row[] = [
         c,
         headersFor('AdtBehaviorDefinition.activate'),
         'ZI_BDEF_X',
+        true,
       ),
   ],
   [
@@ -182,6 +210,7 @@ const rows: Row[] = [
         c,
         headersFor('AdtAccessControl.activate'),
         'ZDCL_X',
+        true,
       ),
   ],
   [
@@ -193,6 +222,7 @@ const rows: Row[] = [
         c,
         headersFor('AdtScalarFunction.activate'),
         'ZDSFD_X',
+        true,
       ),
   ],
   [
@@ -204,6 +234,7 @@ const rows: Row[] = [
         c,
         headersFor('AdtScalarFunctionImplementation.activate'),
         'ZDSFI_X',
+        true,
       ),
   ],
   [
@@ -215,6 +246,7 @@ const rows: Row[] = [
         c,
         headersFor('AdtFunctionGroup.activate'),
         'ZFG_X',
+        true,
       ),
   ],
   [
@@ -227,6 +259,7 @@ const rows: Row[] = [
         headersFor('AdtFunctionModule.activate'),
         'ZFG_X',
         'Z_FM_X',
+        true,
       ),
   ],
   [
@@ -239,6 +272,7 @@ const rows: Row[] = [
         headersFor('AdtFunctionInclude.activate'),
         'ZFG_X',
         'LZFG_XTOP',
+        true,
       ),
   ],
   [
@@ -250,6 +284,7 @@ const rows: Row[] = [
         c,
         headersFor('AdtTransformation.activate'),
         'ZXSLT_X',
+        true,
       ),
   ],
   [
@@ -261,6 +296,7 @@ const rows: Row[] = [
         c,
         headersFor('AdtAuthorizationField.activate'),
         'ZAUTH_X',
+        true,
       ),
   ],
   [
@@ -272,6 +308,7 @@ const rows: Row[] = [
         c,
         headersFor('AdtFeatureToggle.activate'),
         'ZFTG_X',
+        true,
       ),
   ],
   [
@@ -284,6 +321,7 @@ const rows: Row[] = [
         headersFor('AdtEnhancement.activate'),
         'enhoxhb',
         'ZENH_X',
+        true,
       ),
   ],
   [
@@ -296,6 +334,7 @@ const rows: Row[] = [
         headersFor('AdtEnhancement.activate'),
         'enhoxhh',
         'ZENH_X',
+        true,
       ),
   ],
   [
@@ -308,6 +347,7 @@ const rows: Row[] = [
         headersFor('AdtEnhancement.activate'),
         'enhsxsb',
         'ZENH_X',
+        true,
       ),
   ],
 ];

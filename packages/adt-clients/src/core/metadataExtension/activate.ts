@@ -1,7 +1,7 @@
 /**
  * Activate Metadata Extension (DDLX)
  *
- * Endpoint: POST /sap/bc/adt/activation?method=activate&preauditRequested=true
+ * Endpoint: POST /sap/bc/adt/activation?method=activate&preauditRequested=…
  */
 
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
@@ -18,7 +18,7 @@ import { activateObjectInSession } from '../../utils/activationUtils';
  * @param connection - ABAP connection instance
  * @param name - Metadata extension name (e.g., 'ZDEMO_C_CDS_MDE')
  * @param sessionId - Session ID for request tracking
- * @param preaudit - Request pre-audit before activation (default: true)
+ * @param preauditRequested - Sent as `preauditRequested`; the member decides it
  * @returns Axios response with activation result
  *
  * @example
@@ -30,7 +30,7 @@ export async function activateMetadataExtension(
   connection: IAbapConnection,
   headers: IAdtHeaders,
   name: string,
-  preaudit: boolean = true,
+  preauditRequested: boolean,
 ): Promise<IAdtWireResponse> {
   const objectUri = `${METADATA_EXTENSION.uri(name)}`;
 
@@ -39,6 +39,6 @@ export async function activateMetadataExtension(
     headers,
     objectUri,
     name.toUpperCase(),
-    preaudit,
+    preauditRequested,
   );
 }

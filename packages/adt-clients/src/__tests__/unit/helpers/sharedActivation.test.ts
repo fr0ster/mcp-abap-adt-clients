@@ -132,10 +132,10 @@ describe('analyseActivationExecuted, composed through judged()', () => {
     ).toBe(ADT_NO_FAILURE);
   });
 
-  it('refuses activationExecuted="false" with no messages, which the library lets pass', () => {
+  it('refuses activationExecuted="false" with no messages, as analyseActivation does without the inactive list', () => {
     const { analyseActivation } = require('@mcp-abap-adt/adt-strategies');
     const data = results('activationExecuted="false"');
-    expect(analyseActivation(ADT_NO_FAILURE, { status: 200, data })).toBe(
+    expect(analyseActivation(ADT_NO_FAILURE, { status: 200, data })).not.toBe(
       ADT_NO_FAILURE,
     );
     expect(verdictOn(data)).toMatchObject({

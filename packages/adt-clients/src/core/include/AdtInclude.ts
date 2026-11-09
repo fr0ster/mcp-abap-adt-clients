@@ -12,6 +12,7 @@ import type {
   AdtReadVersion,
   AdtVariant,
   IAdtActivatable,
+  IAdtActivationOptions,
   IAdtAnalyseOptions,
   IAdtContentTypes,
   IAdtCreatable,
@@ -439,14 +440,20 @@ export class AdtInclude<
   /** Activate the include. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IIncludeConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const includeName = requireName(config);
     return answering(
-      () => activateInclude(connection, options.headers, includeName),
+      () =>
+        activateInclude(
+          connection,
+          options.headers,
+          includeName,
+          options.preauditRequested ?? true,
+        ),
       this.results.activation,
       options?.analyse,
     );

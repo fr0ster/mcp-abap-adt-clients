@@ -17,6 +17,7 @@ export async function activateStructure(
   connection: IAbapConnection,
   headers: IAdtHeaders,
   structureName: string,
+  preauditRequested: boolean,
 ): Promise<IAdtWireResponse> {
   const objectUri = `${STRUCTURE.uri(structureName)}`;
   return await activateObjectInSession(
@@ -24,6 +25,6 @@ export async function activateStructure(
     headers,
     objectUri,
     structureName,
-    true,
+    preauditRequested,
   );
 }

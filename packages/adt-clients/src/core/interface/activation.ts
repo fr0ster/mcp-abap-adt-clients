@@ -18,6 +18,7 @@ export async function activateInterface(
   connection: IAbapConnection,
   headers: IAdtHeaders,
   interfaceName: string,
+  preauditRequested: boolean,
 ): Promise<IAdtWireResponse> {
   const objectUri = `${INTERFACE.uri(interfaceName)}`;
   return await activateObjectInSession(
@@ -25,6 +26,6 @@ export async function activateInterface(
     headers,
     objectUri,
     interfaceName,
-    true,
+    preauditRequested,
   );
 }

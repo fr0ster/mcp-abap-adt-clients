@@ -21,6 +21,7 @@ import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 import type {
   AdtVariant,
   IAdtActivatable,
+  IAdtActivationOptions,
   IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtContentTypes,
@@ -434,7 +435,7 @@ export class AdtProgram<
   /** Activate the program. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -445,6 +446,7 @@ export class AdtProgram<
           connection,
           options.headers,
           config.programName as string,
+          options.preauditRequested ?? true,
         ),
       this.results.activation,
       options?.analyse,

@@ -17,8 +17,9 @@ export async function activateScalarFunctionImplementation(
   connection: IAbapConnection,
   headers: IAdtHeaders,
   name: string,
+  preauditRequested: boolean,
 ): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/activation?method=activate&preauditRequested=true`;
+  const url = `/sap/bc/adt/activation?method=activate&preauditRequested=${preauditRequested}`;
   const response = await connection.makeAdtRequest({
     url,
     method: 'POST',

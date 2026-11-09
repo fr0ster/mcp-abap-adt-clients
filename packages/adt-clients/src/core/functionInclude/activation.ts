@@ -18,6 +18,7 @@ export async function activateFunctionInclude(
   headers: IAdtHeaders,
   groupName: string,
   includeName: string,
+  preauditRequested: boolean,
 ): Promise<IAdtWireResponse> {
   const objectUri = `${FUNCTION_INCLUDE.uri(groupName, includeName)}`;
 
@@ -26,6 +27,6 @@ export async function activateFunctionInclude(
     headers,
     objectUri,
     includeName.toUpperCase(),
-    true,
+    preauditRequested,
   );
 }

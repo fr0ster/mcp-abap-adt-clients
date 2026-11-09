@@ -14,6 +14,7 @@ import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 
 import type {
   IAdtActivatable,
+  IAdtActivationOptions,
   IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtCreatable,
@@ -406,7 +407,7 @@ export class AdtBehaviorImplementation<
   /** Activate the implementation class. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IBehaviorImplementationConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     return this.class.activate({ className: this.name(config) }, options);
   }

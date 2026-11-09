@@ -15,6 +15,7 @@ import type {
   AdtObjectIdentity,
   AdtVariant,
   IAdtActivatable,
+  IAdtActivationOptions,
   IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtContentTypes,
@@ -427,7 +428,7 @@ export class AdtFunctionInclude<
   /** Activate the include. */
   async activate<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -436,7 +437,13 @@ export class AdtFunctionInclude<
 
     return answering(
       () =>
-        activateFunctionInclude(connection, options.headers, group, include),
+        activateFunctionInclude(
+          connection,
+          options.headers,
+          group,
+          include,
+          options.preauditRequested ?? true,
+        ),
       this.results.activation,
       options?.analyse,
     );

@@ -20,6 +20,7 @@ export async function activateDomain(
   connection: IAbapConnection,
   headers: IAdtHeaders,
   domainName: string,
+  preauditRequested: boolean,
 ): Promise<IAdtWireResponse> {
   const objectUri = `${DOMAIN.uri(domainName)}`;
   return await activateObjectInSession(
@@ -27,6 +28,6 @@ export async function activateDomain(
     headers,
     objectUri,
     domainName.toUpperCase(),
-    true,
+    preauditRequested,
   );
 }

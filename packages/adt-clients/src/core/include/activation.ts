@@ -17,12 +17,13 @@ export async function activateInclude(
   connection: IAbapConnection,
   headers: IAdtHeaders,
   includeName: string,
+  preauditRequested: boolean,
 ): Promise<IAdtWireResponse> {
   return activateObjectInSession(
     connection,
     headers,
     includeUrl(includeName),
     includeName,
-    true,
+    preauditRequested,
   );
 }

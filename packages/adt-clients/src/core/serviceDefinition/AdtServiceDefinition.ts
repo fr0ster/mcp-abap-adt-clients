@@ -8,6 +8,7 @@ import type {
   AdtReadVersion,
   AdtVariant,
   IAdtActivatable,
+  IAdtActivationOptions,
   IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtCreatable,
@@ -393,7 +394,7 @@ export class AdtServiceDefinition<
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IServiceDefinitionConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -401,7 +402,13 @@ export class AdtServiceDefinition<
     const name = this.name(config);
 
     return answering(
-      () => activateServiceDefinition(connection, options.headers, name),
+      () =>
+        activateServiceDefinition(
+          connection,
+          options.headers,
+          name,
+          options.preauditRequested ?? true,
+        ),
       this.results.activation,
       options?.analyse,
     );

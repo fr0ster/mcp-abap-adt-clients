@@ -10,6 +10,7 @@
  */
 import type {
   IAdtActivatable,
+  IAdtActivationOptions,
   IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtCreatable,
@@ -315,7 +316,7 @@ export class AdtDataElement<
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IDataElementConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -323,7 +324,13 @@ export class AdtDataElement<
     const name = this.name(config);
 
     return answering(
-      () => activateDataElement(connection, options.headers, name),
+      () =>
+        activateDataElement(
+          connection,
+          options.headers,
+          name,
+          options.preauditRequested ?? true,
+        ),
       this.results.activation,
       options?.analyse,
     );

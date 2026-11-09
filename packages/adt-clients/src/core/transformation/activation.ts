@@ -27,8 +27,9 @@ export async function activateTransformation(
   connection: IAbapConnection,
   headers: IAdtHeaders,
   transformationName: string,
+  preauditRequested: boolean,
 ): Promise<IAdtWireResponse> {
-  const url = '/sap/bc/adt/activation?method=activate&preauditRequested=true';
+  const url = `/sap/bc/adt/activation?method=activate&preauditRequested=${preauditRequested}`;
   const xmlBody = buildActivationXml(transformationName);
 
   const response = await connection.makeAdtRequest({

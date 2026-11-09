@@ -28,6 +28,7 @@ import {
 import type {
   AdtVariant,
   IAdtActivatable,
+  IAdtActivationOptions,
   IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtCreatable,
@@ -426,11 +427,12 @@ export class AdtClass<
 
   /**
    * Activate test classes (local classes) — one activation POST, read by the
-   * `activation` strategy.
+   * `activation` strategy. `preauditRequested` is sent as given; absent, `true`.
    */
   async activateTestClasses<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig> & { testClassName: string },
-    options?: IAdtAnalyseOptions<E>,
+    options?: IAdtAnalyseOptions<E> &
+      Pick<IAdtActivationOptions<E>, 'preauditRequested'>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     return answering(
       () =>
@@ -438,6 +440,7 @@ export class AdtClass<
           this.connection,
           config.className as string,
           config.testClassName,
+          options?.preauditRequested ?? true,
         ),
       this.results.activation,
       options?.analyse,

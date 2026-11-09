@@ -15,6 +15,7 @@
 
 import type {
   AdtVariant,
+  IAdtActivationOptions,
   IAdtAnalyseOptions,
   IAdtContentTypes,
   IAdtError,
@@ -180,7 +181,7 @@ export abstract class AdtClassMemberBase<
    */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -190,7 +191,12 @@ export abstract class AdtClassMemberBase<
 
     return answering(
       () =>
-        activateClass(connection, options.headers, config.className as string),
+        activateClass(
+          connection,
+          options.headers,
+          config.className as string,
+          options.preauditRequested ?? true,
+        ),
       this.results.activation,
       options?.analyse,
     );

@@ -10,6 +10,7 @@
 import type {
   AdtReadVersion,
   IAdtActivatable,
+  IAdtActivationOptions,
   IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtCreatable,
@@ -365,7 +366,7 @@ export class AdtAppendStructure<
   /** Activate the append structure. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IAppendStructureConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -373,7 +374,13 @@ export class AdtAppendStructure<
     const name = this.name(config);
 
     return answering(
-      () => activateAppendStructure(connection, options.headers, name),
+      () =>
+        activateAppendStructure(
+          connection,
+          options.headers,
+          name,
+          options.preauditRequested ?? true,
+        ),
       this.results.activation,
       options?.analyse,
     );
