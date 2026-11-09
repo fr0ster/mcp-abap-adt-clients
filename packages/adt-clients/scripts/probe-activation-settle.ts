@@ -332,7 +332,7 @@ async function main(): Promise<void> {
       wire = await activateFunctionGroup(
         connection,
         headersFor('AdtFunctionGroup.activate'),
-        group,
+        group, true,
       );
     } catch (error) {
       threw = error as Error;
@@ -390,7 +390,7 @@ async function main(): Promise<void> {
       const again = await activateFunctionGroup(
         connection,
         headersFor('AdtFunctionGroup.activate'),
-        group,
+        group, true,
       );
       const body = String(again.data ?? '');
       say(`  second activation: status ${again.status}`);
@@ -505,7 +505,7 @@ async function main(): Promise<void> {
         const answer = await activateFunctionGroup(
           connection,
           headersFor('AdtFunctionGroup.activate'),
-          group,
+          group, true,
         );
         const postMs = Date.now() - t0;
         const executed =
@@ -599,7 +599,7 @@ async function main(): Promise<void> {
           await activateFunctionGroup(
             connection,
             headersFor('AdtFunctionGroup.activate'),
-            group,
+            group, true,
           );
         } else {
           say('           cleanup: nothing to remove, the create was refused');
@@ -693,7 +693,7 @@ async function main(): Promise<void> {
       const settled = await activateFunctionGroup(
         connection,
         headersFor('AdtFunctionGroup.activate'),
-        group,
+        group, true,
       );
       say(`  group activated again: status ${settled.status}`);
       const left = stillListed(await inactiveNames(connection), group);

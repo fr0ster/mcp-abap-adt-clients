@@ -97,7 +97,7 @@ The one place an object's ADT address is built: a record per kind (`PROGRAM`, `P
 
 **Interprets nothing**: the result strategy is given when the implementation is built (a result set per object type; the shipped `<x>Documents` answer the document as it arrived via `rawDocument`, or `nothing`); the error strategy (`options.analyse`, `IAdtAnalyseOptions`) is given with every call. No member substitutes its own reading or verdict (`analyse ??` fallbacks are banned by `src/__tests__/unit/onlyCorpusStrategiesShip.test.ts`). Every reading and verdict lives in `@mcp-abap-adt/adt-strategies` (`packages/adt-strategies`). A failure caused by SAP's answer comes back through the strategy — never a throw, never a rewrap that drops the response; a member throws only for a cause inside the library (a caller argument missing before a request is built, a defect). Decision 15 in `docs/architecture/DECISIONS.md`.
 
-**One endpoint, one member**: every member issues exactly one ADT request. `create` is the POST; `update` is the write and carries `options.lockHandle` as given; `delete` is the DELETE; `checkDeletion` is the approval ADT wants first; `lock`/`unlock` are the lock window. Nothing composes them for the caller.
+**One endpoint, one member**: every member issues exactly one ADT request. `create` is the POST; `update` is the write and carries `options.lockHandle` as given; `delete` is the DELETE; `checkDeletion` is the approval ADT wants first; `lock`/`unlock` are the lock window. Nothing composes them for the caller. The one exception is activation: after a silent checklist (`activationExecuted="false"` with no message), `activate` and `activateObjects` read `GET /sap/bc/adt/activation/inactiveobjects` once, limited to the named references (`README.md`, "Activation: what activated, and which endpoint").
 
 A multi-step operation is therefore the consumer's sequence, in the order it chooses:
 
@@ -230,7 +230,7 @@ Supply-chain worms (Shai-Hulud and its kind) spread through dependencies' instal
 - `ts-node` — **dev only** — runs the probe and read scripts in `scripts/` (`../../node_modules/.bin/ts-node`, installed at the repository root)
 - `axios` — HTTP client (used internally by connection layer)
 - `@mcp-abap-adt/connection` — **dev only** — concrete `IAbapConnection` implementation for tests; `@mcp-abap-adt/interfaces-auth` and `-auth-sap` are dev-only too
-- `@mcp-abap-adt/adt-strategies` — lives in `packages/adt-strategies`, a workspace of the repository, published on its own. adt-clients' tests take it from npm as a devDependency (`^0.10.0`, which the workspace's 0.15.0 does not satisfy, so npm installs the published 0.10.x in `packages/adt-clients/node_modules`, not a link). Its build writes `ERRATA.md` (copied from `packages/adt-clients/docs/usage/`), because the release publishes with `--ignore-scripts`; its tests read adt-clients' `corpus/adt/`. A strategy change that adt-clients' tests need is published first.
+- `@mcp-abap-adt/adt-strategies` — lives in `packages/adt-strategies`, a workspace of the repository, published on its own. adt-clients' tests take it as a devDependency that the workspace sibling satisfies, so it is linked during development (its range is in `packages/adt-clients/package.json`). Its build writes `ERRATA.md` (copied from `packages/adt-clients/docs/usage/`), because the release publishes with `--ignore-scripts`; its tests read adt-clients' `corpus/adt/`. A strategy change that adt-clients' tests need is published first.
 
 ## Public API (`src/index.ts`)
 

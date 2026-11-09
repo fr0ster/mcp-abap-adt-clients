@@ -986,6 +986,12 @@ const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
     accept: 'application/xml',
     contentType: 'application/xml',
   },
+  // Not in 35.0.0: added with 45.0.0. The pair 7.40's synchronous group
+  // activation sent to the same endpoint (adt-clients-legacy).
+  'AdtUtils.activateObjects': {
+    accept: 'application/xml',
+    contentType: 'application/xml',
+  },
   'AdtUtils.checkDeletionGroup': {
     accept: 'application/vnd.sap.adt.deletion.check.response.v1+xml',
     contentType: 'application/vnd.sap.adt.deletion.check.request.v1+xml',

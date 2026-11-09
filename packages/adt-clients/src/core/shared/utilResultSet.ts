@@ -45,6 +45,7 @@ export const utilDocuments = {
   objectStructure: rawDocument,
   inactive: rawDocument,
   activation: rawDocument,
+  objectActivation: rawDocument,
   run: rawDocument,
   results: rawDocument,
   deletionCheck: rawDocument,

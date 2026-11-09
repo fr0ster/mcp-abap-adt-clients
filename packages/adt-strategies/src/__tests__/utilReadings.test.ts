@@ -1,16 +1,19 @@
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
+  ACTIVATION_RUNS_COLLECTION,
   extractRunId,
   readNamedItems,
   readNodeStructure,
   readSearchHits,
   utilActivationRunId,
+  utilDiscoveryCollections,
   utilInactiveObjects,
   utilNamedItems,
   utilNodeContents,
   utilSearchHits,
   utilWhereUsedReferences,
 } from '../results/utils';
+import { stepTagged } from './corpus';
 
 /**
  * The cross-cutting readings, moved with their tests from adt-clients
@@ -313,5 +316,79 @@ describe('utilActivationRunId', () => {
     expect(extractRunId(`/sap/bc/adt/activation/runs/${RUN_ID}`)).toBe(RUN_ID);
     expect(extractRunId('/sap/bc/adt/somewhere/else')).toBeNull();
     expect(extractRunId(undefined)).toBeNull();
+  });
+});
+
+describe('utilDiscoveryCollections', () => {
+  const collections = (caseName: string): ReadonlySet<string> =>
+    utilDiscoveryCollections(stepTagged(caseName, 'discovery'));
+
+  it.each(['system-description-s4-2025', 'system-description-abap-cloud'])(
+    '%s lists /activation/runs',
+    (caseName) => {
+      const found = collections(caseName);
+      expect(found.has(ACTIVATION_RUNS_COLLECTION)).toBe(true);
+      expect(found.has('/sap/bc/adt/activation')).toBe(true);
+    },
+  );
+
+  it.each(['system-description-basis-740', 'system-description-751-partial'])(
+    '%s does not list /activation/runs',
+    (caseName) => {
+      const found = collections(caseName);
+      expect(found.has(ACTIVATION_RUNS_COLLECTION)).toBe(false);
+      expect(found.has('/sap/bc/adt/activation')).toBe(true);
+      expect(found.has('/sap/bc/adt/activation/inactiveobjects')).toBe(true);
+    },
+  );
+
+  it('names the constant for the exact path', () => {
+    expect(ACTIVATION_RUNS_COLLECTION).toBe('/sap/bc/adt/activation/runs');
+  });
+
+  const service = (...hrefs: string[]): string =>
+    '<?xml version="1.0" encoding="utf-8"?><app:service xmlns:app="http://www.w3.org/2007/app"><app:workspace>' +
+    hrefs.map((href) => `<app:collection href="${href}"/>`).join('') +
+    '</app:workspace></app:service>';
+
+  it('a collection that only starts with the runs path is not runs', () => {
+    const found = utilDiscoveryCollections(
+      wire(service('/sap/bc/adt/activation', '/sap/bc/adt/activation/runsx')),
+    );
+    expect(found.has('/sap/bc/adt/activation/runsx')).toBe(true);
+    expect(found.has(ACTIVATION_RUNS_COLLECTION)).toBe(false);
+  });
+
+  it('skips an absolute href', () => {
+    const found = utilDiscoveryCollections(
+      wire(
+        service(
+          'https://abap.example.com:44300/sap/bc/adt/activation/runs',
+          '/sap/bc/adt/activation',
+        ),
+      ),
+    );
+    expect([...found]).toEqual(['/sap/bc/adt/activation']);
+  });
+
+  it('reads the collections of every workspace', () => {
+    const two =
+      '<?xml version="1.0" encoding="utf-8"?><app:service xmlns:app="http://www.w3.org/2007/app">' +
+      '<app:workspace><app:collection href="/a"/></app:workspace>' +
+      '<app:workspace><app:collection href="/b"/><app:collection href="/c"/></app:workspace>' +
+      '</app:service>';
+    expect([...utilDiscoveryCollections(wire(two))].sort()).toEqual([
+      '/a',
+      '/b',
+      '/c',
+    ]);
+  });
+
+  it.each([
+    ['an exception document', EXCEPTION],
+    ['a logon page', LOGON],
+    ['an empty body', ''],
+  ])('%s gives the empty set', (_what, data) => {
+    expect(utilDiscoveryCollections(wire(data)).size).toBe(0);
   });
 });

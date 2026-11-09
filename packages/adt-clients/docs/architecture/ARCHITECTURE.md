@@ -246,20 +246,22 @@ request.
 
 ## A request's own headers
 
-Since 36.0.0 (interfaces-adt 19.0.0) the 32 members whose request sets both
-`Accept` and `Content-Type` take them from `options.headers` (required). The
+Since 36.0.0 (interfaces-adt 19.0.0) the members whose request sets both
+`Accept` and `Content-Type` (listed in the
+[README](../../README.md#a-requests-own-headers)) take them from
+`options.headers` (required). The
 member passes the pair to its wire function as the second parameter, and
 `requestHeaders(headers)` (`src/utils/requestHeaders.ts`) is the one place it
 becomes the request's headers — no constant of the member's own, nothing merged
 in, defaulted or replaced. A chain (the message class message's write) gives
 the pair to its main write, the `PUT`; its read, locks and unlocks keep their
-own. A request outside the 32 that shares a wire function with one (`validate`
+own. A request outside them that shares a wire function with one (`validate`
 through the check run, `activateTestClasses`) passes its own constant pair
 (`CHECK_RUN_HEADERS`, `ACTIVATION_HEADERS`).
 
-`src/__tests__/unit/requestHeaders.test.ts` drives every implementation of the
-32 with a pair no implementation could hold, asserts it is exactly what goes on
-the wire, and fails for a class method named like one of the 32 that no row
+`src/__tests__/unit/requestHeaders.test.ts` drives every implementation of these
+members with a pair no implementation could hold, asserts it is exactly what goes on
+the wire, and fails for a class method named like one of them that no row
 reaches.
 
 ## Refused media types (406 / 415)

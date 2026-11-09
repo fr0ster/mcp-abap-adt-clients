@@ -9,12 +9,19 @@
 import type {
   AdtParentedTypeCode,
   AdtTypeCode,
+  IAdtError,
   IAdtHeaders,
+  IAdtResponse,
+  IAnalyse,
+  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
+  IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import { XMLParser, XMLValidator } from 'fast-xml-parser';
+import { fetchInactiveObjects } from '../core/shared/getInactiveObjects';
 import {
   type AdtAddressableCode,
   codeEntries,
@@ -25,6 +32,12 @@ import {
   parentEntry,
 } from '../endpoints/codes';
 import { seg } from '../endpoints/objects';
+import {
+  answeringExchange,
+  type IAdtExchange,
+  isUnansweredCredentialRefusal,
+  recogniseFailure,
+} from './adtResponse';
 import { requestHeaders } from './requestHeaders';
 
 /** {@link PARENTED_SEGMENT}, read by any code: absent for an unparented one. */
@@ -107,7 +120,8 @@ export function buildObjectUri<C extends AdtAddressableCode>(
  * @param objectUri - ADT URI of the object (e.g., '/sap/bc/adt/oo/classes/zcl_test')
  * @param objectName - Object name in uppercase (e.g., 'ZCL_TEST')
  * @param sessionId - Session ID for stateful operations
- * @param preaudit - Request pre-audit before activation (default: true)
+ * @param preaudit - Sent as `preauditRequested`. No default: the member
+ *   decides it, once, from its option
  * @returns Axios response with activation result
  */
 export async function activateObjectInSession(
@@ -115,7 +129,7 @@ export async function activateObjectInSession(
   headers: IAdtHeaders,
   objectUri: string,
   objectName: string,
-  preaudit: boolean = true,
+  preaudit: boolean,
 ): Promise<IAdtWireResponse> {
   const url = `/sap/bc/adt/activation?method=activate&preauditRequested=${preaudit}`;
 
@@ -137,4 +151,148 @@ export async function activateObjectInSession(
   // and neither does this function. Whether a checklist body means the
   // activation happened is read by the caller's own `analyse`.
   return response;
+}
+
+// ---------------------------------------------------------------------------
+// The one read after a silent checklist (fr0ster/mcp-abap-adt#351)
+// ---------------------------------------------------------------------------
+
+const parser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '@',
+  parseAttributeValue: false,
+  parseTagValue: false,
+  removeNSPrefix: true,
+});
+
+/** Whether a parsed value is an element: what the parser makes of one. */
+function isElement(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+/** A field of a parsed element; `undefined` for anything else. */
+function field(node: unknown, key: string): unknown {
+  return isElement(node) ? node[key] : undefined;
+}
+
+/** One element or several, as a list. */
+function listOf(value: unknown): unknown[] {
+  if (value === undefined || value === null || value === '') return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+/** A well-formed XML document, parsed; `undefined` for anything else. */
+function parsedXml(body: unknown): Record<string, unknown> | undefined {
+  if (typeof body !== 'string' || body.trim() === '') return undefined;
+  if (XMLValidator.validate(body) !== true) return undefined;
+  const parsed: unknown = parser.parse(body);
+  return isElement(parsed) ? parsed : undefined;
+}
+
+/**
+ * Whether an activation answered the silent checklist: a `2xx`
+ * `chkl:messages` with `activationExecuted="false"` and no `msg`. The one
+ * answer the document alone cannot judge — it answered both a re-activation
+ * that had nothing to do and an activation that left a function group
+ * inactive (S/4HANA 2025).
+ */
+function isSilentChecklist(answer: IAdtWireResponse): boolean {
+  if (answer.status < 200 || answer.status >= 300) return false;
+  const root = parsedXml(answer.data);
+  if (root === undefined || !Object.hasOwn(root, 'messages')) return false;
+  const checklist = field(root, 'messages');
+  const executed = field(field(checklist, 'properties'), '@activationExecuted');
+  return executed === 'false' && listOf(field(checklist, 'msg')).length === 0;
+}
+
+/** The `adtcore:uri` of every reference an activation request sent. */
+function namedIn(request: IAbapRequestOptions | undefined): string[] {
+  const references = field(
+    field(parsedXml(request?.data), 'objectReferences'),
+    'objectReference',
+  );
+  return listOf(references).flatMap((reference) => {
+    const uri = field(reference, '@uri');
+    return typeof uri === 'string' ? [uri] : [];
+  });
+}
+
+/**
+ * The connection a low-level activation function is given: the member's own,
+ * keeping the request it sends, so the read after it names what that request
+ * named — taken from the body sent, not built a second time.
+ */
+function keepingRequests(
+  connection: IAbapConnection,
+  sent: IAbapRequestOptions[],
+): IAbapConnection {
+  return {
+    connect: () => connection.connect(),
+    getBaseUrl: () => connection.getBaseUrl(),
+    getSessionId: () => connection.getSessionId(),
+    setSessionType: (type) => connection.setSessionType(type),
+    makeAdtRequest: <T, D>(options: IAbapRequestOptions) => {
+      sent.push(options);
+      return connection.makeAdtRequest<T, D>(options);
+    },
+  };
+}
+
+/**
+ * An activation, and the one read its answer may need.
+ *
+ * **The one exception to "a member issues one request"** (fr0ster/mcp-abap-adt#351). `send` issues the activation — `POST /sap/bc/adt/activation` — and
+ * after a silent checklist alone (`activationExecuted="false"`, no message)
+ * this reads `GET /sap/bc/adt/activation/inactiveobjects` once, with the
+ * `Accept` `getInactiveObjects` sends, and hands the list and the uris the
+ * request named to `analyse` as `context.activation`. After every other
+ * answer, and when the activation itself failed, nothing more is sent.
+ *
+ * A read that fails is the call's failure: the verdict `analyse` starts from
+ * names that the activation's outcome could not be decided and carries the
+ * read's response; the activation's answer stays the one a cleared verdict is
+ * read from. A credential refusal SAP never saw is thrown as it came.
+ */
+async function activationExchange(
+  connection: IAbapConnection,
+  send: (connection: IAbapConnection) => Promise<IAdtWireResponse>,
+): Promise<IAdtExchange> {
+  const sent: IAbapRequestOptions[] = [];
+  const answer = await send(keepingRequests(connection, sent));
+  if (!isSilentChecklist(answer)) return { answer };
+
+  const named = namedIn(sent.find((request) => request.method === 'POST'));
+  try {
+    const inactiveObjects = await fetchInactiveObjects(connection);
+    return { answer, context: { activation: { named, inactiveObjects } } };
+  } catch (error: unknown) {
+    if (isUnansweredCredentialRefusal(error)) throw error;
+    const cause = recogniseFailure(error);
+    return {
+      answer,
+      failure: {
+        ...cause,
+        message: `The activation's outcome could not be decided: SAP answered that no activation ran and gave no message, and reading the inactive objects failed: ${cause.message}`,
+      },
+    };
+  }
+}
+
+/**
+ * Run an activation member's request through {@link activationExchange} and
+ * compose the two strategies over its answer, as `answering` does. Exported
+ * beside `answering` for the handler classes built on this package (the
+ * legacy package's activation overrides); the read itself is not.
+ */
+export function answeringActivation<T, E extends IAdtError = IAdtError>(
+  connection: IAbapConnection,
+  send: (connection: IAbapConnection) => Promise<IAdtWireResponse>,
+  read: IResultStrategy<T>,
+  analyse?: IAnalyse<E>,
+): Promise<IAdtResponse<T, E>> {
+  return answeringExchange(
+    () => activationExchange(connection, send),
+    read,
+    analyse,
+  );
 }

@@ -132,16 +132,40 @@ describe('analyseActivationExecuted, composed through judged()', () => {
     ).toBe(ADT_NO_FAILURE);
   });
 
-  it('refuses activationExecuted="false" with no messages, which the library lets pass', () => {
+  it('refuses activationExecuted="false" with no messages, as analyseActivation does without the inactive list', () => {
     const { analyseActivation } = require('@mcp-abap-adt/adt-strategies');
     const data = results('activationExecuted="false"');
-    expect(analyseActivation(ADT_NO_FAILURE, { status: 200, data })).toBe(
+    expect(analyseActivation(ADT_NO_FAILURE, { status: 200, data })).not.toBe(
       ADT_NO_FAILURE,
     );
     expect(verdictOn(data)).toMatchObject({
       origin: 'refusal',
       message: expect.stringMatching(/not executed/),
     });
+  });
+
+  it('hands the activation facts to the judges it composes', () => {
+    const { analyseActivation } = require('@mcp-abap-adt/adt-strategies');
+    const composed = judged(analyseActivation);
+    const silent = results('activationExecuted="false"');
+    const emptyList = {
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      data: '<ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects"/>',
+    };
+    expect(
+      composed(
+        ADT_NO_FAILURE,
+        { status: 200, statusText: 'OK', headers: {}, data: silent },
+        {
+          activation: {
+            named: ['/sap/bc/adt/oo/classes/zcl_x'],
+            inactiveObjects: emptyList,
+          },
+        },
+      ),
+    ).toBe(ADT_NO_FAILURE);
   });
 
   it('refuses an error message with an empty text element', () => {

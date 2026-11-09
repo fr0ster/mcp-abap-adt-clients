@@ -264,7 +264,7 @@ async function main(): Promise<void> {
         const wire = await activateClass(
           connection,
           headersFor('AdtClassMemberBase.activate'),
-          className,
+          className, true,
         );
         const ms = Date.now() - started;
         say(`    answer back at ${stamp()}`);

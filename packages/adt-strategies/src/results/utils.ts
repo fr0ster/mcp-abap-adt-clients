@@ -19,7 +19,8 @@ import type {
   IAdtAnsweredObject,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
-import { XMLParser } from 'fast-xml-parser';
+import { XMLParser, XMLValidator } from 'fast-xml-parser';
+import { at, field, isElement, leafText, listOf } from '../parsed';
 import { rawOf } from '../result';
 import { answeredObject } from './answeredObject';
 
@@ -455,4 +456,56 @@ export const utilActivationRunId: IResultStrategy<string> = (answer) => {
     headers['content-location'] ??
     headers['Content-Location'];
   return extractRunId(location) ?? '';
+};
+
+// ---------------------------------------------------------------------------
+// Discovery
+// ---------------------------------------------------------------------------
+
+/**
+ * The collection a system offers background activation runs on. Membership is
+ * exact: a collection whose path only starts with it is another collection.
+ */
+export const ACTIVATION_RUNS_COLLECTION = '/sap/bc/adt/activation/runs';
+
+const discoveryParser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '@',
+  parseAttributeValue: false,
+  parseTagValue: false,
+  removeNSPrefix: true,
+});
+
+/**
+ * What `GET /sap/bc/adt/discovery` answers, read into the paths of its
+ * collections: every `app:collection/@href` that is a path (starts with `/`),
+ * in every `app:workspace`. An absolute `href` names another address, not a
+ * collection of this system's ADT, and is skipped.
+ *
+ * Which group-activation endpoint a system offers is in this set: a consumer
+ * asks `has(ACTIVATION_RUNS_COLLECTION)` and calls `activateObjectsGroup`
+ * (`/activation/runs`) when it does, `activateObjects` (`/activation`) when it
+ * does not. An answer that is no `app:service` document — an exception, a
+ * logon page, an empty body, XML that is not well-formed — reads as the empty
+ * set, which a consumer answers as "discovery could not be read": every
+ * system's discovery lists collections.
+ */
+export const utilDiscoveryCollections: IResultStrategy<ReadonlySet<string>> = (
+  answer,
+) => {
+  const collections = new Set<string>();
+  const xml = rawOf(answer);
+  if (xml.trim() === '' || XMLValidator.validate(xml) !== true) {
+    return collections;
+  }
+  const parsed: unknown = discoveryParser.parse(xml);
+  const service = field(parsed, 'service');
+  if (!isElement(service)) return collections;
+  for (const workspace of listOf(field(service, 'workspace'))) {
+    for (const collection of listOf(field(workspace, 'collection'))) {
+      const href = leafText(at(collection, '@href'));
+      if (href?.startsWith('/')) collections.add(href);
+    }
+  }
+  return collections;
 };

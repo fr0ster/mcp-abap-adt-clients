@@ -44,6 +44,7 @@ export async function activateClassTestClasses(
   connection: IAbapConnection,
   className: string,
   testClassName: string,
+  preauditRequested: boolean,
 ): Promise<IAdtWireResponse> {
   const encodedTest = encodeSapObjectName(testClassName).toUpperCase();
   const objectUri = `${CLASS.uri(className)}#testclass=${encodedTest}`;
@@ -53,6 +54,6 @@ export async function activateClassTestClasses(
     ACTIVATION_HEADERS,
     objectUri,
     objectName,
-    true,
+    preauditRequested,
   );
 }

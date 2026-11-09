@@ -15,6 +15,7 @@ import type {
   AdtObjectIdentity,
   AdtVariant,
   IAdtActivatable,
+  IAdtActivationOptions,
   IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtContentTypes,
@@ -38,6 +39,7 @@ import type {
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
+import { answeringActivation } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
@@ -427,16 +429,23 @@ export class AdtFunctionInclude<
   /** Activate the include. */
   async activate<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const { group, include } = this.names(config);
 
-    return answering(
-      () =>
-        activateFunctionInclude(connection, options.headers, group, include),
+    return answeringActivation(
+      connection,
+      (sent) =>
+        activateFunctionInclude(
+          sent,
+          options.headers,
+          group,
+          include,
+          options.preauditRequested ?? true,
+        ),
       this.results.activation,
       options?.analyse,
     );

@@ -273,6 +273,22 @@ Use `available_in` to scope tests:
 available_in: ["onprem"]
 ```
 
+## Activation Answers
+
+What an activation answers on premise (`integration/shared/activationAnswers.test.ts`): discovery listing `/sap/bc/adt/activation/runs`; a class activated with the default, then again with `preauditRequested=false` (nothing to activate, the inactive list read once); a function group's reference alone with `true` (not activated, `stillInactive`), with `false` (the silent checklist, not activated), and the second step through `activateObjects`. Both objects are created and deleted by the test.
+
+```yaml
+activation_answers:
+  test_cases:
+    - name: "adt_activation_answers"
+      enabled: true
+      available_in: ["onprem"]
+      params:
+        class_name: "ZCL_AC_ACT751"
+        function_group_name: "ZAC_FG_ACT751"
+        description: "Activation answers test object"
+```
+
 ## Group Activation
 
 Tests multi-object activation (domain + data element + structure):

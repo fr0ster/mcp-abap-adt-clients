@@ -32,8 +32,9 @@ export async function activateDataElement(
   connection: IAbapConnection,
   headers: IAdtHeaders,
   dataElementName: string,
+  preauditRequested: boolean,
 ): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/activation?method=activate&preauditRequested=true`;
+  const url = `/sap/bc/adt/activation?method=activate&preauditRequested=${preauditRequested}`;
   const xmlBody = buildActivationXml(dataElementName);
 
   const response = await connection.makeAdtRequest({

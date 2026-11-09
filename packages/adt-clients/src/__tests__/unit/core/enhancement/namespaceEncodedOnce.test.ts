@@ -47,6 +47,7 @@ describe('a namespaced enhancement is encoded once', () => {
       headersFor('AdtEnhancement.activate'),
       'enhoxhb',
       '/NSP/ZENH',
+      true,
     );
     expect(bodyOf(c)).toContain(ONCE);
     expect(bodyOf(c)).not.toContain('%252');

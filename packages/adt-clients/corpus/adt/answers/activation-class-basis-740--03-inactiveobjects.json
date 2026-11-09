@@ -1,0 +1,26 @@
+{
+  "case": "activation-class-basis-740",
+  "step": 3,
+  "stepTag": "inactiveobjects",
+  "capturedAt": "2026-11-09T13:05:28.963Z",
+  "note": "SAP_BASIS 7.40 SP04, fr0ster/mcp-abap-adt#351 live measurement over RFC: a fresh class with one method in $TMP, saved inactive, activated with the single-object request adt-clients sends (preauditRequested=true, one reference: uri and name). Step 01 answered 200 with an empty body; the inactive list (the flat adtcore:objectReferences of 7.40) read at once (02) and about 10 s later (03) no longer lists the class, and its active source carried the method body. The other entries are the test user's other inactive objects; the system id inside their names is replaced by SYS. This step: read about 10 s after step 01.",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/activation/inactiveobjects",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/activation/inactiveobjects",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.inactivectsobjects.v1+xml, application/xml;q=0.8"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded by a hand-run probe over RFC (SADT_REST_RFC_ENDPOINT through @mcp-abap-adt/connection); the connection adds the logon and the session below this point, none of which is recorded. Of the response headers only content-type was kept.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/xml"
+    },
+    "bodyFile": "activation-class-basis-740--03-inactiveobjects.body.xml"
+  }
+}

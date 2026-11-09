@@ -15,6 +15,7 @@
 
 import type {
   AdtVariant,
+  IAdtActivationOptions,
   IAdtAnalyseOptions,
   IAdtContentTypes,
   IAdtError,
@@ -27,6 +28,7 @@ import type {
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
+import { answeringActivation } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
@@ -180,7 +182,7 @@ export abstract class AdtClassMemberBase<
    */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IClassConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -188,9 +190,15 @@ export abstract class AdtClassMemberBase<
     // No server was asked anything, so there is no answer to describe. A missing
     // required argument is the caller's mistake, and it throws.
 
-    return answering(
-      () =>
-        activateClass(connection, options.headers, config.className as string),
+    return answeringActivation(
+      connection,
+      (sent) =>
+        activateClass(
+          sent,
+          options.headers,
+          config.className as string,
+          options.preauditRequested ?? true,
+        ),
       this.results.activation,
       options?.analyse,
     );

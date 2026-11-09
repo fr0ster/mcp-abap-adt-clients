@@ -808,6 +808,15 @@ export const LEGACY_REFUSED: Record<string, Rows<RefusedRow>> = {
         calling('getActivationResults', () => ['GUARD']),
       ),
       utils.refused(
+        'activateObjectsGroup',
+        'fr0ster/mcp-abap-adt#351: no /activation/runs on 7.40',
+        calling('activateObjectsGroup', (h) => [
+          objectReferences,
+          false,
+          h('activateObjectsGroup'),
+        ]),
+      ),
+      utils.refused(
         'checkDeletionGroup',
         '§10.2, §5 measured',
         calling('checkDeletionGroup', (h) => [
@@ -1217,13 +1226,13 @@ export const LEGACY_SENDS: Record<string, Rows<SendsRow>> = {
         calling('getInactiveObjects'),
       ),
       utils.sends(
-        'activateObjectsGroup',
-        '§10.2 legacy override',
+        'activateObjects',
+        'fr0ster/mcp-abap-adt#351: the 7.40 group activation, inherited',
         [post(ACTIVATION, { method: 'activate', preauditRequested: 'false' })],
-        calling('activateObjectsGroup', (h) => [
+        calling('activateObjects', (h) => [
           objectReferences,
           false,
-          h('activateObjectsGroup'),
+          h('activateObjects'),
         ]),
       ),
       utils.sends(

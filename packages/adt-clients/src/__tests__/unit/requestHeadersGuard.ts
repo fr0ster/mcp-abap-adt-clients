@@ -19,7 +19,10 @@ import type { AdtClient } from '../../clients/AdtClient';
 import type { AdtUtils } from '../../core/shared/AdtUtils';
 import { HANDLERS } from './capabilities/manifest';
 
-/** The 32 members of interfaces-adt 19.0.0 that take `options.headers`. */
+/**
+ * The members that take `options.headers`: the 32 of interfaces-adt 19.0.0,
+ * and `activateObjects` (27.0.0).
+ */
 export const HEADER_MEMBERS = [
   'link',
   'pull',
@@ -42,6 +45,7 @@ export const HEADER_MEMBERS = [
   'getVirtualFoldersContents',
   'fetchNodeStructure',
   'activateObjectsGroup',
+  'activateObjects',
   'checkDeletionGroup',
   'deleteObjectsGroup',
   'getSqlQuery',
@@ -310,6 +314,8 @@ export function utilRows(
         m(h, 'fetchNodeStructure')('DEVC/K', 'ZGUARD_PKG', { headers }),
       activateObjectsGroup: (h, headers) =>
         m(h, 'activateObjectsGroup')(OBJECTS, undefined, { headers }),
+      activateObjects: (h, headers) =>
+        m(h, 'activateObjects')(OBJECTS, undefined, { headers }),
       checkDeletionGroup: (h, headers) =>
         m(h, 'checkDeletionGroup')(OBJECTS, { headers }),
       deleteObjectsGroup: (h, headers) =>

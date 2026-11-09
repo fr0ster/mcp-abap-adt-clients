@@ -121,6 +121,7 @@ import {
 } from './elementInfo';
 import { fetchInactiveObjects } from './getInactiveObjects';
 import {
+  activateObjects,
   activateObjectsGroup,
   getActivationResults,
   getActivationRun,
@@ -167,7 +168,10 @@ import {
   codeHas,
   isGroupOnlyCode,
 } from '../../endpoints/codes';
-import { buildObjectUri } from '../../utils/activationUtils';
+import {
+  answeringActivation,
+  buildObjectUri,
+} from '../../utils/activationUtils';
 // Import types
 import {
   type AdtActivationCode,
@@ -242,7 +246,7 @@ import type { utilDocuments } from './utilResultSet';
  * The parser overloads went in 30.0.0, when the reading became something
  * injected once rather than passed per call — and since 19.0.0 there is nothing
  * left that a reading cannot reach. Every member below that makes a request
- * takes its shape from a slot of `IUtilResults`, all twenty-one of them. The three
+ * takes its shape from a slot of `IUtilResults`, all twenty-two of them. The three
  * that take none — `modifyWhereUsedScope`, `supportsSourceCode` and
  * `getObjectSourceUri` — make no request, so there is no answer for a strategy
  * to read.
@@ -549,6 +553,40 @@ export class AdtUtils<
           preauditRequested,
         ),
       this.results.activation,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Activate several objects synchronously — `POST /activation`.
+   *
+   * One POST with the body {@link activateObjectsGroup} sends to
+   * `/activation/runs`, answered in its body (`chkl:messages`,
+   * `ioc:inactiveObjects`, or nothing) and read through the
+   * `objectActivation` slot. Which of the two endpoints a system offers is in
+   * its discovery (`discovery()`; `utilDiscoveryCollections` and
+   * `ACTIVATION_RUNS_COLLECTION` in `@mcp-abap-adt/adt-strategies`), and
+   * choosing the member is the caller's: this one reads no discovery.
+   *
+   * `preauditRequested` defaults to `false`, the group member's. After a
+   * silent checklist (`activationExecuted="false"`, no message) alone, the
+   * inactive list is read once and handed to `analyse` (`IAdtAnalyseContext`).
+   */
+  async activateObjects<E extends IAdtError = IAdtError>(
+    objects: IAdtCodedReference<AdtActivationCode<V>>[],
+    preauditRequested: boolean = false,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<T['objectActivation'], E>> {
+    addressEvery(objects);
+    performEvery(
+      objects.filter((o) => !isActivatedWithoutTable(o.type)),
+      'activate',
+    );
+    return answeringActivation(
+      this.connection,
+      (sent) =>
+        activateObjects(sent, options.headers, objects, preauditRequested),
+      this.results.objectActivation,
       options?.analyse,
     );
   }

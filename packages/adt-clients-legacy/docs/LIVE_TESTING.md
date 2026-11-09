@@ -174,7 +174,7 @@ the base:
 | `IncludeCycle.test.ts` | `legacy_cycle_include` |
 | `DdlCycle.test.ts` | `legacy_cycle_ddl` |
 | `MessageClassCycle.test.ts` | `legacy_cycle_message_class` |
-| `UtilsReaders.test.ts` | `legacy_utils_readers` |
+| `UtilsReaders.test.ts` | `legacy_utils_readers` — search, structure and node reads, discovery (no `/activation/runs`), `activateObjectsGroup` refused with no request, `activateObjects` activating the program |
 
 The include and the message class are not among the kinds `legacy:setup` knows,
 so a crashed run's leftover of those two is removed by hand.

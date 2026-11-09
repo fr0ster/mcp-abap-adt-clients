@@ -208,7 +208,10 @@ export {
   TRANSPORT_REQUEST,
   versionsUri,
 } from './endpoints/objects';
-export { buildObjectUri } from './utils/activationUtils';
+export {
+  answeringActivation,
+  buildObjectUri,
+} from './utils/activationUtils';
 /**
  * The refusal a 2xx can carry.
  *

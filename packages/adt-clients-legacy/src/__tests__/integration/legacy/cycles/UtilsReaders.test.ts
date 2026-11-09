@@ -4,10 +4,12 @@
  *
  * validate (name free) → create → `search` finds it → `getObjectStructure` of
  * it → `fetchNodeStructure('DEVC/K', '$TMP')` lists it → `discovery` (the
- * collections the cycles use) → lock → write without activating → unlock →
- * `getInactiveObjects` lists it → `activateObjectsGroup` activates it →
- * `getInactiveObjects` no longer lists it → lock → delete → unlock → read
- * `404`. Every step asserts the requests it sent, their statuses and its
+ * collections the cycles use, and no `/activation/runs`) → lock → write
+ * without activating → unlock → `getInactiveObjects` lists it →
+ * `activateObjectsGroup` is refused with no request (7.40 lists no
+ * `/activation/runs`) → `activateObjects` activates it (one
+ * `POST /activation`, `preauditRequested=false`) → `getInactiveObjects` no
+ * longer lists it → lock → delete → unlock → read `404`. Every step asserts the requests it sent, their statuses and its
  * effect read back.
  *
  * Records behind the answers: the program's own steps,
@@ -251,6 +253,11 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — utils readers', () => {
             collection,
             catalogue.includes(`href="${collection}"`),
           ]).toEqual([collection, true]);
+        // No background activation runs on 7.40: the group activation is
+        // activateObjects (fr0ster/mcp-abap-adt#351).
+        expect(catalogue.includes('href="/sap/bc/adt/activation/runs"')).toBe(
+          false,
+        );
 
         mark = at();
         expectResult(await prog.lock(), 'lock');
@@ -274,18 +281,30 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — utils readers', () => {
         expect(await inactive()).toBe(true);
 
         mark = at();
-        expectResult(
+        const refused = expectFailure(
           await utils.activateObjectsGroup([{ name, type: 'PROG/P' }], false, {
             headers: integrationHeadersOf(utils, 'activateObjectsGroup'),
             analyse: judged(analyseActivation),
           }),
           'activateObjectsGroup',
         );
-        // docs/LEGACY.md "Measured on BASIS 7.40" (support package not
-        // recorded): 200, and on 7.40 SP04 too, T6-20261027.
+        // Refused before any request: /activation/runs is not offered.
+        expect(refused.message).toContain('activateObjects(');
+        expectSent(recorder, mark, []);
+
+        mark = at();
+        expectResult(
+          await utils.activateObjects([{ name, type: 'PROG/P' }], false, {
+            headers: integrationHeadersOf(utils, 'activateObjects'),
+            analyse: judged(analyseActivation),
+          }),
+          'activateObjects',
+        );
+        // docs/LEGACY.md: 200 with an empty body, the program active after it.
         const [activated] = expectSent(recorder, mark, [
           ['POST /sap/bc/adt/activation', 200],
         ]);
+        expect(queryOf(activated, 'preauditRequested')).toBe('false');
         expect(String(activated?.data).toLowerCase()).toContain(
           `adtcore:uri="${uri}"`,
         );

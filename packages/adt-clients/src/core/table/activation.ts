@@ -17,6 +17,7 @@ export async function activateTable(
   connection: IAbapConnection,
   headers: IAdtHeaders,
   tableName: string,
+  preauditRequested: boolean,
 ): Promise<IAdtWireResponse> {
   const objectUri = `${TABLE.uri(tableName)}`;
   return await activateObjectInSession(
@@ -24,6 +25,6 @@ export async function activateTable(
     headers,
     objectUri,
     tableName,
-    true,
+    preauditRequested,
   );
 }

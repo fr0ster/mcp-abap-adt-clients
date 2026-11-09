@@ -121,6 +121,7 @@ const RUNTIME_EXPORTS = [
   'AmdpDebugger',
   'amdpDebuggerDocuments',
   'answering',
+  'answeringActivation',
   'appendStructureDocuments',
   'ApplicationLog',
   'applicationLogDocuments',

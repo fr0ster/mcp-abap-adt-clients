@@ -18,6 +18,7 @@ export async function activateProgram(
   connection: IAbapConnection,
   headers: IAdtHeaders,
   programName: string,
+  preauditRequested: boolean,
 ): Promise<IAdtWireResponse> {
   const objectUri = `${PROGRAM.uri(programName)}`;
   return await activateObjectInSession(
@@ -25,6 +26,6 @@ export async function activateProgram(
     headers,
     objectUri,
     programName,
-    true,
+    preauditRequested,
   );
 }

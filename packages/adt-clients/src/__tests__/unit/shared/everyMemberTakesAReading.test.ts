@@ -66,13 +66,13 @@ describe('AdtUtils readings', () => {
     expect(awaiting).toEqual(AWAITING_ITS_SLOT);
   });
 
-  it('names a slot for each of the twenty-one members that make a request', () => {
+  it('names a slot for each of the twenty-two members that make a request', () => {
     const named = new Set(
       [...source.matchAll(/this\.results\.(\w+)/g)].map((m) => m[1]),
     );
 
     expect([...named].sort()).toEqual(Object.keys(utilDocuments).sort());
-    expect(named.size).toBe(21);
+    expect(named.size).toBe(22);
   });
 
   it('ships a default for every slot', () => {

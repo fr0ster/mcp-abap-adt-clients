@@ -20,6 +20,7 @@ export async function activateClass(
   connection: IAbapConnection,
   headers: IAdtHeaders,
   className: string,
+  preauditRequested: boolean,
 ): Promise<IAdtWireResponse> {
   const objectUri = `${CLASS.uri(className)}`;
   return await activateObjectInSession(
@@ -27,6 +28,6 @@ export async function activateClass(
     headers,
     objectUri,
     className,
-    true,
+    preauditRequested,
   );
 }

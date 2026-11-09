@@ -26,6 +26,7 @@ export async function activateEnhancement(
   headers: IAdtHeaders,
   enhancementType: EnhancementType,
   enhancementName: string,
+  preauditRequested: boolean,
 ): Promise<IAdtWireResponse> {
   const objectUri = getEnhancementUri(enhancementType, enhancementName);
 
@@ -34,6 +35,6 @@ export async function activateEnhancement(
     headers,
     objectUri,
     enhancementName.toUpperCase(),
-    true,
+    preauditRequested,
   );
 }

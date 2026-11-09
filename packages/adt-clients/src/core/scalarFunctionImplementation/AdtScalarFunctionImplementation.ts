@@ -15,6 +15,7 @@
 import type {
   AdtReadVersion,
   IAdtActivatable,
+  IAdtActivationOptions,
   IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtCreatable,
@@ -37,6 +38,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import { answeringActivation } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
@@ -427,16 +429,22 @@ export class AdtScalarFunctionImplementation<
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IScalarFunctionImplementationConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
 
-    return answering(
-      () =>
-        activateScalarFunctionImplementation(connection, options.headers, name),
+    return answeringActivation(
+      connection,
+      (sent) =>
+        activateScalarFunctionImplementation(
+          sent,
+          options.headers,
+          name,
+          options.preauditRequested ?? true,
+        ),
       this.results.activation,
       options?.analyse,
     );

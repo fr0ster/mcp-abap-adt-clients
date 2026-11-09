@@ -16,6 +16,15 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 > **From 18.x?** Read [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md)
 > first: 19.0.0 is where members became one endpoint call each.
 >
+> **From 44.x?** 45.0.0 (on `interfaces-adt` ^27.0.0): `IUtilResults` has the
+> required `objectActivation` slot, read by the new `getUtils().activateObjects`
+> (`POST /activation`, for a system whose discovery lists no
+> `/activation/runs`); every single-object activation takes
+> `options.preauditRequested`; and after a silent checklist an activation reads
+> the inactive list once and hands it to `analyse`. With adt-strategies 0.22.0,
+> `analyseActivation` answers an activation that activated nothing as a
+> failure. See [`docs/usage/MIGRATION-45.md`](docs/usage/MIGRATION-45.md).
+>
 > **From 42.x?** 43.0.0: a create invents no language — it writes and sends
 > (`sap-language`) the one given, from the config else the system context,
 > and nothing without one; `AdtFunctionModule.validate` requires a
@@ -76,9 +85,9 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 > [`docs/usage/MIGRATION-37.md`](docs/usage/MIGRATION-37.md).
 >
 > **From 35.x?** 36.0.0 (on `interfaces-adt` ^20.0.0) makes a request's
-> `Accept` and `Content-Type` yours: 32 members take them as the required
+> `Accept` and `Content-Type` yours: the members listed in
+> [A request's own headers](#a-requests-own-headers) take them as the required
 > `options.headers` and send exactly that pair. See
-> [A request's own headers](#a-requests-own-headers) and
 > [`docs/usage/MIGRATION-36.md`](docs/usage/MIGRATION-36.md).
 
 ## Features
@@ -1130,6 +1139,23 @@ await client.getClass().read(
 - Each accessor returns its `Adt*` class, typed to its **honest capability set** (since 8.0.0, completed in 12.0.0): the class implements only the capability atoms that object actually supports, written positively — there is no composite at all, and none named for what an object lacks. Since 38.0.0 the accessor answers the class itself (`AdtClass<T>`, …), not a composition of its atoms; since 41.0.0 `T` is what its result slots answer (`ResultValuesOf<typeof results>`). Calling a capability a handler lacks — e.g. `client.getDomain().getVersions(...)` — is a **compile error** rather than a runtime throw. See the [Type System](#type-system) section.
 - See `src/index.ts` for the full type exports and object configs.
 
+### Activation: what activated, and which endpoint
+
+An activation answers `200` whether or not it activated; the verdict is the
+`analyse` you pass, and `analyseActivation` from `@mcp-abap-adt/adt-strategies`
+reads `ioc:inactiveObjects` and an answer that does not state the activation
+as **not activated**, with the objects SAP still lists in `stillInactive`.
+Every single-object activation takes `options.preauditRequested` (absent,
+`true`); after a `chkl:messages` with `activationExecuted="false"` and no
+message, and only then, the member reads the inactive list once and hands it
+to `analyse`. Group activation is two members, one endpoint each:
+`activateObjectsGroup` (`/activation/runs`) and `activateObjects`
+(`/activation`); which one a system offers is in its discovery, and the
+choice is yours. Details and examples:
+[`CLIENT_API_REFERENCE.md`](docs/usage/CLIENT_API_REFERENCE.md) ("What
+`activate()` answers, and who judges it", "AdtUtils (Group activation and
+deletion)"); the measurements by release: [`ERRATA.md`](docs/usage/ERRATA.md).
+
 ### AdtObject Methods (with Long Polling Support)
 
 All `AdtObject` implementations accept the `withLongPolling` parameter on read operations (whether the server acts on it is another matter — see the caveat above):
@@ -1224,13 +1250,14 @@ and nothing is merged in, defaulted or replaced. The options are required with
 it, and a positional parameter before them that was optional is now
 `T | undefined` — pass `undefined` explicitly.
 
-The 32 members: `link`, `pull`, `checkExternalRepo` (abapGit); `create`,
+The members: `link`, `pull`, `checkExternalRepo` (abapGit); `create`,
 `update`, `updateMetadata`, `delete`, `checkDeletion`, `check`, `activate` (the
 object handlers); `checkState` (feature toggle); `removeObject`, `addObject`,
 `createTask`, `changeTaskType`, `moveObjects` (transport request);
 `getWhereUsed`, `getWhereUsedScope`, `getVirtualFoldersContents`,
-`fetchNodeStructure`, `activateObjectsGroup`, `checkDeletionGroup`,
-`deleteObjectsGroup`, `getSqlQuery`, `getTableContents` (`getUtils()`);
+`fetchNodeStructure`, `activateObjectsGroup`, `activateObjects`,
+`checkDeletionGroup`, `deleteObjectsGroup`, `getSqlQuery`, `getTableContents`
+(`getUtils()`);
 `scheduleTrace` (executors); `setBreakpoints`, `getChildVariables`,
 `getVariables`, `syncBreakpoints`, `setDebuggerSettings` (`AbapDebugger`);
 `getDataPreview` (`AmdpDebugger`). Every other member is unchanged, and a read
@@ -1641,6 +1668,7 @@ See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-a
 One document per breaking release, each written for a consumer on the contract
 before it:
 
+- **[44.x → 45.0.0](docs/usage/MIGRATION-45.md)** — interfaces-adt 27: a full `IUtilResults` names `objectActivation`; `getUtils().activateObjects` posts a group activation to `/activation` (the caller picks it or `activateObjectsGroup` from discovery); every single-object activation takes `options.preauditRequested` (absent, `true`); after a silent checklist the member reads the inactive list once and hands it to `analyse`; the low-level activation functions take `preauditRequested`. With adt-strategies 0.22.0, `analyseActivation` reads an activation that activated nothing as a failure, with `stillInactive`.
 - **[43.x → 44.0.0](docs/usage/MIGRATION-44.md)** — `@mcp-abap-adt/interfaces-adt-connection` 4: `getBaseUrl()` answers `Promise<string | undefined>` (`undefined` over RFC), `AdtBatchConnection` hands it on and `isCloudEnvironment` asks `systeminformation` without a URL; adt-strategies 0.21.0 and adt-clients-legacy 0.8.0 declare the same range. The test configuration states `environment.connection_type` (required, `"http"` or `"rfc"`); over RFC it states `SAP_ASHOST` + `SAP_SYSNR` (or the message-server keys), `SAP_CLIENT` and `SAP_LANGUAGE`, and no `SAP_URL`.
 - **[42.x → 43.0.0](docs/usage/MIGRATION-43.md)** — a create invents no language: given one, it writes `adtcore:language` / `adtcore:masterLanguage` and sends `sap-language`, one value, from the config else the system context; given none, neither (no `EN` default); `AdtFunctionModule.validate` requires `description`; class create takes no `abstract` and program create no program type (SAP ignores both on create); a run id of `.` or `..` is refused before anything is sent.
 - **[41.x → 42.0.0](docs/usage/MIGRATION-42.md)** — `create` of every handler whose request needs a package, and `validate` of `AdtProgram` / `AdtInclude`, take `packageName: string`, required, in the config type (SAP creates nothing without a package; program validation refuses an empty one); any other `validate` without a package sends `packagename` empty, never `undefined`; a call that passes a package sends the same request.

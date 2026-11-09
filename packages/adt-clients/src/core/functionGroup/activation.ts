@@ -24,6 +24,7 @@ export async function activateFunctionGroup(
   connection: IAbapConnection,
   headers: IAdtHeaders,
   functionGroupName: string,
+  preauditRequested: boolean,
 ): Promise<IAdtWireResponse> {
   const objectUri = FUNCTION_GROUP.uri(functionGroupName);
   const mainUri = sourceUri(objectUri);
@@ -34,7 +35,7 @@ export async function activateFunctionGroup(
   <adtcore:objectReference adtcore:uri="${mainUri}" adtcore:type="FUGR/I" adtcore:name="SAPL${functionGroupName.toUpperCase()}"/>
 </adtcore:objectReferences>`;
 
-  const url = `/sap/bc/adt/activation?method=activate&preauditRequested=true`;
+  const url = `/sap/bc/adt/activation?method=activate&preauditRequested=${preauditRequested}`;
 
   const response = await connection.makeAdtRequest({
     url,

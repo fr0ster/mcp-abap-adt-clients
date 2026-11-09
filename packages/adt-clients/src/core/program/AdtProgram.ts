@@ -21,6 +21,7 @@ import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
 import type {
   AdtVariant,
   IAdtActivatable,
+  IAdtActivationOptions,
   IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtContentTypes,
@@ -48,6 +49,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { PROGRAM } from '../../endpoints/objects';
+import { answeringActivation } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
@@ -434,17 +436,19 @@ export class AdtProgram<
   /** Activate the program. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IProgramConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    return answering(
-      () =>
+    return answeringActivation(
+      connection,
+      (sent) =>
         activateProgram(
-          connection,
+          sent,
           options.headers,
           config.programName as string,
+          options.preauditRequested ?? true,
         ),
       this.results.activation,
       options?.analyse,

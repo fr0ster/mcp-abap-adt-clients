@@ -18,6 +18,7 @@ import type {
   AdtObjectIdentity,
   AdtVariant,
   IAdtActivatable,
+  IAdtActivationOptions,
   IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtContentTypes,
@@ -44,6 +45,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { FUNCTION_MODULE } from '../../endpoints/objects';
+import { answeringActivation } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
@@ -416,15 +418,23 @@ export class AdtFunctionModule<
   /** Activate the function module. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const { group, module } = this.names(config);
 
-    return answering(
-      () => activateFunctionModule(connection, options.headers, group, module),
+    return answeringActivation(
+      connection,
+      (sent) =>
+        activateFunctionModule(
+          sent,
+          options.headers,
+          group,
+          module,
+          options.preauditRequested ?? true,
+        ),
       this.results.activation,
       options?.analyse,
     );

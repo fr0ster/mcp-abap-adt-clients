@@ -25,11 +25,13 @@ import {
 export function judged<E extends IAdtError>(
   ...specific: IAnalyse<E>[]
 ): IAnalyse<IAdtMessageFailure | E> {
-  return (verdict, answer) => {
+  // The facts a member read beside its answer go to every judge: an
+  // activation's silent checklist is judged by the inactive list in them.
+  return (verdict, answer, context) => {
     const first = analyseException(verdict, answer);
     if (first !== ADT_NO_FAILURE) return first;
     for (const judge of specific) {
-      const next = judge(verdict, answer);
+      const next = judge(verdict, answer, context);
       if (next !== ADT_NO_FAILURE) return next;
     }
     return ADT_NO_FAILURE;

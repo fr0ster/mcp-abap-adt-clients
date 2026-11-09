@@ -1,4 +1,12 @@
-import type { AdtMessage, AdtRefusal, IAdtMessageFailure } from '../index';
+import type {
+  AdtActivationFacts,
+  AdtActivationRefusal,
+  AdtMessage,
+  AdtRefusal,
+  IAdtActivationFailure,
+  IAdtMessageFailure,
+  IAdtStillInactive,
+} from '../index';
 import * as api from '../index';
 import { rawOf } from '../result';
 
@@ -13,6 +21,7 @@ import { rawOf } from '../result';
 describe('the published surface', () => {
   it('exports every strategy and every reading, callable', () => {
     const expected = [
+      'ACTIVATION_RUNS_COLLECTION',
       'abapGitErrorLog',
       'abapGitExternalRepo',
       'abapGitRepos',
@@ -76,6 +85,7 @@ describe('the published surface', () => {
       'readUnitTestRefusal',
       'readValidationRefusal',
       'serviceDefinitionElementInfo',
+      'stillInactiveAmong',
       'structureElementInfo',
       'traceSchedulingProfilerId',
       'traceSchedulingRequests',
@@ -86,6 +96,7 @@ describe('the published surface', () => {
       'transportTree',
       'unitTestRunId',
       'utilActivationRunId',
+      'utilDiscoveryCollections',
       'utilInactiveObjects',
       'utilNamedItems',
       'utilNodeContents',
@@ -93,9 +104,12 @@ describe('the published surface', () => {
       'utilWhereUsedReferences',
     ];
     expect(Object.keys(api).sort()).toEqual(expected);
-    for (const name of expected) {
+    for (const name of expected.filter(
+      (name) => name !== 'ACTIVATION_RUNS_COLLECTION',
+    )) {
       expect(typeof (api as Record<string, unknown>)[name]).toBe('function');
     }
+    expect(api.ACTIVATION_RUNS_COLLECTION).toBe('/sap/bc/adt/activation/runs');
   });
 
   /**
@@ -127,6 +141,33 @@ describe('the published surface', () => {
 
     expect(failure.messages[0].t100?.no).toBe('026');
     expect(refusal.form).toBe('exception');
+  });
+
+  it('keeps the shapes of an activation that did not activate', () => {
+    const listed: IAdtStillInactive = {
+      uri: '/sap/bc/adt/functions/groups/zfg/source/main',
+      type: 'FUGR/I',
+      name: 'SAPLZFG',
+      parentUri: '/sap/bc/adt/functions/groups/zfg',
+    };
+    const refusal: AdtActivationRefusal = {
+      message: 'Not activated: a sentence',
+      messages: [{ type: 'E', text: 'a sentence' }],
+      form: 'activation',
+      stillInactive: [listed],
+    };
+    const failure: IAdtActivationFailure = {
+      origin: 'refusal',
+      message: refusal.message,
+      messages: refusal.messages,
+      stillInactive: refusal.stillInactive,
+    };
+    const facts: AdtActivationFacts = {
+      named: ['/sap/bc/adt/functions/groups/zfg'],
+      inactiveObjects: { data: '', status: 200, statusText: 'OK', headers: {} },
+    };
+
+    expect(failure.stillInactive[0]?.parentUri).toBe(facts.named[0]);
   });
 });
 

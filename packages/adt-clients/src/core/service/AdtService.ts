@@ -2,6 +2,7 @@ import type {
   AdtReadVersion,
   AdtVariant,
   IAdtActivatable,
+  IAdtActivationOptions,
   IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtCreatable,
@@ -39,6 +40,7 @@ import {
 } from '../../constants/contentTypes';
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { SERVICE_BINDING } from '../../endpoints/objects';
+import { answeringActivation } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { buildQueryString, limitDescription } from '../../utils/internalUtils';
@@ -686,18 +688,19 @@ export class AdtServiceBinding<
    */
   async activate<E extends IAdtError = IAdtError>(
     config: Partial<IServiceBindingConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
 
-    return answering(
-      () =>
-        this.activateRequest(connection, options.headers, {
+    return answeringActivation(
+      connection,
+      (sent) =>
+        this.activateRequest(sent, options.headers, {
           bindingName: name,
-          preauditRequested: true,
+          preauditRequested: options.preauditRequested ?? true,
         }),
       this.results.activation,
       options?.analyse,

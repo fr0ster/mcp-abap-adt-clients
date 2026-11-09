@@ -18,6 +18,7 @@ export async function activateFunctionModule(
   headers: IAdtHeaders,
   functionGroupName: string,
   functionModuleName: string,
+  preauditRequested: boolean,
 ): Promise<IAdtWireResponse> {
   const objectUri = `${FUNCTION_MODULE.uri(functionGroupName, functionModuleName)}`;
 
@@ -26,6 +27,6 @@ export async function activateFunctionModule(
     headers,
     objectUri,
     functionModuleName,
-    true,
+    preauditRequested,
   );
 }

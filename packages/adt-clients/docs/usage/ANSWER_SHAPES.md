@@ -78,6 +78,23 @@ configuration knob that was left open for flexibility's sake.
 
 Worth knowing before writing any rule of your own.
 
+**An activation that had nothing to do and one that did nothing.** Both HTTP
+200, both `chkl:messages` with `activationExecuted="false"` and no message:
+
+| asked to activate | answer | still inactive after |
+|---|---|---|
+| a class that is already active (S/4HANA 2025, ABAP cloud) | `activationExecuted="false"`, no `msg` | nothing |
+| a function group's reference alone, `preauditRequested=false` (S/4HANA 2025) | `activationExecuted="false"`, no `msg` | the group and its main program |
+
+Only the inactive list read after the answer separates them
+(`activation-reactivate-active-s4-2025`, `activation-group-alone-s4-2025`).
+Beside them, an activation may answer `ioc:inactiveObjects` and activate
+nothing (`activation-preaudit-still-inactive-751`,
+`activation-group-alone-s4-2025` 01), or an empty body and activate
+(`activation-sync-activated-751`, `activation-class-basis-740` 01). The
+verdicts `analyseActivation` takes from them are in
+[`ERRATA.md`](ERRATA.md).
+
 **A clean check and a check of something absent.** Both HTTP 200, both with zero
 messages. Only `chkrun:status` differs:
 

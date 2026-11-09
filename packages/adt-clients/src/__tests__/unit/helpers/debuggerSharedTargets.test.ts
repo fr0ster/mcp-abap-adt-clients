@@ -112,6 +112,10 @@ describe('debugger tests use shared targets', () => {
 const LOCK_BODY = `<?xml version="1.0" encoding="utf-8"?>
 <asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE>SHARED-LOCK</LOCK_HANDLE></DATA></asx:values></asx:abap>`;
 
+/** What a system answers an activation that activated (`analyseActivation` reads it). */
+const ACTIVATED = `<?xml version="1.0" encoding="utf-8"?>
+<chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties checkExecuted="true" activationExecuted="true" generationExecuted="true"/></chkl:messages>`;
+
 /**
  * A recording connection. `currentSource`, when given, is what the object's
  * source answers — the system already holding that text.
@@ -145,7 +149,13 @@ function recording(currentSource?: string): {
         status: 200,
         statusText: 'OK',
         headers: {},
-        data: locking ? LOCK_BODY : source ? currentSource : '<x/>',
+        data: locking
+          ? LOCK_BODY
+          : source
+            ? currentSource
+            : request.url.startsWith('/sap/bc/adt/activation')
+              ? ACTIVATED
+              : '<x/>',
       } as IAdtWireResponse;
     },
   } as unknown as IAbapConnection;

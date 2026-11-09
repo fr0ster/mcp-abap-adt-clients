@@ -17,6 +17,7 @@ export async function activateDDLS(
   connection: IAbapConnection,
   headers: IAdtHeaders,
   ddlName: string,
+  preauditRequested: boolean,
 ): Promise<IAdtWireResponse> {
   const objectUri = `${DDL_SOURCE.uri(ddlName)}`;
   return await activateObjectInSession(
@@ -24,6 +25,6 @@ export async function activateDDLS(
     headers,
     objectUri,
     ddlName,
-    true,
+    preauditRequested,
   );
 }
