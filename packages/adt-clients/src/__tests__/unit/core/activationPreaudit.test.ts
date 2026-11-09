@@ -10,12 +10,17 @@
  */
 import { headersOf } from '../../helpers/adtHeaders';
 import { recordingClient } from '../capabilities/behaviourGuard';
-import { ACTIVATING_APIS, activatingHandler } from './activatingApis';
+import {
+  ACTIVATING_APIS,
+  type ActivatingApi,
+  activatingHandler,
+  TABLE_ACTIVATING_APIS,
+} from './activatingApis';
 
 const ACTIVATION = '/sap/bc/adt/activation?method=activate&preauditRequested=';
 
 async function sentBy(
-  api: string,
+  api: ActivatingApi,
   preauditRequested: boolean | undefined,
 ): Promise<string[]> {
   const { handler, config, calls } = activatingHandler(api);
@@ -33,7 +38,8 @@ async function sentBy(
 
 describe('preauditRequested on every single-object activation', () => {
   it('finds the activating APIs of the type tables', () => {
-    expect(ACTIVATING_APIS.length).toBeGreaterThanOrEqual(30);
+    expect(TABLE_ACTIVATING_APIS.length).toBeGreaterThanOrEqual(30);
+    expect(ACTIVATING_APIS).toEqual(TABLE_ACTIVATING_APIS);
   });
 
   it.each(ACTIVATING_APIS)('%s sends true when not asked', async (api) => {

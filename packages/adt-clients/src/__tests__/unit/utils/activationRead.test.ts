@@ -17,22 +17,21 @@ import {
   type IAdtError,
   type IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
-import type {
-  IAbapConnection,
-  IAbapRequestOptions,
-  IAdtWireResponse,
-} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClient } from '../../../clients/AdtClient';
 import { headersOf } from '../../helpers/adtHeaders';
 import { readExchange } from '../../helpers/recordedConformance';
+import { CriticalSectionConnection } from '../../helpers/recordingConnection';
 import { createLibraryLogger } from '../../helpers/testLogger';
 import { ACTIVATING_APIS, activatingHandler } from '../core/activatingApis';
 
 const ANSWERS = join(__dirname, '../../../../corpus/adt/answers');
 
 /** One recorded step, as the wire answer it was. */
-function recorded(caseName: string, step: string): IAdtWireResponse {
+function recorded(caseName: string, step: string): IAdtWireResponse<string> {
   const { status, body } = readExchange(ANSWERS, `${caseName}--${step}.json`);
+  // Every recording replayed here is a 200, which the connection answers.
+  if (status !== 200) throw new Error(`${caseName} ${step}: not a 200`);
   return { status, statusText: 'OK', headers: {}, data: body };
 }
 
@@ -54,32 +53,28 @@ function refused(status: number): Error & { response: IAdtWireResponse } {
 }
 
 interface IReplay {
-  activation: IAdtWireResponse;
-  inactive?: IAdtWireResponse | Error;
+  activation: IAdtWireResponse<string>;
+  inactive?: IAdtWireResponse<string> | Error;
 }
 
-/** A client over a connection that answers by request, recording each one. */
+/**
+ * A client over a connection that answers by request, recording each one:
+ * the shared `CriticalSectionConnection`, whose `bodyFor` answers `200` with
+ * the recorded body or throws what it throws. Every recording replayed here
+ * is a `200`.
+ */
 function replaying(replay: IReplay) {
-  const sent: IAbapRequestOptions[] = [];
-  const connection: IAbapConnection = {
-    connect: async () => {},
-    getBaseUrl: async () => undefined,
-    getSessionId: () => null,
-    setSessionType: () => {},
-    makeAdtRequest: async <T, D>(
-      options: IAbapRequestOptions,
-    ): Promise<IAdtWireResponse<T, D>> => {
-      sent.push(options);
-      const answer =
-        options.url === INACTIVE ? replay.inactive : replay.activation;
-      if (answer === undefined) throw new Error(`unexpected ${options.url}`);
-      if (answer instanceof Error) throw answer;
-      // The stub answers with recorded wire answers; the generic is the
-      // caller's view of the body, which a recording does not narrow.
-      return answer as IAdtWireResponse<T, D>;
-    },
+  const connection = new CriticalSectionConnection((options) => {
+    const answer =
+      options.url === INACTIVE ? replay.inactive : replay.activation;
+    if (answer === undefined) throw new Error(`unexpected ${options.url}`);
+    if (answer instanceof Error) throw answer;
+    return answer.data;
+  });
+  return {
+    client: new AdtClient(connection, createLibraryLogger()),
+    sent: connection.sent,
   };
-  return { client: new AdtClient(connection, createLibraryLogger()), sent };
 }
 
 /** An `analyse` that records what it was handed and clears nothing. */
@@ -227,10 +222,7 @@ describe('every activation member reads after a silent checklist', () => {
     '%s reads once and names what its request named',
     async (api) => {
       const { analyse, seen } = spying();
-      const { handler, config, calls } = activatingHandler(
-        api,
-        String(SILENT.data),
-      );
+      const { handler, config, calls } = activatingHandler(api, SILENT.data);
       await handler.activate(config, {
         headers: headersOf(handler, 'activate', config),
         analyse,
