@@ -305,7 +305,7 @@ So a legacy client lists and reads its user's requests and does nothing else wit
 | `readObjectMetadata`, `readObjectSource`, `fetchNodeStructure`, `getObjectStructure` for a code `ADT_TYPES_BASIS_740` does not list — `DOMA/DD`, `DTEL/DE`, `TABL/DS`, `TABL/DT`, `TTYP/DA`, `BDEF/BDO`, `SRVD/SRV`, `DDLX/EX`, `DCLS/DL`, `ENHO/XHH`, … (`DEVC/K` stays served for the two structure reads) | does not compile; from a caller outside the type system refused (answered, not thrown, no request): their families answered `404` or are not advertised |
 | `activateObjects` for a code 7.40 does not activate (`AdtActivationCode<'basis740'>` names the codes) | does not compile. A caller that bypasses the types is not guarded: the request is sent as the base member builds it (a code no table activates, such as `MSAG/N`, is still thrown by the base before any request), and SAP's answer is the verdict |
 | `getTypeStructure` | kept: `POST /repository/typestructure`, the caller's headers; 7.40's answer is recorded in adt-clients' corpus (`typestructure/system-description-basis-740--07-typestructure`) |
-| `activateObjects` | inherited from adt-clients 45: the group activation of 7.40, synchronous `POST /activation?method=activate&preauditRequested=…` (default `false`), references with uri, type and name, read through `objectActivation`. The request the legacy `activateObjectsGroup` sent before: measured earlier on BASIS 7.40; on 7.40 SP04 `POST /activation` `200` in the utils cycle (`T6-20261027` UtilsReaders). `VIEW/DV` is sent (`ADT_UTILITY_CODES_BASIS_740` lists its group activation, not measured). The answer is judged as any activation's (below) |
+| `activateObjects` | inherited from adt-clients 45: the group activation of 7.40, synchronous `POST /activation?method=activate&preauditRequested=…` (default `false`), references with uri, type and name, read through `objectActivation`. Measured on 7.40 SP04 (2026-11-09, below): `200`, empty body, the objects active afterwards. `VIEW/DV` is sent (`ADT_UTILITY_CODES_BASIS_740` lists its group activation, not measured). The answer is judged as any activation's (below) |
 | `activateObjectsGroup` | refused without a request: `/activation/runs` is not in 7.40's discovery (measured on 7.40 SP04, 2026-11-09, below); the message points to `activateObjects` |
 | `getInclude` | not measured, kept (`/programs/includes` advertised) |
 | `getWhereUsed`, `getWhereUsedScope` | refused — measured: `usageReferences` answered `404` (s11-usage). 7.40 serves where-used only through RIS (`fullnamemapping` → `metadata` → `whereused?RIS_REQUEST_TYPE=WHERE_USED_LAZY`), another family; the message names it |
@@ -452,6 +452,13 @@ On premise, BASIS 7.40, 2026-10-01, over RFC and over HTTP. **These measurements
   `/activation/inactiveobjects` are listed, `/activation/runs` and
   `/activation/results` are not. So `activateObjects` is the group
   activation and `activateObjectsGroup` refuses.
+- **The group activation through this package** (2026-11-09, over RFC, two
+  programs in `$TMP` written inactive): `activateObjectsGroup` answered the
+  refusal and sent no request; `activateObjects` sent one
+  `POST /sap/bc/adt/activation?method=activate&preauditRequested=false`,
+  answered `200` with an empty body, read as activated, and the inactive list
+  named neither program afterwards. The utils cycle (`UtilsReaders.test.ts`)
+  runs these steps on a program of its own.
 - **No write guard** (2026-11-03, over RFC). A source read answers an `ETag`;
   a source write answers none. A source `PUT` with a stale `If-Match`, and one
   with an arbitrary `If-Match`, each answered `200`, and the write took place:

@@ -124,6 +124,21 @@ package's live checks in
 `SAPNWRFC_HOME` and `LD_LIBRARY_PATH` must be passed at launch because `dotenv`
 does not expand `PATH`.
 
+## Activation answers, live
+
+`integration/shared/activationAnswers.test.ts` (case
+`activation_answers/adt_activation_answers`, on premise) holds what an
+activation answers to the requests the library sends: discovery lists
+`/activation/runs`; a class activates with the default, and a re-activation
+with `preauditRequested=false` is nothing to activate after one read of the
+inactive list; a function group's reference alone answers not activated with
+`stillInactive` for `true`, the silent checklist (not activated, one read of
+the list) for `false`, and the group with its main program activates through
+`activateObjects`. Each object is created and deleted by the test. The
+answers it holds are recorded in `corpus/adt/answers/`
+(`activation-*-s4-2025`). The 7.40 counterpart is the legacy utils cycle
+([LIVE_TESTING.md](../../../adt-clients-legacy/docs/LIVE_TESTING.md)).
+
 ## The type tables' conformance check, live
 
 `src/__tests__/integration/shared/typeTablesConformance.test.ts` reads the
