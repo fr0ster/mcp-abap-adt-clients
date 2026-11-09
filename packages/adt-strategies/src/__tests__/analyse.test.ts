@@ -458,7 +458,7 @@ describe('analyseDebuggerFreed', () => {
 });
 
 /**
- * The activation table (spec D1, decisions Q1, Q2, Q7), one case per row, on
+ * The activation table (fr0ster/mcp-abap-adt#351; the table and its measurements: ERRATA.md), one case per row, on
  * recorded answers where one exists. Each assertion names what only its row
  * produces: the sentence about the document, or the objects SAP listed.
  */
@@ -557,7 +557,7 @@ describe('analyseActivation answers every row of the activation table', () => {
     expect(verdict.stillInactive).toEqual([]);
   });
 
-  it('Q7: a silent checklist with the group still listed is not activated', () => {
+  it('silent checklist: a silent checklist with the group still listed is not activated', () => {
     const steps = stepsOf('activation-group-alone-s4-2025');
     const verdict = activationFailure(
       analyseActivation(ADT_NO_FAILURE, steps[3], listed([GROUP], steps[4])),
@@ -569,14 +569,14 @@ describe('analyseActivation answers every row of the activation table', () => {
     ]);
   });
 
-  it('Q7: a silent checklist after a re-activation is nothing to activate', () => {
+  it('silent checklist: a silent checklist after a re-activation is nothing to activate', () => {
     const steps = stepsOf('activation-reactivate-active-s4-2025');
     expect(
       analyseActivation(ADT_NO_FAILURE, steps[2], listed([PROBE], steps[3])),
     ).toBe(ADT_NO_FAILURE);
   });
 
-  it('Q7: an entry counts by its parentUri', () => {
+  it('silent checklist: an entry counts by its parentUri', () => {
     const list = wire(
       '<?xml version="1.0" encoding="utf-8"?><ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects"><ioc:entry><ioc:object ioc:user="" ioc:deleted="false"><ioc:ref adtcore:uri="/sap/bc/adt/oo/classes/zcl_x/includes/definitions" adtcore:type="CLAS/OCN/definitions" adtcore:name="ZCL_X" adtcore:parentUri="/sap/bc/adt/oo/classes/zcl_x" xmlns:adtcore="http://www.sap.com/adt/core"/></ioc:object><ioc:transport/></ioc:entry></ioc:inactiveObjects>',
     );
@@ -592,7 +592,7 @@ describe('analyseActivation answers every row of the activation table', () => {
     ]);
   });
 
-  it('Q7: the transport-only entry is never counted', () => {
+  it('silent checklist: the transport-only entry is never counted', () => {
     // The request's own transport named, to show the transport entry is not
     // read at all rather than merely not matched.
     const steps = stepsOf('activation-group-alone-s4-2025');
@@ -605,7 +605,7 @@ describe('analyseActivation answers every row of the activation table', () => {
     ).toBe(ADT_NO_FAILURE);
   });
 
-  it('Q7: the flat 7.40 list is read like the ioc list', () => {
+  it('silent checklist: the flat 7.40 list is read like the ioc list', () => {
     const list = stepsOf('activation-class-basis-740')[1];
     const verdict = activationFailure(
       analyseActivation(
@@ -623,7 +623,7 @@ describe('analyseActivation answers every row of the activation table', () => {
     ]);
   });
 
-  it('Q7: an object listed but not named is not counted', () => {
+  it('silent checklist: an object listed but not named is not counted', () => {
     const list = stepsOf('activation-class-basis-740')[1];
     expect(
       analyseActivation(
@@ -634,7 +634,7 @@ describe('analyseActivation answers every row of the activation table', () => {
     ).toBe(ADT_NO_FAILURE);
   });
 
-  it('Q7 without the list: the outcome could not be decided', () => {
+  it('silent checklist without the list: the outcome could not be decided', () => {
     const verdict = activationFailure(
       analyseActivation(
         ADT_NO_FAILURE,
@@ -647,7 +647,7 @@ describe('analyseActivation answers every row of the activation table', () => {
     expect(verdict.stillInactive).toEqual([]);
   });
 
-  it('Q7 on ABAP cloud with an empty list: nothing to activate', () => {
+  it('silent checklist on ABAP cloud with an empty list: nothing to activate', () => {
     const empty = stepsOf('activation-reactivate-active-s4-2025')[3];
     expect(
       analyseActivation(
@@ -658,7 +658,7 @@ describe('analyseActivation answers every row of the activation table', () => {
     ).toBe(ADT_NO_FAILURE);
   });
 
-  it('Q7 with a list that is no inactive-objects document: not decided', () => {
+  it('silent checklist with a list that is no inactive-objects document: not decided', () => {
     const verdict = activationFailure(
       analyseActivation(
         ADT_NO_FAILURE,
@@ -669,7 +669,7 @@ describe('analyseActivation answers every row of the activation table', () => {
     expect(verdict.message).toContain('the inactive list could not be read');
   });
 
-  it('an E refusal stays a refusal, with its messages (Q6)', () => {
+  it('an E refusal stays a refusal, with its messages', () => {
     const verdict = activationFailure(
       analyseActivation(ADT_NO_FAILURE, answerFor('refusal-activation-fails')),
     );

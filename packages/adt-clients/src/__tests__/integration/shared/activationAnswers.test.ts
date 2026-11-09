@@ -1,7 +1,6 @@
 /**
  * What an activation answers, and what the library and `analyseActivation`
- * make of it, on a live on-premise system (fr0ster/mcp-abap-adt#351; the D8
- * measurements of S/4HANA 2025, recorded in `corpus/adt/answers/` as
+ * make of it, on a live on-premise system (fr0ster/mcp-abap-adt#351; the measurements of S/4HANA 2025, recorded in `corpus/adt/answers/` as
  * `activation-*-s4-2025`).
  *
  * - discovery lists `/sap/bc/adt/activation/runs`;
@@ -281,7 +280,7 @@ describe('Activation answers (fr0ster/mcp-abap-adt#351)', () => {
           'create function group',
         );
         // A fresh group is created active: its main program is changed, so
-        // the group and SAPL<group> are inactive (measured, D8).
+        // the group and SAPL<group> are inactive (measured on S/4HANA 2025).
         const main = expectResult(
           await handler.read({ functionGroupName: group }, 'active', {
             analyse: analyseException,

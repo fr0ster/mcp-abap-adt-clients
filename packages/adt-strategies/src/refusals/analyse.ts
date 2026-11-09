@@ -159,7 +159,7 @@ export interface IAdtActivationFailure extends IAdtMessageFailure {
 
 /**
  * What an activation answered, judged by {@link readActivationRefusal}'s
- * table (spec D1): `ioc:inactiveObjects`, a document that does not state the
+ * table (fr0ster/mcp-abap-adt#351; ERRATA.md): `ioc:inactiveObjects`, a document that does not state the
  * activation, and a silent checklist whose inactive list still names an
  * activated object are **not activated**; an empty answer is activated; a
  * message of type `E` is a refusal with its messages.

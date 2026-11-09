@@ -254,7 +254,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — utils readers', () => {
             catalogue.includes(`href="${collection}"`),
           ]).toEqual([collection, true]);
         // No background activation runs on 7.40: the group activation is
-        // activateObjects (fr0ster/mcp-abap-adt#351, D5).
+        // activateObjects (fr0ster/mcp-abap-adt#351).
         expect(catalogue.includes('href="/sap/bc/adt/activation/runs"')).toBe(
           false,
         );

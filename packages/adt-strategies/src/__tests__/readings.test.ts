@@ -87,7 +87,7 @@ describe('each reading, against its own pair', () => {
    * Captured by activating an already-active class — SAP had nothing to do.
    * The same document answered an activation that left a function group
    * inactive on S/4HANA 2025 (`activation-group-alone-s4-2025` 04), so it is
-   * judged by the inactive list read after it (decision Q7): empty here.
+   * judged by the inactive list read after it: empty here.
    */
   it('activation: nothing to activate, by the empty inactive list', () => {
     const document = documentOf('activation-nothing-to-activate');
@@ -134,7 +134,7 @@ describe('each reading, against its own pair', () => {
 
 describe('every reading answers null rather than guessing', () => {
   // Not the activation reading: an activation's answer that is not a
-  // checklist is "the answer does not state the activation" (spec D1), below.
+  // checklist is "the answer does not state the activation", below.
   const readings = [
     readCheckRunRefusal,
     readDeletionRefusal,
@@ -173,9 +173,12 @@ describe('the activation reading on a document that is no checklist', () => {
     ['whitespace', '   \n  '],
     ['no body at all', undefined],
     ['a null body', null],
-  ])('on %s: activated (decision Q1)', (_label, document) => {
-    expect(readActivationRefusal(document)).toBeNull();
-  });
+  ])(
+    'on %s: activated (an empty answer activated on every release measured)',
+    (_label, document) => {
+      expect(readActivationRefusal(document)).toBeNull();
+    },
+  );
 
   it.each([
     ['plain text that is not XML', 'CLASS zcl_x DEFINITION.'],
@@ -504,7 +507,7 @@ describe('an activation that reports no reason', () => {
   /**
    * `activationExecuted="false"` with no `<msg>` answers both an activation
    * that had nothing to do and one that left objects inactive (S/4HANA 2025,
-   * decision Q7). Without the inactive list read after it the reading cannot
+   * fr0ster/mcp-abap-adt#351). Without the inactive list read after it the reading cannot
    * tell them apart, so it says the outcome was not decided — a sentence
    * about the document, never a verdict invented about the object.
    */

@@ -287,7 +287,7 @@ export interface AdtActivationRefusal extends AdtRefusal {
   readonly stillInactive: ReadonlyArray<IAdtStillInactive>;
 }
 
-/** The facts an activation member hands beside a silent checklist (Q7). */
+/** The facts an activation member hands beside a silent checklist. */
 export type AdtActivationFacts = NonNullable<IAdtAnalyseContext['activation']>;
 
 /** A well-formed XML document, parsed; `null` for anything else. */
@@ -345,7 +345,7 @@ function listedObjects(
  * counts.
  *
  * The one judgement both activation paths make after a silent checklist
- * (`activationExecuted="false"`, no message; decisions Q7 and Q8):
+ * (`activationExecuted="false"`, no message):
  * `readActivationRefusal` calls it with the list the member read, and a
  * consumer of the run sequence calls it with the list it read after
  * `getActivationResults`. An empty array: none of the named objects is still
@@ -383,7 +383,7 @@ function notActivated(
 }
 
 /**
- * What `POST /activation` answered, judged (spec D1).
+ * What `POST /activation` answered, judged (fr0ster/mcp-abap-adt#351; the measurements by release: ERRATA.md).
  *
  * Fixtures: `refusal-activation-fails` (200, `activationExecuted="false"` plus
  * a `msg` of type `E`), `activation-success-verdict` (200,
@@ -402,7 +402,7 @@ function notActivated(
  * | `chkl:messages`, `activationExecuted="false"`, **no message** | judged by the inactive list read after it (below) |
  * | `chkl:messages`, no `activationExecuted` | refused, the messages explain it, or a sentence that the document says nothing |
  * | `ioc:inactiveObjects` | **not activated**, every object it lists |
- * | an empty body | **activated**, whatever `preauditRequested` was (decision Q1) |
+ * | an empty body | **activated**, whatever `preauditRequested` was (an empty answer activated on every release measured) |
  * | anything else, or a document that is not well-formed | **not activated**: the answer does not state the activation |
  *
  * **The silent checklist** (`activationExecuted="false"`, no message) answered
@@ -410,7 +410,7 @@ function notActivated(
  * an activation that left a function group inactive (S/4HANA 2025): the
  * document alone cannot tell them apart. The member that sent the activation
  * reads `GET /activation/inactiveobjects` once after it and hands the list as
- * `activation` (decision Q7): an object the activation named still listed (by
+ * `activation`: an object the activation named still listed (by
  * `uri` or `parentUri`, {@link stillInactiveAmong}) is not activated; none is
  * nothing to activate. Without the list, or with a list that cannot be read,
  * the outcome is not decided and is answered as not activated.

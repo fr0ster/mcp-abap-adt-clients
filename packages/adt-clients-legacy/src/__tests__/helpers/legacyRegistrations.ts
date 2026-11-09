@@ -180,7 +180,7 @@ export const REFUSED_WITHOUT_REQUEST: [IHandlerClass, string[]][] = [
       'getActivationRun',
       'getActivationResults',
       // No /activation/runs on 7.40: activateObjects is its group activation
-      // (fr0ster/mcp-abap-adt#351, D5).
+      // (fr0ster/mcp-abap-adt#351).
       'activateObjectsGroup',
       // Refused on legacy before this change, and still (spec §10.2).
       'getTableColumns',

@@ -1,5 +1,5 @@
 /**
- * `preauditRequested` on every single-object activation (spec D3): absent, a
+ * `preauditRequested` on every single-object activation (fr0ster/mcp-abap-adt#351): absent, a
  * member sends `true`, the value it sent before the option existed; given, it
  * sends what it was given.
  *

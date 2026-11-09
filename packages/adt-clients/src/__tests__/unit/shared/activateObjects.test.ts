@@ -1,5 +1,5 @@
 /**
- * `activateObjects` (spec D2): one `POST /sap/bc/adt/activation` with the
+ * `activateObjects` (fr0ster/mcp-abap-adt#351): one `POST /sap/bc/adt/activation` with the
  * body `activateObjectsGroup` sends to `/activation/runs`, `preauditRequested`
  * `false` unless asked, read by the `objectActivation` slot. Which of the two
  * endpoints a system offers is in its discovery; the caller picks the member.

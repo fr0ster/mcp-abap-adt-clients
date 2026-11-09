@@ -1,5 +1,5 @@
 /**
- * The one read after a silent checklist (spec D1, decision Q7): when an
+ * The one read after a silent checklist (fr0ster/mcp-abap-adt#351): when an
  * activation answers `chkl:messages` with `activationExecuted="false"` and no
  * message, the member reads `GET /sap/bc/adt/activation/inactiveobjects` once
  * and hands `analyse` the list and the uris its request named; after every

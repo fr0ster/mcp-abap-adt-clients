@@ -809,7 +809,7 @@ export const LEGACY_REFUSED: Record<string, Rows<RefusedRow>> = {
       ),
       utils.refused(
         'activateObjectsGroup',
-        'D5 (fr0ster/mcp-abap-adt#351): no /activation/runs on 7.40',
+        'fr0ster/mcp-abap-adt#351: no /activation/runs on 7.40',
         calling('activateObjectsGroup', (h) => [
           objectReferences,
           false,
@@ -1227,7 +1227,7 @@ export const LEGACY_SENDS: Record<string, Rows<SendsRow>> = {
       ),
       utils.sends(
         'activateObjects',
-        'D5 (fr0ster/mcp-abap-adt#351): the 7.40 group activation, inherited',
+        'fr0ster/mcp-abap-adt#351: the 7.40 group activation, inherited',
         [post(ACTIVATION, { method: 'activate', preauditRequested: 'false' })],
         calling('activateObjects', (h) => [
           objectReferences,

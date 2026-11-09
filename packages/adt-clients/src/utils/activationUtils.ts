@@ -154,7 +154,7 @@ export async function activateObjectInSession(
 }
 
 // ---------------------------------------------------------------------------
-// The one read after a silent checklist (spec D1, decision Q7)
+// The one read after a silent checklist (fr0ster/mcp-abap-adt#351)
 // ---------------------------------------------------------------------------
 
 const parser = new XMLParser({
@@ -241,8 +241,7 @@ function keepingRequests(
 /**
  * An activation, and the one read its answer may need.
  *
- * **The one exception to "a member issues one request"** (spec D1, decision
- * Q7). `send` issues the activation — `POST /sap/bc/adt/activation` — and
+ * **The one exception to "a member issues one request"** (fr0ster/mcp-abap-adt#351). `send` issues the activation — `POST /sap/bc/adt/activation` — and
  * after a silent checklist alone (`activationExecuted="false"`, no message)
  * this reads `GET /sap/bc/adt/activation/inactiveobjects` once, with the
  * `Accept` `getInactiveObjects` sends, and hands the list and the uris the
