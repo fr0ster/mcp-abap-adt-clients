@@ -40,6 +40,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { PROGRAM_INCLUDE } from '../../endpoints/objects';
+import { answeringActivation } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
@@ -446,10 +447,11 @@ export class AdtInclude<
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const includeName = requireName(config);
-    return answering(
-      () =>
+    return answeringActivation(
+      connection,
+      (sent) =>
         activateInclude(
-          connection,
+          sent,
           options.headers,
           includeName,
           options.preauditRequested ?? true,

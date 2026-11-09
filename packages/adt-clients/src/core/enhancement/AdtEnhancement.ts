@@ -39,6 +39,7 @@ import type {
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant } from '../../clients/variant';
+import { answeringActivation } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
@@ -487,10 +488,11 @@ export class AdtEnhancement<
 
     const name = this.name(config);
 
-    return answering(
-      () =>
+    return answeringActivation(
+      connection,
+      (sent) =>
         activateEnhancement(
-          connection,
+          sent,
           options.headers,
           this.enhancementType(config),
           name,

@@ -40,6 +40,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { DDL_SOURCE } from '../../endpoints/objects';
+import { answeringActivation } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
@@ -398,10 +399,11 @@ export class AdtDdl<
 
     const name = this.name(config);
 
-    return answering(
-      () =>
+    return answeringActivation(
+      connection,
+      (sent) =>
         activateDDLS(
-          connection,
+          sent,
           options.headers,
           name,
           options.preauditRequested ?? true,

@@ -30,6 +30,8 @@ export type Recorded = {
   headers?: Record<string, string>;
   /** What deadline the request actually carried, if any. */
   timeout?: number;
+  /** The body the request carried, if any. */
+  data?: unknown;
 };
 
 /**
@@ -138,6 +140,7 @@ export function recordingClientOf<C>(
         method: req.method,
         headers: req.headers,
         timeout: (req as { timeout?: number }).timeout,
+        data: req.data,
       });
       return {
         status: 200,

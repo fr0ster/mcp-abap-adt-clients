@@ -51,6 +51,7 @@ import type {
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { CLASS } from '../../endpoints/objects';
+import { answeringActivation } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import type {
   ResultStrategiesOf,
@@ -434,10 +435,11 @@ export class AdtClass<
     options?: IAdtAnalyseOptions<E> &
       Pick<IAdtActivationOptions<E>, 'preauditRequested'>,
   ): Promise<IAdtResponse<T['activation'], E>> {
-    return answering(
-      () =>
+    return answeringActivation(
+      this.connection,
+      (sent) =>
         activateClassTestClasses(
-          this.connection,
+          sent,
           config.className as string,
           config.testClassName,
           options?.preauditRequested ?? true,

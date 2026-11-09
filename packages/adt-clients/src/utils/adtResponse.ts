@@ -27,6 +27,7 @@
 
 import type {
   AdtNoFailure,
+  IAdtAnalyseContext,
   IAdtError,
   IAdtResponse,
   IAnalyse,
@@ -255,11 +256,50 @@ export async function answering<T, E extends IAdtError = IAdtError>(
   read: IResultStrategy<T>,
   analyse?: IAnalyse<E>,
 ): Promise<IAdtResponse<T, E>> {
+  return answeringExchange(
+    async () => ({ answer: await run() }),
+    read,
+    analyse,
+  );
+}
+
+/**
+ * What a member hands {@link answeringExchange}: the answer its request got,
+ * and — only where the answer alone cannot be judged — the facts it read
+ * beside it, or the failure of that read.
+ */
+export interface IAdtExchange {
+  /** The answer to the member's request; the result is read from it. */
+  readonly answer: IAdtWireResponse;
+  /** Facts read after the answer, handed to `analyse` as its third parameter. */
+  readonly context?: IAdtAnalyseContext;
+  /**
+   * A read after the answer that failed: the default verdict, which only
+   * `analyse` may clear. The answer stays the one the result is read from.
+   */
+  readonly failure?: IAdtError;
+}
+
+/**
+ * {@link answering} for a member whose answer is judged with facts read
+ * after it: `analyse` gets the exchange's `context` as its third parameter,
+ * and a failed read (`failure`) is the verdict it starts from. Every other
+ * row of {@link answering}'s table holds as it is.
+ */
+export async function answeringExchange<T, E extends IAdtError = IAdtError>(
+  run: () => Promise<IAdtExchange>,
+  read: IResultStrategy<T>,
+  analyse?: IAnalyse<E>,
+): Promise<IAdtResponse<T, E>> {
   let wire: IAdtWireResponse | undefined;
   let verdict: IAdtError | AdtNoFailure = ADT_NO_FAILURE;
+  let context: IAdtAnalyseContext | undefined;
 
   try {
-    wire = await run();
+    const exchange = await run();
+    wire = exchange.answer;
+    context = exchange.context;
+    if (exchange.failure) verdict = exchange.failure;
   } catch (error: unknown) {
     // The provider refused before SAP said anything: no answer exists to come
     // back, and every further request would only ask the provider again. It is
@@ -275,7 +315,12 @@ export async function answering<T, E extends IAdtError = IAdtError>(
   // `E` is its default `IAdtError`, which is what that verdict already is. The
   // compiler cannot see that from inside the body; a caller never sees either.
   if (analyse) {
-    const overruled = analyse(verdict, wire);
+    // The facts only where a member read some: every other member calls
+    // `analyse` with the two arguments it always had.
+    const overruled =
+      context === undefined
+        ? analyse(verdict, wire)
+        : analyse(verdict, wire, context);
     if (overruled !== ADT_NO_FAILURE) {
       return failed<T, E>(overruled);
     }
