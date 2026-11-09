@@ -1053,18 +1053,24 @@ export function isIndeterminateWalkAnswer(document: unknown): boolean {
  * not written for — the failure mode that makes `deletionRefusal` report every
  * successful delete as refused when it meets a `deletionResult`.
  *
+ * `activation` is the facts an activation member read beside its answer, handed
+ * to the activation reading for a checklist.
+ *
  * Returns `null` for a document that is not a refusal **and** for one that is
  * none of the four forms. Those two are not the same thing, and a caller that
  * needs to tell them apart should call the specific reader.
  */
-export function readAdtRefusal(document: unknown): AdtRefusal | null {
+export function readAdtRefusal(
+  document: unknown,
+  activation?: AdtActivationFacts,
+): AdtRefusal | null {
   return (
     readExceptionRefusal(document) ??
     // Only a checklist: what else an activation may answer (an inactive-objects
     // list, nothing, another document) is judged as an activation's answer by
     // the activation reading alone — here it is no form this dispatches.
     (rootIs(wellFormed(document), 'messages')
-      ? readActivationRefusal(document)
+      ? readActivationRefusal(document, activation)
       : null) ??
     readDeletionRefusal(document) ??
     readCheckRunRefusal(document) ??

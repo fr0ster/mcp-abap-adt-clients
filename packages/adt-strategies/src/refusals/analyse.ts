@@ -5,6 +5,7 @@ import {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
+  type AdtActivationFacts,
   type AdtMessage,
   type AdtRefusal,
   type IAdtStillInactive,
@@ -133,11 +134,19 @@ function enrich(
  * 3. Neither — `ADT_NO_FAILURE`, a verdict rather than an absence.
  */
 function analyser(
-  read: (document: unknown) => AdtRefusal | null,
+  read: (
+    document: unknown,
+    activation?: AdtActivationFacts,
+  ) => AdtRefusal | null,
 ): IAnalyse<IAdtMessageFailure> {
-  return (verdict, answer) => {
+  // The facts a member read beside the answer travel to the reading: a
+  // dispatcher that dropped them would judge an activation without its list.
+  return (verdict, answer, context) => {
     if (verdict !== ADT_NO_FAILURE) return enrich(verdict, answer);
-    const refusal = read((answer as { data?: unknown } | undefined)?.data);
+    const refusal = read(
+      (answer as { data?: unknown } | undefined)?.data,
+      context?.activation,
+    );
     return refusal ? asFailure(refusal, answer) : ADT_NO_FAILURE;
   };
 }

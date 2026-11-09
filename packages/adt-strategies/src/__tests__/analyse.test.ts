@@ -770,3 +770,33 @@ describe('stillInactiveAmong, the one judgement of both activation paths', () =>
     ).toBeNull();
   });
 });
+
+describe('analyseAny hands an activation its facts', () => {
+  const silent = () => stepsOf('activation-reactivate-active-s4-2025')[2];
+  const emptyList = () => stepsOf('activation-reactivate-active-s4-2025')[3];
+  const PROBE = '/sap/bc/adt/oo/classes/zcl_act751_probe_9335';
+
+  it('a silent checklist with an empty inactive list is no failure, as analyseActivation says', () => {
+    const context = {
+      activation: { named: [PROBE], inactiveObjects: emptyList() },
+    };
+    expect(analyseActivation(ADT_NO_FAILURE, silent(), context)).toBe(
+      ADT_NO_FAILURE,
+    );
+    expect(analyseAny(ADT_NO_FAILURE, silent(), context)).toBe(ADT_NO_FAILURE);
+  });
+
+  it('a silent checklist with the object still listed is not activated', () => {
+    const steps = stepsOf('activation-group-alone-s4-2025');
+    const verdict = analyseAny(ADT_NO_FAILURE, steps[3], {
+      activation: {
+        named: ['/sap/bc/adt/functions/groups/zact751p9325'],
+        inactiveObjects: steps[4],
+      },
+    });
+    expect(verdict).not.toBe(ADT_NO_FAILURE);
+    expect(verdict !== ADT_NO_FAILURE && verdict.message).toContain(
+      'the inactive list still names',
+    );
+  });
+});

@@ -40,9 +40,11 @@ Released with `@mcp-abap-adt/adt-clients` 45.0.0 (fr0ster/mcp-abap-adt#351).
   An empty `200` is activated, whatever `preauditRequested` was. A `msg` of
   type `E` stays a refusal.
 - `readActivationRefusal(document, activation?)` answers the same table
-  (`AdtActivationRefusal | null`). `readAdtRefusal` dispatches an
-  activation's checklist only: an inactive-objects list, an empty or another
-  document is no form it reads, as before.
+  (`AdtActivationRefusal | null`). `readAdtRefusal(document, activation?)`
+  dispatches an activation's checklist only — an inactive-objects list, an
+  empty or another document is no form it reads, as before — and hands it the
+  facts; `analyseAny` passes `context.activation` on, so it judges a silent
+  checklist as `analyseActivation` does.
 - **On `@mcp-abap-adt/interfaces-adt` `^27.0.0`** (was `^26.0.0`).
 
 ### Added

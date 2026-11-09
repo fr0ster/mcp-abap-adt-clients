@@ -144,6 +144,30 @@ describe('analyseActivationExecuted, composed through judged()', () => {
     });
   });
 
+  it('hands the activation facts to the judges it composes', () => {
+    const { analyseActivation } = require('@mcp-abap-adt/adt-strategies');
+    const composed = judged(analyseActivation);
+    const silent = results('activationExecuted="false"');
+    const emptyList = {
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      data: '<ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects"/>',
+    };
+    expect(
+      composed(
+        ADT_NO_FAILURE,
+        { status: 200, statusText: 'OK', headers: {}, data: silent },
+        {
+          activation: {
+            named: ['/sap/bc/adt/oo/classes/zcl_x'],
+            inactiveObjects: emptyList,
+          },
+        },
+      ),
+    ).toBe(ADT_NO_FAILURE);
+  });
+
   it('refuses an error message with an empty text element', () => {
     expect(
       verdictOn(
