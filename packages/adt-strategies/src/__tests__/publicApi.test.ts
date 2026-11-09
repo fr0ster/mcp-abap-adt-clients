@@ -13,6 +13,7 @@ import { rawOf } from '../result';
 describe('the published surface', () => {
   it('exports every strategy and every reading, callable', () => {
     const expected = [
+      'ACTIVATION_RUNS_COLLECTION',
       'abapGitErrorLog',
       'abapGitExternalRepo',
       'abapGitRepos',
@@ -87,6 +88,7 @@ describe('the published surface', () => {
       'transportTree',
       'unitTestRunId',
       'utilActivationRunId',
+      'utilDiscoveryCollections',
       'utilInactiveObjects',
       'utilNamedItems',
       'utilNodeContents',
@@ -94,9 +96,12 @@ describe('the published surface', () => {
       'utilWhereUsedReferences',
     ];
     expect(Object.keys(api).sort()).toEqual(expected);
-    for (const name of expected) {
+    for (const name of expected.filter(
+      (name) => name !== 'ACTIVATION_RUNS_COLLECTION',
+    )) {
       expect(typeof (api as Record<string, unknown>)[name]).toBe('function');
     }
+    expect(api.ACTIVATION_RUNS_COLLECTION).toBe('/sap/bc/adt/activation/runs');
   });
 
   /**

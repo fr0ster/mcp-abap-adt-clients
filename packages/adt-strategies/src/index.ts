@@ -177,6 +177,7 @@ export {
 } from './results/transport';
 export { unitTestRunId } from './results/unitTest';
 export {
+  ACTIVATION_RUNS_COLLECTION,
   extractRunId,
   type IAdtObjectHit,
   type IInactiveObject,
@@ -193,6 +194,7 @@ export {
   readNodeStructure,
   readSearchHits,
   utilActivationRunId,
+  utilDiscoveryCollections,
   utilInactiveObjects,
   utilNamedItems,
   utilNodeContents,

@@ -10,8 +10,10 @@ import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
  */
 const CORPUS = join(__dirname, '../../../adt-clients/corpus/adt');
 
-/** The folders a case may be recorded in: the answers and the debugger's. */
-const FOLDERS = ['answers', 'debugger'].map((folder) => join(CORPUS, folder));
+/** The folders a case may be recorded in: the answers, the debugger's and discovery. */
+const FOLDERS = ['answers', 'debugger', 'discovery'].map((folder) =>
+  join(CORPUS, folder),
+);
 
 /** The folder that holds a case's steps, and its files. */
 function caseFolder(caseName: string): { dir: string; files: string[] } {
