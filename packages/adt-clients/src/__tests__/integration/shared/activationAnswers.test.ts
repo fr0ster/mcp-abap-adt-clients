@@ -29,6 +29,7 @@ import {
   analyseException,
   utilDiscoveryCollections,
 } from '@mcp-abap-adt/adt-strategies';
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -232,6 +233,13 @@ describe('Activation answers (fr0ster/mcp-abap-adt#351)', () => {
         await cleanup.run(`delete class ${className}`, remove, {
           checkAnswer: true,
         });
+        await cleanup.run(`class ${className} is gone`, () =>
+          expectAbsent(
+            () =>
+              cls.readMetadata({ className }, { analyse: analyseException }),
+            `class ${className}`,
+          ),
+        );
       }
       cleanup.finish();
     },
@@ -332,7 +340,12 @@ describe('Activation answers (fr0ster/mcp-abap-adt#351)', () => {
           expect.arrayContaining([uri, `${uri}/source/main`]),
         );
 
-        // The second step: the group and its main program, false.
+        // The second step: the group and its main program, false. The main
+        // program's reference is the one the library builds for it — `FUGR/I`
+        // `SAPL<group>` under the group — which E1 measured activating on
+        // 2026-11-09. The preaudit answer's own form of it (`source/main`,
+        // typed `FUGR/F`, with the group as `parentUri`) was measured
+        // activating too (corpus `activation-group-second-step-s4-2025`).
         mark = recorder.requests.length;
         expectResult(
           await utils.activateObjects(
@@ -348,7 +361,16 @@ describe('Activation answers (fr0ster/mcp-abap-adt#351)', () => {
           ),
           'the second step',
         );
-        expect(sentSince(mark)[0]).toBe(`POST ${ACTIVATION}false`);
+        // One request, and nothing after it: the answer stated the
+        // activation, so no inactive-list read follows.
+        expect(sentSince(mark)).toEqual([`POST ${ACTIVATION}false`]);
+        const body = String(recorder.requests[mark]?.data);
+        expect(body).toContain(
+          `adtcore:uri="${uri}" adtcore:type="FUGR/F" adtcore:name="${group}"`,
+        );
+        expect(body).toContain(
+          `adtcore:type="FUGR/I" adtcore:name="${mainProgram}"`,
+        );
         expect(await listed(uri)).toBe(false);
       } catch (error) {
         cleanup.record('test', error);
@@ -356,12 +378,40 @@ describe('Activation answers (fr0ster/mcp-abap-adt#351)', () => {
         await cleanup.run(`delete function group ${group}`, remove, {
           checkAnswer: true,
         });
+        await cleanup.run(`function group ${group} is gone`, () =>
+          expectAbsent(
+            () =>
+              handler.readMetadata(
+                { functionGroupName: group },
+                { analyse: analyseException },
+              ),
+            `function group ${group}`,
+          ),
+        );
       }
       cleanup.finish();
     },
     getTimeout('long') ?? 600000,
   );
 });
+
+/**
+ * The object is gone: its metadata read answers `404`, as the measurement probe
+ * confirmed each deletion. Anything else — a document, another status —
+ * throws, so a leftover fails the test.
+ */
+async function expectAbsent(
+  read: () => Promise<IAdtResponse<unknown>>,
+  what: string,
+): Promise<void> {
+  const answer = await read();
+  if (answer.ok) throw new Error(`${what} is still there after its delete`);
+  const status = answer.getError().response?.status;
+  if (status !== 404)
+    throw new Error(
+      `${what}: the read after its delete answered ${status ?? 'no status'}, not 404`,
+    );
+}
 
 /** The uris of a failure's `stillInactive`, when it carries one. */
 function stillInactiveUris(failure: object): string[] {
