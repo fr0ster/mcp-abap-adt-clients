@@ -24,6 +24,57 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [45.0.0] - 2026-11-09
+
+Released with `@mcp-abap-adt/adt-strategies` 0.22.0 and
+`@mcp-abap-adt/adt-clients-legacy` 0.9.0 (fr0ster/mcp-abap-adt#351).
+Migration: [MIGRATION-45](docs/usage/MIGRATION-45.md).
+
+### Changed — breaking
+
+- **On `@mcp-abap-adt/interfaces-adt` `^27.0.0`** (was `^26.0.0`):
+  `IUtilResults.objectActivation` is a required slot; `utilDocuments` names
+  it (`rawDocument`). A full result set written out names it.
+- **`activateInclude` and `activateEnhancement`** (exported) take
+  `preauditRequested: boolean` as their last parameter, with no default;
+  `activateObjectInSession` and every activation function behind the members
+  take it too, so the value is decided once, in the member.
+
+### Added
+
+- **`getUtils().activateObjects(objects, preauditRequested = false, options)`**:
+  one `POST /sap/bc/adt/activation?method=activate&preauditRequested=…` with
+  the body `activateObjectsGroup` sends to `/activation/runs` (one function
+  builds both), read through `objectActivation`; it refuses an unaddressable
+  or non-activated code before any request. `getUtils()` is an
+  `IAdtObjectActivation<…, V>`. No member reads discovery: the caller picks
+  this or `activateObjectsGroup` (unchanged) from the system's discovery
+  (`utilDiscoveryCollections`, `ACTIVATION_RUNS_COLLECTION` of adt-strategies
+  0.22.0). SAP_BASIS 751 and 7.40 SP04 list no `/activation/runs`.
+- **`options.preauditRequested` on every single-object activation**
+  (`IAdtActivationOptions`): `activate` of every handler and
+  `getClass().activateTestClasses` send it; absent, `true`, today's request.
+- **The one read after a silent checklist** (decision Q7): after an
+  activation answered `chkl:messages` with `activationExecuted="false"` and
+  no message — and after no other answer — the member reads
+  `GET /sap/bc/adt/activation/inactiveobjects` once, with the `Accept`
+  `getInactiveObjects` sends, and hands `analyse` the list and the uris its
+  request named as `context.activation` (`IAdtAnalyseContext`). A read that
+  fails is the call's failure ("the activation's outcome could not be
+  decided"), carrying the read's response. Measured on S/4HANA 2025: the same
+  document answered a re-activation that had nothing to do and an activation
+  that left a function group inactive. `analyse` gets the third parameter only
+  where a member read one.
+
+### Documentation
+
+- `CLIENT_API_REFERENCE.md`: what `activate()` answers, `preauditRequested`,
+  the read after a silent checklist, the two group members and the choice by
+  discovery, and the read a run-sequence consumer makes after a silent
+  results checklist (`stillInactiveAmong`). `ERRATA.md` and
+  `ANSWER_SHAPES.md`: the activation answers by release. README: the
+  activation note and the header members (33).
+
 ## [44.0.0] - 2026-11-09
 
 Released with `@mcp-abap-adt/adt-strategies` 0.21.0 and

@@ -1198,48 +1198,69 @@ SAP_BASIS 7.40 does not act on `If-Match` (see `@mcp-abap-adt/adt-clients-legacy
 
 ### What `activate()` answers, and who judges it
 
-`/sap/bc/adt/activation` answers **HTTP 200 even when activation fails**, so the
-verdict is in the body. **This package no longer reads it.**
-
-Until 19.0.0 it applied a rule of its own — a response carrying `<msg type="E">`
-was a failure — and threw. That strategy is gone, with its two siblings. An
-activation now comes back as a success carrying the checklist, and turning that
-into a failure is the `analyse` you pass:
+`activate()` is `POST /sap/bc/adt/activation?method=activate&preauditRequested=…`
+with one `adtcore:objectReference` (a function group sends two: the group and
+its `FUGR/I` main program). `/sap/bc/adt/activation` answers **HTTP 200 whether
+or not it activated**, so the verdict is in the body, and this package does not
+read it: the answer comes back as it came, and turning it into a failure is the
+`analyse` you pass. `analyseActivation` from `@mcp-abap-adt/adt-strategies` is
+the shipped reading:
 
 ```typescript
-await client.getClass().activate({ className: 'ZCL_X' }, { headers,
-  analyse: (verdict, answer) =>
-    /type="E"/.test(String(answer?.data ?? ''))
-      ? { origin: 'refusal', message: String(answer?.data) }
-      : verdict,
-});
+import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+
+const answer = await client
+  .getClass()
+  .activate({ className: 'ZCL_X' }, { headers, analyse: analyseActivation });
+if (!answer.ok) {
+  const failure = answer.getError();
+  failure.messages; // what SAP said
+  failure.stillInactive; // what SAP listed as still inactive: { uri, type, name, parentUri? }
+}
 ```
 
-Build yours from your own corpus of answers rather than from the sketch above.
-The measurements below are what this package saw before it stopped judging, and
-they are offered as evidence, not as a rule.
+Its table, and the measurements behind each row by release, are in
+[`ERRATA.md`](ERRATA.md) ("An activation answered with `200` that activated
+nothing"): `ioc:inactiveObjects` and a document that does not state the
+activation are **not activated**; an empty body is activated; a `msg type="E"`
+is a refusal with its messages.
 
-`activationExecuted="false"` is **not** a failure signal, despite how it reads:
+**`preauditRequested`.** Every single-object activation — `activate` of every
+handler and `getClass().activateTestClasses` — takes
+`options.preauditRequested` and sends it; absent, `true`. On SAP_BASIS 751 a
+class answered `preauditRequested=true` with `ioc:inactiveObjects` and
+activated nothing, and the same reference with `false` activated it. Sending
+that second request is the caller's: no member takes a second step.
 
-| scenario | HTTP | `activationExecuted` | `msg` |
-|---|---|---|---|
-| object already active (class) | 200 | `false` | none |
-| object already active (DDIC table) | 200 | `true` | none |
-| object does not exist | 200 | `false` | `E` |
-| locked by another session | **403** | — | — |
+```typescript
+const first = await client.getClass().activate(config, { headers, analyse: analyseActivation });
+if (!first.ok && first.getError().stillInactive.length > 0) {
+  // The objects SAP listed may include ones you did not name: choose what to send.
+  await client.getClass().activate(config, {
+    headers,
+    preauditRequested: false,
+    analyse: analyseActivation,
+  });
+}
+```
 
-An object that needs no activation reports `false` with an empty message list — by the
-flag alone, indistinguishable from an object that does not exist. The flag says whether
-ADT did any work, not whether the work succeeded. Note also that the two DDIC rows differ
-on identical semantics: a table re-activates unconditionally, a class does not. Any
-consumer reading these responses directly should branch on the messages, not the flags.
+**The one read after a silent checklist.** `chkl:messages` with
+`activationExecuted="false"` and no message answers both a re-activation that
+had nothing to do and an activation that left a function group inactive
+(S/4HANA 2025): the document alone cannot tell them apart. After that answer,
+and only that one, the member reads `GET /sap/bc/adt/activation/inactiveobjects`
+once (the `Accept` `getInactiveObjects` sends) and hands the list to `analyse`
+as its third parameter, `context.activation` (`IAdtAnalyseContext` of
+`@mcp-abap-adt/interfaces-adt`): `named`, the uris of the references the
+activation request sent, and `inactiveObjects`, the answer. `analyseActivation`
+judges by it: a named object still listed (by `uri` or `parentUri`) is not
+activated; none is nothing to activate. A read that fails is the call's
+failure ("the activation's outcome could not be decided"), carrying the read's
+response. This is the one exception to "a member issues one request"; every
+other answer is handed on with no second request.
 
-A lock held by another session is an HTTP 403 (`User … is currently editing …`) and
-surfaces as a rejected request, never as a body to inspect.
-
-Object types differ in the shape of their success body, which is why inferring a
-failure from an unfamiliar one turns working calls into errors — and why the
-judgement moved to the caller, who knows which types they are activating.
+A lock held by another session is an HTTP 403 (`User … is currently editing …`)
+and surfaces as a failure with its response, never as a body to inspect.
 
 ### Accept Negotiation (removed in 36.0.0)
 
@@ -1820,9 +1841,59 @@ await utils.activateObjectsGroup([
 ], undefined, { headers });
 ```
 
-On a legacy system (`@mcp-abap-adt/adt-clients-legacy`) `activateObjectsGroup` is a synchronous
-`POST /sap/bc/adt/activation?method=activate` (no run id; measured on an earlier
-BASIS 7.40 system, not measured on 7.40 SP04), and `checkDeletionGroup` and
+**Two members, one endpoint each.** `activateObjectsGroup` posts to
+`/sap/bc/adt/activation/runs` and answers `202` with the run id in `Location`;
+`activateObjects(objects, preauditRequested = false, options)` posts the same
+body to `/sap/bc/adt/activation` and answers in its body (`chkl:messages`,
+`ioc:inactiveObjects`, or nothing), read through the `objectActivation` slot
+and judged like a single-object activation (`analyseActivation`, the one read
+after a silent checklist). Which endpoint a system offers is in its discovery:
+SAP_BASIS 751 and 7.40 SP04 do not list `/activation/runs`, S/4HANA 2025 and
+ABAP cloud do. Reading it and choosing the member is yours — no member reads
+discovery, and a `404` from `/activation/runs` is that call's answer, never
+retried elsewhere:
+
+```typescript
+import {
+  ACTIVATION_RUNS_COLLECTION,
+  analyseActivation,
+  utilDiscoveryCollections,
+} from '@mcp-abap-adt/adt-strategies';
+import { utilDocuments } from '@mcp-abap-adt/adt-clients';
+
+const utils = client.getUtils({
+  ...utilDocuments,
+  discovery: utilDiscoveryCollections,
+});
+const discovery = await utils.discovery();
+if (!discovery.ok || discovery.getResult().value.size === 0) {
+  throw new Error('discovery could not be read: the activation endpoint is not decided');
+}
+const objects = [
+  { name: 'ZCL_MY_CLASS', type: 'CLAS/OC' },
+  { name: 'Z_MY_FM', type: 'FUGR/FF', parentName: 'Z_MY_GROUP' },
+] as const;
+if (discovery.getResult().value.has(ACTIVATION_RUNS_COLLECTION)) {
+  // The run sequence: activateObjectsGroup, getActivationRun, getActivationResults.
+  await utils.activateObjectsGroup([...objects], undefined, { headers });
+} else {
+  await utils.activateObjects([...objects], undefined, { headers, analyse: analyseActivation });
+}
+```
+
+**After a run's results.** The run sequence is yours, so the read after a
+silent checklist is too: when `getActivationResults` answers `chkl:messages`
+with `activationExecuted="false"` and no message, read `getInactiveObjects()`
+once and judge with `stillInactiveAmong(<the uris of the run's references>,
+<that answer>)` from `@mcp-abap-adt/adt-strategies` — the judgement
+`analyseActivation` makes on the synchronous paths. The run's uris are
+`buildObjectUri(name, type, parentName)` of each reference you started it
+with; a non-empty answer is not activated, an empty one nothing to activate,
+and `null` (no `2xx` list) leaves the outcome undecided.
+
+On a legacy system (`@mcp-abap-adt/adt-clients-legacy`) `activateObjects` is the
+group activation; `activateObjectsGroup` refuses without a request, because
+7.40 does not list `/activation/runs`. `checkDeletionGroup` and
 `deleteObjectsGroup` refuse without a request: 7.40 has no `/deletion/*`.
 
 ### AdtUtils (Object properties)

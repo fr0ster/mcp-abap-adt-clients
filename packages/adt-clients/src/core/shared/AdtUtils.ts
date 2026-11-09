@@ -564,7 +564,7 @@ export class AdtUtils<
    * `/activation/runs`, answered in its body (`chkl:messages`,
    * `ioc:inactiveObjects`, or nothing) and read through the
    * `objectActivation` slot. Which of the two endpoints a system offers is in
-   * its discovery (`getDiscovery`; `utilDiscoveryCollections` and
+   * its discovery (`discovery()`; `utilDiscoveryCollections` and
    * `ACTIVATION_RUNS_COLLECTION` in `@mcp-abap-adt/adt-strategies`), and
    * choosing the member is the caller's: this one reads no discovery.
    *
