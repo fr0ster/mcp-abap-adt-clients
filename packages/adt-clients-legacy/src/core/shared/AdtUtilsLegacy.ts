@@ -3,8 +3,8 @@ import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
  * AdtUtilsLegacy - Utility operations for legacy SAP systems (7.40 SP04)
  *
  * Every override below refuses without a request, answered through `failed()`
- * (spec §2.1, §10.2), except `activateObjectsGroup`, which sends the legacy
- * request.
+ * (spec §2.1, §10.2). The group activation of 7.40 is the inherited
+ * `activateObjects`: the synchronous `POST /sap/bc/adt/activation`.
  *
  * Not in the legacy discovery catalogue, refused:
  * - getTableColumns → /sap/bc/adt/datapreview/ddic/{name}/metadata
@@ -31,11 +31,10 @@ import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
  * those types is refused, in any case; every other type goes to the base
  * unchanged, so an unknown type is still thrown.
  *
- * Refused because a legacy group activation has no run:
- * - getActivationRun, getActivationResults → /sap/bc/adt/activation/runs,
- *   /results (not advertised). `activateObjectsGroup` here sends the
- *   synchronous /sap/bc/adt/activation, not /activation/runs, and yields no
- *   run id to ask about.
+ * Refused because 7.40 offers no activation runs (not in its discovery):
+ * - activateObjectsGroup, getActivationRun, getActivationResults →
+ *   /sap/bc/adt/activation/runs, /results. The group activation is the
+ *   inherited activateObjects, which yields no run id to ask about.
  *
  * A further override refused `getTransaction`
  * (/sap/bc/adt/repository/informationsystem/objectproperties, also absent). It

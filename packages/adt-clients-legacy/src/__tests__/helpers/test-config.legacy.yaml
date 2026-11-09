@@ -134,6 +134,6 @@ legacy_740:
         message_class_name: "ZLG7_C_MSAG"        # up to 20 characters
     - name: "legacy_utils_readers"
       enabled: false
-      description: "Utils readers on a program of its own: search, getObjectStructure, fetchNodeStructure of $TMP, discovery, getInactiveObjects before and after activateObjectsGroup"
+      description: "Utils readers on a program of its own: search, getObjectStructure, fetchNodeStructure of $TMP, discovery, getInactiveObjects before and after activateObjects, activateObjectsGroup refused"
       params:
         program_name: "ZLG7_C_UTIL"
