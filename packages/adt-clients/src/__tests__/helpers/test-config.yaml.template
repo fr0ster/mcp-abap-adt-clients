@@ -2564,6 +2564,20 @@ create_cds_unit_test:
             ENDCLASS.
 
 # Group Activation Test
+activation_answers:
+  test_cases:
+    - name: "adt_activation_answers"
+      enabled: true
+      # On premise: the measured answers are S/4HANA 2025's (fr0ster/mcp-abap-adt#351).
+      available_in: ["onprem"]
+      description: "What an activation answers: a class and a function group of its own, each created and deleted by the test"
+      params:
+        class_name: "ZCL_AC_ACT751"            # created by this test
+        function_group_name: "ZAC_FG_ACT751"   # created by this test
+        description: "Activation answers test object"
+        # package_name: uses environment.default_package if omitted
+        # transport_request: uses environment.default_transport if omitted
+
 group_activation:
   test_cases:
     - name: "adt_group_activation"
