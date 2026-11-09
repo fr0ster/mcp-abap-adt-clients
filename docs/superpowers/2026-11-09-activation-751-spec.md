@@ -388,6 +388,11 @@ still activates, with the same requests*.
   `getActivationResults`.
 - Each path is pinned by a test on `refusal-activation-fails` and on the issue's
   751 refusal (D7).
+- **The silent checklist on the runs path (Q8).** A run's results can carry the
+  same `chkl:messages` with `activationExecuted="false"` and no message that Q7
+  is about; today the server reads it as `nothing_to_activate`
+  (`handleActivateObject.ts`, `activationRun.ts`). The same rule applies there,
+  read by the consumer of the run sequence — see Q8.
 
 ## 6. D5 — 7.40 (adt-clients-legacy)
 
@@ -701,3 +706,28 @@ cases apart, and a re-activation of an already active object must not become a
 false failure — nor may an activation that left objects inactive pass as a
 success. The read changes nothing on the system and activates nothing. Cost: one
 extra `GET`, in this case only; every other answer is judged as it came (D1).
+
+**Q8 — The silent checklist on the `/activation/runs` path.** A run's results
+(`GET /activation/results/{runId}`) may answer `chkl:messages` with
+`activationExecuted="false"` and no message, the document Q7 is about (not
+recorded on the runs path; Inference from the shared document form). Options were
+(a) apply Q7's rule there too, (b) leave the runs path as it is.
+
+**Decided (owner, 2026-11-09): (a).** After a run's results that are a silent
+checklist, **one** `GET /sap/bc/adt/activation/inactiveobjects`, limited to the
+named objects (the references the run was started with; an entry counts by its
+`uri` or `parentUri`): any still listed → "not activated", with `stillInactive`;
+none → "nothing to activate", a success; a failed read is the call's failure,
+naming that the activation's outcome could not be decided.
+- **Where the read happens**: in the **consumer of the run sequence**, after
+  `getActivationResults` — the server's `awaitActivationRun`
+  (`src/lib/strategies/activationRun.ts`), with `getUtils(…).getInactiveObjects()`.
+  The library's run members stay one request each (`activateObjectsGroup`,
+  `getActivationRun`, `getActivationResults`): the sequence is already the
+  caller's, and only the caller holds the references the run was started with.
+- **Where the rule lives**: adt-strategies exports the one judgement both paths
+  use — given the named uris and the inactive-list answer, the entries still
+  listed (either list shape) — so `analyseActivation`'s Q7 row and the runs
+  consumer cannot drift apart. A library consumer running the sequence itself
+  makes the same read and calls the same judgement (documented in the API
+  reference).
