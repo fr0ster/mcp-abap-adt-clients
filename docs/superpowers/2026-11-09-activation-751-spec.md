@@ -234,17 +234,19 @@ stays a refusal*.
 - **Where**: adt-strategies, `readActivationRefusal` / `analyseActivation`. The
   library keeps judging nothing past the transport (decision 15); the strict
   default verdict is the shipped strategy's, and the consumer names or clears it
-  with its own `analyse` (owner rule). No `analyse ??` fallback is added.
+  with its own `analyse` (owner rule). No `analyse ??` fallback is added. The one
+  exception is the read of Q7 below: the library adds one `GET` in one case, so
+  the reading has the facts to judge it.
 - **The table the reading answers** (rows marked new):
 
   | Answer (`2xx`) | Verdict |
   |---|---|
   | `chkl:messages`, `activationExecuted="true"`, no `E` | activated |
   | `chkl:messages`, a `msg type="E"` | refused, the messages (unchanged) |
-  | `chkl:messages`, `activationExecuted="false"`, no message | activated — nothing to activate (unchanged, Measured) |
+  | `chkl:messages`, `activationExecuted="false"`, no message (changed, Q7) | the inactive list is read once: a named object still listed → **not activated**, `stillInactive` the listed entries of the named objects; none listed → activated — nothing to activate |
   | `chkl:messages`, the other rows of `read.ts:275-282` | refused (unchanged) |
   | **`ioc:inactiveObjects`** (new) | **not activated**, the objects named |
-  | **empty body** (new rule) | see Q1: recommended activated |
+  | **empty body** (new rule, Q1) | activated, whatever `preauditRequested` was |
   | **any other document** (new) | **not activated**: the answer does not state the activation |
 
 - **The failure's shape** (static, no cast): a new exported type in
@@ -270,12 +272,32 @@ stays a refusal*.
   sent. `messages` carries one `E` with a sentence about the document ("SAP
   answered the objects still inactive; nothing was activated" / "the answer does
   not state the activation"), as the reading already composes one for a silent
-  checklist (`read.ts:359-362`). `form: 'activation'`. See Q2 for the
-  alternative (one message per object).
+  checklist (`read.ts:359-362`). `form: 'activation'`. Decided by Q2 (a).
+- **The read for `activationExecuted="false"` without a message (Q7).** Measured
+  on S/4HANA 2025 (D8): the same document answered an activation that left the
+  objects inactive (L5) and the re-activation of an object already active (L7);
+  the document alone cannot tell them apart. So, **only for that document**, the
+  member that sent the activation reads `GET /sap/bc/adt/activation/inactiveobjects`
+  once, after the answer, and the reading judges with it:
+  - *the named objects* are the references of the activation request;
+  - an entry counts when its `ioc:ref` (on 7.40 the flat `adtcore:objectReference`)
+    has the `uri` of a named object, or a `parentUri` that is one; the
+    transport-only entry never counts;
+  - any entry counts → not activated, those entries as `stillInactive`; none →
+    nothing to activate, a success.
+  The read changes nothing on the system (a `GET`) and activates nothing; it costs
+  one request, in this case only — every other answer is judged as it came. A
+  re-activation of an already active object must not become a false failure, and
+  without the read the reading could only call both cases one thing. Where the
+  list travels to the reading (the answer handed to `analyse`) is the plan's to
+  fix. A failed read is the call's failure, naming that the activation's outcome
+  could not be decided — no verdict is invented (as D2 does for discovery). Checked
+  against both recordings: L5's list holds the group's own uri → not activated;
+  L7's list is empty → nothing to activate.
 - **Parsing**: `fast-xml-parser`, as the other readings; no regex. A document
   that does not parse is "does not state the activation".
-- **No path turns it into success**: the library does not (it reads nothing); the
-  server does not (D6). A consumer that clears it does so by its own `analyse`,
+- **No path turns it into success**: the library does not (it judges nothing; its
+  one read, Q7, only gives the reading the facts); the server does not (D6). A consumer that clears it does so by its own `analyse`,
   which is the contract.
 
 ## 3. D2 — the group endpoint is chosen from discovery, by the consumer
@@ -348,11 +370,14 @@ still activates, with the same requests*.
   passes its options on to the class, unchanged.
 - **Group members**: `activateObjectsGroup` and `activateObjects` keep the
   positional `preauditRequested`, default `false` (unchanged for the first).
-- The library takes no second step: an `ioc` failure is returned; re-posting with
+- The library takes no second activation (its one read, Q7, activates nothing): an
+  `ioc` failure is returned; re-posting with
   `preauditRequested=false` is the caller's next call, on whichever member it
   names (`activate` of the object, or `activateObjects` with the references it
   chooses — the failure's `stillInactive` lists what SAP named, which may include
-  objects the caller did not name).
+  objects the caller did not name). Measured (D8, L6): re-posting every reference
+  of the `ioc` answer, as given, with `preauditRequested=false` activates a
+  function group on S/4HANA 2025.
 
 ## 5. D4 — `chkl:messages` with `E` stays a refusal on every path
 
@@ -370,12 +395,16 @@ still activates, with the same requests*.
   (`CLAUDE.md`); the legacy group is already synchronous. The legacy package reads
   no discovery.
 - **The new `activateObjects`** is inherited unchanged: it is exactly the request
-  `AdtUtilsLegacy.activateObjectsGroup` sends today. Two members would then send
-  the same request — a breach of one endpoint, one member — see Q3.
+  `AdtUtilsLegacy.activateObjectsGroup` sends today, and it is the 7.40 group
+  activation (Q3 (a)). **`AdtUtilsLegacy.activateObjectsGroup` refuses** with no
+  request, as `getActivationRun` / `getActivationResults` do, because 7.40
+  advertises no `/activation/runs` (D8, L2): one endpoint, one member.
 - **Single-object `preauditRequested`** reaches the legacy function group override
   (`AdtFunctionGroupLegacy.ts:100-130`) the same way; default `true`.
 - **The verdict on 7.40's answers**: every recorded 7.40 activation answer is an
-  empty `200` (§1.4), so how the 7.40 path is judged follows Q1.
+  empty `200` (§1.4, D8 L1), read as activated (Q1 (a)). Q7's read, if 7.40 ever
+  answers `activationExecuted="false"` without a message, reads the flat
+  `adtcore:objectReferences` list (not measured on 7.40: no such answer seen).
 - Legacy changes are a minor (owner, 2026-10-24).
 
 ## 7. D6 — the server (mcp-abap-adt#346)
@@ -392,10 +421,11 @@ still activates, with the same requests*.
 - **The single-object path honours `preaudit`**: `activateFamily` passes
   `preauditRequested: preaudit`; `preaudit` keeps its default `true` on
   `ActivateObjects`/`ActivateObjectLow`/`HandlerActivate` (today's request);
-  `preauditDescription` says it is sent on both paths. Which other tools take
-  `preaudit`: Q4.
-- **The group path reads discovery** (Q5 decides per call or once per
-  connection): `getUtils(…).getDiscovery` with `utilDiscoveryCollections`;
+  `preauditDescription` says it is sent on both paths. Only these three tools take
+  `preaudit` (Q4 (a)); a caller of a per-type `Activate*` tool that gets "not
+  activated" takes its next step through `ActivateObjects`.
+- **The group path reads discovery on every group activation** (Q5 (a); no
+  state kept): `getUtils(…).getDiscovery` with `utilDiscoveryCollections`;
   `/activation/runs` listed → today's three requests unchanged; not listed →
   `activateObjects(references, preaudit, { headers, analyse: analyseActivation })`
   projected by `terseActivation`; discovery not readable → that failure, step
@@ -415,30 +445,41 @@ object names as the issue gives them):
   `ioc:inactiveObjects` (the issue shows two entries in full and names the other
   six by type; the recording carries what the issue shows, and the `note` says so);
 - `activation-sync-activated-751` — request #3, `200`, empty body;
-- `activation-sync-refused-751` — `preauditRequested=false` with a method's syntax
-  error, `chkl:messages` `E` (the issue describes it; the body is reconstructed
-  from the description and the `note` says so — or asked of the reporter, Q6);
+- no 751 refusal recording: the `E` path is pinned on the existing
+  `refusal-activation-fails` recording (Q6); the reporter is asked in the issue
+  for the real body, and it is added when it arrives;
 - `activation-runs-absent-751` — request #2, `404`;
 - the 751 discovery's activation collections as the issue lists them (a partial
   document, said so in its `note`).
+
+Measured recordings already in the corpus (D8): `activation-class-transportable-s4-2025`,
+`activation-group-alone-s4-2025`, `activation-group-second-step-s4-2025`,
+`activation-reactivate-active-s4-2025`, `activation-class-basis-740`.
 
 Tests:
 - adt-strategies: `analyseActivation` over each row of D1 — the 751 `ioc`
   answer (`stillInactive` lists the 8, transport entry skipped), the server's
   `activation-still-inactive` (copied into this corpus: transport entry + 2
-  objects), empty with `preauditRequested=true` and with `false` (per Q1), an
-  unknown document, the three existing fixtures unchanged;
+  objects), empty with `preauditRequested=true` and with `false` (activated, Q1),
+  an unknown document, the three existing fixtures (the ABAP cloud
+  `activation-nothing-to-activate` now with Q7's read: an empty list), and Q7 on
+  the two S/4HANA 2025 recordings — `activation-group-alone-s4-2025` 04 with list
+  05 → not activated, the group in `stillInactive`;
+  `activation-reactivate-active-s4-2025` 03 with list 04 → nothing to activate;
+  an entry counted by `parentUri`; the transport-only entry never counted;
   `utilDiscoveryCollections` over the three recorded discovery documents (runs
   listed on S/4HANA 2025 and ABAP cloud, absent on 7.40) and the 751 partial one;
   exact membership (a collection that only starts with the path does not count).
 - adt-clients: request shapes — every single-object member with no option sends
   `preauditRequested=true` (today's, `r2RequestShapes` unchanged) and with
-  `preauditRequested: false` sends `false`; `activateObjects` sends one `POST
+  `preauditRequested: false` sends `false`; Q7's `GET /activation/inactiveobjects`
+  is sent after an `activationExecuted="false"` answer without a message and
+  after no other answer, and a failed read is the call's failure; `activateObjects` sends one `POST
   /activation` with the references and its default `false`; `activateObjectsGroup`
   unchanged; the public surface and the typed-atom tests name the new member and
   slot.
-- legacy: the new member inherited (or refused, per Q3); `preauditRequested` on
-  the function group override.
+- legacy: `activateObjects` inherited; `activateObjectsGroup` refused with no
+  request (Q3); `preauditRequested` on the function group override.
 - Each new rule is proved load-bearing: delete it, watch its test go red, restore.
 - server (#346): `ActivateClass`, `ActivateObjects` single and group, and
   `UpdateClass activate: true` over the 751 recordings answer `isError` with
@@ -475,9 +516,17 @@ placeholders).
 | L3b | S/4HANA 2025, class, transportable | `preauditRequested=true` | `200`, `chkl:messages`, `activationExecuted="true"`, no `msg` | no / no — activated | method body present |
 | L3c | S/4HANA 2025, function group alone, transportable | `preauditRequested=true` | `200`, **`ioc:inactiveObjects`**: the transport request, the group (`FUGR/F`), its `source/main` (typed `FUGR/F` in the answer) | **yes / yes** — not activated | — |
 | L5 | same group, same single reference | `preauditRequested=false` | `200`, `chkl:messages`, **`activationExecuted="false"`, no `msg`** | **yes / yes** — not activated | — |
+| L6 | S/4HANA 2025, another fresh group, transportable, after its own L3c-like `ioc` answer | `preauditRequested=false`, **every reference of the `ioc` answer as given**: the group (`FUGR/F`) and its `source/main` (typed `FUGR/F` by that answer, with `parentUri`) | `200`, `chkl:messages`, `activationExecuted="true"`, no `msg` | no / no — **activated** | — |
+| L7 | S/4HANA 2025, class, transportable, **already active** (activated with `true` first) | `preauditRequested=false`, the class alone | `200`, `chkl:messages`, `checkExecuted="false"` **`activationExecuted="false"`** `generationExecuted="true"`, no `msg` | no / no — nothing was inactive | — |
 
 The inactive list after L3c and L5 names the group and `SAPL<group>` (`FUGR/I`,
 uri `…/source/main`, on the task of the request), unchanged between the two reads.
+L6 and L7 were run second, the same way (records `activation-group-second-step-s4-2025`,
+`activation-reactivate-active-s4-2025`). L6 sent the `ioc` answer's references as
+they came; that answer types `source/main` `FUGR/F` with the group's name, while
+the inactive list names it `FUGR/I` `SAPL<group>`. L5 and L7 differ only in
+`generationExecuted` (`false` / `true`); that attribute is not read as a verdict
+(Inference: one pair of recordings is no rule).
 
 Discovery (`GET /sap/bc/adt/discovery`), the collections under
 `/sap/bc/adt/activation` — Measured:
@@ -503,7 +552,13 @@ Discovery (`GET /sap/bc/adt/discovery`), the collections under
   stayed inactive. D1's row "`activationExecuted="false"`, no message → activated —
   nothing to activate" rests on ABAP cloud, where nothing was inactive (§1.2); on
   S/4HANA 2025 the same document came back when something inactive was not
-  activated. Read alone, the document cannot tell the two apart. See §11 F5.
+  activated. Read alone, the document cannot tell the two apart (L7 is the same
+  document for a re-activation that had nothing to do). See §11 F5; decided by Q7.
+- **Q7's read rule holds against both recordings**: after L5 the inactive list
+  holds the named group's own uri → not activated; after L7 it is empty → nothing
+  to activate.
+- **The caller's second step works on S/4HANA 2025** (L6): every reference of the
+  `ioc` answer, as given, with `preauditRequested=false` activates the group.
 - **L5 is answered for the group only**: `preauditRequested=false` on the
   single-object path gives `chkl:messages`, not an empty body, on S/4HANA 2025.
   For a class `false` was not sent, because `true` had already activated it.
@@ -532,24 +587,26 @@ from the registry, published in that order (global rule). No 23.x backport.
   `preauditRequested=true` answered `200` empty, and the steps after it ran on the
   active version (§1.4). Read literally, the invariant turns every 7.40
   single-object activation into "not activated", against *Every system that
-  activates today still activates*. Q1.
+  activates today still activates*. Decided by Q1 (a); confirmed by D8 L1.
 - **F2 — S/4HANA 2025 has one record of an `ioc` answer with nothing left
-  inactive** (§1.6). If L3 shows `ioc:inactiveObjects` answering an activation
-  that did happen there, D1's `ioc` row is wrong for that release.
+  inactive** (§1.6). Settled by D8 (L3c, L5): the `ioc` answer left the objects
+  inactive in both reads 10 s apart; D1's `ioc` row holds for that release.
 - **F3 — the goal file names systems.** `docs/superpowers/2026-11-09-activation-751-goal.md`
   names the two test systems by id; `notesNameNoSystem.test.ts` scans `docs/` and
   fails on it. This spec names releases only. The goal is the owner's to edit.
 - **F4 — 7.40's group member already sends the request the new member sends**
-  (§1.1, D5): one endpoint, two members, unless Q3 refuses one.
+  (§1.1, D5). Decided by Q3 (a): the legacy `activateObjectsGroup` refuses.
 - **F5 — `chkl:messages` `activationExecuted="false"` with no message answered an
   activation that left objects inactive** (D8, L5, S/4HANA 2025, Measured
   2026-11-09: a function group's reference alone with `preauditRequested=false`).
   D1 keeps that document as "activated — nothing to activate", which the goal's
   first invariant ("any answer that does not state the activation … reaches the
-  caller as not activated") does not allow when something was left inactive. The
-  owner decides how D1 reads it.
+  caller as not activated") does not allow when something was left inactive.
+  Decided by Q7: one read of the inactive list, in this case only (D1).
 
-## 12. Questions for the owner
+## 12. Decisions (owner, 2026-11-09)
+
+Each question as it was asked, with the owner's decision.
 
 **Q1 — What is an empty `200` to an activation?**
 - (a) **Activated, whatever `preauditRequested` was.** Pro: every empty answer
@@ -568,8 +625,8 @@ from the registry, published in that order (global rule). No 23.x backport.
   what was measured on it. Con: a second activation strategy to keep in step;
   adt-strategies grows release-specific readings (today it has none).
 
-Recommendation: **(a)**, with L1 and L5 run before release; if any of them records
-an empty answer that did not activate, revisit with (c).
+**Decided: (a)** — an empty `200` is activated, whatever `preauditRequested` was.
+D8 recorded no empty answer that did not activate (L1 activated).
 
 **Q2 — How the failure names the objects.**
 - (a) **A typed field `stillInactive`** (D1). Pro: static, reusable for a next
@@ -580,7 +637,7 @@ an empty answer that did not activate, revisit with (c).
   the type and name live in composed text; `messages` is meant to hold what SAP
   said, and here SAP said no message.
 
-Recommendation: **(a)**.
+**Decided: (a)** — a typed `stillInactive` field on `IAdtActivationFailure`.
 
 **Q3 — 7.40's two members on one request.** With `activateObjects` added,
 `AdtUtilsLegacy.activateObjectsGroup` sends the identical request.
@@ -592,7 +649,7 @@ Recommendation: **(a)**.
 - (b) **Keep both.** Pro: nothing changes for a legacy consumer. Con: two members,
   one endpoint, on 7.40.
 
-Recommendation: **(a)**.
+**Decided: (a)** — on 7.40 `AdtUtilsLegacy.activateObjectsGroup` refuses with no request, because `/activation/runs` is not advertised; `activateObjects` is the 7.40 group activation.
 
 **Q4 — Which server tools take `preaudit`.**
 - (a) **Only the tools that already declare it** (`ActivateObjects`,
@@ -606,7 +663,7 @@ Recommendation: **(a)**.
   and activate on 751. Con: up to 34 more schemas; a write tool grows an activation
   detail.
 
-Recommendation: **(a)**.
+**Decided: (a)** — only `ActivateObjects`, `ActivateObjectLow` and `HandlerActivate` take `preaudit`, now honoured on the single-object path too.
 
 **Q5 — When the server reads discovery for a group activation.**
 - (a) **On every group activation**, one `GET /discovery` before the `POST`. Pro:
@@ -616,7 +673,7 @@ Recommendation: **(a)**.
   read. Con: state the server holds; a discovery read failure must be retried by
   a later call, and the cache needs an owner.
 
-Recommendation: **(a)**.
+**Decided: (a)** — discovery is read on every group activation.
 
 **Q6 — The 751 refusal body.** The issue describes the `chkl:messages` `E`
 answer but does not quote it.
@@ -627,4 +684,20 @@ answer but does not quote it.
 - (c) **Pin the `E` path on the existing `refusal-activation-fails` recording
   only.** Pro: real bytes. Con: no 751 bytes for that case.
 
-Recommendation: **(c)** now, **(b)** asked in the issue; replace when it arrives.
+**Decided: (c), with (b) asked** — the `E` path is pinned on the existing
+`refusal-activation-fails` recording; the reporter is asked in the issue for the
+real body, which replaces nothing until it arrives and is then added.
+
+**Q7 — `chkl:messages` `activationExecuted="false"` with no message (F5).** The
+same document answered an activation that left objects inactive (D8 L5) and the
+re-activation of an object already active (L7).
+
+**Decided:** for that document only, the library reads
+`GET /sap/bc/adt/activation/inactiveobjects` once, limited to the named objects
+(the references the activation request sent; an entry counts by its `uri` or its
+`parentUri`). Any still listed → "not activated", with `stillInactive`; none →
+"nothing to activate", a success. Rationale: the document cannot tell the two
+cases apart, and a re-activation of an already active object must not become a
+false failure — nor may an activation that left objects inactive pass as a
+success. The read changes nothing on the system and activates nothing. Cost: one
+extra `GET`, in this case only; every other answer is judged as it came (D1).
