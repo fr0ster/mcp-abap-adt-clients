@@ -447,26 +447,68 @@ Tests:
   discovery fails; `activateObjectPreaudit.test.ts` and
   `strategyProjections.test.ts:83-85` are rewritten to the new contract.
 
-## 9. D8 — live measurements (listed, not run; each needs the owner's go)
+## 9. D8 — live measurements (run 2026-11-09, owner's go)
 
-On SAP_BASIS 7.40 SP04 (RFC):
-- **L1** `preauditRequested=true` on a class left inactive with changed includes:
-  is the answer `ioc:inactiveObjects` (or the older flat
-  `adtcore:objectReferences`), or empty as recorded (§1.4)? Then read
-  `/activation/inactiveobjects` to settle whether that empty answer activated.
-- **L2** does discovery list `/sap/bc/adt/activation/runs`? (Recorded absent,
-  2026-10-27; a fresh read confirms the recording.)
+**How.** A hand-run probe (deleted after the run) created each object fresh,
+saved it inactive (one method in a class; a changed main program `source/main` in
+a function group, since a freshly created group is not inactive — Measured, the
+first group run), and sent the single-object request adt-clients sends: `POST
+/sap/bc/adt/activation?method=activate&preauditRequested=…`, one
+`adtcore:objectReference` (uri and name, no type), Content-Type
+`application/vnd.sap.adt.activation+xml`, Accept `application/xml`. After each
+activation it read `GET /sap/bc/adt/activation/inactiveobjects` at once and again
+about 10 s later, and for a class `GET …/source/main?version=active` (does it
+carry the method body). `preauditRequested=false` on the same reference was sent
+only where the object was still inactive. Each object was deleted at the end and
+its absence confirmed (metadata `404`, quick search empty). The S/4HANA 2025 system
+was measured over HTTP (stateful session); the 7.40 system over RFC, because over
+HTTP the source `PUT` under a lock answers `423` there (`LEGACY.md`, and again on
+this run's first attempt). Records: `packages/adt-clients/corpus/adt/answers/`,
+cases `activation-class-transportable-s4-2025`, `activation-group-alone-s4-2025`,
+`activation-class-basis-740` (D7's place; transport numbers and the user are
+placeholders).
 
-On S/4HANA 2025 (HTTP and RFC):
-- **L3** `preauditRequested=true` on a class and on a function group alone, in a
-  transportable package, inactive: which document comes back (`chkl:messages` or
-  `ioc:inactiveObjects`), and what `/activation/inactiveobjects` says right
-  after — read twice, the second time after a pause, since the server's comment
-  calls a single read a snapshot (§1.6).
-- **L4** does discovery list `/sap/bc/adt/activation/runs`? (Recorded listed,
-  2026-10-27.)
-- **L5** `preauditRequested=false` on the single-object path: `chkl:messages` as
-  with `true`, or empty?
+| # | Release, object, package | Request | Answer | Inactive after: at once / ~10 s | Active source |
+|---|---|---|---|---|---|
+| L1 | 7.40, class, `$TMP` | `preauditRequested=true` | `200`, **empty body** | no / no — **activated** | method body present |
+| L3a | S/4HANA 2025, class, `$TMP` | `preauditRequested=true` | `200`, `chkl:messages`, `activationExecuted="true"`, no `msg` | no / no — activated | method body present |
+| L3b | S/4HANA 2025, class, transportable | `preauditRequested=true` | `200`, `chkl:messages`, `activationExecuted="true"`, no `msg` | no / no — activated | method body present |
+| L3c | S/4HANA 2025, function group alone, transportable | `preauditRequested=true` | `200`, **`ioc:inactiveObjects`**: the transport request, the group (`FUGR/F`), its `source/main` (typed `FUGR/F` in the answer) | **yes / yes** — not activated | — |
+| L5 | same group, same single reference | `preauditRequested=false` | `200`, `chkl:messages`, **`activationExecuted="false"`, no `msg`** | **yes / yes** — not activated | — |
+
+The inactive list after L3c and L5 names the group and `SAPL<group>` (`FUGR/I`,
+uri `…/source/main`, on the task of the request), unchanged between the two reads.
+
+Discovery (`GET /sap/bc/adt/discovery`), the collections under
+`/sap/bc/adt/activation` — Measured:
+- **L2**, 7.40 (over RFC; 34 609 characters, the recorded document's size):
+  `/activation`, `/activation/inactiveobjects`; **no `/activation/runs`** — the
+  2026-10-27 recording confirmed.
+- **L4**, S/4HANA 2025 (over HTTP): `/activation`, `/activation/inactiveobjects`,
+  `/activation/results`, **`/activation/runs`** — the recording confirmed.
+
+**What the measurements settle** (Measured, the rows above):
+- **F2 — `ioc:inactiveObjects` means "not activated", not "activation still
+  running".** On S/4HANA 2025 the `ioc` answer (L3c) left the objects inactive in
+  both reads, 10 s apart. D1's `ioc` row holds for that release as it does for 751.
+  (The server's 2026-09-21 record of a `count: 0` read after an `ioc` answer is not
+  reproduced.)
+- **Q1 — an empty `200`.** On 7.40 the empty answer to `preauditRequested=true`
+  activated (L1, the inactive list and the active source both say so). Neither
+  S/4HANA 2025 nor 7.40 answered an empty body to anything that did not activate.
+  This supports Q1 (a) for every release measured; an empty answer to `true` was
+  not seen on S/4HANA 2025 (it answers `chkl:messages` there).
+- **New — F5: `activationExecuted="false"` without a message is not always
+  "nothing to activate".** L5 answered it while the group and its main program
+  stayed inactive. D1's row "`activationExecuted="false"`, no message → activated —
+  nothing to activate" rests on ABAP cloud, where nothing was inactive (§1.2); on
+  S/4HANA 2025 the same document came back when something inactive was not
+  activated. Read alone, the document cannot tell the two apart. See §11 F5.
+- **L5 is answered for the group only**: `preauditRequested=false` on the
+  single-object path gives `chkl:messages`, not an empty body, on S/4HANA 2025.
+  For a class `false` was not sent, because `true` had already activated it.
+- The class on S/4HANA 2025 is not the 751 case: the same request activated it in
+  `$TMP` and in a transportable package.
 
 On 751: the reporter offered to run a branch build (issue, "Workaround in use");
 the empty answer to `preauditRequested=true`, if it occurs there, and the full
@@ -499,6 +541,13 @@ from the registry, published in that order (global rule). No 23.x backport.
   fails on it. This spec names releases only. The goal is the owner's to edit.
 - **F4 — 7.40's group member already sends the request the new member sends**
   (§1.1, D5): one endpoint, two members, unless Q3 refuses one.
+- **F5 — `chkl:messages` `activationExecuted="false"` with no message answered an
+  activation that left objects inactive** (D8, L5, S/4HANA 2025, Measured
+  2026-11-09: a function group's reference alone with `preauditRequested=false`).
+  D1 keeps that document as "activated — nothing to activate", which the goal's
+  first invariant ("any answer that does not state the activation … reaches the
+  caller as not activated") does not allow when something was left inactive. The
+  owner decides how D1 reads it.
 
 ## 12. Questions for the owner
 

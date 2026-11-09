@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/oo/classes/zmcp_bld_clsut_l1" adtcore:type="CLAS/OC" adtcore:name="ZMCP_BLD_CLSUT_L1" adtcore:packageName="TEST_MCP_SHR_PKG"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/oo/classes/zmcp_tmp_177_dqqy" adtcore:type="CLAS/OC" adtcore:name="ZMCP_TMP_177_DQQY" adtcore:packageName="$TMP"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/programs/programs/zmcp_sys_prog_h1" adtcore:type="PROG/P" adtcore:name="ZMCP_SYS_PROG_H1"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/programs/programs/zmcp_sys_prog_l1" adtcore:type="PROG/P" adtcore:name="ZMCP_SYS_PROG_L1"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/programs/programs/zok_tester" adtcore:type="PROG/P" adtcore:name="ZOK_TESTER"/>
+</adtcore:objectReferences>
