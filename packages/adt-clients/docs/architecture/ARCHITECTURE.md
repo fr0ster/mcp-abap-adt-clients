@@ -259,8 +259,8 @@ own. A request outside them that shares a wire function with one (`validate`
 through the check run, `activateTestClasses`) passes its own constant pair
 (`CHECK_RUN_HEADERS`, `ACTIVATION_HEADERS`).
 
-`src/__tests__/unit/requestHeaders.test.ts` drives every implementation of the
-32 with a pair no implementation could hold, asserts it is exactly what goes on
+`src/__tests__/unit/requestHeaders.test.ts` drives every implementation of these
+members with a pair no implementation could hold, asserts it is exactly what goes on
 the wire, and fails for a class method named like one of them that no row
 reaches.
 
