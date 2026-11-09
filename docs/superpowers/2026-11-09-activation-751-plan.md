@@ -46,6 +46,13 @@ Each release follows the same sequence:
 Versions below are proposals. Each CHANGELOG step asks the owner for the
 version first (`CLAUDE.md`).
 
+**Owner's decisions on this plan (2026-11-09).**
+- **`objectActivation` is a required slot** of `IUtilResults` (option A):
+  interfaces-adt 27.0.0 and adt-clients 45.0.0 are majors, as A3 and C4 propose.
+- **The silent checklist on the `/activation/runs` path is in scope** (option A,
+  spec Q8): the same one read of the inactive list after a run's results, in the
+  consumer of the run sequence (B2's shared judgement, step F4b).
+
 ---
 
 ## Part A — interfaces-adt (repository `mcp-abap-adt-interfaces`)
@@ -176,6 +183,11 @@ No link to the interfaces repository.
     - the other `chkl:messages` rows stay as they are.
   - The list is read in either shape: `ioc:inactiveObjects`, or the flat 7.40
     `adtcore:objectReferences`.
+  - The judgement itself is one exported function, `stillInactiveAmong(named, inactiveObjects)`:
+    the entries of either list shape whose `uri` or `parentUri` is named,
+    the transport-only entry never counted. `analyseActivation`'s Q7 row
+    calls it, and so does the runs consumer (F4b, spec Q8), so the two paths
+    cannot drift apart.
   - New exported types `IAdtActivationFailure` (with `stillInactive`) and
     `IAdtStillInactive`. `analyseActivation` becomes
     `IAnalyse<IAdtActivationFailure>`.
@@ -205,13 +217,21 @@ No link to the interfaces repository.
 
   `IAdtActivationFailure` is checked statically in a typecheck file: no cast
   reads `stillInactive`.
+
+  `stillInactiveAmong` gets its own cases: the S/4HANA 2025 lists 05 and 04
+  (one entry; none), a `parentUri` match, the transport-only entry, the flat
+  7.40 list, and a name that is listed but not named (not counted).
 - **Mutations.** Each must turn its own case red:
   - remove the `ioc` branch;
   - stop skipping the transport entry;
   - read an empty body as not activated;
   - read an unknown document as activated;
   - match by `uri` only, dropping `parentUri`;
-  - count every list entry, not only the named ones;
+  - count every list entry, not only the named ones (red in both the
+    `analyseActivation` case and the `stillInactiveAmong` case);
+  - drop the `parentUri` match inside `stillInactiveAmong` only: both its own
+    case and `analyseActivation`'s `parentUri` case go red, which shows the
+    reading calls the shared judgement rather than a copy;
   - answer "nothing to activate" when there is no context;
   - drop the flat-list reader;
   - turn the `E` row into a success.
@@ -348,7 +368,10 @@ No link to the interfaces repository.
 - **Documentation.**
   - `docs/usage/CLIENT_API_REFERENCE.md`: the option, the new member, the read
     of Q7, and discovery as the consumer's choice, with an example that reads
-    discovery and picks a member.
+    discovery and picks a member. The run sequence's section adds the
+    consumer's read after a silent results checklist (spec Q8):
+    `getInactiveObjects`, then `stillInactiveAmong` with the run's
+    references.
   - `README.md` activation section.
   - A new `docs/usage/MIGRATION-45.md`: `IUtilResults.objectActivation`; that
     `analyseActivation`'s new verdicts change what a caller sees; how to send
@@ -527,13 +550,49 @@ whoever runs live tests there. They go into #346's 24.0.0 entry, not a new PR.
   - Answer a failed discovery with runs: the `500` case goes red.
 - **Gate.** The server gate.
 
+### F4b. The silent checklist on the runs path (spec Q8)
+- **What changes.** In `awaitActivationRun`, after `getActivationResults`:
+  - only when the results are a silent checklist (`activationExecuted="false"`
+    and no message), one `getUtils(…).getInactiveObjects()`;
+  - `stillInactiveAmong(<the run's reference uris>, <that answer>)`:
+    entries → the run's outcome is "not activated", an error carrying
+    `still_inactive`; none → `nothing_to_activate`, a success, as today;
+  - a failed read → the call's failure, step `inactiveObjects`, naming that the
+    activation's outcome could not be decided;
+  - any other results document → no read, judged as today (`E` stays a
+    refusal, D4).
+  The run's reference uris are those `activateObjectsGroup` was given, built by
+  the library's `buildObjectUri`; the handler passes them into
+  `awaitActivationRun`.
+- **Files.** `src/lib/strategies/activationRun.ts`,
+  `src/handlers/common/low/handleActivateObject.ts`.
+- **Tests (red first).** In `activationRunWait.test.ts` (stub connection; the
+  silent results document is not recorded on the runs path, so the case is
+  built from the existing results fixture with `activationExecuted="false"` and
+  its messages removed, said so in the test; the lists are the recorded S/4HANA
+  2025 lists 05 and 04):
+  - silent results + list naming a run reference → `isError`, `still_inactive`;
+  - silent results + empty list → `nothing_to_activate`, no error;
+  - silent results + a `500` on the read → error, step `inactiveObjects`;
+  - results with `activationExecuted="true"`, or with an `E` → no read (the test
+    counts requests).
+- **Mutations.**
+  - Never read: the first case goes red.
+  - Read after every results document: the "no read" case goes red.
+  - Read the list unfiltered (count every entry): a case with a listed object
+    that is not a run reference goes red.
+  - Answer a failed read as `nothing_to_activate`: the `500` case goes red.
+- **Gate.** The server gate.
+
 ### F5. Documentation
 - **What changes.**
   - The tool descriptions and generated tool docs.
   - `README.md` / `docs/`: the activation answer, `still_inactive`, `preaudit`,
     and the discovery choice.
   - #346's CHANGELOG 24.0.0 entry and its migration note: `activation_not_stated`
-    is gone, an `ioc` answer is an error, and the group path reads discovery.
+    is gone, an `ioc` answer is an error, the group path reads discovery, and a
+    run whose results say nothing about what was left inactive is checked
+    against the inactive list.
 - **Gate.** The server gate, docs checks.
 
 ### F6. Live verification of the server (owner's go)
@@ -546,6 +605,10 @@ whoever runs live tests there. They go into #346's 24.0.0 entry, not a new PR.
      activated.
   4. `ActivateObjects` with two objects goes through runs (discovery lists
      them).
+  5. A run of two objects that are already active: if its results are a silent
+     checklist, the read follows and the answer is `nothing_to_activate`;
+     whichever document comes back is recorded into the corpus (the runs
+     path's silent results are not recorded yet).
 - 7.40 is not served by this server (it does not use the legacy package).
 - **After the runs.** Every failure is fixed before release.
 - **Gate.** The run green.
@@ -576,13 +639,8 @@ whoever runs live tests there. They go into #346's 24.0.0 entry, not a new PR.
     The ranges are given to the owner for confirmation.
   - **Run by the owner** after R3, never before the fixed versions are on the
     registry.
-- **The issue.** A comment on fr0ster/mcp-abap-adt#351 is drafted and shown to
-  the owner before posting. It names the fixed versions and asks the reporter to
-  run 24.0.0 on 751. It also asks for the `chkl:messages` `E` body (Q6 (b)),
-  which is added to the corpus when it arrives.
-- **Reported, not built.**
-  - The runs path's results can also answer `activationExecuted="false"`
-    without a message. The server reads that as "nothing to activate". Q7's
-    read applies only to the member that sent the activation, so the runs
-    path's handling of that document is outside the approved spec. It goes to
-    the owner as a note.
+- **The issue.** The comment on fr0ster/mcp-abap-adt#351 was posted on
+  2026-11-09, including the request for the `chkl:messages` `E` body (Q6 (b)).
+  The body is added to the corpus when it arrives.
+- **The runs path's silent checklist** is no longer a note: it is step F4b
+  (spec Q8).
