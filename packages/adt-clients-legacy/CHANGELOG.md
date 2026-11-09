@@ -18,6 +18,10 @@ On `@mcp-abap-adt/adt-clients` `^45.0.0` (fr0ster/mcp-abap-adt#351).
   preauditRequested, options)` — the same synchronous
   `POST /sap/bc/adt/activation` the legacy `activateObjectsGroup` sent,
   inherited from adt-clients 45 and read through the `objectActivation` slot.
+  It takes 7.40's activated codes by type (`AdtActivationCode<'basis740'>`);
+  unlike the old override it has no runtime refusal of another code — a caller
+  that bypasses the types sends the request, and SAP's answer is the
+  verdict.
 - **The `@mcp-abap-adt/adt-clients` peer range moves to `^45.0.0`** (was
   `^44.0.0`; the devDependency too), and `@mcp-abap-adt/interfaces-adt` to
   `^27.0.0`; the adt-strategies dev range to `^0.22.0`.

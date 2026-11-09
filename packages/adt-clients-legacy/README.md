@@ -324,10 +324,12 @@ measured on 7.40). `getStructureElementInfo` and
 discovery lists no element info for either. The group activation is
 `activateObjects` (inherited: synchronous `POST /activation`);
 `activateObjectsGroup` is refused without a request, because 7.40's discovery
-lists no `/activation/runs`. `readObjectMetadata`, `readObjectSource`,
-`fetchNodeStructure`, `getObjectStructure` and `activateObjects` take
-7.40's codes (`ADT_TYPES_BASIS_740`, and `DEVC/K` for the structure reads;
-`VIEW/DV` too for the group activation, `ADT_UTILITY_CODES_BASIS_740`) and
+lists no `/activation/runs`. `activateObjects` takes 7.40's activated codes
+by type (`AdtActivationCode<'basis740'>`, `VIEW/DV` among them): another code
+does not compile, and a caller that bypasses the types is not guarded — the
+request is sent and SAP's answer is the verdict. `readObjectMetadata`,
+`readObjectSource`, `fetchNodeStructure` and `getObjectStructure` take
+7.40's codes (`ADT_TYPES_BASIS_740`, and `DEVC/K` for the structure reads) and
 refuse any other without a request — `BDEF/BDO`, `SRVD/SRV`, `DDLX/EX`,
 `DCLS/DL` and `ENHO/XHH` among them. `search` filters by 7.40's search names
 (`ADT_SEARCH_TYPES_BASIS_740`: `DEVC`, `CLAS`, `INTF`, `PROG`, `FUGR`, `FUNC`,
