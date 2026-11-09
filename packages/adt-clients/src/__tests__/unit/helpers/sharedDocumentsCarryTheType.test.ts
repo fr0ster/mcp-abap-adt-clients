@@ -135,3 +135,58 @@ describe('the document a shared data element is updated with', () => {
     ).toThrow(/dtel:dataType/);
   });
 });
+
+/**
+ * The description goes on the object's own element. A shell read in a
+ * language the object has no text in carries no root `adtcore:description`,
+ * while its `adtcore:packageRef` carries the package's; patching the first
+ * `adtcore:description` in the document then rewrote the package reference
+ * and left the object without one — the PUT SAP refuses with `400`
+ * "The description is missing" (SWB_TOOL 019).
+ */
+describe('the description of a shell read without one', () => {
+  const withoutRootDescription = (shell: string, root: string): string =>
+    shell
+      .replace(`<${root} `, `<${root} `)
+      .replace(' adtcore:description="old"', '')
+      .replace(
+        '<adtcore:packageRef adtcore:name="ZADT_BLD_PKG03"/>',
+        '<adtcore:packageRef adtcore:name="ZADT_BLD_PKG03" adtcore:description="the package"/>',
+      );
+
+  it('a data element gets it on blue:wbobj, the package reference keeps its own', () => {
+    const shell = withoutRootDescription(
+      DTEL_SHELL.replace(
+        '<dtel:typeKind/>',
+        '<adtcore:packageRef adtcore:name="ZADT_BLD_PKG03"/><dtel:typeKind/>',
+      ),
+      'blue:wbobj',
+    );
+    const document = dataElementDocumentFor(shell, {
+      description: 'Group activation test objects',
+      type_kind: 'domain',
+      domain_name: 'zac_shr_ga_dom',
+    });
+
+    expect(document).toMatch(
+      /<blue:wbobj [^>]*adtcore:description="Group activation test objects"/,
+    );
+    expect(document).toContain(
+      '<adtcore:packageRef adtcore:name="ZADT_BLD_PKG03" adtcore:description="the package"/>',
+    );
+  });
+
+  it('a domain gets it on doma:domain, the package reference keeps its own', () => {
+    const shell = withoutRootDescription(DOMAIN_SHELL, 'doma:domain');
+    const document = domainDocumentFor(shell, {
+      description: 'Shared test domain',
+    });
+
+    expect(document).toMatch(
+      /<doma:domain [^>]*adtcore:description="Shared test domain"/,
+    );
+    expect(document).toContain(
+      '<adtcore:packageRef adtcore:name="ZADT_BLD_PKG03" adtcore:description="the package"/>',
+    );
+  });
+});

@@ -1606,11 +1606,14 @@ function domainDocumentFor(current, depConfig) {
   // as well as by ts-jest, and only the latter can resolve a TypeScript path.
   const {
     patchIf,
-    patchXmlAttribute,
     patchXmlElement,
+    patchXmlElementAttribute,
   } = require('../../utils/xmlPatch');
-  let xml = patchXmlAttribute(
+  // On the domain's own element, added when the shell carries none: the first
+  // `adtcore:description` of a shell without one is the package reference's.
+  let xml = patchXmlElementAttribute(
     current,
+    'doma:domain',
     'adtcore:description',
     (depConfig.description || 'Shared test domain').slice(0, 60),
   );
@@ -1633,11 +1636,15 @@ function domainDocumentFor(current, depConfig) {
 function dataElementDocumentFor(current, depConfig) {
   const {
     patchIf,
-    patchXmlAttribute,
     patchXmlElement,
+    patchXmlElementAttribute,
   } = require('../../utils/xmlPatch');
-  let xml = patchXmlAttribute(
+  // On `blue:wbobj` itself, added when the shell carries none: patching the
+  // first `adtcore:description` rewrote the package reference's instead, and
+  // SAP refused the PUT, "The description is missing" (SWB_TOOL 019).
+  let xml = patchXmlElementAttribute(
     current,
+    'blue:wbobj',
     'adtcore:description',
     (depConfig.description || 'Shared test data element').slice(0, 60),
   );
