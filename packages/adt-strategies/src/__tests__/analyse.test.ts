@@ -1,4 +1,8 @@
-import { ADT_NO_FAILURE, type IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import {
+  ADT_NO_FAILURE,
+  type IAdtAnalyseContext,
+  type IAdtError,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   analyseActivation,
@@ -11,8 +15,10 @@ import {
   analysePublicationLock,
   analyseUnitTest,
   analyseValidation,
+  type IAdtActivationFailure,
   type IAdtMessageFailure,
 } from '../refusals/analyse';
+import { stillInactiveAmong } from '../refusals/read';
 import { asItCame } from '../result';
 import { answerFor, stepsOf, stepTagged } from './corpus';
 
@@ -89,15 +95,6 @@ describe('each strategy separates its refusal from its success', () => {
     expect(verdict.messages.length).toBeGreaterThan(0);
     expect(verdict.messages.some((m) => m.type === 'E')).toBe(true);
     expect(verdict.messages[0].text.length).toBeGreaterThan(0);
-  });
-
-  it('an activation with nothing to activate is no failure', () => {
-    expect(
-      analyseActivation(
-        ADT_NO_FAILURE,
-        answerFor('activation-nothing-to-activate'),
-      ),
-    ).toBe(ADT_NO_FAILURE);
   });
 
   it('keeps the T100 key where the carrier supplies one', () => {
@@ -457,5 +454,319 @@ describe('analyseDebuggerFreed', () => {
         undefined,
       ),
     ).not.toBe(ADT_NO_FAILURE);
+  });
+});
+
+/**
+ * The activation table (spec D1, decisions Q1, Q2, Q7), one case per row, on
+ * recorded answers where one exists. Each assertion names what only its row
+ * produces: the sentence about the document, or the objects SAP listed.
+ */
+describe('analyseActivation answers every row of the activation table', () => {
+  const activationFailure = (
+    verdict: IAdtActivationFailure | typeof ADT_NO_FAILURE,
+  ): IAdtActivationFailure => {
+    if (verdict === ADT_NO_FAILURE) {
+      throw new Error('expected a failure, got ADT_NO_FAILURE');
+    }
+    return verdict;
+  };
+  /** The facts the member hands beside a silent checklist. */
+  const listed = (
+    named: readonly string[],
+    inactiveObjects: IAdtWireResponse,
+  ): IAdtAnalyseContext => ({ activation: { named, inactiveObjects } });
+  const wire = (data: string): IAdtWireResponse => ({
+    data,
+    status: 200,
+    statusText: 'OK',
+    headers: {},
+  });
+  const GROUP = '/sap/bc/adt/functions/groups/zact751p9325';
+  const PROBE = '/sap/bc/adt/oo/classes/zcl_act751_probe_9335';
+
+  it('751: an ioc answer is not activated, its 8 objects named', () => {
+    const verdict = activationFailure(
+      analyseActivation(
+        ADT_NO_FAILURE,
+        answerFor('activation-preaudit-still-inactive-751'),
+      ),
+    );
+    expect(verdict.message).toContain(
+      'SAP answered the objects still inactive',
+    );
+    expect(verdict.stillInactive).toHaveLength(8);
+    expect(verdict.stillInactive[0]).toEqual({
+      uri: '/sap/bc/adt/oo/classes/zcl_ai_act_probe',
+      type: 'CLAS/OC',
+      name: 'ZCL_AI_ACT_PROBE',
+    });
+    expect(verdict.stillInactive[1]).toEqual({
+      uri: '/sap/bc/adt/oo/classes/zcl_ai_act_probe/includes/definitions',
+      type: 'CLAS/OCN/definitions',
+      name: 'ZCL_AI_ACT_PROBE',
+      parentUri: '/sap/bc/adt/oo/classes/zcl_ai_act_probe',
+    });
+  });
+
+  it('an ioc answer with a transport entry skips the transport', () => {
+    const verdict = activationFailure(
+      analyseActivation(ADT_NO_FAILURE, answerFor('activation-still-inactive')),
+    );
+    expect(verdict.stillInactive.map((o) => o.uri)).toEqual([
+      '/sap/bc/adt/functions/groups/zmcp_bld_fgr_l1',
+      '/sap/bc/adt/functions/groups/zmcp_bld_fgr_l1/source/main',
+    ]);
+    expect(verdict.stillInactive.some((o) => o.type === '/RQ')).toBe(false);
+  });
+
+  it('S/4HANA 2025: the ioc answer to the group alone is not activated', () => {
+    const verdict = activationFailure(
+      analyseActivation(
+        ADT_NO_FAILURE,
+        stepsOf('activation-group-alone-s4-2025')[0],
+      ),
+    );
+    expect(verdict.stillInactive.map((o) => o.uri)).toEqual([
+      GROUP,
+      `${GROUP}/source/main`,
+    ]);
+  });
+
+  it('an empty answer to preauditRequested=true is activated (7.40)', () => {
+    const answer = stepsOf('activation-class-basis-740')[0];
+    expect(answer.data).toBe('');
+    expect(analyseActivation(ADT_NO_FAILURE, answer)).toBe(ADT_NO_FAILURE);
+  });
+
+  it('an empty answer to preauditRequested=false is activated (751)', () => {
+    const answer = answerFor('activation-sync-activated-751');
+    expect(answer.data).toBe('');
+    expect(analyseActivation(ADT_NO_FAILURE, answer)).toBe(ADT_NO_FAILURE);
+  });
+
+  it.each([
+    ['a document of another kind', '<?xml version="1.0"?><a:b xmlns:a="x"/>'],
+    ['a document that does not parse', '<?xml version="1.0"?><chkl:messages'],
+    ['text that is not XML', 'Activated.'],
+  ])('%s is not activated: the answer does not state it', (_what, data) => {
+    const verdict = activationFailure(
+      analyseActivation(ADT_NO_FAILURE, wire(data)),
+    );
+    expect(verdict.message).toContain('does not state the activation');
+    expect(verdict.stillInactive).toEqual([]);
+  });
+
+  it('Q7: a silent checklist with the group still listed is not activated', () => {
+    const steps = stepsOf('activation-group-alone-s4-2025');
+    const verdict = activationFailure(
+      analyseActivation(ADT_NO_FAILURE, steps[3], listed([GROUP], steps[4])),
+    );
+    expect(verdict.message).toContain('the inactive list still names');
+    expect(verdict.stillInactive.map((o) => o.uri)).toEqual([
+      GROUP,
+      `${GROUP}/source/main`,
+    ]);
+  });
+
+  it('Q7: a silent checklist after a re-activation is nothing to activate', () => {
+    const steps = stepsOf('activation-reactivate-active-s4-2025');
+    expect(
+      analyseActivation(ADT_NO_FAILURE, steps[2], listed([PROBE], steps[3])),
+    ).toBe(ADT_NO_FAILURE);
+  });
+
+  it('Q7: an entry counts by its parentUri', () => {
+    const list = wire(
+      '<?xml version="1.0" encoding="utf-8"?><ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects"><ioc:entry><ioc:object ioc:user="" ioc:deleted="false"><ioc:ref adtcore:uri="/sap/bc/adt/oo/classes/zcl_x/includes/definitions" adtcore:type="CLAS/OCN/definitions" adtcore:name="ZCL_X" adtcore:parentUri="/sap/bc/adt/oo/classes/zcl_x" xmlns:adtcore="http://www.sap.com/adt/core"/></ioc:object><ioc:transport/></ioc:entry></ioc:inactiveObjects>',
+    );
+    const verdict = activationFailure(
+      analyseActivation(
+        ADT_NO_FAILURE,
+        answerFor('activation-nothing-to-activate'),
+        listed(['/sap/bc/adt/oo/classes/zcl_x'], list),
+      ),
+    );
+    expect(verdict.stillInactive.map((o) => o.uri)).toEqual([
+      '/sap/bc/adt/oo/classes/zcl_x/includes/definitions',
+    ]);
+  });
+
+  it('Q7: the transport-only entry is never counted', () => {
+    // The request's own transport named, to show the transport entry is not
+    // read at all rather than merely not matched.
+    const steps = stepsOf('activation-group-alone-s4-2025');
+    expect(
+      analyseActivation(
+        ADT_NO_FAILURE,
+        steps[3],
+        listed(['/sap/bc/adt/cts/transportrequests/SYSK9R0001'], steps[4]),
+      ),
+    ).toBe(ADT_NO_FAILURE);
+  });
+
+  it('Q7: the flat 7.40 list is read like the ioc list', () => {
+    const list = stepsOf('activation-class-basis-740')[1];
+    const verdict = activationFailure(
+      analyseActivation(
+        ADT_NO_FAILURE,
+        answerFor('activation-nothing-to-activate'),
+        listed(['/sap/bc/adt/programs/programs/zok_tester'], list),
+      ),
+    );
+    expect(verdict.stillInactive).toEqual([
+      {
+        uri: '/sap/bc/adt/programs/programs/zok_tester',
+        type: 'PROG/P',
+        name: 'ZOK_TESTER',
+      },
+    ]);
+  });
+
+  it('Q7: an object listed but not named is not counted', () => {
+    const list = stepsOf('activation-class-basis-740')[1];
+    expect(
+      analyseActivation(
+        ADT_NO_FAILURE,
+        answerFor('activation-nothing-to-activate'),
+        listed(['/sap/bc/adt/oo/classes/zcl_act751_probe_3748'], list),
+      ),
+    ).toBe(ADT_NO_FAILURE);
+  });
+
+  it('Q7 without the list: the outcome could not be decided', () => {
+    const verdict = activationFailure(
+      analyseActivation(
+        ADT_NO_FAILURE,
+        answerFor('activation-nothing-to-activate'),
+      ),
+    );
+    expect(verdict.message).toContain(
+      "the activation's outcome could not be decided",
+    );
+    expect(verdict.stillInactive).toEqual([]);
+  });
+
+  it('Q7 on ABAP cloud with an empty list: nothing to activate', () => {
+    const empty = stepsOf('activation-reactivate-active-s4-2025')[3];
+    expect(
+      analyseActivation(
+        ADT_NO_FAILURE,
+        answerFor('activation-nothing-to-activate'),
+        listed(['/sap/bc/adt/oo/classes/zmcp_bld_ansch01'], empty),
+      ),
+    ).toBe(ADT_NO_FAILURE);
+  });
+
+  it('Q7 with a list that is no inactive-objects document: not decided', () => {
+    const verdict = activationFailure(
+      analyseActivation(
+        ADT_NO_FAILURE,
+        answerFor('activation-nothing-to-activate'),
+        listed([GROUP], wire('<?xml version="1.0"?><a:b xmlns:a="x"/>')),
+      ),
+    );
+    expect(verdict.message).toContain('the inactive list could not be read');
+  });
+
+  it('an E refusal stays a refusal, with its messages (Q6)', () => {
+    const verdict = activationFailure(
+      analyseActivation(ADT_NO_FAILURE, answerFor('refusal-activation-fails')),
+    );
+    expect(verdict.messages.some((m) => m.type === 'E')).toBe(true);
+    expect(verdict.message).toContain('STRONG_BUT_NOT_A_REAL_TYPE');
+    expect(verdict.stillInactive).toEqual([]);
+  });
+
+  it('activationExecuted="true" without an E is activated', () => {
+    expect(
+      analyseActivation(
+        ADT_NO_FAILURE,
+        answerFor('activation-success-verdict'),
+      ),
+    ).toBe(ADT_NO_FAILURE);
+  });
+
+  it("the library's failure is enriched and names nothing still inactive", () => {
+    const verdict = activationFailure(
+      analyseActivation(
+        { origin: 'refusal', message: 'Request failed with status code 404' },
+        answerFor('activation-runs-absent-751'),
+      ),
+    );
+    expect(verdict.message).toBe('Request failed with status code 404');
+    expect(verdict.stillInactive).toEqual([]);
+  });
+});
+
+describe('stillInactiveAmong, the one judgement of both activation paths', () => {
+  const GROUP = '/sap/bc/adt/functions/groups/zact751p9325';
+
+  it('S/4HANA 2025 list 05 names the group and its main program', () => {
+    const list = stepsOf('activation-group-alone-s4-2025')[4];
+    expect(stillInactiveAmong([GROUP], list)?.map((o) => o.name)).toEqual([
+      'ZACT751P9325',
+      'SAPLZACT751P9325',
+    ]);
+  });
+
+  it('S/4HANA 2025 list 04 after a re-activation names none', () => {
+    const list = stepsOf('activation-reactivate-active-s4-2025')[3];
+    expect(
+      stillInactiveAmong(
+        ['/sap/bc/adt/oo/classes/zcl_act751_probe_9335'],
+        list,
+      ),
+    ).toEqual([]);
+  });
+
+  it('matches by parentUri', () => {
+    const list = stepsOf('activation-group-alone-s4-2025')[4];
+    // Named only through the parent: the source/main entry carries the group
+    // as its parentUri, the group's own entry has none.
+    const found = stillInactiveAmong([GROUP], list) ?? [];
+    expect(found.find((o) => o.type === 'FUGR/I')?.parentUri).toBe(GROUP);
+  });
+
+  it('never counts the transport-only entry', () => {
+    const list = stepsOf('activation-group-alone-s4-2025')[4];
+    expect(
+      stillInactiveAmong(
+        [
+          '/sap/bc/adt/cts/transportrequests/SYSK9R0001',
+          '/sap/bc/adt/cts/transportrequests/SYSK9R0002',
+        ],
+        list,
+      ),
+    ).toEqual([]);
+  });
+
+  it('reads the flat 7.40 list', () => {
+    const list = stepsOf('activation-class-basis-740')[1];
+    expect(
+      stillInactiveAmong(['/sap/bc/adt/programs/programs/zok_tester'], list),
+    ).toEqual([
+      {
+        uri: '/sap/bc/adt/programs/programs/zok_tester',
+        type: 'PROG/P',
+        name: 'ZOK_TESTER',
+      },
+    ]);
+  });
+
+  it('does not count an object that is listed but not named', () => {
+    const list = stepsOf('activation-class-basis-740')[1];
+    expect(
+      stillInactiveAmong(
+        ['/sap/bc/adt/oo/classes/zcl_act751_probe_3748'],
+        list,
+      ),
+    ).toEqual([]);
+  });
+
+  it('answers null for an answer that is no inactive-objects list', () => {
+    expect(
+      stillInactiveAmong([GROUP], answerFor('activation-success-verdict')),
+    ).toBeNull();
   });
 });

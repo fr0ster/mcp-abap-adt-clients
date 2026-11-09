@@ -84,17 +84,22 @@ describe('each reading, against its own pair', () => {
    * `readActivationRefusal` that the other two cannot show:
    * `activationExecuted="false"` with no messages at all.
    *
-   * Captured by activating an already-active class — SAP had nothing to do and
-   * said so. Both other fixtures agree with a reading that treats the bare
-   * attribute as a refusal, which is how that reading survived; this one does
-   * not.
+   * Captured by activating an already-active class — SAP had nothing to do.
+   * The same document answered an activation that left a function group
+   * inactive on S/4HANA 2025 (`activation-group-alone-s4-2025` 04), so it is
+   * judged by the inactive list read after it (decision Q7): empty here.
    */
-  it('activation: nothing to activate is not a refusal', () => {
+  it('activation: nothing to activate, by the empty inactive list', () => {
     const document = documentOf('activation-nothing-to-activate');
     expect(document).toContain('activationExecuted="false"');
     expect(document).not.toContain('<msg');
 
-    expect(readActivationRefusal(document)).toBeNull();
+    expect(
+      readActivationRefusal(document, {
+        named: ['/sap/bc/adt/oo/classes/zmcp_bld_ansch01'],
+        inactiveObjects: stepsOf('activation-reactivate-active-s4-2025')[3],
+      }),
+    ).toBeNull();
   });
 
   /**
@@ -128,8 +133,9 @@ describe('each reading, against its own pair', () => {
 });
 
 describe('every reading answers null rather than guessing', () => {
+  // Not the activation reading: an activation's answer that is not a
+  // checklist is "the answer does not state the activation" (spec D1), below.
   const readings = [
-    readActivationRefusal,
     readCheckRunRefusal,
     readDeletionRefusal,
     readValidationRefusal,
@@ -158,6 +164,37 @@ describe('every reading answers null rather than guessing', () => {
       expect(read(null)).toBeNull();
       expect(read(42)).toBeNull();
     }
+  });
+});
+
+describe('the activation reading on a document that is no checklist', () => {
+  it.each([
+    ['an empty document', ''],
+    ['whitespace', '   \n  '],
+    ['no body at all', undefined],
+    ['a null body', null],
+  ])('on %s: activated (decision Q1)', (_label, document) => {
+    expect(readActivationRefusal(document)).toBeNull();
+  });
+
+  it.each([
+    ['plain text that is not XML', 'CLASS zcl_x DEFINITION.'],
+    [
+      'XML of an unrelated shape',
+      '<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom"/>',
+    ],
+    ['a value that is not a string', 42],
+  ])('on %s: the answer does not state the activation', (_label, document) => {
+    const found = readActivationRefusal(document);
+    expect(found?.form).toBe('activation');
+    expect(found?.message).toContain('does not state the activation');
+    expect(found?.messages).toHaveLength(1);
+    expect(found?.stillInactive).toEqual([]);
+  });
+
+  it('the dispatcher still answers null for them', () => {
+    expect(readAdtRefusal('CLASS zcl_x DEFINITION.')).toBeNull();
+    expect(readAdtRefusal(documentOf('activation-still-inactive'))).toBeNull();
   });
 });
 
@@ -235,10 +272,12 @@ describe('severities the recordings do not contain', () => {
 });
 
 describe('a document the parser cannot read', () => {
-  it('is not a refusal, and does not throw', () => {
+  it('does not throw; for an activation it states nothing', () => {
     const malformed = '<?xml version="1.0"?><chkl:messages><msg type="E"';
     expect(() => readActivationRefusal(malformed)).not.toThrow();
-    expect(readActivationRefusal(malformed)).toBeNull();
+    expect(readActivationRefusal(malformed)?.message).toContain(
+      'does not state the activation',
+    );
     expect(readAdtRefusal(malformed)).toBeNull();
   });
 });
@@ -463,25 +502,22 @@ describe('a check run answering several reports', () => {
 
 describe('an activation that reports no reason', () => {
   /**
-   * This used to assert the opposite, and it is worth saying why it flipped.
-   *
-   * `messages` is documented as never empty, and `activationExecuted="false"`
-   * with no `<msg>` at all was the one branch that could leave it bare — so
-   * the reading filled it with a sentence of its own ("SAP reported
-   * activationExecuted=false and gave no reason") to keep the promise. That
-   * fixed the type and left the verdict wrong: the document means SAP had
-   * nothing to activate, and the invented `E` announced a failure that had not
-   * happened.
-   *
-   * The promise is kept a better way now. The branch that could produce an
-   * empty list answers `null` instead, so nothing reaching the refusal path
-   * carries fewer than one message and none of them is composed here.
+   * `activationExecuted="false"` with no `<msg>` answers both an activation
+   * that had nothing to do and one that left objects inactive (S/4HANA 2025,
+   * decision Q7). Without the inactive list read after it the reading cannot
+   * tell them apart, so it says the outcome was not decided — a sentence
+   * about the document, never a verdict invented about the object.
    */
-  it('is not a refusal, and so has no message to promise', () => {
+  it('without the inactive list it is undecided, with one composed message', () => {
     const silent =
       '<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties checkExecuted="true" activationExecuted="false" generationExecuted="false"/></chkl:messages>';
 
-    expect(readActivationRefusal(silent)).toBeNull();
+    const found = readActivationRefusal(silent);
+    expect(found?.message).toContain(
+      "the activation's outcome could not be decided",
+    );
+    expect(found?.messages).toHaveLength(1);
+    expect(found?.messages[0].type).toBe('E');
   });
 
   /**

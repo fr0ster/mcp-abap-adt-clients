@@ -76,6 +76,7 @@ describe('the published surface', () => {
       'readUnitTestRefusal',
       'readValidationRefusal',
       'serviceDefinitionElementInfo',
+      'stillInactiveAmong',
       'structureElementInfo',
       'traceSchedulingProfilerId',
       'traceSchedulingRequests',

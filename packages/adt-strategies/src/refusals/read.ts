@@ -1,6 +1,17 @@
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
+import {
+  AdtObjectErrorCodes,
+  type IAdtAnalyseContext,
+} from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
-import { at, field, isElement, listOf, type ParsedElement } from '../parsed';
+import {
+  at,
+  field,
+  isElement,
+  leafText,
+  listOf,
+  type ParsedElement,
+} from '../parsed';
 
 /**
  * Reading a refusal out of the document SAP sent.
@@ -256,69 +267,188 @@ export function readExceptionRefusal(document: unknown): AdtRefusal | null {
 }
 
 // ---------------------------------------------------------------------------
-// Form 2a — activation: a boolean attribute, under HTTP 200
+// Form 2a — activation: the answer of `POST /activation`, under HTTP 200
 // ---------------------------------------------------------------------------
 
 /**
- * `chkl:messages`, what `POST /activation` answers.
+ * One object an inactive-objects list names: the attributes of its reference,
+ * as SAP sent them.
+ */
+export interface IAdtStillInactive {
+  readonly uri: string;
+  readonly type: string;
+  readonly name: string;
+  readonly parentUri?: string;
+}
+
+/** An activation's refusal, with what SAP listed as still inactive. */
+export interface AdtActivationRefusal extends AdtRefusal {
+  /** What SAP listed as still inactive; empty for a checklist refusal. */
+  readonly stillInactive: ReadonlyArray<IAdtStillInactive>;
+}
+
+/** The facts an activation member hands beside a silent checklist (Q7). */
+export type AdtActivationFacts = NonNullable<IAdtAnalyseContext['activation']>;
+
+/** A well-formed XML document, parsed; `null` for anything else. */
+function wellFormed(document: unknown): ParsedElement | null {
+  if (typeof document !== 'string') return null;
+  if (XMLValidator.validate(document) !== true) return null;
+  return parseXml(document);
+}
+
+/** Whether a parsed document's root is the element of this (local) name. */
+function rootIs(parsed: ParsedElement | null, name: string): boolean {
+  return parsed !== null && Object.hasOwn(parsed, name);
+}
+
+/** A reference's attributes, when it carries a name; nothing otherwise. */
+function stillInactiveOf(ref: unknown): IAdtStillInactive[] {
+  const name = leafText(field(ref, '@name'));
+  if (!name) return [];
+  const uri = leafText(field(ref, '@uri')) ?? '';
+  const type = leafText(field(ref, '@type')) ?? '';
+  const parentUri = leafText(field(ref, '@parentUri'));
+  return parentUri === undefined
+    ? [{ uri, type, name }]
+    : [{ uri, type, name, parentUri }];
+}
+
+/**
+ * The objects an inactive-objects list names, in either shape it is answered
+ * in: `ioc:inactiveObjects` (an entry's `ioc:object/ioc:ref`; a transport's
+ * `ioc:ref` is never read, so the transport-only entry contributes nothing)
+ * and the flat `adtcore:objectReferences` of SAP_BASIS 7.40. `null` for a
+ * document that is neither.
+ */
+function listedObjects(
+  parsed: ParsedElement | null,
+): IAdtStillInactive[] | null {
+  if (parsed === null) return null;
+  if (rootIs(parsed, 'inactiveObjects')) {
+    return listOf(at(parsed, 'inactiveObjects', 'entry')).flatMap((entry) =>
+      stillInactiveOf(at(entry, 'object', 'ref')),
+    );
+  }
+  if (rootIs(parsed, 'objectReferences')) {
+    return listOf(at(parsed, 'objectReferences', 'objectReference')).flatMap(
+      stillInactiveOf,
+    );
+  }
+  return null;
+}
+
+/**
+ * The objects of an inactive-objects list that an activation named: an entry
+ * counts when its `uri`, or its `parentUri`, is one of `named` (the uris of
+ * the references the activation request sent). The transport-only entry never
+ * counts.
+ *
+ * The one judgement both activation paths make after a silent checklist
+ * (`activationExecuted="false"`, no message; decisions Q7 and Q8):
+ * `readActivationRefusal` calls it with the list the member read, and a
+ * consumer of the run sequence calls it with the list it read after
+ * `getActivationResults`. An empty array: none of the named objects is still
+ * inactive. `null`: the answer is no `2xx` inactive-objects list, so nothing
+ * can be decided from it.
+ */
+export function stillInactiveAmong(
+  named: readonly string[],
+  inactiveObjects: IAdtWireResponse,
+): ReadonlyArray<IAdtStillInactive> | null {
+  if (inactiveObjects.status < 200 || inactiveObjects.status >= 300) {
+    return null;
+  }
+  const listed = listedObjects(wellFormed(inactiveObjects.data));
+  if (listed === null) return null;
+  const names = new Set(named);
+  return listed.filter(
+    (entry) =>
+      names.has(entry.uri) ||
+      (entry.parentUri !== undefined && names.has(entry.parentUri)),
+  );
+}
+
+/** A refusal about the activation's answer, in a sentence of this reading. */
+function notActivated(
+  sentence: string,
+  stillInactive: ReadonlyArray<IAdtStillInactive> = [],
+): AdtActivationRefusal {
+  return {
+    form: 'activation',
+    message: `Not activated: ${sentence}`,
+    messages: [{ type: 'E', text: sentence }],
+    stillInactive,
+  };
+}
+
+/**
+ * What `POST /activation` answered, judged (spec D1).
  *
  * Fixtures: `refusal-activation-fails` (200, `activationExecuted="false"` plus
  * a `msg` of type `E`), `activation-success-verdict` (200,
- * `activationExecuted="true"`, no messages) and
- * `activation-nothing-to-activate` (200, `activationExecuted="false"`,
- * `generationExecuted="true"`, no messages).
+ * `activationExecuted="true"`, no messages), `activation-nothing-to-activate`
+ * and `activation-group-alone-s4-2025` 04 (200, `activationExecuted="false"`,
+ * no messages), `activation-preaudit-still-inactive-751` and
+ * `activation-group-alone-s4-2025` 01 (200, `ioc:inactiveObjects`),
+ * `activation-sync-activated-751` and `activation-class-basis-740` 01 (200,
+ * empty).
  *
- * **Two signals, and the second one only counts with a message beside it.**
- * `activationExecuted` says whether ADT did any work; the messages say whether
- * the work succeeded. So:
+ * | Answer | Verdict |
+ * |---|---|
+ * | `chkl:messages`, `activationExecuted="true"`, no `E` | activated |
+ * | `chkl:messages`, a `msg` of type `E` | refused, the messages explain it |
+ * | `chkl:messages`, `activationExecuted="false"`, a message | refused, the messages explain it |
+ * | `chkl:messages`, `activationExecuted="false"`, **no message** | judged by the inactive list read after it (below) |
+ * | `chkl:messages`, no `activationExecuted` | refused, the messages explain it, or a sentence that the document says nothing |
+ * | `ioc:inactiveObjects` | **not activated**, every object it lists |
+ * | an empty body | **activated**, whatever `preauditRequested` was (decision Q1) |
+ * | anything else, or a document that is not well-formed | **not activated**: the answer does not state the activation |
  *
- * | `activationExecuted` | `msg` | verdict |
- * |---|---|---|
- * | `"true"`  | none, or none of type `E` | activated |
- * | `"true"`  | a type `E` | refused, the messages explain it |
- * | `"false"` | any | refused, the messages explain it |
- * | `"false"` | **none** | **nothing needed activating** |
- * | absent | any | refused, the messages explain it |
- * | absent | none | refused: the document says nothing at all |
+ * **The silent checklist** (`activationExecuted="false"`, no message) answered
+ * the re-activation of an object already active (ABAP cloud, S/4HANA 2025) and
+ * an activation that left a function group inactive (S/4HANA 2025): the
+ * document alone cannot tell them apart. The member that sent the activation
+ * reads `GET /activation/inactiveobjects` once after it and hands the list as
+ * `activation` (decision Q7): an object the activation named still listed (by
+ * `uri` or `parentUri`, {@link stillInactiveAmong}) is not activated; none is
+ * nothing to activate. Without the list, or with a list that cannot be read,
+ * the outcome is not decided and is answered as not activated.
+ *
+ * **`ioc:inactiveObjects` is not "still running".** Measured on S/4HANA 2025:
+ * the objects stayed inactive in two reads of the list ten seconds apart; on
+ * 751 (fr0ster/mcp-abap-adt#351) the class stayed inactive until it was
+ * activated with `preauditRequested=false`. Each listed object whose reference
+ * carries a name is one `stillInactive` entry; a transport's reference is not
+ * read.
  *
  * **The attribute is read as three states, not as a boolean.** Absent is not
  * `false`: a checklist that carries no `activationExecuted` — or no
- * `chkl:properties` — has told us nothing, and the no-op row below is
- * measured for SAP writing `false`, never for SAP writing nothing. The last
- * row is the only place this reading composes a sentence instead of quoting
- * one, and what it composes is a statement about the document rather than a
- * verdict about the object.
- *
- * **The last row is measured, and it used to be read as a refusal.** An
- * earlier version of this function took the attribute as a refusal on its own,
- * "whether or not SAP explained itself". That is one reading too many, and it
- * made every no-op activation answer an error. Measured on an ABAP Cloud system
- * (2026-09-16), three ways, all answering the identical document:
- *
- * - activating a class a second time, straight after an activation that
- *   answered `activationExecuted="true"` — captured as the third fixture above;
- * - activating a function group straight after creating one, because a
- *   function group is created active: `adtcore:version="active"` stands on its
- *   metadata before any activation is asked for;
- * - both of those through a consumer's tools, which is how it surfaced.
- *
- * The reading that the request was accepted and is still running is ruled out
- * by the contrast: when SAP does have work, it answers
- * `activationExecuted="true"` in the same request rather than deferring behind
- * a 200. This library's own `activationUtils.ts` recorded the same finding
- * from its own probe before the strategies moved here — "class already active |
- * 200 | false | none" — and concluded that only an `E` message is a failure
- * signal.
- *
- * The hole the old reading was guarding against is real but narrower than it
- * was drawn: an activation SAP declines **and says nothing about** is
- * indistinguishable, in this document, from one it had no work for. Between
- * answering "failed" for every already-active object and "fine" for a silent
- * decline nobody has ever observed, this takes the measured case.
+ * `chkl:properties` — has told us nothing, and the silent row is measured for
+ * SAP writing `false`, never for SAP writing nothing.
  */
-export function readActivationRefusal(document: unknown): AdtRefusal | null {
-  const root = field(parseXml(document), 'messages');
-  if (!root) return null;
+export function readActivationRefusal(
+  document: unknown,
+  activation?: AdtActivationFacts,
+): AdtActivationRefusal | null {
+  if (
+    document === undefined ||
+    document === null ||
+    (typeof document === 'string' && document.trim() === '')
+  ) {
+    return null;
+  }
+  const parsed = wellFormed(document);
+  if (rootIs(parsed, 'inactiveObjects')) {
+    return notActivated(
+      'SAP answered the objects still inactive; nothing was activated',
+      listedObjects(parsed) ?? [],
+    );
+  }
+  if (!rootIs(parsed, 'messages')) {
+    return notActivated('the answer does not state the activation');
+  }
+  const root = field(parsed, 'messages');
 
   const messages: AdtMessage[] = asArray(field(root, 'msg')).map((msg) => {
     const line = field(msg, '@line');
@@ -338,20 +468,31 @@ export function readActivationRefusal(document: unknown): AdtRefusal | null {
   const errors = messages.filter((m) => m.type.toUpperCase() === 'E');
   const executed = at(root, 'properties', '@activationExecuted');
   const activated = executed === 'true' || executed === true;
-
-  // Read as the three states it has, not as a boolean. `!activated` is also
-  // true for a document that carries no `activationExecuted` at all — or no
-  // `chkl:properties` — and the measurement below is of SAP writing `false`,
-  // not of SAP writing nothing. Collapsing the two would hand an unreadable
-  // answer the verdict earned by a measured one.
   const declaredNotActivated = executed === 'false' || executed === false;
 
   if (activated && errors.length === 0) return null;
 
-  // Declared not activated, and nothing said about it: SAP had no work. See
-  // the table above — the one row the attribute alone decides, and it decides
-  // it in the object's favour.
-  if (declaredNotActivated && messages.length === 0) return null;
+  if (declaredNotActivated && messages.length === 0) {
+    if (activation === undefined) {
+      return notActivated(
+        "SAP answered that no activation ran and gave no message; without the list of inactive objects the activation's outcome could not be decided",
+      );
+    }
+    const still = stillInactiveAmong(
+      activation.named,
+      activation.inactiveObjects,
+    );
+    if (still === null) {
+      return notActivated(
+        "SAP answered that no activation ran and gave no message, and the inactive list could not be read; the activation's outcome could not be decided",
+      );
+    }
+    if (still.length === 0) return null;
+    return notActivated(
+      `SAP answered that no activation ran, and the inactive list still names ${still.length} object(s) of the activation; nothing was activated`,
+      still,
+    );
+  }
 
   const explanation = errors.length
     ? errors.map((m) => m.text).join('; ')
@@ -370,6 +511,7 @@ export function readActivationRefusal(document: unknown): AdtRefusal | null {
     // sentence above, which is a statement about the document rather than an
     // invented verdict about the object.
     messages: messages.length ? messages : [{ type: 'E', text: explanation }],
+    stillInactive: [],
   };
 }
 
@@ -918,7 +1060,12 @@ export function isIndeterminateWalkAnswer(document: unknown): boolean {
 export function readAdtRefusal(document: unknown): AdtRefusal | null {
   return (
     readExceptionRefusal(document) ??
-    readActivationRefusal(document) ??
+    // Only a checklist: what else an activation may answer (an inactive-objects
+    // list, nothing, another document) is judged as an activation's answer by
+    // the activation reading alone — here it is no form this dispatches.
+    (rootIs(wellFormed(document), 'messages')
+      ? readActivationRefusal(document)
+      : null) ??
     readDeletionRefusal(document) ??
     readCheckRunRefusal(document) ??
     readValidationRefusal(document) ??

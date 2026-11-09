@@ -7,6 +7,7 @@ import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   type AdtMessage,
   type AdtRefusal,
+  type IAdtStillInactive,
   readActivationRefusal,
   readAdtRefusal,
   readCdsTestDoublesRefusal,
@@ -141,8 +142,37 @@ function analyser(
   };
 }
 
-/** `chkl:messages` — `activationExecuted="false"` or a message of type `E`. */
-export const analyseActivation = analyser(readActivationRefusal);
+/** An activation's failure: the messages, and what SAP listed as still inactive. */
+export interface IAdtActivationFailure extends IAdtMessageFailure {
+  /** What SAP listed as still inactive; empty for a checklist refusal. */
+  readonly stillInactive: ReadonlyArray<IAdtStillInactive>;
+}
+
+/**
+ * What an activation answered, judged by {@link readActivationRefusal}'s
+ * table (spec D1): `ioc:inactiveObjects`, a document that does not state the
+ * activation, and a silent checklist whose inactive list still names an
+ * activated object are **not activated**; an empty answer is activated; a
+ * message of type `E` is a refusal with its messages.
+ *
+ * A silent checklist (`activationExecuted="false"`, no message) is judged by
+ * the inactive list the member read after it, handed as
+ * `context.activation`; without it the outcome is not decided, and that is a
+ * failure too.
+ */
+export const analyseActivation: IAnalyse<IAdtActivationFailure> = (
+  verdict,
+  answer,
+  context,
+) => {
+  if (verdict !== ADT_NO_FAILURE) {
+    return { ...enrich(verdict, answer), stillInactive: [] };
+  }
+  const refusal = readActivationRefusal(answer?.data, context?.activation);
+  return refusal
+    ? { ...asFailure(refusal, answer), stillInactive: refusal.stillInactive }
+    : ADT_NO_FAILURE;
+};
 
 /** `del:deletionResult` and `del:checkResponse` — the verdict is an attribute. */
 export const analyseDeletion = analyser(readDeletionRefusal);

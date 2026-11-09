@@ -42,14 +42,18 @@ export {
   analyseUnitTestStart,
   analyseUnsupportedStatus,
   analyseValidation,
+  type IAdtActivationFailure,
   type IAdtMessageFailure,
 } from './refusals/analyse';
 
 // The readings underneath them — pure functions over a document, for a caller
 // composing their own strategy rather than taking one.
 export {
+  type AdtActivationFacts,
+  type AdtActivationRefusal,
   type AdtMessage,
   type AdtRefusal,
+  type IAdtStillInactive,
   isIndeterminateWalkAnswer,
   readActivationRefusal,
   readAdtRefusal,
@@ -63,6 +67,7 @@ export {
   readPublicationRefusal,
   readUnitTestRefusal,
   readValidationRefusal,
+  stillInactiveAmong,
 } from './refusals/read';
 export { asItCame, rawOf } from './result';
 // The result axis: the document as it came, and the readings a caller may ask for.
