@@ -85,9 +85,9 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 > [`docs/usage/MIGRATION-37.md`](docs/usage/MIGRATION-37.md).
 >
 > **From 35.x?** 36.0.0 (on `interfaces-adt` ^20.0.0) makes a request's
-> `Accept` and `Content-Type` yours: 32 members take them as the required
+> `Accept` and `Content-Type` yours: the members listed in
+> [A request's own headers](#a-requests-own-headers) take them as the required
 > `options.headers` and send exactly that pair. See
-> [A request's own headers](#a-requests-own-headers) and
 > [`docs/usage/MIGRATION-36.md`](docs/usage/MIGRATION-36.md).
 
 ## Features
@@ -1250,7 +1250,7 @@ and nothing is merged in, defaulted or replaced. The options are required with
 it, and a positional parameter before them that was optional is now
 `T | undefined` — pass `undefined` explicitly.
 
-The 33 members: `link`, `pull`, `checkExternalRepo` (abapGit); `create`,
+The members: `link`, `pull`, `checkExternalRepo` (abapGit); `create`,
 `update`, `updateMetadata`, `delete`, `checkDeletion`, `check`, `activate` (the
 object handlers); `checkState` (feature toggle); `removeObject`, `addObject`,
 `createTask`, `changeTaskType`, `moveObjects` (transport request);

@@ -1,6 +1,6 @@
 # @mcp-abap-adt/adt-strategies
 
-> **Since adt-clients 36.0.0** every call below to one of the 32 members that
+> **Since adt-clients 36.0.0** every call below to one of the members that
 > take `options.headers` (`create`, `update`, `updateMetadata`, `delete`,
 > `checkDeletion`, `check`, `activate` and the others listed in
 > [A request's own headers](https://github.com/fr0ster/mcp-abap-adt-clients#a-requests-own-headers)) passes the request's own `Accept` / `Content-Type` pair.

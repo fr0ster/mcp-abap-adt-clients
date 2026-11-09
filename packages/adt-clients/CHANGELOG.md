@@ -54,7 +54,7 @@ Migration: [MIGRATION-45](docs/usage/MIGRATION-45.md).
 - **`options.preauditRequested` on every single-object activation**
   (`IAdtActivationOptions`): `activate` of every handler and
   `getClass().activateTestClasses` send it; absent, `true`, today's request.
-- **The one read after a silent checklist** (decision Q7): after an
+- **The one read after a silent checklist**: after an
   activation answered `chkl:messages` with `activationExecuted="false"` and
   no message — and after no other answer — the member reads
   `GET /sap/bc/adt/activation/inactiveobjects` once, with the `Accept`
@@ -73,7 +73,8 @@ Migration: [MIGRATION-45](docs/usage/MIGRATION-45.md).
   discovery, and the read a run-sequence consumer makes after a silent
   results checklist (`stillInactiveAmong`). `ERRATA.md` and
   `ANSWER_SHAPES.md`: the activation answers by release. README: the
-  activation note and the header members (33).
+  activation note; the header members' list names `activateObjects`, and
+  no doc states their number any more — the list does.
 
 ## [44.0.0] - 2026-11-09
 
