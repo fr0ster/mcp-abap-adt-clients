@@ -76,3 +76,57 @@ there is nothing to unlock. Every other refusal stays a refusal. It treats any
 `403` on that LOCK this way; what was observed is the one above, where an
 editing session already held the binding. A caller who wants the `403` to stop
 them passes `analyseException` instead.
+
+## An activation answered with `200` that activated nothing
+
+**Symptom.** `POST /sap/bc/adt/activation?method=activate&preauditRequested=…`
+answers `200` without activating, in two documents that carry no message:
+
+- **`ioc:inactiveObjects`**: the objects still inactive, no `chkl:messages`
+  and no `msg`. Answered to `preauditRequested=true`: on SAP_BASIS 751 for a
+  class in `$TMP` (fr0ster/mcp-abap-adt#351, 2026-11-09), on S/4HANA 2025 for a
+  function group's reference alone in a transportable package (2026-11-09).
+  The objects stayed inactive in two reads of the inactive list ten seconds
+  apart (S/4HANA 2025), so it is no activation still running.
+- **`chkl:messages` with `activationExecuted="false"` and no message**: on
+  S/4HANA 2025 the same function group's reference, sent again with
+  `preauditRequested=false`, answered it and left the group inactive
+  (2026-11-09). The identical document answers the re-activation of an object
+  that is already active — on S/4HANA 2025 and on ABAP cloud (2026-09-16) —
+  where nothing was inactive. The document alone cannot tell the two apart.
+
+**What activates.** On SAP_BASIS 751 the same reference with
+`preauditRequested=false` (`200`, empty body). On S/4HANA 2025 every reference
+the `ioc:inactiveObjects` answer listed, as it listed them, with
+`preauditRequested=false` (`200`, `activationExecuted="true"`). Sending that
+next request is the caller's: the list may name objects the caller did not.
+
+**An empty `200` is an activation.** Every empty answer recorded activated:
+SAP_BASIS 7.40 SP04 to `preauditRequested=true` and `false` (the inactive list
+and the active source both said so), SAP_BASIS 751 to `false`.
+
+**Why the library has a strategy for it.** `analyseActivation` from
+`@mcp-abap-adt/adt-strategies` (0.22.0) answers each of them:
+
+| Answer (`2xx`) | Verdict |
+|---|---|
+| `chkl:messages`, `activationExecuted="true"`, no `E` | activated |
+| `chkl:messages`, a `msg type="E"` | refused, with the messages |
+| `chkl:messages`, `activationExecuted="false"`, no message | judged by the inactive list read after it: a named object still listed → not activated, with `stillInactive`; none → nothing to activate; no list → not decided, a failure |
+| `ioc:inactiveObjects` | not activated, every listed object in `stillInactive` |
+| empty | activated |
+| any other document | not activated: the answer does not state the activation |
+
+For the silent checklist, every adt-clients member that sends
+`POST /activation` reads `GET /sap/bc/adt/activation/inactiveobjects` once,
+after that answer only, and hands the list to `analyse` (`IAdtAnalyseContext`);
+an entry counts when its `uri` or `parentUri` is one the request named
+(`stillInactiveAmong`). A caller who wants another verdict passes its own
+`analyse`.
+
+**`/activation/runs` is not on every system.** SAP_BASIS 751 and 7.40 SP04 do
+not list it in their discovery, and a `POST` there answers `404` on 751.
+S/4HANA 2025 and ABAP cloud list it. `utilDiscoveryCollections` reads the
+discovery's collections, and the caller picks `activateObjectsGroup`
+(`/activation/runs`) or `activateObjects` (`/activation`) by
+`has(ACTIVATION_RUNS_COLLECTION)`.

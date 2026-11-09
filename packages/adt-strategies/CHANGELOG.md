@@ -14,6 +14,55 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.22.0] - 2026-11-09
+
+Released with `@mcp-abap-adt/adt-clients` 45.0.0 (fr0ster/mcp-abap-adt#351).
+
+### Changed
+
+- **`analyseActivation` is stricter**: an activation that SAP answered
+  without activating is now a failure. It answers `IAdtActivationFailure`
+  (`IAnalyse<IAdtActivationFailure>`), whose `stillInactive` lists what SAP
+  named as still inactive. Newly failures:
+  - `ioc:inactiveObjects` — not activated, every listed object in
+    `stillInactive` (a transport's reference is not read). Measured on
+    SAP_BASIS 751 and S/4HANA 2025: the objects stayed inactive;
+  - any answer that is neither a checklist, an inactive-objects list nor
+    empty, or a document that is not well-formed — "the answer does not state
+    the activation";
+  - `chkl:messages` with `activationExecuted="false"` and no message, when
+    the inactive list read after it still names an object the activation
+    named (by `uri` or `parentUri`), or when no list is handed beside it (the
+    outcome could not be decided). With the list and none of the named
+    objects on it, it stays "nothing to activate". The list arrives as the
+    third parameter of `IAnalyse`, `context.activation`
+    (`@mcp-abap-adt/interfaces-adt` 27.0.0); adt-clients 45.0.0 reads it.
+  An empty `200` is activated, whatever `preauditRequested` was. A `msg` of
+  type `E` stays a refusal.
+- `readActivationRefusal(document, activation?)` answers the same table
+  (`AdtActivationRefusal | null`). `readAdtRefusal` dispatches an
+  activation's checklist only: an inactive-objects list, an empty or another
+  document is no form it reads, as before.
+- **On `@mcp-abap-adt/interfaces-adt` `^27.0.0`** (was `^26.0.0`).
+
+### Added
+
+- `stillInactiveAmong(named, inactiveObjects)`: the entries of an
+  inactive-objects answer — `ioc:inactiveObjects` or the flat
+  `adtcore:objectReferences` of 7.40 — whose `uri` or `parentUri` is named;
+  the transport-only entry never counts; `null` for an answer that is no
+  `2xx` list. `analyseActivation` uses it, and a consumer of the
+  `/activation/runs` sequence calls it after a silent results checklist with
+  the run's references and the list it read.
+- `utilDiscoveryCollections` (the `discovery` slot): the path of every
+  `app:collection/@href` of the discovery document, as a set; an absolute
+  `href` is skipped; an answer that is no `app:service` document is the empty
+  set. `ACTIVATION_RUNS_COLLECTION` (`/sap/bc/adt/activation/runs`) is the
+  exact path to ask `has()` about before choosing between
+  `activateObjectsGroup` and `activateObjects`.
+- Types `IAdtActivationFailure`, `IAdtStillInactive`,
+  `AdtActivationRefusal`, `AdtActivationFacts`.
+
 ## [0.21.0] - 2026-11-09
 
 Released with `@mcp-abap-adt/adt-clients` 44.0.0.
