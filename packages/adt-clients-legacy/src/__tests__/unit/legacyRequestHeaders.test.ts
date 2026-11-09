@@ -71,6 +71,8 @@ const SENDS_NO_REQUEST: ReadonlySet<string> = new Set([
   'AdtUtilsLegacy.getWhereUsed',
   'AdtUtilsLegacy.getWhereUsedScope',
   'AdtUtilsLegacy.getVirtualFoldersContents',
+  // No /activation/runs on 7.40 (fr0ster/mcp-abap-adt#351, D5).
+  'AdtUtilsLegacy.activateObjectsGroup',
 ]);
 
 const legacy = (connection: IAbapConnection) =>

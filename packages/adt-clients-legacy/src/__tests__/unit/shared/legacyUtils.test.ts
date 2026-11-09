@@ -113,6 +113,16 @@ describe('legacy utilities', () => {
         '/sap/bc/adt/activation/results',
         (utils) => utils.getActivationResults('GUARD'),
       ],
+      [
+        'activateObjectsGroup',
+        '/sap/bc/adt/activation/runs',
+        (utils) =>
+          utils.activateObjectsGroup(
+            [{ name: 'ZCL_GUARD', type: 'CLAS/OC' }],
+            false,
+            { headers: headersOf(utils, 'activateObjectsGroup') },
+          ),
+      ],
     ];
 
     it.each(MEMBERS)('%s', async (member, endpoint, call) => {
@@ -359,12 +369,25 @@ describe('legacy utilities', () => {
       },
     );
 
-    it('a group activation of VIEW/DV, which 7.40 lists for group activation, is sent', async () => {
+    it('activateObjectsGroup points to activateObjects, the 7.40 group activation', async () => {
       const { utils, sent } = legacyUtils();
       const answer = await utils.activateObjectsGroup(
-        [{ name: 'ZGUARD', type: 'VIEW/DV' }],
+        [{ name: 'ZCL_GUARD', type: 'CLAS/OC' }],
         false,
         { headers: headersOf(utils, 'activateObjectsGroup') },
+      );
+      expect(sent).toEqual([]);
+      expect(answer.ok).toBe(false);
+      if (answer.ok) return;
+      expect(answer.getError().message).toContain('activateObjects(');
+    });
+
+    it('a group activation of VIEW/DV, which 7.40 lists for group activation, is sent by activateObjects', async () => {
+      const { utils, sent } = legacyUtils();
+      const answer = await utils.activateObjects(
+        [{ name: 'ZGUARD', type: 'VIEW/DV' }],
+        false,
+        { headers: headersOf(utils, 'activateObjects') },
       );
       expect(answer.ok).toBe(true);
       expect(sent).toEqual([
@@ -402,21 +425,18 @@ describe('legacy utilities', () => {
     });
 
     it.each(['MSAG/N', 'DEVC/K', 'TABL/DT'])(
-      'a group activation of %s, which 7.40 does not activate, is refused without a request',
-      async (code) => {
-        const { utils, sent } = legacyUtils();
-        const answer = await utils.activateObjectsGroup(
-          // @ts-expect-error -- ADT_TYPES_BASIS_740 activates no such code
-          [{ name: 'ZGUARD', type: code }],
-          false,
-          { headers: headersOf(utils, 'activateObjectsGroup') },
-        );
-        expectRefusal(
-          answer,
-          sent,
-          'activateObjectsGroup',
-          'ADT_TYPES_BASIS_740',
-        );
+      'a group activation of %s, which 7.40 does not activate, does not compile',
+      (code) => {
+        // Type-level: the references of activateObjects on 7.40 take only
+        // the codes ADT_TYPES_BASIS_740 activates. Never called.
+        const call = (utils: AdtUtilsLegacy) =>
+          utils.activateObjects(
+            // @ts-expect-error -- ADT_TYPES_BASIS_740 activates no such code
+            [{ name: 'ZGUARD', type: code }],
+            false,
+            { headers: headersOf(utils, 'activateObjects') },
+          );
+        expect(typeof call).toBe('function');
       },
     );
   });

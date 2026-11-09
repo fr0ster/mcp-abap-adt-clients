@@ -57,7 +57,6 @@ import {
   AdtUtils,
   type AdtWhereUsedCode,
   answering,
-  buildObjectUri,
   DATA_ELEMENT,
   DOMAIN,
   failed,
@@ -65,7 +64,6 @@ import {
   PACKAGE,
   type ParentedArguments,
   type ResultValuesOf,
-  requestHeaders,
   STRUCTURE,
   TABLE,
   TABLE_TYPE,
@@ -91,7 +89,6 @@ import type {
 import {
   ADT_SEARCH_TYPES_BASIS_740,
   ADT_TYPES_BASIS_740,
-  ADT_UTILITY_CODES_BASIS_740,
   AdtObjectErrorCodes,
   type IAdtAnalyseOptions,
   type IAdtError,
@@ -118,7 +115,9 @@ const WHERE_USED_ON_740 =
 const OBJECT_TYPES_ON_740 =
   '7.40 serves object types through repository/typestructure: getTypeStructure.';
 const NO_RUN_ID =
-  'A legacy activateObjectsGroup is the synchronous /sap/bc/adt/activation: its answer is the result, and there is no run id to ask about.';
+  'A legacy group activation is the synchronous /sap/bc/adt/activation (activateObjects): its answer is the result, and there is no run id to ask about.';
+const GROUP_ACTIVATION_ON_740 =
+  'Nothing is sent. A group activation on 7.40 is activateObjects(objects, preauditRequested, options): the synchronous /sap/bc/adt/activation.';
 
 const PACKAGE_ITEM = `${PACKAGE.collection}/{name}`;
 
@@ -193,24 +192,6 @@ const CODES_740: ReadonlySet<string> = new Set(
 );
 
 /**
- * The codes a 7.40 group activation activates: those 7.40's table lists
- * `activate` for, and those its utility table lists `groupActivation` for
- * (`VIEW/DV`) — `AdtActivationCode<'basis740'>`.
- */
-const ACTIVATED_740: ReadonlySet<string> = new Set([
-  ...Object.values(TABLE_740).flatMap((entry) =>
-    Object.entries(entry?.codes ?? {})
-      .filter(([, facts]) => facts.operations.includes('activate'))
-      .map(([code]) => code),
-  ),
-  ...Object.entries(ADT_UTILITY_CODES_BASIS_740)
-    .filter(([, facts]) =>
-      facts.operations.some((operation) => operation === 'groupActivation'),
-    )
-    .map(([code]) => code),
-]);
-
-/**
  * A code 7.40's table does not list, from a caller outside the type system:
  * refused, as every legacy refusal is, and nothing is sent.
  */
@@ -229,57 +210,20 @@ export class AdtUtilsLegacy<
   T extends UtilValues = ResultValuesOf<typeof utilDocuments>,
 > extends AdtUtils<T, 'basis740'> {
   /**
-   * Legacy group activation — synchronous POST to /sap/bc/adt/activation
-   *
-   * Modern systems use async /sap/bc/adt/activation/runs with polling.
-   * Legacy systems use synchronous /sap/bc/adt/activation. A success answers
-   * `200` with an empty body, not a checklist: BASIS 7.40 activated six objects
-   * that way, and only `/activation/inactiveobjects` afterwards said so
-   * (measured on premise, 2026-10-01; docs/LEGACY.md, "Measured
-   * on BASIS 7.40").
-   *
-   * Read through the same `activation` slot as the modern run. The default keeps
-   * the document, which here is the result itself; `utilActivationRunId` would
-   * find no run id in it and answer `''`, so a caller on a legacy system does
-   * not pass that one.
+   * Refused without a request: 7.40 does not list `/activation/runs` in its
+   * discovery (measured on 7.40 SP04), and a group activation there is the
+   * synchronous `POST /sap/bc/adt/activation` — `activateObjects`, inherited
+   * unchanged. One endpoint, one member: this one is `/activation/runs`'s.
    */
   override async activateObjectsGroup<E extends IAdtError = IAdtError>(
-    objects: IAdtCodedReference<AdtActivationCode<'basis740'>>[],
-    preauditRequested: boolean = false,
-    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
+    _objects: IAdtCodedReference<AdtActivationCode<'basis740'>>[],
+    _preauditRequested: boolean = false,
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
-    // The type admits only the codes 7.40's table activates; a caller outside
-    // the type system is answered the refusal, and nothing is sent.
-    const foreign = objects.find((o) => !ACTIVATED_740.has(o.type));
-    if (foreign)
-      return refuseCode<T['activation'], E>(
-        'activateObjectsGroup',
-        foreign.type,
-      );
-    const url = `/sap/bc/adt/activation?method=activate&preauditRequested=${preauditRequested}`;
-
-    const objectReferences = objects
-      .map((obj) => {
-        const uri = buildObjectUri(obj.name, obj.type, obj.parentName);
-        return `  <adtcore:objectReference adtcore:uri="${uri}" adtcore:type="${obj.type}" adtcore:name="${obj.name}"/>`;
-      })
-      .join('\n');
-
-    const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
-${objectReferences}
-</adtcore:objectReferences>`;
-
-    return answering(
-      () =>
-        this.connection.makeAdtRequest({
-          url,
-          method: 'POST',
-          timeout: 0,
-          data: xmlBody,
-          headers: requestHeaders(options.headers),
-        }),
-      this.results.activation,
-      options?.analyse,
+    return legacyRefusal<T['activation'], E>(
+      'activateObjectsGroup',
+      ACTIVATION_RUNS,
+      GROUP_ACTIVATION_ON_740,
     );
   }
 

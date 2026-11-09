@@ -49,6 +49,7 @@ const HANDLER_MEMBERS = [
   'getVirtualFoldersContents',
   'fetchNodeStructure',
   'activateObjectsGroup',
+  'activateObjects',
   'checkDeletionGroup',
   'deleteObjectsGroup',
   'getSqlQuery',

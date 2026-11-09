@@ -107,7 +107,7 @@ export const LEGACY_HEADER_PAIRS: [
   [
     AdtUtilsLegacy,
     {
-      activateObjectsGroup: XML,
+      activateObjects: XML,
       // The override refuses a code 7.40 lacks, and otherwise sends the base's
       // request with the base's pair (`AdtUtils.fetchNodeStructure`).
       fetchNodeStructure: {
@@ -179,6 +179,9 @@ export const REFUSED_WITHOUT_REQUEST: [IHandlerClass, string[]][] = [
       'getAllTypes',
       'getActivationRun',
       'getActivationResults',
+      // No /activation/runs on 7.40: activateObjects is its group activation
+      // (fr0ster/mcp-abap-adt#351, D5).
+      'activateObjectsGroup',
       // Refused on legacy before this change, and still (spec §10.2).
       'getTableColumns',
       'getObjectProperties',

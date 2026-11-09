@@ -17,6 +17,7 @@ import {
   AdtFunctionGroup,
   type AdtPerformedBy,
   answering,
+  answeringActivation,
   FUNCTION_GROUP,
   type FunctionGroupValues,
   type functionGroupDocuments,
@@ -25,6 +26,7 @@ import {
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
 import type {
+  IAdtActivationOptions,
   IAdtError,
   IAdtHeaders,
   IAdtOperationOptions,
@@ -105,10 +107,14 @@ export class AdtFunctionGroupLegacy<
    * cloud; on 7.40 it is not sent, so the single reference stays. Measured on
    * 7.40 SP04 in `$TMP`: after a write of the group's source, this one
    * reference activated the group and its main program both.
+   *
+   * `preauditRequested` is sent as given; absent, `true`. Through the base's
+   * activation helper: after a silent checklist alone, the inactive list is
+   * read once and handed to `analyse`.
    */
   override async activate<E extends IAdtError = IAdtError>(
     config: Partial<IFunctionGroupConfig>,
-    options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     const name = config.functionGroupName as string;
@@ -117,10 +123,13 @@ export class AdtFunctionGroupLegacy<
   <adtcore:objectReference adtcore:uri="${FUNCTION_GROUP.uri(name)}" adtcore:name="${name}"/>
 </adtcore:objectReferences>`;
 
-    return answering(
-      () =>
-        connection.makeAdtRequest({
-          url: '/sap/bc/adt/activation?method=activate&preauditRequested=true',
+    const preauditRequested = options.preauditRequested ?? true;
+
+    return answeringActivation(
+      connection,
+      (sent) =>
+        sent.makeAdtRequest({
+          url: `/sap/bc/adt/activation?method=activate&preauditRequested=${preauditRequested}`,
           method: 'POST',
           timeout: 0,
           data: xmlPayload,

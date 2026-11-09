@@ -281,7 +281,9 @@ async function activationExchange(
 
 /**
  * Run an activation member's request through {@link activationExchange} and
- * compose the two strategies over its answer, as `answering` does.
+ * compose the two strategies over its answer, as `answering` does. Exported
+ * beside `answering` for the handler classes built on this package (the
+ * legacy package's activation overrides); the read itself is not.
  */
 export function answeringActivation<T, E extends IAdtError = IAdtError>(
   connection: IAbapConnection,
