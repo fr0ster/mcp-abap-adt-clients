@@ -42,6 +42,13 @@ describe('group members refuse an object they cannot address', () => {
         }),
     ],
     [
+      'activateObjects',
+      (o: never) =>
+        utils().activateObjects(o, undefined, {
+          headers: headersOf(utils(), 'activateObjects'),
+        }),
+    ],
+    [
       'checkDeletionGroup',
       (o: never) =>
         utils().checkDeletionGroup(o, {

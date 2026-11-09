@@ -7,7 +7,7 @@
  * deliberately ones no implementation could hold as a constant, so a member
  * that still chose its own would send something else and fail here.
  *
- * The table is closed: every class method in `src` named like one of the 32
+ * The table is closed: every class method in `src` named like one of the
  * members is found with the TypeScript parser, and each must be reached by a
  * row here (or be listed in `NOT_A_HEADERS_MEMBER` with the contract it
  * implements instead). A new implementation of one of these members that is

@@ -25,6 +25,7 @@ import type {
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtObjectAccess,
+  IAdtObjectActivation,
   IAdtObjectProperties,
   IAdtReadable,
   IAdtRepositoryStructure,
@@ -73,6 +74,7 @@ type LifecycleAtoms = IAdtCreatable<U, U> &
 type UtilsAtoms = IAdtInformationSystem<U, U, U, U, U> &
   IAdtRepositoryStructure<U, U> &
   IAdtGroupLifecycle<U, U, U, U, U, U> &
+  IAdtObjectActivation<U> &
   IAdtDataPreview<U, U, U> &
   IAdtDiscovery<U> &
   IAdtObjectAccess<U, U, U> &

@@ -26,6 +26,7 @@ import type {
   AdtGroupDeletionCode,
   AdtVariant,
   AdtWhereUsedCode as AdtWhereUsedContractCode,
+  IAdtObjectActivation,
   IAdtTypedGroupLifecycle,
   IAdtTypedWhereUsed,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -57,13 +58,17 @@ type SetsEqual<V extends AdtVariant> = readonly [
 
 const ALL_EQUAL = [true, true, true, true] as const;
 
-/** Both typed atoms of variant `V`, over the shipped result set. */
-type TypedAtoms<V extends AdtVariant> = IAdtTypedGroupLifecycle<
-  ReturnType<R['activation']>,
-  ReturnType<R['deletionCheck']>,
-  ReturnType<R['deletion']>,
+/** The typed atoms of variant `V`, over the shipped result set. */
+type TypedAtoms<V extends AdtVariant> = IAdtObjectActivation<
+  ReturnType<R['objectActivation']>,
   V
 > &
+  IAdtTypedGroupLifecycle<
+    ReturnType<R['activation']>,
+    ReturnType<R['deletionCheck']>,
+    ReturnType<R['deletion']>,
+    V
+  > &
   IAdtTypedWhereUsed<
     ReturnType<R['whereUsed']>,
     ReturnType<R['whereUsedScope']>,
@@ -111,7 +116,18 @@ async function referenceChecks(
     false,
     { headers },
   );
+  await utils.activateObjects(
+    [{ type: 'FUGR/FF', name: 'Z_FM', parentName: 'ZFG' }],
+    false,
+    { headers },
+  );
   // …and without it the reference does not compile (spec 2.3).
+  await utils.activateObjects(
+    // @ts-expect-error -- `FUGR/FF` requires `parentName`
+    [{ type: 'FUGR/FF', name: 'Z_FM' }],
+    false,
+    { headers },
+  );
   await utils.activateObjectsGroup(
     // @ts-expect-error -- `FUGR/FF` requires `parentName`
     [{ type: 'FUGR/FF', name: 'Z_FM' }],

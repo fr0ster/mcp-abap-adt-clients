@@ -64,6 +64,27 @@ export async function getActivationResults(
 }
 
 /**
+ * The body of a group activation: one `adtcore:objectReference` per object,
+ * with its uri, type and name. Both group members send it —
+ * `activateObjectsGroup` to `/activation/runs`, `activateObjects` to
+ * `/activation` — so the two bodies cannot drift apart.
+ */
+function groupActivationBody(
+  objects: readonly IAdtGroupReference<AdtAddressableCode>[],
+): string {
+  const objectReferences = objects
+    .map((obj) => {
+      const uri = buildObjectUri(obj.name, obj.type, obj.parentName);
+      return `  <adtcore:objectReference adtcore:uri="${uri}" adtcore:type="${obj.type}" adtcore:name="${obj.name}"/>`;
+    })
+    .join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
+${objectReferences}
+</adtcore:objectReferences>`;
+}
+
+/**
  * Activate multiple objects in a group (with session support)
  *
  * One POST — `/sap/bc/adt/activation/runs?method=activate` — answered as it
@@ -103,26 +124,33 @@ export async function activateObjectsGroup(
   objects: readonly IAdtGroupReference<AdtAddressableCode>[],
   preauditRequested: boolean = false,
 ): Promise<IAdtWireResponse> {
-  // Step 1: Start activation run
-  const url = `/sap/bc/adt/activation/runs?method=activate&preauditRequested=${preauditRequested}`;
-
-  // Build object references XML
-  const objectReferences = objects
-    .map((obj) => {
-      const uri = buildObjectUri(obj.name, obj.type, obj.parentName);
-      return `  <adtcore:objectReference adtcore:uri="${uri}" adtcore:type="${obj.type}" adtcore:name="${obj.name}"/>`;
-    })
-    .join('\n');
-
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
-${objectReferences}
-</adtcore:objectReferences>`;
-
   return connection.makeAdtRequest({
-    url,
+    url: `/sap/bc/adt/activation/runs?method=activate&preauditRequested=${preauditRequested}`,
     method: 'POST',
     timeout: 0,
-    data: xmlBody,
+    data: groupActivationBody(objects),
+    headers: requestHeaders(headers),
+  });
+}
+
+/**
+ * Activate several objects synchronously — one POST to
+ * `/sap/bc/adt/activation?method=activate`, with the body
+ * {@link activateObjectsGroup} sends to `/activation/runs`. The answer is in
+ * its body (`chkl:messages`, `ioc:inactiveObjects`, or nothing), as it came.
+ * A system whose discovery does not list `/activation/runs` offers this one.
+ */
+export async function activateObjects(
+  connection: IAbapConnection,
+  headers: IAdtHeaders,
+  objects: readonly IAdtGroupReference<AdtAddressableCode>[],
+  preauditRequested: boolean,
+): Promise<IAdtWireResponse> {
+  return connection.makeAdtRequest({
+    url: `/sap/bc/adt/activation?method=activate&preauditRequested=${preauditRequested}`,
+    method: 'POST',
+    timeout: 0,
+    data: groupActivationBody(objects),
     headers: requestHeaders(headers),
   });
 }
