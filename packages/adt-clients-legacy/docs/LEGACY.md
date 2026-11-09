@@ -302,9 +302,10 @@ So a legacy client lists and reads its user's requests and does nothing else wit
 | `discovery` | measured — 125 collections (s10-discovery) |
 | `getInactiveObjects` | measured (s10-inactive); 7.40 answers the older `adtcore:objectReferences` document |
 | `readObjectMetadata`, `readObjectSource` for the served types (program, class, interface, function group and module, DDL source, …) | measured through the handlers, which send the same request (`B2-reads-20261023-1749` s1–s4, s8) |
-| `readObjectMetadata`, `readObjectSource`, `fetchNodeStructure`, `getObjectStructure`, `activateObjectsGroup` for a code `ADT_TYPES_BASIS_740` does not list — `DOMA/DD`, `DTEL/DE`, `TABL/DS`, `TABL/DT`, `TTYP/DA`, `BDEF/BDO`, `SRVD/SRV`, `DDLX/EX`, `DCLS/DL`, `ENHO/XHH`, … (`DEVC/K` stays served for the two structure reads) | does not compile; from a caller outside the type system refused (answered, not thrown, no request): their families answered `404` or are not advertised |
+| `readObjectMetadata`, `readObjectSource`, `fetchNodeStructure`, `getObjectStructure`, `activateObjects` for a code `ADT_TYPES_BASIS_740` does not list — `DOMA/DD`, `DTEL/DE`, `TABL/DS`, `TABL/DT`, `TTYP/DA`, `BDEF/BDO`, `SRVD/SRV`, `DDLX/EX`, `DCLS/DL`, `ENHO/XHH`, … (`DEVC/K` stays served for the two structure reads) | does not compile; from a caller outside the type system refused (answered, not thrown, no request): their families answered `404` or are not advertised |
 | `getTypeStructure` | kept: `POST /repository/typestructure`, the caller's headers; 7.40's answer is recorded in adt-clients' corpus (`typestructure/system-description-basis-740--07-typestructure`) |
-| `activateObjectsGroup` | kept (legacy override): synchronous `POST /activation?method=activate`, no `/activation/runs`. Measured earlier on BASIS 7.40; on 7.40 SP04 `POST /activation` `200` in the utils cycle (`T6-20261027` UtilsReaders). `VIEW/DV` is sent since 0.3.0 (`ADT_UTILITY_CODES_BASIS_740` lists its group activation, not measured) |
+| `activateObjects` | inherited from adt-clients 45: the group activation of 7.40, synchronous `POST /activation?method=activate&preauditRequested=…` (default `false`), references with uri, type and name, read through `objectActivation`. The request the legacy `activateObjectsGroup` sent before: measured earlier on BASIS 7.40; on 7.40 SP04 `POST /activation` `200` in the utils cycle (`T6-20261027` UtilsReaders). `VIEW/DV` is sent (`ADT_UTILITY_CODES_BASIS_740` lists its group activation, not measured). The answer is judged as any activation's (below) |
+| `activateObjectsGroup` | refused without a request: `/activation/runs` is not in 7.40's discovery (measured on 7.40 SP04, 2026-11-09, below); the message points to `activateObjects` |
 | `getInclude` | not measured, kept (`/programs/includes` advertised) |
 | `getWhereUsed`, `getWhereUsedScope` | refused — measured: `usageReferences` answered `404` (s11-usage). 7.40 serves where-used only through RIS (`fullnamemapping` → `metadata` → `whereused?RIS_REQUEST_TYPE=WHERE_USED_LAZY`), another family; the message names it |
 | `modifyWhereUsedScope` | kept: edits XML you hold, sends nothing |
@@ -361,11 +362,11 @@ Each row ships as decided until a run on 7.40 SP04 measures it. The live checks 
 | `readObjectMetadata`/`readObjectSource` for table types | refused | not advertised; the other DDIC families answered `404` |
 | enhancement readers; versions of a function include; the `check`s and `activate`s not listed as measured | kept | under advertised collections; at worst a `404`, read strictly |
 | `updateMetadata` of a class, interface, program, function module, DDL source and include (adt-clients 38) | refused until measured | no run on 7.40 has sent the `PUT` of their metadata document; 7.40's table lists none |
-| function group `activate` with its main program as a second reference | not sent: the group alone, as before | the second reference is measured on S/4HANA 2025 and ABAP cloud only |
+| function group `activate` with its main program as a second reference | not sent: the group alone, as before; `preauditRequested` as given, absent `true` | the second reference is measured on S/4HANA 2025 and ABAP cloud only |
 | message class message `readMetadata`; `activateTestClasses`; function group `updateMetadata` | kept | `/oo/classes` and the other collections are advertised; the inherited members address the container class |
 | trace `listRequests`, `getRequestsByUri`, `scheduleTrace` | kept | advertised |
 | function module runner `run` | refused | not a 7.40 statement: `run(functionModuleName)` names no group, and the measured request needs the module's URI under its group |
-| `getUtils()` `getActivationRun`, `getActivationResults` | refused | a legacy group activation yields no run id; `/activation/runs` is not advertised |
+| `getUtils()` `getActivationRun`, `getActivationResults`, `activateObjectsGroup` | refused | a legacy group activation (`activateObjects`) yields no run id; `/activation/runs` is not advertised |
 | `getRequest()` `updateMetadata`, `delete` | refused | changes to a request are refused on legacy |
 | the other `getRequest()` members (`searchConfigurations`, `checkDeletion`, `readObjects`, `readActionLog`, `addObject`, `removeObject`, `moveObjects`, `sortAndCompress`, `createTask`, `changeTaskType`) | refused | not advertised (`/sap/bc/adt/cts/*`) |
 | `getMessageClass().updateMetadata` | refused until its document is measured | the `PUT` of the class document answered `400 ExceptionInvalidData`; 7.40 expects another root element (B4 r2-m2-updateMetadata) |
@@ -434,6 +435,22 @@ On premise, BASIS 7.40, 2026-10-01, over RFC and over HTTP. **These measurements
 - **A group activation answers `200` with an empty body on success** — no
   checklist, no messages, no run id. Six objects activated that way; the
   inactive-objects list read afterwards named none of them.
+- **A single-object activation answers `200` with an empty body, and it
+  activated** (2026-11-09, over RFC, fr0ster/mcp-abap-adt#351): a fresh class
+  in `$TMP` with one method, saved inactive, activated with
+  `preauditRequested=true` and one reference (uri and name); the inactive list
+  read at once and about 10 s later no longer named the class, and its active
+  source carried the method (adt-clients' corpus,
+  `activation-class-basis-740`). `analyseActivation` of adt-strategies 0.22.0
+  reads every empty `200` as activated. Should 7.40 ever answer
+  `activationExecuted="false"` without a message, the activation reads the
+  flat inactive list once and judges by it (not seen on 7.40).
+- **`/sap/bc/adt/activation/runs` is not in the discovery** (2026-11-09, over
+  RFC, the same 34 609-character document as recorded on 2026-10-27,
+  `system-description-basis-740`): `/activation` and
+  `/activation/inactiveobjects` are listed, `/activation/runs` and
+  `/activation/results` are not. So `activateObjects` is the group
+  activation and `activateObjectsGroup` refuses.
 - **No write guard** (2026-11-03, over RFC). A source read answers an `ETag`;
   a source write answers none. A source `PUT` with a stale `If-Match`, and one
   with an arbitrary `If-Match`, each answered `200`, and the write took place:

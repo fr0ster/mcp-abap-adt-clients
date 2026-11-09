@@ -4,6 +4,37 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [0.9.0] - 2026-11-09
+
+On `@mcp-abap-adt/adt-clients` `^45.0.0` (fr0ster/mcp-abap-adt#351).
+
+### Changed — breaking (a 0.x minor)
+
+- **`getUtils().activateObjectsGroup` is refused without a request**
+  (`UNSUPPORTED_OPERATION`), as `getActivationRun` and
+  `getActivationResults` are: 7.40's discovery lists no `/activation/runs`
+  (measured on 7.40 SP04, 2026-11-09). Its message points to
+  `activateObjects`. **Migration:** call `activateObjects(objects,
+  preauditRequested, options)` — the same synchronous
+  `POST /sap/bc/adt/activation` the legacy `activateObjectsGroup` sent,
+  inherited from adt-clients 45 and read through the `objectActivation` slot.
+- **The `@mcp-abap-adt/adt-clients` peer range moves to `^45.0.0`** (was
+  `^44.0.0`; the devDependency too), and `@mcp-abap-adt/interfaces-adt` to
+  `^27.0.0`; the adt-strategies dev range to `^0.22.0`.
+
+### Added
+
+- `getFunctionGroup().activate` takes `options.preauditRequested` and sends
+  it; absent, `true`, today's request. It goes through adt-clients'
+  activation helper: after a `chkl:messages` with `activationExecuted="false"`
+  and no message, it reads the inactive list once and hands it to `analyse`.
+
+### Documentation
+
+- `docs/LEGACY.md` and the README: the group activation member, and the 7.40
+  measurements of 2026-11-09 — an empty `200` that activated a class, and no
+  `/activation/runs` in the discovery.
+
 ## [0.8.0] - 2026-11-09
 
 On `@mcp-abap-adt/adt-clients` `^44.0.0`: legacy 0.8.0 requires adt-clients

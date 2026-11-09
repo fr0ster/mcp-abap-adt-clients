@@ -220,7 +220,7 @@ type system.
 | Member | On 7.40 SP04 |
 |---|---|
 | `create`, `lock`, `unlock`, `check` | sends |
-| `activate` | sends the group alone, one reference — the modern client (adt-clients 38) adds its main program `SAPL<group>` (`FUGR/I`), measured on S/4HANA 2025 and ABAP cloud only |
+| `activate` | sends the group alone, one reference — the modern client (adt-clients 38) adds its main program `SAPL<group>` (`FUGR/I`), measured on S/4HANA 2025 and ABAP cloud only; `preauditRequested` as given (`options.preauditRequested`), absent `true`, as every activation |
 | `validate` | sends `/functions/validation` (`200`) |
 | `readMetadata` | sends (a system group) |
 | `read`, `update` (the group's source, `source/main` — the main program `SAPL<group>`) | sends, inherited from adt-clients: `read` one `GET …/source/main` (`Accept: text/plain`, the version as asked), `update` one `PUT …/source/main?lockHandle=` of your text under your lock; read → write → activate → read back measured in `$TMP` |
@@ -321,8 +321,11 @@ document), `readObjectMetadata` / `readObjectSource` for the served types,
 `getTypeStructure`, and `getObjectOutline` (sent as on the modern client; not
 measured on 7.40). `getStructureElementInfo` and
 `getServiceDefinitionElementInfo` are refused without a request: the 7.40
-discovery lists no element info for either. `readObjectMetadata`, `readObjectSource`,
-`fetchNodeStructure`, `getObjectStructure` and `activateObjectsGroup` take
+discovery lists no element info for either. The group activation is
+`activateObjects` (inherited: synchronous `POST /activation`);
+`activateObjectsGroup` is refused without a request, because 7.40's discovery
+lists no `/activation/runs`. `readObjectMetadata`, `readObjectSource`,
+`fetchNodeStructure`, `getObjectStructure` and `activateObjects` take
 7.40's codes (`ADT_TYPES_BASIS_740`, and `DEVC/K` for the structure reads;
 `VIEW/DV` too for the group activation, `ADT_UTILITY_CODES_BASIS_740`) and
 refuse any other without a request — `BDEF/BDO`, `SRVD/SRV`, `DDLX/EX`,
