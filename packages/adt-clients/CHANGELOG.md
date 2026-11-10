@@ -24,6 +24,28 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [45.1.0] - 2026-11-11
+
+### Added
+
+- **`IAdtError.connectionCause`** (`@mcp-abap-adt/interfaces-adt` 27.1.0) on
+  a connection failure: when a request throws below the ADT conversation —
+  a socket that would not open, a connection the system reset, a name that
+  did not resolve — the failure carries the thrown value's `code` when it is
+  one of `ADT_CONNECTION_CAUSES` (`ECONNREFUSED`, `ECONNRESET`, `ENOTFOUND`,
+  `EAI_AGAIN`, `ETIMEDOUT`, `EHOSTUNREACH`, `ENETUNREACH`). The code is read
+  as an own data property (a getter is never run), compared as it is, and
+  the message is never read; any other code, or none, leaves the field
+  absent. A refusal and SAP's `401` carry none. Every other field of the
+  failure is unchanged, and every member that answers through the default
+  error strategy carries it.
+
+### Changed
+
+- **On `@mcp-abap-adt/interfaces-adt` `^27.1.0`** (was `^27.0.0`), for the
+  field above. Released with `@mcp-abap-adt/adt-strategies` 0.22.1 and
+  `@mcp-abap-adt/adt-clients-legacy` 0.9.1, on the same range.
+
 ## [45.0.0] - 2026-11-09
 
 Released with `@mcp-abap-adt/adt-strategies` 0.22.0 and
