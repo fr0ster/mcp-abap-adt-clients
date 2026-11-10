@@ -148,9 +148,18 @@ export function isUnansweredCredentialRefusal(error: unknown): boolean {
  * system, so `code` is read by {@link ownValue} — a getter is never run — and
  * compared with each listed code as it is. The message is never read: a code
  * is named only by a code.
+ *
+ * An inspection that throws (a Proxy's `getOwnPropertyDescriptor` trap) is no
+ * cause: the classifier never throws on what was thrown at it, and without the
+ * code the failure is the one it was before the cause existed.
  */
 function connectionCauseOf(error: unknown): AdtConnectionCause | undefined {
-  const code = ownValue(error, 'code');
+  let code: unknown;
+  try {
+    code = ownValue(error, 'code');
+  } catch {
+    return undefined;
+  }
   return ADT_CONNECTION_CAUSES.find((listed) => listed === code);
 }
 

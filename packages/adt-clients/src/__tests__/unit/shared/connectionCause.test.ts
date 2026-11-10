@@ -95,6 +95,26 @@ describe('a connection failure names its cause by code', () => {
     expect('connectionCause' in failure).toBe(false);
   });
 
+  it('names no cause, and throws nothing, when inspecting the code throws', async () => {
+    // A Proxy whose descriptor trap throws for `code` alone: `response` and
+    // `refusal` read as before, so the failure is the one it was without the
+    // cause — the classifier never throws on what was thrown at it.
+    const thrown = new Proxy(new Error('x'), {
+      getOwnPropertyDescriptor(target, key) {
+        if (key === 'code') throw new Error('a trap that refuses');
+        return Reflect.getOwnPropertyDescriptor(target, key);
+      },
+    });
+
+    const failure = await failureOf(thrown);
+
+    expect(failure.origin).toBe('connection');
+    expect(failure.message).toBe('x');
+    expect(failure.response).toBeUndefined();
+    expect(failure.request).toBeUndefined();
+    expect('connectionCause' in failure).toBe(false);
+  });
+
   it('reads only an own code, not one the prototype supplies', async () => {
     const thrown = Object.create({ code: 'ECONNREFUSED' });
 
