@@ -4,6 +4,14 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [0.9.1] - 2026-11-11
+
+### Changed
+
+- **On `@mcp-abap-adt/interfaces-adt` `^27.1.0`** (was `^27.0.0`), which it
+  depends on directly, and on `@mcp-abap-adt/adt-clients` `^45.1.0`, so a
+  consumer installs one copy of interfaces-adt. No member changes.
+
 ## [0.9.0] - 2026-11-09
 
 On `@mcp-abap-adt/adt-clients` `^45.0.0` (fr0ster/mcp-abap-adt#351).

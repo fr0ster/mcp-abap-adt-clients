@@ -1003,6 +1003,20 @@ in the other half of the answer.
 any other until your `analyse` says it is a failure: that is the one decision
 this package leaves wholly to you.
 
+**A connection failure names its cause by code.** When the request threw
+below the ADT conversation with one of the network codes
+`ADT_CONNECTION_CAUSES` lists (`@mcp-abap-adt/interfaces-adt`), the failure
+carries it as `connectionCause` — on a connection already made too, when the
+system went away between two requests. Any other code, or none, leaves it
+absent; a refusal carries none. Tell "the system is not reachable" from the
+code, never from `message`:
+
+```typescript
+if (!answer.ok && answer.getError().connectionCause !== undefined) {
+  // no answer came back: ECONNREFUSED, ENOTFOUND, ETIMEDOUT, …
+}
+```
+
 **What throws, and what does not.** The boundary is the cause. A failure caused
 by SAP's answer comes back through the strategies, with the response attached —
 never as an exception, and never rewrapped into one that drops the response.
