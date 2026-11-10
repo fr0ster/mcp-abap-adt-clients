@@ -26,6 +26,7 @@
  */
 
 import type {
+  AdtConnectionCause,
   AdtNoFailure,
   IAdtAnalyseContext,
   IAdtError,
@@ -33,7 +34,10 @@ import type {
   IAnalyse,
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
-import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
+import {
+  ADT_CONNECTION_CAUSES,
+  ADT_NO_FAILURE,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtSAPError } from './adtErrors';
 
@@ -136,6 +140,21 @@ export function isUnansweredCredentialRefusal(error: unknown): boolean {
 }
 
 /**
+ * The network code `error` was thrown with, when it is one of
+ * `ADT_CONNECTION_CAUSES`; any other code, none, or a code that is not an own
+ * data property is `undefined`.
+ *
+ * The thrown value comes from below the ADT conversation, outside the type
+ * system, so `code` is read by {@link ownValue} — a getter is never run — and
+ * compared with each listed code as it is. The message is never read: a code
+ * is named only by a code.
+ */
+function connectionCauseOf(error: unknown): AdtConnectionCause | undefined {
+  const code = ownValue(error, 'code');
+  return ADT_CONNECTION_CAUSES.find((listed) => listed === code);
+}
+
+/**
  * The default error strategy: what this library recognises as a failure.
  *
  * Origin is not decoration — the two have different remedies, and a caller
@@ -179,6 +198,9 @@ export function recogniseFailure(error: unknown): IAdtError {
   // Everything else reached us from below the ADT conversation: a status the
   // transport refused, a socket that would not open, a session that is gone.
   const carried = error as IWithResponse;
+  // The network code, by code alone, so a caller can say "no connection"
+  // without reading the message. Absent unless it is a listed one.
+  const connectionCause = connectionCauseOf(error);
   return {
     origin: 'connection',
     message:
@@ -189,6 +211,7 @@ export function recogniseFailure(error: unknown): IAdtError {
     // most common failure — a status the transport refused — as the one a
     // caller could not locate in a chain of six.
     request: carried?.request,
+    ...(connectionCause === undefined ? {} : { connectionCause }),
   };
 }
 
