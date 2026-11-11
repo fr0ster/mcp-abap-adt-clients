@@ -14,6 +14,17 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.22.2] - 2026-11-11
+
+Released with `@mcp-abap-adt/adt-clients` 45.2.0.
+
+### Changed
+
+- **On `fast-xml-parser` `^5.12.0`** (was `^5.9.3`), past
+  GHSA-474x-hrwr-fgx4 (5.11.2 and earlier), the range adt-clients 45.2.0
+  declares. The parser's changes touch only `captureMetaData` and
+  `stopNodes`, which this package does not use; no reading changes.
+
 ## [0.22.1] - 2026-11-11
 
 ### Changed

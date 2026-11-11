@@ -4,6 +4,18 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [0.9.2] - 2026-11-11
+
+Released with `@mcp-abap-adt/adt-clients` 45.2.0.
+
+### Changed
+
+- **The `fast-xml-parser` devDependency moves to `^5.12.0`** (was `^5.9.3`),
+  past GHSA-474x-hrwr-fgx4 (5.11.2 and earlier), the range adt-clients
+  45.2.0 declares. The published package does not depend on it; no member
+  changes. The `@mcp-abap-adt/adt-clients` range stays `^45.1.0`, which
+  45.2.0 satisfies.
+
 ## [0.9.1] - 2026-11-11
 
 ### Changed

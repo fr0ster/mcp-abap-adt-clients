@@ -38,7 +38,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   document `readMetadata` answered and the fields the caller names, and
   answers that document with exactly those changes — every other byte as SAP
   stored it — or a refusal (`not-a-document`, `not-this-type`,
-  `element-missing`) and no document. It sends no request: an update stays
+  `element-missing`) and no document. `not-a-document` also refuses a read
+  the patch cannot edit safely — more than one root, a DOCTYPE or other
+  markup declaration, a malformed reference, a character that is not an XML
+  Char, `--` in a comment; a leading BOM is kept. It sends no request: an update stays
   `readMetadata`, the patch, `updateMetadata`. An element is found by its path
   from the root, never by the first of its name; the description is written
   on the root, and added there when a fresh object's read carries none; a
@@ -84,7 +87,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   when no transport is configured.
 - **On `fast-xml-parser` `^5.12.0`** (was `^5.9.3`), past GHSA-474x-hrwr-fgx4
   (5.11.2 and earlier); `adt-strategies` and `adt-clients-legacy` declare the
-  same range. Its `XMLValidator` is unchanged; the parser's changes touch only
+  same range (released as 0.22.2 and 0.9.2). Its `XMLValidator` is unchanged; the parser's changes touch only
   `captureMetaData` and `stopNodes`, which the library does not use.
 
 ## [45.1.0] - 2026-11-11

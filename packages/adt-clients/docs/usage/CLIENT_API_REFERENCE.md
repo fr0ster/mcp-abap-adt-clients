@@ -1275,7 +1275,7 @@ A refusal is returned, never thrown: its cause is SAP's document.
 
 | `refusal.kind` | When |
 |---|---|
-| `not-a-document` | The read is empty, blank, not XML or not well-formed — the empty `200` ADT answers for an object that is not ready yet |
+| `not-a-document` | The read is empty, blank, not XML or not well-formed — the empty `200` ADT answers for an object that is not ready yet — or one the patch cannot edit safely: more than one root, or text or CDATA outside it; a DOCTYPE or any other markup declaration anywhere; an `&` that starts neither a predefined entity nor a character reference to an XML Char; a `<` in an attribute value; `]]>` in text; a character that is not an XML Char; a comment holding `--`. A leading BOM is accepted and kept. The check guards the splice; it is not a full XML 1.0 validator |
 | `not-this-type` | The root is another element (`refusal.root`) |
 | `element-missing` | The first field, in the changes type's declaration order, whose element is not in the document (`refusal.field`, `refusal.path`) |
 
