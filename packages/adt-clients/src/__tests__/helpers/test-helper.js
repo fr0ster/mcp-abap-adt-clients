@@ -17,6 +17,7 @@ const {
 } = require('@mcp-abap-adt/adt-strategies');
 // Every expected-success call is judged, the exception document first.
 const { judged } = require('./judged');
+const { failureOf, whatFailureSays } = require('./contract');
 const {
   loadTestConfigFrom,
   overlayPathFromEnv,
@@ -53,10 +54,7 @@ async function writeAndActivate(handler, config, options, logger) {
       analyse: judged(analyseActivation),
     });
     if (activated && activated.ok === false) {
-      const failure = activated.getError();
-      throw new Error(
-        `activate failed [${failure.origin}]: ${failure.message}`,
-      );
+      throw new Error(failureOf(activated, 'activate'));
     }
   }
 }
@@ -70,8 +68,7 @@ async function writeAndActivate(handler, config, options, logger) {
 async function writeSource(handler, config, options, logger) {
   const raise = (answer, what) => {
     if (answer && answer.ok === false) {
-      const failure = answer.getError();
-      throw new Error(`${what} failed [${failure.origin}]: ${failure.message}`);
+      throw new Error(failureOf(answer, what));
     }
     return answer && answer.ok ? answer.getResult().value : undefined;
   };
@@ -128,7 +125,9 @@ async function writeSource(handler, config, options, logger) {
         analyse: analyseException,
       });
       if (released && released.ok === false) {
-        const refusal = `unlock failed, the handle may still be held: ${released.getError().message}`;
+        // SAP's answer, by `failureOf`: the request's query is the lock
+        // handle, which no log line may hold.
+        const refusal = `${failureOf(released, 'unlock')}; the handle may still be held`;
         // A refused unlock is a failure of its own: the handle left held is
         // what makes the next write answer 403. When the write already
         // failed, that failure is the one in flight, so this one is logged
@@ -1438,36 +1437,11 @@ function mustSucceed(answer, what) {
     // thing, and this is not the place to guess what.
     return answer;
   }
-  if (!answer.ok) {
-    const failure = answer.getError();
-    // The status and SAP's own sentence, so a refusal says what it was: the
-    // message alone is the transport's "Request failed with status code …"
-    // whenever no strategy read the body.
-    const status = failure.response?.status;
-    const said = sapMessageOf(failure.response?.data);
-    throw new Error(
-      `${what} failed [${failure.origin}]${status ? ` ${status}` : ''}: ${failure.message}` +
-        (said && !String(failure.message ?? '').includes(said)
-          ? ` — SAP: ${said}`
-          : '') +
-        (failure.request?.url ? ` (${failure.request.url})` : ''),
-    );
-  }
+  // The status and SAP's own sentence, by `failureOf`, so a refusal says what
+  // it was: the message alone is the transport's "Request failed with status
+  // code …" whenever no strategy read the body.
+  if (!answer.ok) throw new Error(failureOf(answer, what));
   return answer.getResult().value;
-}
-
-/**
- * The text of the first `<message …>` (or `<ns:message …>`) element of an ADT
- * exception document, or ''.
- */
-function sapMessageOf(data) {
-  const text = typeof data === 'string' ? data : '';
-  const open = text.search(/<(\w+:)?message[\s>]/);
-  if (open < 0) return '';
-  const start = text.indexOf('>', open);
-  const end = text.indexOf('</', start);
-  if (start < 0 || end < 0) return '';
-  return text.slice(start + 1, end).trim();
 }
 
 /**
@@ -1508,7 +1482,7 @@ async function ensureSharedPackage(client, logger) {
   const failure = answer.getError();
   if (!answerSaysAbsent(failure)) {
     throw new Error(
-      `Could not determine whether shared package ${packageName} exists: ${failure.message}. ` +
+      `Could not determine whether shared package ${packageName} exists: ${whatFailureSays(failure)}. ` +
         'Refusing to assume it is missing.',
     );
   }
@@ -1571,10 +1545,7 @@ async function readDocumentForUpdate(read, what, logger) {
   let last = '';
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     const answer = await read();
-    if (!answer.ok) {
-      const failure = answer.getError();
-      throw new Error(`${what} failed [${failure.origin}]: ${failure.message}`);
-    }
+    if (!answer.ok) throw new Error(failureOf(answer, what));
     last = String(answer.getResult().value ?? '');
     if (last.trim() !== '') return last;
     logger?.debug?.(`${what} came back empty (attempt ${attempt}), retrying`);
@@ -1770,7 +1741,7 @@ async function sharedSourceIsCurrent(client, type, name, depConfig) {
     const failure = answer.getError();
     if (answerSaysAbsent(failure)) return false;
     throw new Error(
-      `Could not read the active source of shared ${type} ${name}: ${failure.message}`,
+      `Could not read the active source of shared ${type} ${name}: ${whatFailureSays(failure)}`,
     );
   }
   return sameSource(answer.getResult().value, depConfig.source);
@@ -1955,7 +1926,7 @@ async function activateSharedFunctionGroup(
   );
   if (!answer.ok) {
     throw new Error(
-      `Shared function group ${name} could not be activated: ${answer.getError().message}`,
+      `Shared function group ${name} could not be activated: ${whatFailureSays(answer.getError())}`,
     );
   }
 
@@ -1980,7 +1951,7 @@ async function activateSharedFunctionGroup(
   if (!listed.ok) {
     throw new Error(
       `Shared function group ${name} was activated, but the inactive list ` +
-        `could not be read to confirm it: ${listed.getError().message}`,
+        `could not be read to confirm it: ${whatFailureSays(listed.getError())}`,
     );
   }
 
@@ -2174,7 +2145,7 @@ async function ensureSharedDependency(client, type, name, logger) {
       // sentence a cloud system answers in place of a 404.
       if (!answerSaysAbsent(failure)) {
         throw new Error(
-          `Could not determine whether shared ${type} ${name} exists: ${failure.message}. ` +
+          `Could not determine whether shared ${type} ${name} exists: ${whatFailureSays(failure)}. ` +
             'Refusing to assume it is missing — the create that would follow ' +
             'either fails on an object that exists or writes over one that does.',
         );

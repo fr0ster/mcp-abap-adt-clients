@@ -54,7 +54,7 @@ import { LogLevel } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtClient } from '../../clients/AdtClient';
 import { integrationHeadersOf } from './adtHeaders';
 import { configuredCase, missingCaseMessage } from './caseGate';
-import { expectResult } from './contract';
+import { expectResult, failureOf } from './contract';
 import { judged } from './judged';
 import {
   expectLockReleased,
@@ -446,23 +446,9 @@ export class BaseTester<TConfig, TState = unknown> {
       headers: integrationHeadersOf(this.adtObject, 'delete'),
       analyse: judged(analyseDeletion),
     });
-    if (!answer.ok) {
-      const failure = answer.getError();
-      // The headline names the object; SAP's reason is in `messages`, and a
-      // red cleanup without it cannot be told apart from a misreading.
-      const said = (failure.messages ?? [])
-        .map(
-          (m) =>
-            `${m.type} ${m.text}` +
-            (m.t100 ? ` [${m.t100.id}/${m.t100.no}]` : ''),
-        )
-        .join('; ');
-      throw new Error(
-        `[${failure.origin}] ${failure.message}` +
-          (failure.request?.url ? ` (${failure.request.url})` : '') +
-          (said ? ` — SAP: ${said}` : ''),
-      );
-    }
+    // SAP's reason, by `failureOf`: a red cleanup without it cannot be told
+    // apart from a misreading, and the request's query never reaches the log.
+    if (!answer.ok) throw new Error(failureOf(answer, 'delete'));
   }
 
   /**
@@ -658,7 +644,9 @@ export class BaseTester<TConfig, TState = unknown> {
     this.objectLocked = false;
     this.lockHandle = undefined;
     if (released.ok) return true;
-    const refusal = `unlock after update failed, the handle may still be held: ${released.getError().message}`;
+    // SAP's answer, by `failureOf`: the request's query is the lock handle,
+    // which no log line may hold.
+    const refusal = `${failureOf(released, 'unlock after update')}; the handle may still be held`;
     if (!writeFailed) throw new Error(refusal);
     this.log(LogLevel.WARN, refusal);
     return false;

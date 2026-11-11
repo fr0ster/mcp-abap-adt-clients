@@ -27,6 +27,8 @@ jest.mock('../../helpers/adtHeaders', () => ({
   }),
 }));
 
+import type { IAdtFailure } from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { BaseTester } from '../../helpers/BaseTester';
 
 type Answer = { ok: boolean };
@@ -60,12 +62,13 @@ function fakeHandler(overrides: Record<string, jest.Mock> = {}) {
   };
 }
 
-function testerOver(handler: ReturnType<typeof fakeHandler>) {
+function testerOver(handler: ReturnType<typeof fakeHandler>, logger?: ILogger) {
   const tester = new BaseTester<{ thingName: string }>(
     handler as never,
     'Thing',
     'create_thing',
     'adt_thing',
+    logger,
   );
   tester.setup({
     connection: {} as never,
@@ -167,21 +170,35 @@ describe('a failing step logs its error text', () => {
     '<localizedMessage lang="EN">Interface ZTHING could not be saved</localizedMessage>' +
     '<properties><entry key="T100KEY-ID">SEO_X</entry>' +
     '<entry key="T100KEY-NO">042</entry></properties></exc:exception>';
-  const failedOnTheWire = (data: unknown): Answer =>
-    ({
-      ok: false,
-      getError: () => ({
-        origin: 'connection',
-        message: 'Request failed with status code 500',
-        response: { status: 500, data },
-        request: {
-          method: 'PUT',
-          url: '/sap/bc/adt/oo/interfaces/zthing/source/main?lockHandle=SECRET01&corrNr=X',
-        },
-      }),
-    }) as Answer;
+  const SOURCE_URL =
+    '/sap/bc/adt/oo/interfaces/zthing/source/main?lockHandle=SECRET01&corrNr=X';
+  const UNLOCK_URL =
+    '/sap/bc/adt/oo/interfaces/zthing?_action=UNLOCK&lockHandle=SECRET01';
+  const failedOnTheWire = (
+    data: unknown,
+    request: { method: string; url: string } = {
+      method: 'PUT',
+      url: SOURCE_URL,
+    },
+  ): IAdtFailure => ({
+    ok: false,
+    getError: () => ({
+      origin: 'connection',
+      message: 'Request failed with status code 500',
+      response: {
+        status: 500,
+        statusText: 'Internal Server Error',
+        headers: {},
+        data,
+      },
+      request,
+    }),
+  });
 
-  async function runAndCapture(update: jest.Mock): Promise<{
+  async function runAndCapture(
+    overrides: Record<string, jest.Mock>,
+    logger?: ILogger,
+  ): Promise<{
     thrown: string;
     logged: string;
   }> {
@@ -194,7 +211,7 @@ describe('a failing step logs its error text', () => {
       });
     let thrown = '';
     try {
-      await testerOver(fakeHandler({ update })).flowTest(
+      await testerOver(fakeHandler(overrides), logger).flowTest(
         config,
         {},
         { updateConfig },
@@ -207,19 +224,23 @@ describe('a failing step logs its error text', () => {
     return { thrown, logged: lines.join('') };
   }
 
+  const SAP_ANSWER = [
+    'Request failed with status code 500',
+    'HTTP 500',
+    'SEO_X/042',
+    'Interface ZTHING could not be saved',
+  ];
+
   it("logs SAP's status, message key and short text with the step", async () => {
-    const { thrown, logged } = await runAndCapture(
-      jest.fn(async () => failedOnTheWire(EXCEPTION)),
-    );
+    const { thrown, logged } = await runAndCapture({
+      update: jest.fn(async () => failedOnTheWire(EXCEPTION)),
+    });
     const step = logged
       .split('\n')
       .find((line) => line.includes('✗ update FAILED'));
     expect(step).toBeDefined();
     for (const part of [
-      'Request failed with status code 500',
-      'HTTP 500',
-      'SEO_X/042',
-      'Interface ZTHING could not be saved',
+      ...SAP_ANSWER,
       '/sap/bc/adt/oo/interfaces/zthing/source/main',
     ]) {
       expect(step).toContain(part);
@@ -228,17 +249,82 @@ describe('a failing step logs its error text', () => {
   });
 
   it('never logs the request query, where the lock handle travels', async () => {
-    const { thrown, logged } = await runAndCapture(
-      jest.fn(async () => failedOnTheWire(EXCEPTION)),
-    );
+    const { thrown, logged } = await runAndCapture({
+      update: jest.fn(async () => failedOnTheWire(EXCEPTION)),
+    });
     expect(logged).not.toContain('SECRET01');
     expect(thrown).not.toContain('SECRET01');
   });
 
-  it('names a body that is not an ADT document by its length only', async () => {
+  it("fails a refused unlock with SAP's answer, never its lock handle", async () => {
+    const { thrown, logged } = await runAndCapture({
+      unlock: jest.fn(async () =>
+        failedOnTheWire(EXCEPTION, { method: 'POST', url: UNLOCK_URL }),
+      ),
+    });
+    const step = logged.split('\n').find((line) => line.includes('FAILED'));
+    expect(step).toBeDefined();
+    expect(thrown).toContain('unlock after update failed');
+    for (const part of [...SAP_ANSWER, '/sap/bc/adt/oo/interfaces/zthing']) {
+      expect(step).toContain(part);
+      expect(thrown).toContain(part);
+    }
+    expect(logged).not.toContain('SECRET01');
+    expect(thrown).not.toContain('SECRET01');
+    expect(thrown).not.toContain('_action=UNLOCK');
+  });
+
+  it("logs a refused unlock beside a failed update with SAP's answer, never its lock handle", async () => {
+    const warned: string[] = [];
+    const logger: ILogger = {
+      info: () => {},
+      debug: () => {},
+      error: () => {},
+      warn: (message: string) => {
+        warned.push(message);
+      },
+    };
     const { thrown } = await runAndCapture(
-      jest.fn(async () => failedOnTheWire('<html>gateway down</html>')),
+      {
+        update: jest.fn(async () => refused('the write was refused')),
+        unlock: jest.fn(async () =>
+          failedOnTheWire(EXCEPTION, { method: 'POST', url: UNLOCK_URL }),
+        ),
+      },
+      logger,
     );
+    expect(thrown).toContain('update failed [refusal]: the write was refused');
+    const line = warned.find((message) =>
+      message.includes('unlock after update failed'),
+    );
+    expect(line).toBeDefined();
+    for (const part of [...SAP_ANSWER, '/sap/bc/adt/oo/interfaces/zthing']) {
+      expect(line).toContain(part);
+    }
+    expect(warned.join('\n')).not.toContain('SECRET01');
+    expect(line).not.toContain('_action=UNLOCK');
+  });
+
+  it("fails a refused cleanup delete with SAP's answer, never the request query", async () => {
+    const { thrown } = await runAndCapture({
+      delete: jest.fn(async () =>
+        failedOnTheWire(EXCEPTION, {
+          method: 'DELETE',
+          url: '/sap/bc/adt/oo/interfaces/zthing?lockHandle=SECRET01',
+        }),
+      ),
+    });
+    expect(thrown).toContain('cleanup failed');
+    for (const part of [...SAP_ANSWER, '/sap/bc/adt/oo/interfaces/zthing']) {
+      expect(thrown).toContain(part);
+    }
+    expect(thrown).not.toContain('SECRET01');
+  });
+
+  it('names a body that is not an ADT document by its length only', async () => {
+    const { thrown } = await runAndCapture({
+      update: jest.fn(async () => failedOnTheWire('<html>gateway down</html>')),
+    });
     expect(thrown).toContain('HTTP 500');
     expect(thrown).toContain('25 characters, not an ADT document');
     expect(thrown).not.toContain('gateway down');

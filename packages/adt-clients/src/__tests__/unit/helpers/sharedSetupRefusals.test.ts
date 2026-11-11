@@ -193,7 +193,7 @@ describe('ensureSharedPackage', () => {
       getUtils: { search: jest.fn(async () => ok('ZAC_SHR_PKG')) },
     });
     await expect(ensureSharedPackage(client, logger)).rejects.toThrow(
-      /shared package create .* failed .*409.*already exist/,
+      /shared package create .* failed .*already exist.*HTTP 409/,
     );
     expect(calls).toEqual(['getPackage.readMetadata', 'getPackage.create']);
   });

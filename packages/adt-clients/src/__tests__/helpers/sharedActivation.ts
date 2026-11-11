@@ -22,7 +22,7 @@ import { AdtUtils } from '../../core/shared/AdtUtils';
 import { utilDocuments } from '../../core/shared/utilResultSet';
 import { wireItself } from '../../utils/resultStrategy';
 import { integrationHeadersOf } from './adtHeaders';
-import { expectResult } from './contract';
+import { expectResult, failureOf } from './contract';
 import { judged } from './judged';
 import {
   attributeOf,
@@ -56,9 +56,7 @@ export async function activateSharedGroup(
     headers: integrationHeadersOf(utils, 'activateObjectsGroup'),
   });
   if (!started.ok) {
-    throw new Error(
-      `group activation of ${what}: ${started.getError().message}`,
-    );
+    throw new Error(failureOf(started, `group activation of ${what}`));
   }
   const wire = started.getResult().value;
   const runId = /runs\/([^/?]+)/.exec(

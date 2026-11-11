@@ -68,10 +68,19 @@ export function saysAbsent(failure: IAdtError): boolean {
 export function failureOf(answer: IAdtResponse<unknown>, what: string): string {
   if (answer.ok) return '';
   const failure = answer.getError();
+  return `${what} failed [${failure.origin}]: ${whatFailureSays(failure)}`;
+}
+
+/**
+ * What a failure says, for a caller that names the step in its own words:
+ * the library's sentence, SAP's status, each message's T100 key and short text,
+ * and the request's path — never its query, which carries the lock handle.
+ */
+export function whatFailureSays(failure: IAdtError): string {
   const status = failure.response?.status;
   const said = sapSaid(failure.response?.data);
   return (
-    `${what} failed [${failure.origin}]: ${failure.message}` +
+    failure.message +
     (status === undefined ? '' : `; HTTP ${status}`) +
     (said ? `; SAP: ${said}` : '') +
     (failure.request?.url ? ` (${pathOf(failure.request.url)})` : '')
