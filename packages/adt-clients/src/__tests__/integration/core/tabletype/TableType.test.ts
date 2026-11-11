@@ -243,6 +243,26 @@ describe('TableType (using AdtClient)', () => {
               description,
             );
 
+            // The access and the primary key other than a fresh table type's
+            // standard / standard / nonUnique, which the flow writes too: a
+            // sorted table with a unique key of the whole row.
+            await tableType.write(
+              patchedDocument(
+                patchTableTypeDocument(stored, {
+                  accessType: 'sorted',
+                  keyDefinition: 'rowType',
+                  keyKind: 'unique',
+                }),
+                'table type sorted unique',
+              ),
+            );
+            const sorted = await tableType.read();
+            expect([
+              contentAt(sorted, ['ttyp:accessType']),
+              contentAt(sorted, ['ttyp:primaryKey', 'ttyp:definition']),
+              contentAt(sorted, ['ttyp:primaryKey', 'ttyp:kind']),
+            ]).toEqual(['sorted', 'rowType', 'unique']);
+
             // A built-in row type, one write each, through the shipped patch:
             // the row type's kind and name, and the built-in type's data
             // type, length and decimals. Each is read back as SAP stored it
