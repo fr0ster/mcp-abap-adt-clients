@@ -27,8 +27,8 @@ step, test first.
 - Long runs start with `~/.claude/scripts/start-detached` and are waited on with
   `~/.claude/scripts/wait-pid`. Never `pgrep -f`.
 - **Every live step writes to SAP.** Before each one, tell the controller it is ready for
-  its live run and wait for the go. E19 runs as the test user, with the overlay's transport.
-  Trial runs in `ZADT_BLD_PKG03`.
+  its live run and wait for the go. Onprem runs as the test user, with the overlay's transport.
+  Cloud runs in `ZADT_BLD_PKG03`.
 
 **Owner publish point**, marked ⛳: adt-clients 45.2.0. The release follows the usual
 sequence: final review approves, CI is green, merge, tag `adt-clients-v45.2.0`, publish
@@ -57,7 +57,7 @@ This comes before any patch code.
 - **Control.** For each, the same change through the element as SAP answers it (all
   attributes, new values). A refusal of the name-only form then shows whether the form or
   the change itself is refused.
-- **Systems.** Trial and E19. Clean up the probe objects at the end, each answer read
+- **Systems.** Cloud and onprem. Clean up the probe objects at the end, each answer read
   (no `catch {}`).
 - **Record.** Every answer whole: status, `T100KEY`, and what the read-back holds for
   `uri` / `type` / `name`.
@@ -95,7 +95,7 @@ This comes before any patch code.
 
 ### A3. Fixtures into the corpus
 
-- Record the measured reads of the six types, from trial (`abap-cloud`) and E19
+- Record the measured reads of the six types, from cloud (`abap-cloud`) and onprem
   (`s4-2025`), into `corpus/adt/documents/<release>/`. Each gets its JSON sidecar as
   `corpus/README.md` describes, and is scrubbed to the placeholders.
   - Domain: the shared domain, `WAERS` (value table), `ABAP_BOOLEAN` (fixed values).
@@ -194,11 +194,12 @@ Every type follows the same step.
   helper. Delete `src/utils/xmlPatch.ts` and `unit/utils/xmlPatchFailsLoudly.test.ts` and
   see `npm run test:check` fail in `TableType.test.ts`, `Package.test.ts` and
   `domain/IfMatch.test.ts`.
-- **Change.** Each test patches through the shipped function of its type.
+- **Change.** Each test patches through the shipped function of its type. The `describe`
+  command of `scripts/transport-admin.ts`, the helper's other user, is deleted with it.
 - **Extend the six types' integration flows** for the live assertions of spec §5:
   - every field the system takes;
   - the fresh object's description;
-  - a description over the limit, read back;
+  - a description of exactly the limit, read back whole, and one over it, answered as measured;
   - `fixedValues` with and without `high`, and `[]`;
   - `valueTable` empty → A → B;
   - `superPackage` change.
@@ -221,7 +222,7 @@ Every type follows the same step.
 - **Change:**
   - the key goes into `helpers/overlays/onprem.yaml` (`true`), `cloud.yaml` (`false`), the
     template, `scripts/check-config-drift.js`, `docs/development/TEST_CONFIG_SCHEMA.md`
-    and the local overlays (trial `false`, E19 as measured there);
+    and the local overlays (cloud `false`, onprem as measured there);
   - the reader of the key, required and boolean, like `helpers/lockReleased.ts`;
   - the list case: registered `it.skip` with the reason in its title when `false`; run
     when `true`, where an empty list fails.
@@ -233,21 +234,22 @@ Every type follows the same step.
 
 - **Change.** The transport request case is registered `it.skip`, with the reason in its
   title, when `environment.default_transport` is empty; otherwise it runs as today.
-- **Red first:** the trial overlay registers the case as running, and it throws.
-- **Mutation:** gate removed, and the trial run fails again.
+- **Red first:** the cloud overlay registers the case as running, and it throws.
+- **Mutation:** gate removed, and the cloud run fails again.
 
-### A15. Live runs, per type, trial and E19
+### A15. Live runs, per type, cloud and onprem
 
 Each run needs the controller's go.
 
-- Run the six types' integration suites and A12–A14's files on trial, then on E19, one
+- Run the six types' integration suites and A12–A14's files on cloud, then on onprem, one
   directory at a time (`test:detached -- integration/core/<type>`).
 - Every failure is fixed before going on. "Pre-existing" is no excuse.
 - From the run, record into the corpus (A3's rules) each type's fresh read-back without a
   root description, and add a unit case for it to its type's patch test.
-- What SAP stores for the over-long description: if it truncates, the spec's "owner's
-  statement" becomes Measured, with the date. If SAP refuses or stores it whole, stop and
-  report to the controller.
+- The over-long description: the patch passes it as given and SAP's answer reaches the
+  caller as it is. Measure what each type answers on each system and record it in spec §2
+  as Measured; each type's live test writes a description of exactly the limit and then one
+  over it, and expects what each system measured.
 - Then the whole integration suite once on each system. Its summary goes into the PR
   description.
 
@@ -316,7 +318,7 @@ This is the server's own PR, in its own worktree. It starts only once
 - **B4. IncludeHighHandlers.test.** It moves to a root-scoped description helper in plain
   string code, like adt-clients' `helpers/rootDescription.ts`. That removes the last user
   of `xmlPatch.ts`.
-- **B5. Live.** Run the six types' high and low handler suites on trial and E19, each run
+- **B5. Live.** Run the six types' high and low handler suites on cloud and onprem, each run
   with the controller's go.
 - **B6. Docs and CHANGELOG** of the server, as its repository's rules say. Then its review,
   release and the owner's publish, in that repository's sequence.

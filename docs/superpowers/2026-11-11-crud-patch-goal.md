@@ -11,8 +11,8 @@ reading the metadata, patching it with the library and writing it with the libra
 it no longer patches XML itself: mcp-abap-adt calls the library and keeps no patcher of its
 own. A description is set on the object's own root element, on every system — also where
 SAP's read-back carries no description there and a nested reference (`adtcore:packageRef`)
-carries another object's. The library's integration suite passes on ABAP Cloud (trial) and
-on premise (E19): the table type update is accepted, and the master-language, transport-list
+carries another object's. The library's integration suite passes on ABAP Cloud (cloud) and
+on premise (onprem): the table type update is accepted, and the master-language, transport-list
 and transport-deletion-check cases either pass or skip stating why.
 
 ## Invariants
@@ -38,9 +38,9 @@ and transport-deletion-check cases either pass or skip stating why.
 - **No timeouts, retries or polling** added by the library. A failed request is its own
   answer.
 - **Proved live, per type, on both kinds of system.** Each of the six types' update is run
-  against ABAP Cloud (trial) and on premise (E19) and its result read back. Unit tests show
+  against ABAP Cloud (cloud) and on premise (onprem) and its result read back. Unit tests show
   each rule is load-bearing: break the rule deliberately and a test goes red.
-- **The other trial failures are closed.** A failure the library or its tests cause is fixed.
+- **The other cloud failures are closed.** A failure the library or its tests cause is fixed.
   Where it is an environment condition — no saved transport search configuration on a fresh
   account, no transport request on cloud — the test skips and states that reason; it never
   passes green having run nothing, and never fails for the environment.

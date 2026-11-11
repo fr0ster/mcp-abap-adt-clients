@@ -67,7 +67,7 @@ of the start tag). The same attribute name on any other element is never touched
 element-text field replaces the element's content, and `<x/>` becomes `<x>v</x>`. An empty
 string is written as `<x/>`, the form SAP answers for an empty value (Measured:
 `<doma:conversionExit/>`, `<dtel:searchHelp/>`). The prefixes are the ones SAP answers, and
-they are identical on trial and E19 (Measured, 2026-11-11, reads of `ZAC_SHR_GA_DOM`,
+they are identical on cloud and onprem (Measured, 2026-11-11, reads of `ZAC_SHR_GA_DOM`,
 `ZAC_SHR_AUTH_DTEL`, `ZADT_BLD_PKG03`, a Z table type, a Z function group, a Z message
 class, `XFELD`, `WAERS`, `ABAP_BOOLEAN`, `BUKRS` on both systems). An element is matched by
 its qualified name as SAP writes it. A document that uses other prefixes is refused
@@ -186,20 +186,31 @@ control in the full form SAP answers was accepted the same way.
 
 ### The description is passed as given
 
-No truncation and no refusal for length (owner's statement: SAP truncates a long
-description itself, at 60, and at 40 for a function group, whose document says
-`adtcore:descriptionTextLimit="40"`, Measured). The live tests write a description longer
-than the limit and read back what SAP stored. Until that run, this is the owner's statement
-to be confirmed.
+No truncation and no check of its length: the patch writes the description as given, and
+SAP's answer reaches the caller as it is. What SAP answers for a description ten characters
+over the limit depends on the type, and is the same on cloud and on onprem (**Measured**,
+2026-11-11, each type's live suite on both systems):
+
+| Type | Limit | SAP's answer |
+|---|---|---|
+| Domain, data element, table type, package | 60 | `400 ExceptionInvalidData`, T100 `SWB_TOOL` `018` "The description is too long. Maximum length: 60 characters" (value `60`), subtype `src_prop_decr_too_long`; nothing stored |
+| Function group | 40 (`adtcore:descriptionTextLimit="40"`) | `400`, T100 `FUNC_ADT` `103` "Description of <group> longer than 40 characters." (values: the group, `40`); nothing stored |
+| Message class | 60 | accepted (`200`); SAP stores the first 60 characters |
+
+The live tests write a description of exactly the limit and read it back whole, then one ten
+characters over it, and assert each type's answer: the refusal and the stored description
+unchanged, or, for the message class, the first 60 characters stored.
 
 ### A root without a description
 
-ADT's read-back of a freshly created, not yet activated object carries no
-`adtcore:description` on the root. The package reference carries the package's (Measured on
-trial: table type, `tabletype-wire.txt`; domain, the server's 79f62d7c; on premise: data
-element, #211). Active objects carry it on both systems (Measured). For function group,
-package and message class the fresh shape is not yet seen (Inference: same rule). The
-patch adds the attribute either way.
+ADT's read-back of a freshly created, not yet activated domain, data element and table type
+carries no `adtcore:description` on the root, and the package reference carries the
+package's (**Measured**, 2026-11-11, recorded from the live suites on cloud and on onprem:
+`corpus/adt/documents/<release>/read-<type>-fresh--01-read-metadata`). A package's and a
+message class's first read after the create carries it on the root, on both systems
+(Measured, same runs; both are active at once). The function group's flow reads no metadata
+document before its update, so its fresh shape is not seen (Inference: same rule as the
+domain's). The patch adds the attribute when it is missing, either way.
 
 ## 3. How the XML is handled — no regular expression
 
@@ -263,7 +274,7 @@ A source scan (`noRegexInDocumentPatches.test.ts`, with the TypeScript parser li
 `noHardcodedObjectAddresses.test.ts`) refuses a regex literal or a `RegExp` call in
 `src/core/*/patch.ts` and `src/utils/documentEdit.ts`.
 
-### Live (integration; trial and E19, per type)
+### Live (integration; cloud and onprem, per type)
 
 For each of the six types, the type's integration flow patches through the shipped
 function (`updateTakesDocument` → `patch…Document`). It then reads back and asserts each
@@ -271,19 +282,22 @@ changed field's stored value and the root's description:
 
 - every field of §2 that the system takes, set once in the update step;
 - the description on a fresh object (create → read-back without root description → patch
-  → write accepted): the table type's trial failure, now passing;
-- a description longer than the limit: what SAP stores is read back and asserted as
-  truncated (the owner's statement, confirmed or reported back);
+  → write accepted): the table type's cloud failure, now passing;
+- a description of exactly the limit, stored whole; one ten characters over it, answered
+  as §2 measured for the type (refused and the stored description unchanged, or, for the
+  message class, its first 60 characters stored);
 - `fixedValues` with `high`, without it and with `[]`; `valueTable` set on
   `<doma:valueTableRef/>` and changed from one table to another; `superPackage` changed —
   each read back with SAP's own `uri` / `type` for the new target (the first measurement
   above, now as a regression test).
 
-### The other trial failures
+### The other cloud failures
 
 - **TableType.test, Package.test, domain/IfMatch.test** patch through the shipped functions.
-  `src/utils/xmlPatch.ts` (regex, first match, used only by tests, Code) and
-  `unit/utils/xmlPatchFailsLoudly.test.ts` are deleted. `helpers/rootDescription.ts` stays:
+  `src/utils/xmlPatch.ts` (regex, first match, used by these tests and by the `describe`
+  command of `scripts/transport-admin.ts`, Code) and `unit/utils/xmlPatchFailsLoudly.test.ts`
+  are deleted, and the `describe` command with them: no first-match patcher is left in the
+  repository. `helpers/rootDescription.ts` stays:
   BaseTester and ScalarFunction use it for types outside this change.
 - **MasterLanguage.test** follows the library, in two cases. Without a configured language
   the create body carries no `adtcore:masterLanguage` and no `adtcore:language`, and the
@@ -292,10 +306,10 @@ changed field's stored value and the root's description:
   Cause (Code): `createLanguage` answers `undefined` for `""`, and `languageAttributes`
   writes nothing, by design since 2026-11-04. The test still expected `EN`.
 - **deletionCheck.test, transport request:** registered `it.skip` when
-  `environment.default_transport` is empty, the title stating so (it is `""` on trial,
+  `environment.default_transport` is empty, the title stating so (it is `""` on cloud,
   Code: overlay).
 - **Transport.test, list through a saved search:** a new required overlay key,
-  `environment.transport_search_configured` (boolean; `false` on trial), states whether the
+  `environment.transport_search_configured` (boolean; `false` on cloud), states whether the
   account holds a saved transport search configuration, as `environment.verify_lock_released`
   states its fact. `false` registers the case `it.skip`, its title stating that the account
   has no saved search configuration; `true` runs it and an empty list fails. The key goes
