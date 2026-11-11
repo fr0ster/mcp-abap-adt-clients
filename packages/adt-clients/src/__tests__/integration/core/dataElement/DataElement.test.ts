@@ -76,7 +76,20 @@ const {
   createDependencyDomain,
   extractValidationErrorMessage,
   getEnvironmentConfig,
+  ensureSharedDependency,
+  getSharedDependenciesConfig,
 } = require('../../../helpers/test-helper');
+
+/** The first shared domain: the one a data element is typed by. */
+function sharedDomain(): { name: string; datatype: string; length: number } {
+  const domains: Array<{ name: string; datatype: string; length: number }> =
+    getSharedDependenciesConfig()?.domains ?? [];
+  const [first] = domains;
+  if (!first) {
+    throw new Error('shared_dependencies.domains needs a domain');
+  }
+  return first;
+}
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -548,6 +561,81 @@ describe('DataElement (using AdtClient)', () => {
                   ),
                 ).toEqual(Object.values(step.changes));
               }
+
+              // A packed number with decimals: a fresh element holds 000000.
+              await element.write(
+                patchedDocument(
+                  patchDataElementDocument(stored, {
+                    dataType: 'DEC',
+                    length: 15,
+                    decimals: 2,
+                  }),
+                  'data element DEC 15,2',
+                ),
+              );
+              let written = await element.read();
+              expect([
+                contentAt(written, ['dtel:dataElement', 'dtel:dataType']),
+                contentAt(written, ['dtel:dataElement', 'dtel:dataTypeLength']),
+                contentAt(written, [
+                  'dtel:dataElement',
+                  'dtel:dataTypeDecimals',
+                ]),
+              ]).toEqual(['DEC', '000015', '000002']);
+
+              // Short and medium label lengths other than the flow's 10 and
+              // 20, still holding the case's labels.
+              await element.write(
+                patchedDocument(
+                  patchDataElementDocument(stored, {
+                    shortLength: 5,
+                    mediumLength: 15,
+                  }),
+                  'data element label lengths',
+                ),
+              );
+              written = await element.read();
+              expect([
+                contentAt(written, [
+                  'dtel:dataElement',
+                  'dtel:shortFieldLength',
+                ]),
+                contentAt(written, [
+                  'dtel:dataElement',
+                  'dtel:mediumFieldLength',
+                ]),
+              ]).toEqual(['05', '15']);
+
+              // Typed by a domain: the shared one, present on every system.
+              // SAP stores the domain's own type beside its name (measured).
+              const domain = sharedDomain();
+              await ensureSharedDependency(
+                client,
+                'domains',
+                domain.name,
+                testsLogger,
+              );
+              await element.write(
+                patchedDocument(
+                  patchDataElementDocument(stored, {
+                    typeKind: 'domain',
+                    typeName: domain.name,
+                  }),
+                  'data element typed by a domain',
+                ),
+              );
+              written = await element.read();
+              expect([
+                contentAt(written, ['dtel:dataElement', 'dtel:typeKind']),
+                contentAt(written, ['dtel:dataElement', 'dtel:typeName']),
+                contentAt(written, ['dtel:dataElement', 'dtel:dataType']),
+                contentAt(written, ['dtel:dataElement', 'dtel:dataTypeLength']),
+              ]).toEqual([
+                'domain',
+                domain.name,
+                domain.datatype,
+                String(domain.length).padStart(6, '0'),
+              ]);
             },
             updateConfig: {
               dataElementName: config.dataElementName,
