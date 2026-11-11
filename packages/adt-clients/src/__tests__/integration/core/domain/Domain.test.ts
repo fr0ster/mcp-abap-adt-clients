@@ -16,12 +16,19 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { IDomainConfig } from '../../../../core/domain';
+import {
+  type IDomainChanges,
+  type IDomainConfig,
+  patchDomainDocument,
+} from '../../../../core/domain';
 import { getDomain } from '../../../../core/domain/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { BaseTester } from '../../../helpers/BaseTester';
+import { BaseTester, type IUpdatedObject } from '../../../helpers/BaseTester';
 import { gate, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
+import { contentAt, documentAt } from '../../../helpers/documentAt';
+import { patchedDocument } from '../../../helpers/patchedDocument';
+import { readRootDescription } from '../../../helpers/rootDescription';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -41,11 +48,69 @@ import {
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
 
+const TYPE = ['doma:content', 'doma:typeInformation'];
+const OUTPUT = ['doma:content', 'doma:outputInformation'];
+const VALUE = ['doma:content', 'doma:valueInformation'];
+
+/** Each fixed value as [position, low, high, text], in order. */
+function fixedValuesOf(document: string): string[][] {
+  const block = contentAt(document, [...VALUE, 'doma:fixValues']);
+  return block
+    .split('<doma:fixValue>')
+    .slice(1)
+    .map((rest) => {
+      const entry = `<doma:fixValue>${rest}`;
+      return ['doma:position', 'doma:low', 'doma:high', 'doma:text'].map(
+        (name) => contentAt(entry, [name]),
+      );
+    });
+}
+
+/** The value table reference's attributes as SAP stored them. */
+function valueTableOf(document: string): Readonly<Record<string, string>> {
+  return (
+    documentAt(document, [...VALUE, 'doma:valueTableRef'])?.attributes ?? {}
+  );
+}
+
+/** What SAP writes for a value table it resolved by name (measured). */
+function referenceTo(table: string): Record<string, string> {
+  return {
+    'adtcore:uri': `/sap/bc/adt/ddic/tables/${table.toLowerCase()}`,
+    'adtcore:type': 'TABL/DT',
+    'adtcore:name': table,
+  };
+}
+
+/** The first two shared tables: the value tables the test names. */
+function sharedTables(): [string, string] {
+  const tables: Array<{ name: string }> =
+    getSharedDependenciesConfig()?.tables ?? [];
+  const [first, second] = tables;
+  if (!first || !second) {
+    throw new Error('shared_dependencies.tables needs two tables');
+  }
+  return [first.name, second.name];
+}
+
+/** Patch what was read, write it, and read what SAP stored. */
+async function writeAndRead(
+  domain: IUpdatedObject,
+  read: string,
+  changes: IDomainChanges,
+): Promise<string> {
+  await domain.write(
+    patchedDocument(patchDomainDocument(read, changes), 'domain patch'),
+  );
+  return domain.read();
+}
+
 const {
+  ensureSharedDependency,
+  getSharedDependenciesConfig,
   resolvePackageName,
   resolveTransportRequest,
   getTimeout,
-  domainDocumentFor,
 } = require('../../../helpers/test-helper');
 
 const envPath =
@@ -164,17 +229,77 @@ describe('Domain (using AdtClient)', () => {
           decimals?: number;
         };
 
+        // Longer than the 60 characters SAP keeps: the patch passes it as
+        // given, and the read-back shows what SAP stored.
+        const description = `${config.description || ''} (updated)`.padEnd(
+          70,
+          '.',
+        );
+        // The value tables a domain can name: the shared ones.
+        const [tableA, tableB] = sharedTables();
+        for (const table of [tableA, tableB]) {
+          await ensureSharedDependency(client, 'tables', table, testsLogger);
+        }
+
         await tester.flowTestAuto({
           // The create is a shell — `<doma:datatype/>` empty — and the
           // update is what gives it a type; without one activation refuses
-          // it: "Data type ' ' does not exist" (measured).
-          updateTakesDocument: (current) =>
-            domainDocumentFor(current, {
-              description: `${config.description || ''} (updated)`,
-              datatype: config.datatype,
-              length: config.length,
-              decimals: config.decimals,
-            }),
+          // it: "Data type ' ' does not exist" (measured). Every field the
+          // patch writes on a domain is set here once.
+          updateTakesDocument: (current) => {
+            testsLogger.info?.(
+              `the read before the update ${readRootDescription(current) === undefined ? 'carries no' : 'carries a'} root description`,
+            );
+            return patchedDocument(
+              patchDomainDocument(current, {
+                description,
+                dataType: config.datatype || 'CHAR',
+                length: config.length || 10,
+                decimals: config.decimals ?? 0,
+                conversionExit: '',
+                signExists: false,
+                lowercase: true,
+                fixedValues: [
+                  { low: 'A', high: 'C', text: 'A to C' },
+                  { low: 'Z', text: 'Zed' },
+                ],
+              }),
+              'domain update',
+            );
+          },
+          afterUpdate: async (domain) => {
+            let stored = await domain.read();
+            expect(readRootDescription(stored)).toBe(description.slice(0, 60));
+            expect(contentAt(stored, [...TYPE, 'doma:datatype'])).toBe(
+              config.datatype || 'CHAR',
+            );
+            expect(contentAt(stored, [...TYPE, 'doma:length'])).toBe(
+              String(config.length || 10).padStart(6, '0'),
+            );
+            expect(contentAt(stored, [...OUTPUT, 'doma:lowercase'])).toBe(
+              'true',
+            );
+            expect(fixedValuesOf(stored)).toEqual([
+              ['0001', 'A', 'C', 'A to C'],
+              ['0002', 'Z', '', 'Zed'],
+            ]);
+
+            // No fixed values, and a value table set on the empty reference
+            // (the key field of the shared tables is CHAR 10).
+            stored = await writeAndRead(domain, stored, {
+              fixedValues: [],
+              valueTable: tableA,
+              length: 10,
+            });
+            expect(fixedValuesOf(stored)).toEqual([]);
+            expect(valueTableOf(stored)).toEqual(referenceTo(tableA));
+
+            // One value table to another, by name alone.
+            stored = await writeAndRead(domain, stored, {
+              valueTable: tableB,
+            });
+            expect(valueTableOf(stored)).toEqual(referenceTo(tableB));
+          },
           updateConfig: {
             domainName: config.domainName,
             packageName: config.packageName,

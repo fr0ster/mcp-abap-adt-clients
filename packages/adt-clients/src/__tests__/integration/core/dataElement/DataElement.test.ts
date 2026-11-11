@@ -20,7 +20,10 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { IDataElementConfig } from '../../../../core/dataElement';
+import {
+  type IDataElementConfig,
+  patchDataElementDocument,
+} from '../../../../core/dataElement';
 import { getDataElement } from '../../../../core/dataElement/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
@@ -33,7 +36,10 @@ import {
   missingCaseMessage,
 } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
+import { contentAt } from '../../../helpers/documentAt';
 import { judged } from '../../../helpers/judged';
+import { patchedDocument } from '../../../helpers/patchedDocument';
+import { readRootDescription } from '../../../helpers/rootDescription';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -64,7 +70,6 @@ const {
   createDependencyDomain,
   extractValidationErrorMessage,
   getEnvironmentConfig,
-  dataElementDocumentFor,
 } = require('../../../helpers/test-helper');
 
 const envPath =
@@ -376,19 +381,86 @@ describe('DataElement (using AdtClient)', () => {
 
         try {
           // Use BaseTester.flowTest() for standardized CRUD flow
+          // Longer than the 60 characters SAP keeps: passed as given, and the
+          // read-back shows what SAP stored.
+          const description = `${config.description || ''} (updated)`.padEnd(
+            70,
+            '.',
+          );
+          const typeKind = config.typeKind ?? 'domain';
+          const params = testCase.params;
+          // The labels the case configures, each at its full length: the
+          // caller sets a length, the patch never derives one.
+          const labels = {
+            shortLabel: params.short_label ?? 'Short',
+            shortLength: 10,
+            mediumLabel: params.medium_label ?? 'Medium',
+            mediumLength: 20,
+            longLabel: params.long_label ?? 'Long',
+            longLength: 40,
+            headingLabel: params.heading_label ?? 'Heading',
+            headingLength: 55,
+          };
+          const typed =
+            typeKind === 'domain'
+              ? { typeName: String(domainName ?? '').toUpperCase() }
+              : {
+                  dataType: String(config.dataType ?? 'CHAR').toUpperCase(),
+                  length: config.length,
+                  decimals: config.decimals,
+                };
           await tester.flowTest(config, testCase.params, {
             // The create is a shell — `<dtel:typeKind/>` empty — and the
             // update is what gives it a type; without one activation refuses
             // it: "No domain or data type was defined" (measured).
-            updateTakesDocument: (current) =>
-              dataElementDocumentFor(current, {
-                description: `${config.description || ''} (updated)`,
-                type_kind: config.typeKind,
-                domain_name: domainName,
-                data_type: config.dataType,
-                length: config.length,
-                decimals: config.decimals,
-              }),
+            updateTakesDocument: (current) => {
+              testsLogger.info?.(
+                `the read before the update ${readRootDescription(current) === undefined ? 'carries no' : 'carries a'} root description`,
+              );
+              return patchedDocument(
+                patchDataElementDocument(current, {
+                  description,
+                  typeKind,
+                  ...typed,
+                  ...labels,
+                }),
+                'data element update',
+              );
+            },
+            afterUpdate: async (element) => {
+              const stored = await element.read();
+              expect(readRootDescription(stored)).toBe(
+                description.slice(0, 60),
+              );
+              const at = (name: string) =>
+                contentAt(stored, ['dtel:dataElement', name]);
+              expect(at('dtel:typeKind')).toBe(typeKind);
+              if (typed.typeName !== undefined) {
+                expect(at('dtel:typeName')).toBe(typed.typeName);
+              }
+              if (typed.dataType !== undefined) {
+                expect(at('dtel:dataType')).toBe(typed.dataType);
+              }
+              expect([
+                at('dtel:shortFieldLabel'),
+                at('dtel:shortFieldLength'),
+                at('dtel:mediumFieldLabel'),
+                at('dtel:mediumFieldLength'),
+                at('dtel:longFieldLabel'),
+                at('dtel:longFieldLength'),
+                at('dtel:headingFieldLabel'),
+                at('dtel:headingFieldLength'),
+              ]).toEqual([
+                labels.shortLabel,
+                '10',
+                labels.mediumLabel,
+                '20',
+                labels.longLabel,
+                '40',
+                labels.headingLabel,
+                '55',
+              ]);
+            },
             updateConfig: {
               dataElementName: config.dataElementName,
               packageName: config.packageName!,

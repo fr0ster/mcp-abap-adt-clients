@@ -16,13 +16,19 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { ITableTypeConfig } from '../../../../core/tabletype';
+import {
+  type ITableTypeChanges,
+  type ITableTypeConfig,
+  patchTableTypeDocument,
+} from '../../../../core/tabletype';
 import { getTableTypeSource } from '../../../../core/tabletype/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { patchXmlAttribute } from '../../../../utils/xmlPatch';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
+import { contentAt } from '../../../helpers/documentAt';
+import { patchedDocument } from '../../../helpers/patchedDocument';
+import { readRootDescription } from '../../../helpers/rootDescription';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -43,6 +49,7 @@ import {
 } from '../../../helpers/testProgressLogger';
 
 const {
+  ensureSharedDependency,
   resolvePackageName,
   resolveTransportRequest,
   getTimeout,
@@ -159,13 +166,60 @@ describe('TableType (using AdtClient)', () => {
 
         // TableType is XML-based, no sourceCode needed
         // Update config contains XML parameters (rowTypeName, etc.)
+        const params = tester.getTestCaseDefinition()?.params ?? {};
+        // Longer than the 60 characters SAP keeps: passed as given, and the
+        // read-back shows what SAP stored.
+        const description = `${config?.description || ''} (updated)`.padEnd(
+          70,
+          '.',
+        );
+        if (params.row_type_name) {
+          await ensureSharedDependency(
+            client,
+            'structures',
+            params.row_type_name,
+            testsLogger,
+          );
+        }
+        // The fields the case configures, each written by the patch.
+        const changes: ITableTypeChanges = {
+          description,
+          rowTypeKind: params.row_type_kind,
+          rowTypeName: params.row_type_name,
+          accessType: params.access_type,
+          keyDefinition: params.primary_key_definition,
+          keyKind: params.primary_key_kind,
+        };
+
         await tester.flowTestAuto({
-          updateTakesDocument: (current) =>
-            patchXmlAttribute(
-              current,
-              'adtcore:description',
-              `${config?.description || ''} (updated)`.slice(0, 60),
-            ),
+          // A fresh table type reads back with no root description (measured
+          // on ABAP Cloud): the patch adds it on ttyp:tableType.
+          updateTakesDocument: (current) => {
+            testsLogger.info?.(
+              `the read before the update ${readRootDescription(current) === undefined ? 'carries no' : 'carries a'} root description`,
+            );
+            return patchedDocument(
+              patchTableTypeDocument(current, changes),
+              'table type update',
+            );
+          },
+          afterUpdate: async (tableType) => {
+            const stored = await tableType.read();
+            expect(readRootDescription(stored)).toBe(description.slice(0, 60));
+            expect([
+              contentAt(stored, ['ttyp:rowType', 'ttyp:typeKind']),
+              contentAt(stored, ['ttyp:rowType', 'ttyp:typeName']),
+              contentAt(stored, ['ttyp:accessType']),
+              contentAt(stored, ['ttyp:primaryKey', 'ttyp:definition']),
+              contentAt(stored, ['ttyp:primaryKey', 'ttyp:kind']),
+            ]).toEqual([
+              changes.rowTypeKind,
+              changes.rowTypeName,
+              changes.accessType,
+              changes.keyDefinition,
+              changes.keyKind,
+            ]);
+          },
           updateConfig: config
             ? {
                 tableTypeName: config.tableTypeName,

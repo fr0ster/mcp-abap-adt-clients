@@ -1604,73 +1604,52 @@ async function readDocumentForUpdate(read, what, logger) {
 function domainDocumentFor(current, depConfig) {
   // Required here rather than at the top: this module is loaded by plain node
   // as well as by ts-jest, and only the latter can resolve a TypeScript path.
-  const {
-    patchIf,
-    patchXmlElement,
-    patchXmlElementAttribute,
-  } = require('../../utils/xmlPatch');
-  // On the domain's own element, added when the shell carries none: the first
-  // `adtcore:description` of a shell without one is the package reference's.
-  let xml = patchXmlElementAttribute(
-    current,
-    'doma:domain',
-    'adtcore:description',
-    (depConfig.description || 'Shared test domain').slice(0, 60),
-  );
-  xml = patchXmlElement(xml, 'doma:datatype', depConfig.datatype || 'CHAR');
-  xml = patchXmlElement(
-    xml,
-    'doma:length',
-    String(depConfig.length || 10).padStart(6, '0'),
-  );
-  return patchIf(xml, depConfig.decimals, (x, val) =>
-    patchXmlElement(x, 'doma:decimals', String(val).padStart(6, '0')),
+  const { patchDomainDocument } = require('../../core/domain/patch');
+  const { patchedDocument } = require('./patchedDocument');
+  // The values are this helper's to choose (the defaults, the 60 characters);
+  // where they go is the shipped patch's: the description on the domain's own
+  // element, added when the shell carries none.
+  return patchedDocument(
+    patchDomainDocument(current, {
+      description: (depConfig.description || 'Shared test domain').slice(0, 60),
+      dataType: depConfig.datatype || 'CHAR',
+      length: depConfig.length || 10,
+      decimals: depConfig.decimals ?? undefined,
+    }),
+    'shared domain document',
   );
 }
 
 /**
  * The same, for a data element: its type kind, and the domain it points at or
- * the predefined type it carries (`data_type`, `length`, `decimals`, lengths
- * as six digits like the domain's).
+ * the predefined type it carries (`data_type`, `length`, `decimals`).
  */
 function dataElementDocumentFor(current, depConfig) {
-  const {
-    patchIf,
-    patchXmlElement,
-    patchXmlElementAttribute,
-  } = require('../../utils/xmlPatch');
-  // On `blue:wbobj` itself, added when the shell carries none: patching the
-  // first `adtcore:description` rewrote the package reference's instead, and
-  // SAP refused the PUT, "The description is missing" (SWB_TOOL 019).
-  let xml = patchXmlElementAttribute(
-    current,
-    'blue:wbobj',
-    'adtcore:description',
-    (depConfig.description || 'Shared test data element').slice(0, 60),
-  );
+  const { patchDataElementDocument } = require('../../core/dataElement/patch');
+  const { patchedDocument } = require('./patchedDocument');
   const typeKind = depConfig.type_kind || 'domain';
-  xml = patchXmlElement(xml, 'dtel:typeKind', typeKind);
+  const changes = {
+    // On `blue:wbobj` itself, added when the shell carries none: patching the
+    // first `adtcore:description` rewrote the package reference's instead, and
+    // SAP refused the PUT, "The description is missing" (SWB_TOOL 019).
+    description: (depConfig.description || 'Shared test data element').slice(
+      0,
+      60,
+    ),
+    typeKind,
+  };
   if (typeKind === 'domain' && depConfig.domain_name) {
-    xml = patchXmlElement(
-      xml,
-      'dtel:typeName',
-      String(depConfig.domain_name).toUpperCase(),
-    );
+    changes.typeName = String(depConfig.domain_name).toUpperCase();
   }
   if (typeKind !== 'domain' && depConfig.data_type) {
-    xml = patchXmlElement(
-      xml,
-      'dtel:dataType',
-      String(depConfig.data_type).toUpperCase(),
-    );
-    xml = patchIf(xml, depConfig.length, (x, val) =>
-      patchXmlElement(x, 'dtel:dataTypeLength', String(val).padStart(6, '0')),
-    );
-    xml = patchIf(xml, depConfig.decimals, (x, val) =>
-      patchXmlElement(x, 'dtel:dataTypeDecimals', String(val).padStart(6, '0')),
-    );
+    changes.dataType = String(depConfig.data_type).toUpperCase();
+    changes.length = depConfig.length ?? undefined;
+    changes.decimals = depConfig.decimals ?? undefined;
   }
-  return xml;
+  return patchedDocument(
+    patchDataElementDocument(current, changes),
+    'shared data element document',
+  );
 }
 
 /**

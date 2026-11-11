@@ -16,16 +16,21 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { IPackageConfig } from '../../../../core/package';
+import {
+  type IPackageConfig,
+  patchPackageDocument,
+} from '../../../../core/package';
 import { deletePackage } from '../../../../core/package/delete';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { patchXmlAttribute } from '../../../../utils/xmlPatch';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
+import { documentAt } from '../../../helpers/documentAt';
 import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
+import { patchedDocument } from '../../../helpers/patchedDocument';
+import { readRootDescription } from '../../../helpers/rootDescription';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -46,6 +51,7 @@ import {
 } from '../../../helpers/testProgressLogger';
 
 const {
+  getSharedDependenciesConfig,
   getTestCaseDefinition,
   resolveMasterSystem,
   resolvePackageName,
@@ -225,6 +231,12 @@ describe('Package (using AdtClient)', () => {
       'should execute full workflow and store all results',
       async () => {
         const config = await tester.requireConfig();
+        // Longer than the 60 characters SAP keeps: passed as given, and the
+        // read-back shows what SAP stored.
+        const description = `${config.description || ''} (updated)`.padEnd(
+          70,
+          '.',
+        );
 
         await tester.flowTestAuto({
           // **The update in its own ABAP session** (issue #176): the create
@@ -238,11 +250,41 @@ describe('Package (using AdtClient)', () => {
             ({ connection, client } = await tester.recycleSession());
           },
           updateTakesDocument: (current) =>
-            patchXmlAttribute(
-              current,
-              'adtcore:description',
-              `${config.description || ''} (updated)`.slice(0, 60),
+            patchedDocument(
+              patchPackageDocument(current, { description }),
+              'package update',
             ),
+          // The super package moved by name alone; SAP resolves the reference
+          // (measured): the read-back carries its own uri and type.
+          afterUpdate: async (pkg) => {
+            expect(readRootDescription(await pkg.read())).toBe(
+              description.slice(0, 60),
+            );
+            // A write from the session that wrote last is refused (#176).
+            ({ connection, client } = await tester.recycleSession());
+            const target = getSharedDependenciesConfig()?.package;
+            if (!target) throw new Error('shared_dependencies.package not set');
+            await pkg.write(
+              patchedDocument(
+                patchPackageDocument(await pkg.read(), {
+                  superPackage: target,
+                }),
+                'package move',
+              ),
+            );
+            const stored = await pkg.read();
+            const reference =
+              documentAt(stored, ['pak:superPackage'])?.attributes ?? {};
+            expect([
+              reference['adtcore:uri'],
+              reference['adtcore:type'],
+              reference['adtcore:name'],
+            ]).toEqual([
+              `/sap/bc/adt/packages/${target.toLowerCase()}`,
+              'DEVC/K',
+              target,
+            ]);
+          },
           // Packages do not require activation in ADT
           activateOnCreate: true,
           activateOnUpdate: true,

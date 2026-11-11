@@ -11,9 +11,10 @@
  * that call said the update "fills in the type" the whole time.
  *
  * So these assert the one thing that was missing — that what the builders hand
- * back is a document with the configured type actually in it. `patchXmlElement`
- * throws when its element is absent, which makes a wrong element name loud
- * rather than silent; these pin the names against the shape the server returns.
+ * back is a document with the configured type actually in it. The shipped
+ * patches refuse a document without the element, which the helpers turn into
+ * a throw, so a wrong shape is loud rather than silent; the shells below are
+ * the shape the server returns.
  */
 
 const {
@@ -39,7 +40,8 @@ const DTEL_SHELL =
   'adtcore:description="old" xmlns:blue="http://www.sap.com/wbobj/dictionary/dtel" ' +
   'xmlns:adtcore="http://www.sap.com/adt/core" ' +
   'xmlns:dtel="http://www.sap.com/wbobj/dictionary/dtel">' +
-  '<dtel:typeKind/><dtel:typeName/></blue:wbobj>';
+  '<dtel:dataElement><dtel:typeKind/><dtel:typeName/></dtel:dataElement>' +
+  '</blue:wbobj>';
 
 describe('the document a shared domain is updated with', () => {
   it('carries the configured data type, not an empty element', () => {
@@ -106,9 +108,9 @@ describe('the document a shared data element is updated with', () => {
 
   it('carries a predefined type, its length and decimals as six digits', () => {
     const shell = DTEL_SHELL.replace(
-      '</blue:wbobj>',
+      '</dtel:dataElement>',
       '<dtel:dataType/><dtel:dataTypeLength>000000</dtel:dataTypeLength>' +
-        '<dtel:dataTypeDecimals>000000</dtel:dataTypeDecimals></blue:wbobj>',
+        '<dtel:dataTypeDecimals>000000</dtel:dataTypeDecimals></dtel:dataElement>',
     );
     const document = dataElementDocumentFor(shell, {
       type_kind: 'predefinedAbapType',
@@ -157,8 +159,8 @@ describe('the description of a shell read without one', () => {
   it('a data element gets it on blue:wbobj, the package reference keeps its own', () => {
     const shell = withoutRootDescription(
       DTEL_SHELL.replace(
-        '<dtel:typeKind/>',
-        '<adtcore:packageRef adtcore:name="ZADT_BLD_PKG03"/><dtel:typeKind/>',
+        '<dtel:dataElement>',
+        '<adtcore:packageRef adtcore:name="ZADT_BLD_PKG03"/><dtel:dataElement>',
       ),
       'blue:wbobj',
     );

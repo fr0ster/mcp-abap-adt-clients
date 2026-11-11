@@ -161,6 +161,21 @@ export interface IFlowTestOptions {
    * handler is the same on every system.
    */
   metadataUpdate?: boolean;
+  /**
+   * What the suite proves on the object once the flow's update (and its
+   * activation) is done, before cleanup: the object is there and unlocked.
+   * `read` answers its metadata document; `write` writes one with
+   * `updateMetadata` under a lock and activates it when the type activates.
+   * A document type's suite patches through the shipped patch and asserts
+   * what SAP stored.
+   */
+  afterUpdate?: (object: IUpdatedObject) => Promise<void>;
+}
+
+/** The object as {@link IFlowTestOptions.afterUpdate} gets it. */
+export interface IUpdatedObject {
+  read(): Promise<string>;
+  write(document: string): Promise<void>;
 }
 
 export interface IReadTestOptions {
@@ -1420,6 +1435,38 @@ export class BaseTester<TConfig, TState = unknown> {
           'read metadata (after metadata update)',
         );
         expect(readRootDescription(after ?? '')).toBe(description);
+      }
+
+      if (options?.afterUpdate) {
+        currentStep = 'after update';
+        const target = {
+          ...config,
+          ...options.updateConfig,
+        } as Partial<TConfig>;
+        await options.afterUpdate({
+          read: async () =>
+            (await readMetadata('read metadata (after update)')) ?? '',
+          write: async (document) => {
+            logTestStep('write metadata (after update)', this.logger);
+            expectResult(
+              (await this.updateUnderLock(
+                target,
+                { source: document, timeout: options.timeout },
+                (c, o) => this.writeMetadata(c, o),
+              )) as IAdtResponse<unknown>,
+              'updateMetadata (after update)',
+            );
+            if (this.adtObject.activate) {
+              expectResult(
+                await this.adtObject.activate(config as Partial<TConfig>, {
+                  headers: integrationHeadersOf(this.adtObject, 'activate'),
+                  analyse: judged(analyseActivation),
+                }),
+                'activate (after update)',
+              );
+            }
+          },
+        });
       }
 
       // 5. Cleanup (if enabled)

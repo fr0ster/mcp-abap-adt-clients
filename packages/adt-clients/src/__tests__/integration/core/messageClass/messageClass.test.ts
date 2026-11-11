@@ -30,7 +30,10 @@ import type {
   IMessageClassConfig,
   IParsedMessage,
 } from '../../../../core/messageClass';
-import { parseMessageClass } from '../../../../core/messageClass';
+import {
+  parseMessageClass,
+  patchMessageClassDocument,
+} from '../../../../core/messageClass';
 import type { AdtMessageClassMessage } from '../../../../core/messageClass/AdtMessageClassMessage';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
@@ -39,6 +42,8 @@ import { gate } from '../../../helpers/caseGate';
 import { expectResult, failureOf, saysAbsent } from '../../../helpers/contract';
 import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
+import { patchedDocument } from '../../../helpers/patchedDocument';
+import { readRootDescription } from '../../../helpers/rootDescription';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -404,6 +409,76 @@ describe('MessageClass (using AdtClient)', () => {
             String(msgReadAfterUpdate ?? ''),
           ).messages.find((m: IParsedMessage) => m.msgno === msgNo);
           expect(updatedMessage?.msgtext).toBe(msgTextUpdated);
+
+          // ── Step 6b: The class's description, through the shipped patch ───
+          // Read, patch, write under the class's lock: the description on
+          // mc:messageClass, longer than the 60 SAP keeps, and the message
+          // row in the same document written back as read.
+          logTestStep('patch the class description', testsLogger);
+          const description = `${config.description || ''} (patched)`.padEnd(
+            70,
+            '.',
+          );
+          const classRead = String(
+            expectResult(
+              await mcHandler.readMetadata(
+                { name: msgClassName },
+                { analyse: analyseException },
+              ),
+              'read class before the description patch',
+            ) ?? '',
+          );
+          const classHandle = expectResult(
+            await mcHandler.lock(
+              { name: msgClassName },
+              { analyse: analyseException },
+            ),
+            'lock class for the description patch',
+          );
+          try {
+            expectResult(
+              await mcHandler.updateMetadata(
+                {
+                  name: msgClassName,
+                  transportRequest: config.transportRequest,
+                },
+                {
+                  analyse: analyseException,
+                  headers: integrationHeadersOf(mcHandler, 'updateMetadata'),
+                  lockHandle: classHandle,
+                  source: patchedDocument(
+                    patchMessageClassDocument(classRead, { description }),
+                    'message class description',
+                  ),
+                },
+              ),
+              'write the patched class',
+            );
+          } finally {
+            expectResult(
+              await mcHandler.unlock({ name: msgClassName }, classHandle, {
+                analyse: analyseException,
+              }),
+              'unlock class after the description patch',
+            );
+          }
+          const classStored = String(
+            expectResult(
+              await mcHandler.readMetadata(
+                { name: msgClassName },
+                { analyse: analyseException },
+              ),
+              'read class after the description patch',
+            ) ?? '',
+          );
+          expect(readRootDescription(classStored)).toBe(
+            description.slice(0, 60),
+          );
+          expect(
+            parseMessageClass(classStored).messages.find(
+              (m: IParsedMessage) => m.msgno === msgNo,
+            )?.msgtext,
+          ).toBe(msgTextUpdated);
 
           // ── Step 7: Remove the message ─────────────────────────────────────
           // A message is a row inside its class's document, so removing it is a

@@ -25,11 +25,11 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
+import { patchDomainDocument } from '../../../../core/domain/patch';
 import {
   getSystemInformation,
   isCloudEnvironment,
 } from '../../../../utils/systemInfo';
-import { patchXmlElement } from '../../../../utils/xmlPatch';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import {
   configuredCase,
@@ -46,6 +46,7 @@ import {
 import { judged } from '../../../helpers/judged';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import { presenceOf } from '../../../helpers/objectPresence';
+import { patchedDocument } from '../../../helpers/patchedDocument';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -697,10 +698,9 @@ describe('AdtRequest', () => {
               `${domainName} was created but its document read back empty`,
             );
           }
-          const typed = patchXmlElement(
-            patchXmlElement(shellDocument, 'doma:datatype', 'CHAR'),
-            'doma:length',
-            '000004',
+          const typed = patchedDocument(
+            patchDomainDocument(shellDocument, { dataType: 'CHAR', length: 4 }),
+            `type ${domainName}`,
           );
           const domainLock = await domain.lock(
             { domainName },

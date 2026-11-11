@@ -31,10 +31,10 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
+import { patchDomainDocument } from '../../../../core/domain/patch';
 import { domainDocuments } from '../../../../core/domain/types';
 import { wireItself } from '../../../../utils/resultStrategy';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { patchXmlAttribute, patchXmlElement } from '../../../../utils/xmlPatch';
 import { freshSuffix, probePlace } from '../../../helpers/abapUnitProbes';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import {
@@ -48,6 +48,7 @@ import {
   removeAndReadBack,
 } from '../../../helpers/ifMatchProbes';
 import { judged } from '../../../helpers/judged';
+import { patchedDocument } from '../../../helpers/patchedDocument';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -92,15 +93,13 @@ const TITLE = 'IfMatch - a domain document written only if unchanged';
  * write and the type a domain needs (as the domain workflow writes it).
  */
 function domainDocument(current: string, n: number): string {
-  const described = patchXmlAttribute(
-    current,
-    'adtcore:description',
-    `If-Match probe, write ${n}`,
-  );
-  return patchXmlElement(
-    patchXmlElement(described, 'doma:datatype', 'CHAR'),
-    'doma:length',
-    '000005',
+  return patchedDocument(
+    patchDomainDocument(current, {
+      description: `If-Match probe, write ${n}`,
+      dataType: 'CHAR',
+      length: 5,
+    }),
+    `If-Match write ${n}`,
   );
 }
 

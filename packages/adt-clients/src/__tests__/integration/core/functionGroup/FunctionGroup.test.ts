@@ -20,7 +20,10 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { IFunctionGroupConfig } from '../../../../core/functionGroup';
+import {
+  type IFunctionGroupConfig,
+  patchFunctionGroupDocument,
+} from '../../../../core/functionGroup';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
@@ -28,6 +31,8 @@ import { gate, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult, failureOf } from '../../../helpers/contract';
 import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
+import { patchedDocument } from '../../../helpers/patchedDocument';
+import { readRootDescription } from '../../../helpers/rootDescription';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -227,6 +232,26 @@ describe('FunctionGroup (using AdtClient)', () => {
           updateEditsSource: {
             edit: (current) => `${SOURCE_MARKER}\n${current}`,
             marker: SOURCE_MARKER,
+          },
+          // The description beyond the 40 a function group keeps
+          // (`adtcore:descriptionTextLimit="40"`): passed as given by the
+          // patch, and the read-back shows what SAP stored.
+          afterUpdate: async (group) => {
+            const description = `${config.description || ''} (patched)`.padEnd(
+              45,
+              '.',
+            );
+            await group.write(
+              patchedDocument(
+                patchFunctionGroupDocument(await group.read(), {
+                  description,
+                }),
+                'function group description',
+              ),
+            );
+            expect(readRootDescription(await group.read())).toBe(
+              description.slice(0, 40),
+            );
           },
           updateConfig: {
             functionGroupName: config.functionGroupName,
