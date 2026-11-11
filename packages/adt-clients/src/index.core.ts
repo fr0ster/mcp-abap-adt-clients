@@ -85,6 +85,8 @@ export {
 export {
   AdtFunctionGroup,
   type FunctionGroupValues,
+  type IFunctionGroupChanges,
+  patchFunctionGroupDocument,
 } from './core/functionGroup';
 export {
   AdtFunctionInclude,
