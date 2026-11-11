@@ -176,6 +176,8 @@ export {
 } from './core/table';
 export {
   AdtDdicTableType,
+  type ITableTypeChanges,
+  patchTableTypeDocument,
   type TableTypeValues,
 } from './core/tabletype';
 export {
