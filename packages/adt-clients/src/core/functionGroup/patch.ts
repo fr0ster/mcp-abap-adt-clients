@@ -2,9 +2,10 @@
  * The function group's document patch: the description on
  * `group:abapFunctionGroup`, and nothing else.
  *
- * The description is passed as given: SAP stores what fits
- * (`adtcore:descriptionTextLimit="40"` on the measured reads) and cuts the
- * rest itself.
+ * The description is passed as given, with no check of its length. SAP holds
+ * 40 characters (`adtcore:descriptionTextLimit="40"` on the measured reads)
+ * and refuses a longer one with `400` `FUNC_ADT/103`, storing nothing
+ * (measured on cloud and on premise); that answer reaches the caller as is.
  */
 import {
   DocumentEdits,

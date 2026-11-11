@@ -56,7 +56,7 @@ describe.each(RELEASES)('patchFunctionGroupDocument (%s)', (release) => {
     );
   });
 
-  it('passes a description beyond the 40 SAP takes as given', () => {
+  it('passes a description beyond the 40 SAP accepts as given', () => {
     const long = 'F'.repeat(41);
     expect(read).toContain('adtcore:descriptionTextLimit="40"');
     expect(rootDescriptionOf(patched(read, long))).toBe(long);
