@@ -290,6 +290,12 @@ changed field's stored value and the root's description:
   `<doma:valueTableRef/>` and changed from one table to another; `superPackage` changed —
   each read back with SAP's own `uri` / `type` for the new target (the first measurement
   above, now as a regression test).
+- The limit of the live proof: the package's `responsible`, `masterSystem`,
+  `softwareComponent` and `transportLayer` are written live only with the package's own
+  values — another responsible is another SAP user, and neither system offers the package
+  another master system, software component or transport layer. That the patch writes each
+  of them is proved by the unit tests and their mutations; live, `packageType` and
+  `recordChanges` reach SAP and are refused as measured.
 
 ### The other cloud failures
 
