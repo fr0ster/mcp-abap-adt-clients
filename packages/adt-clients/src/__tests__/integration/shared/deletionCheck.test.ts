@@ -52,6 +52,21 @@ const { getDefaultTransport } = require('../../helpers/test-helper');
 
 const testsLogger: ILogger = createTestsLogger();
 
+/**
+ * The reason a case is skipped, read from the configuration at registration;
+ * `undefined` when it runs — and when no configuration is there to read,
+ * where the gate registers nothing that runs anyway.
+ */
+function configured(
+  skippedBecause: (() => string | undefined) | undefined,
+): string | undefined {
+  try {
+    return skippedBecause?.();
+  } catch {
+    return undefined;
+  }
+}
+
 /** A name no system has, so the answer is about the address and nothing else. */
 const NEVER_EXISTS = 'ZZ_NO_SUCH_OBJECT_ZZ';
 
@@ -89,6 +104,11 @@ describe('Shared - the deletion check, per type', () => {
     ask: () => Promise<{ ok: boolean; text: string }>;
     /** What the answer must hold: the deletion document, or the request's. */
     expected: () => string;
+    /**
+     * Why the case is registered as skipped on this system, or `undefined`
+     * when it runs.
+     */
+    skippedBecause?: () => string | undefined;
   }[] = [
     {
       label: 'PROG/I include',
@@ -147,12 +167,21 @@ describe('Shared - the deletion check, per type', () => {
           : { ok: false, text: answer.getError().message };
       },
       expected: () => `tm:number="${getDefaultTransport()}"`,
+      // A system with no transport request to ask about (ABAP Cloud: its
+      // objects go to no request, and the configuration states "").
+      skippedBecause: () =>
+        getDefaultTransport()
+          ? undefined
+          : 'environment.default_transport is empty, there is no request to ask about',
     },
   ];
 
-  for (const { label, ask, expected } of unmeasured) {
-    gateOn(() => true)(
-      `answers the deletion check for a ${label}`,
+  for (const { label, ask, expected, skippedBecause } of unmeasured) {
+    const reason = configured(skippedBecause);
+    gateOn(() => reason === undefined)(
+      reason === undefined
+        ? `answers the deletion check for a ${label}`
+        : `answers the deletion check for a ${label} — skipped: ${reason}`,
       async () => {
         logTestStep(`deletion check for a ${label}`, testsLogger);
 
