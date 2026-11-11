@@ -151,6 +151,10 @@ export {
   AdtContentTypesModern,
 } from './core/shared/contentTypes';
 export type {
+  DocumentPatch,
+  DocumentPatchRefusal,
+} from './core/shared/documentPatch';
+export type {
   AdtHandlerOptions,
   AdtLoggedOptions,
   AdtShippedOptions,
