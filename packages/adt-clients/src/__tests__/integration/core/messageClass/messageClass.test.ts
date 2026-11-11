@@ -39,7 +39,12 @@ import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate } from '../../../helpers/caseGate';
-import { expectResult, failureOf, saysAbsent } from '../../../helpers/contract';
+import {
+  expectResult,
+  failureOf,
+  releasing,
+  saysAbsent,
+} from '../../../helpers/contract';
 import {
   descriptionOfLength,
   overTheLimit,
@@ -433,7 +438,9 @@ describe('MessageClass (using AdtClient)', () => {
                 what,
               ) ?? '',
             );
-          const writeClass = async (document: string) => {
+          // The write's refusal is the step's error; a refused unlock is added
+          // to it, never put in its place (both through failureOf).
+          const writeClass = async (document: string, what: string) => {
             const classHandle = expectResult(
               await mcHandler.lock(
                 { name: msgClassName },
@@ -441,37 +448,40 @@ describe('MessageClass (using AdtClient)', () => {
               ),
               'lock class for the description patch',
             );
-            try {
-              return await mcHandler.updateMetadata(
-                {
-                  name: msgClassName,
-                  transportRequest: config.transportRequest,
-                },
-                {
-                  analyse: analyseException,
-                  headers: integrationHeadersOf(mcHandler, 'updateMetadata'),
-                  lockHandle: classHandle,
-                  source: document,
-                },
-              );
-            } finally {
-              expectResult(
-                await mcHandler.unlock({ name: msgClassName }, classHandle, {
+            return releasing(
+              async () =>
+                expectResult(
+                  await mcHandler.updateMetadata(
+                    {
+                      name: msgClassName,
+                      transportRequest: config.transportRequest,
+                    },
+                    {
+                      analyse: analyseException,
+                      headers: integrationHeadersOf(
+                        mcHandler,
+                        'updateMetadata',
+                      ),
+                      lockHandle: classHandle,
+                      source: document,
+                    },
+                  ),
+                  what,
+                ),
+              () =>
+                mcHandler.unlock({ name: msgClassName }, classHandle, {
                   analyse: analyseException,
                 }),
-                'unlock class after the description patch',
-              );
-            }
+              'unlock class after the description patch',
+            );
           };
-          expectResult(
-            await writeClass(
-              patchedDocument(
-                patchMessageClassDocument(
-                  await readClass('read class before the description patch'),
-                  { description },
-                ),
-                'message class description',
+          await writeClass(
+            patchedDocument(
+              patchMessageClassDocument(
+                await readClass('read class before the description patch'),
+                { description },
               ),
+              'message class description',
             ),
             'write the patched class',
           );
@@ -482,14 +492,12 @@ describe('MessageClass (using AdtClient)', () => {
           // Over the limit: passed as given by the patch. A message class's
           // write is accepted, and SAP stores the first 60 characters
           // (measured on the cloud and on premise).
-          expectResult(
-            await writeClass(
-              patchedDocument(
-                patchMessageClassDocument(classStored, {
-                  description: overTheLimit(60),
-                }),
-                'message class description over the limit',
-              ),
+          await writeClass(
+            patchedDocument(
+              patchMessageClassDocument(classStored, {
+                description: overTheLimit(60),
+              }),
+              'message class description over the limit',
             ),
             'write a description over the limit',
           );

@@ -27,7 +27,12 @@ import {
   MISSING_TEST_CONFIG,
   missingCaseMessage,
 } from '../../../helpers/caseGate';
-import { expectFailure, expectResult } from '../../../helpers/contract';
+import { CleanupSteps, withCleanup } from '../../../helpers/cleanupSteps';
+import {
+  expectFailure,
+  expectResult,
+  releasing,
+} from '../../../helpers/contract';
 import { judged } from '../../../helpers/judged';
 import { expectLockReleased } from '../../../helpers/lockReleased';
 import {
@@ -171,9 +176,11 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
       await enhancement.lock(object, analyse),
       'lock enhancement',
     );
-    try {
-      expect(handle).toBeTruthy();
-      if (source !== undefined) {
+    // A refused body stays the step's error; a refused unlock is added to it.
+    await releasing(
+      async () => {
+        expect(handle).toBeTruthy();
+        if (source === undefined) return;
         // Only ENHO/XHH has a source, and `update` takes it in its type.
         const { enhancementType } = object;
         if (enhancementType !== 'enhoxhh') {
@@ -191,13 +198,10 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
           ),
           'update source',
         );
-      }
-    } finally {
-      expectResult(
-        await enhancement.unlock(object, handle, analyse),
-        'unlock enhancement',
-      );
-    }
+      },
+      () => enhancement.unlock(object, handle, analyse),
+      'unlock enhancement',
+    );
     // The helper alone opens/closes the independent session proving release.
     await expectLockReleased(
       (other) => other.getEnhancement(),
@@ -239,39 +243,37 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
       const cls = client.getClass();
       const enhancement = client.getEnhancement();
       const esc = escapeXmlAttr;
-      // Cleanup attempts every object in reverse dependency order, even on failure.
-      async function cleanup(): Promise<void> {
-        try {
-          await removeLeftover(container);
-        } finally {
-          try {
-            const read = await cls.readMetadata(classConfig, analyse);
-            if (read.ok)
-              expectResult(
-                await cls.delete(classConfig, {
-                  headers: integrationHeadersOf(cls, 'delete'),
-                  analyse: judged(analyseDeletion),
-                }),
-                'delete BAdI class',
-              );
-            else expect(read.getError().response?.status).toBe(404);
-          } finally {
-            try {
-              await removeLeftover(spot);
-            } finally {
-              const read = await intf.readMetadata(intfConfig, analyse);
-              if (read.ok)
-                expectResult(
-                  await intf.delete(intfConfig, {
-                    headers: integrationHeadersOf(intf, 'delete'),
-                    analyse: judged(analyseDeletion),
-                  }),
-                  'delete BAdI interface',
-                );
-              else expect(read.getError().response?.status).toBe(404);
-            }
-          }
-        }
+      // Cleanup attempts every object in reverse dependency order, even on
+      // failure; every step's failure is reported, none replaces another.
+      async function cleanup(steps: CleanupSteps): Promise<void> {
+        await steps.run('delete BAdI container', () =>
+          removeLeftover(container),
+        );
+        await steps.run('delete BAdI class', async () => {
+          const read = await cls.readMetadata(classConfig, analyse);
+          if (read.ok)
+            expectResult(
+              await cls.delete(classConfig, {
+                headers: integrationHeadersOf(cls, 'delete'),
+                analyse: judged(analyseDeletion),
+              }),
+              'delete BAdI class',
+            );
+          else expect(read.getError().response?.status).toBe(404);
+        });
+        await steps.run('delete BAdI spot', () => removeLeftover(spot));
+        await steps.run('delete BAdI interface', async () => {
+          const read = await intf.readMetadata(intfConfig, analyse);
+          if (read.ok)
+            expectResult(
+              await intf.delete(intfConfig, {
+                headers: integrationHeadersOf(intf, 'delete'),
+                analyse: judged(analyseDeletion),
+              }),
+              'delete BAdI interface',
+            );
+          else expect(read.getError().response?.status).toBe(404);
+        });
       }
       async function writeDocument(
         object: IEnhancementConfig,
@@ -281,26 +283,24 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
           await enhancement.lock(object, analyse),
           'lock BAdI document',
         );
-        try {
-          expectResult(
-            await enhancement.updateMetadata(object, {
-              headers: integrationHeadersOf(
-                enhancement,
-                'updateMetadata',
-                object,
-              ),
-              ...analyse,
-              source,
-              lockHandle: handle,
-            }),
-            'write BAdI document',
-          );
-        } finally {
-          expectResult(
-            await enhancement.unlock(object, handle, analyse),
-            'unlock BAdI document',
-          );
-        }
+        await releasing(
+          async () =>
+            expectResult(
+              await enhancement.updateMetadata(object, {
+                headers: integrationHeadersOf(
+                  enhancement,
+                  'updateMetadata',
+                  object,
+                ),
+                ...analyse,
+                source,
+                lockHandle: handle,
+              }),
+              'write BAdI document',
+            ),
+          () => enhancement.unlock(object, handle, analyse),
+          'unlock BAdI document',
+        );
         expectResult(
           await enhancement.activate(object, {
             headers: integrationHeadersOf(enhancement, 'activate'),
@@ -317,8 +317,10 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
       ): string {
         return `<?xml version="1.0" encoding="UTF-8"?><${prefix}:objectData xmlns:${prefix}="http://www.sap.com/adt/enhancements/${prefix}" xmlns:adtcore="http://www.sap.com/adt/core" xmlns:enhcore="http://www.sap.com/abapsource/enhancementscore" adtcore:name="${esc(name)}" adtcore:type="${type}" adtcore:description="${esc(spot.description ?? '')}" adtcore:language="EN" adtcore:masterLanguage="EN"><adtcore:packageRef adtcore:name="${esc(spot.packageName ?? '')}"/>${content}</${prefix}:objectData>`;
       }
-      await cleanup();
-      try {
+      const leftovers = new CleanupSteps();
+      await cleanup(leftovers);
+      leftovers.finish();
+      await withCleanup(async () => {
         expectResult(
           await intf.create(intfConfig, {
             ...analyse,
@@ -330,22 +332,20 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
           await intf.lock(intfConfig, analyse),
           'lock BAdI interface',
         );
-        try {
-          expectResult(
-            await intf.update(intfConfig, {
-              headers: integrationHeadersOf(intf, 'update'),
-              ...analyse,
-              lockHandle: interfaceHandle,
-              source: `INTERFACE ${interfaceName} PUBLIC.\n INTERFACES if_badi_interface.\n METHODS calc RETURNING VALUE(r) TYPE i.\nENDINTERFACE.`,
-            }),
-            'write BAdI interface',
-          );
-        } finally {
-          expectResult(
-            await intf.unlock(intfConfig, interfaceHandle, analyse),
-            'unlock BAdI interface',
-          );
-        }
+        await releasing(
+          async () =>
+            expectResult(
+              await intf.update(intfConfig, {
+                headers: integrationHeadersOf(intf, 'update'),
+                ...analyse,
+                lockHandle: interfaceHandle,
+                source: `INTERFACE ${interfaceName} PUBLIC.\n INTERFACES if_badi_interface.\n METHODS calc RETURNING VALUE(r) TYPE i.\nENDINTERFACE.`,
+              }),
+              'write BAdI interface',
+            ),
+          () => intf.unlock(intfConfig, interfaceHandle, analyse),
+          'unlock BAdI interface',
+        );
         expectResult(
           await intf.activate(intfConfig, {
             headers: integrationHeadersOf(intf, 'activate'),
@@ -396,22 +396,20 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
           await cls.lock(classConfig, analyse),
           'lock BAdI class',
         );
-        try {
-          expectResult(
-            await cls.update(classConfig, {
-              headers: integrationHeadersOf(cls, 'update'),
-              ...analyse,
-              lockHandle: classHandle,
-              source: `CLASS ${className} DEFINITION PUBLIC FINAL CREATE PUBLIC.\n PUBLIC SECTION.\n INTERFACES if_badi_interface.\n INTERFACES ${interfaceName}.\nENDCLASS.\nCLASS ${className} IMPLEMENTATION.\n METHOD ${interfaceName}~calc.\n r = 1.\n ENDMETHOD.\nENDCLASS.`,
-            }),
-            'write BAdI class',
-          );
-        } finally {
-          expectResult(
-            await cls.unlock(classConfig, classHandle, analyse),
-            'unlock BAdI class',
-          );
-        }
+        await releasing(
+          async () =>
+            expectResult(
+              await cls.update(classConfig, {
+                headers: integrationHeadersOf(cls, 'update'),
+                ...analyse,
+                lockHandle: classHandle,
+                source: `CLASS ${className} DEFINITION PUBLIC FINAL CREATE PUBLIC.\n PUBLIC SECTION.\n INTERFACES if_badi_interface.\n INTERFACES ${interfaceName}.\nENDCLASS.\nCLASS ${className} IMPLEMENTATION.\n METHOD ${interfaceName}~calc.\n r = 1.\n ENDMETHOD.\nENDCLASS.`,
+              }),
+              'write BAdI class',
+            ),
+          () => cls.unlock(classConfig, classHandle, analyse),
+          'unlock BAdI class',
+        );
         expectResult(
           await cls.activate(classConfig, {
             headers: integrationHeadersOf(cls, 'activate'),
@@ -451,9 +449,7 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
         expect(implementation['enho:implementingClass']['@_adtcore:name']).toBe(
           className,
         );
-      } finally {
-        await cleanup();
-      }
+      }, cleanup);
     },
     getTimeout('test'),
   );
@@ -464,36 +460,40 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
       const resolver = configured('enhsxsb');
       const object = config(resolver, 'enhsxsb');
       await removeLeftover(object);
-      try {
-        expectResult(
-          await client.getEnhancement().create(object, {
-            ...analyse,
-            headers: integrationHeadersOf(
-              client.getEnhancement(),
-              'create',
-              object,
-            ),
-          }),
-          'create XSB',
-        );
-        const document = expectResult(
-          await client.getEnhancement().readMetadata(object, analyse),
-          'XSB metadata',
-        );
-        expect(root(document, 'enhs:objectData')['@_adtcore:type']).toBe(
-          'ENHS/XSB',
-        );
-        await lockWindow(object);
-        expectResult(
-          await client.getEnhancement().activate(object, {
-            headers: integrationHeadersOf(client.getEnhancement(), 'activate'),
-            analyse: judged(analyseActivation),
-          }),
-          'activate XSB',
-        );
-      } finally {
-        await deleteAndVerify(object);
-      }
+      await withCleanup(
+        async () => {
+          expectResult(
+            await client.getEnhancement().create(object, {
+              ...analyse,
+              headers: integrationHeadersOf(
+                client.getEnhancement(),
+                'create',
+                object,
+              ),
+            }),
+            'create XSB',
+          );
+          const document = expectResult(
+            await client.getEnhancement().readMetadata(object, analyse),
+            'XSB metadata',
+          );
+          expect(root(document, 'enhs:objectData')['@_adtcore:type']).toBe(
+            'ENHS/XSB',
+          );
+          await lockWindow(object);
+          expectResult(
+            await client.getEnhancement().activate(object, {
+              headers: integrationHeadersOf(
+                client.getEnhancement(),
+                'activate',
+              ),
+              analyse: judged(analyseActivation),
+            }),
+            'activate XSB',
+          );
+        },
+        (steps) => steps.run('delete XSB', () => deleteAndVerify(object)),
+      );
     },
     getTimeout('test'),
   );
@@ -509,49 +509,49 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
       };
       await removeLeftover(object);
       await removeLeftover(spot);
-      try {
-        expectResult(
-          await client.getEnhancement().create(spot, {
-            ...analyse,
-            headers: integrationHeadersOf(
-              client.getEnhancement(),
-              'create',
-              spot,
-            ),
-          }),
-          'create XHB spot',
-        );
-        expectResult(
-          await client.getEnhancement().create(object, {
-            ...analyse,
-            headers: integrationHeadersOf(
-              client.getEnhancement(),
-              'create',
-              object,
-            ),
-          }),
-          'create XHB',
-        );
-        const document = expectResult(
-          await client.getEnhancement().readMetadata(object, analyse),
-          'XHB metadata',
-        );
-        const metadata = root(document, 'enho:objectData');
-        expect(metadata['@_adtcore:type']).toBe('ENHO/XHB');
-        const usages = metadata['enho:contentCommon']['enho:usages'];
-        expect(
-          usages['enhcore:referencedObject']['enhcore:objectReference'][
-            '@_adtcore:name'
-          ],
-        ).toBe(spot.enhancementName);
-      } finally {
-        // Attempt both deletions, in dependency order, even when one fails.
-        try {
-          await removeLeftover(object);
-        } finally {
-          await removeLeftover(spot);
-        }
-      }
+      await withCleanup(
+        async () => {
+          expectResult(
+            await client.getEnhancement().create(spot, {
+              ...analyse,
+              headers: integrationHeadersOf(
+                client.getEnhancement(),
+                'create',
+                spot,
+              ),
+            }),
+            'create XHB spot',
+          );
+          expectResult(
+            await client.getEnhancement().create(object, {
+              ...analyse,
+              headers: integrationHeadersOf(
+                client.getEnhancement(),
+                'create',
+                object,
+              ),
+            }),
+            'create XHB',
+          );
+          const document = expectResult(
+            await client.getEnhancement().readMetadata(object, analyse),
+            'XHB metadata',
+          );
+          const metadata = root(document, 'enho:objectData');
+          expect(metadata['@_adtcore:type']).toBe('ENHO/XHB');
+          const usages = metadata['enho:contentCommon']['enho:usages'];
+          expect(
+            usages['enhcore:referencedObject']['enhcore:objectReference'][
+              '@_adtcore:name'
+            ],
+          ).toBe(spot.enhancementName);
+        },
+        async (steps) => {
+          // Attempt both deletions, in dependency order, even when one fails.
+          await steps.run('delete XHB', () => removeLeftover(object));
+          await steps.run('delete XHB spot', () => removeLeftover(spot));
+        },
+      );
     },
     getTimeout('test'),
   );
@@ -590,23 +590,11 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
       // Wire notes (2026-10-15), “ENHO/XHH”: options say static/dynamic;
       // create rejects those words and requires the corresponding S/D code.
       const enhancementMode = mode === 'static' ? 'S' : 'D';
-      try {
-        expectResult(
-          await client.getEnhancement().create(
-            {
-              ...object,
-              enhancementOption,
-              enhancementMode,
-              enhancedObject: {
-                uri: PROGRAM.uri(programName),
-                type: 'PROG/P',
-                name: programName,
-                program: programName,
-              },
-            },
-            {
-              ...analyse,
-              headers: integrationHeadersOf(client.getEnhancement(), 'create', {
+      await withCleanup(
+        async () => {
+          expectResult(
+            await client.getEnhancement().create(
+              {
                 ...object,
                 enhancementOption,
                 enhancementMode,
@@ -616,43 +604,63 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
                   name: programName,
                   program: programName,
                 },
-              }),
-            },
-          ),
-          'create XHH',
-        );
-        const source = expectResult(
-          await client.getEnhancement().read(object, 'inactive', analyse),
-          'inactive XHH source',
-        );
-        expect(source).toMatch(/ENHANCEMENT 1[\s\S]*ENDENHANCEMENT\./);
-        const elements = expectResult(
-          await program.readEnhancementElements({ programName }, analyse),
-          'host elements',
-        );
-        root(elements, 'enh:enhancements');
-        expect(elements).toContain(object.enhancementName);
-        const comment = '* Integration enhancement source update';
-        await lockWindow(
-          object,
-          source.replace('ENDENHANCEMENT.', `${comment}\nENDENHANCEMENT.`),
-        );
-        expectResult(
-          await client.getEnhancement().activate(object, {
-            headers: integrationHeadersOf(client.getEnhancement(), 'activate'),
-            analyse: judged(analyseActivation),
-          }),
-          'activate XHH',
-        );
-        expect(
+              },
+              {
+                ...analyse,
+                headers: integrationHeadersOf(
+                  client.getEnhancement(),
+                  'create',
+                  {
+                    ...object,
+                    enhancementOption,
+                    enhancementMode,
+                    enhancedObject: {
+                      uri: PROGRAM.uri(programName),
+                      type: 'PROG/P',
+                      name: programName,
+                      program: programName,
+                    },
+                  },
+                ),
+              },
+            ),
+            'create XHH',
+          );
+          const source = expectResult(
+            await client.getEnhancement().read(object, 'inactive', analyse),
+            'inactive XHH source',
+          );
+          expect(source).toMatch(/ENHANCEMENT 1[\s\S]*ENDENHANCEMENT\./);
+          const elements = expectResult(
+            await program.readEnhancementElements({ programName }, analyse),
+            'host elements',
+          );
+          root(elements, 'enh:enhancements');
+          expect(elements).toContain(object.enhancementName);
+          const comment = '* Integration enhancement source update';
+          await lockWindow(
+            object,
+            source.replace('ENDENHANCEMENT.', `${comment}\nENDENHANCEMENT.`),
+          );
           expectResult(
-            await client.getEnhancement().read(object, 'active', analyse),
-            'active XHH source',
-          ),
-        ).toContain(comment);
-      } finally {
-        await removeLeftover(object);
-      }
+            await client.getEnhancement().activate(object, {
+              headers: integrationHeadersOf(
+                client.getEnhancement(),
+                'activate',
+              ),
+              analyse: judged(analyseActivation),
+            }),
+            'activate XHH',
+          );
+          expect(
+            expectResult(
+              await client.getEnhancement().read(object, 'active', analyse),
+              'active XHH source',
+            ),
+          ).toContain(comment);
+        },
+        (steps) => steps.run('delete XHH', () => removeLeftover(object)),
+      );
     },
     getTimeout('test'),
   );
