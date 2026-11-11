@@ -226,9 +226,13 @@ domain's). The patch adds the attribute when it is missing, either way.
   read: attribute order, quoting, entities, whitespace, attributes unknown to the library.
   This is why no parse-and-rebuild is used: the server's ordered round trip already
   rewrites some characters (`&apos;`, Code: mcp-abap-adt `xml/ordered`).
-- **Escaping:** element text escapes `&`, `<` and `>`. An attribute value escapes `&`, `<`,
-  `>` and the quote character the attribute is delimited with. A new attribute is written
-  with `"`.
+- **Escaping:** element text escapes `&`, `<`, `>` and CR (`&#13;`). An attribute value
+  escapes `&`, `<`, `>`, the quote character the attribute is delimited with, and LF, tab and
+  CR (`&#10;`, `&#9;`, `&#13;`), so a conforming parser reads back exactly the value given
+  (XML 1.0 §2.11, §3.3.3). A new attribute is written with `"`.
+- **A document is well-formed or refused:** every `&` starts a predefined entity or a
+  character reference to an XML Char; an attribute value holds no `<`; text holds no `]]>`.
+  Anything else is `not-a-document`.
 - Nothing is held as `unknown` and narrowed by casts. The scanner returns typed ranges,
   and a missing path is a typed absence. No `as`, `any`, `@ts-ignore` or `!` in the new
   code.
@@ -267,7 +271,7 @@ while the test is written, and the PR records it.
 | Not this type | a domain document to `patchTableTypeDocument`: `not-this-type` | drop the root check |
 | Formatting | 6-digit lengths, 2-digit label lengths, `true` / `false`, `fixValues` block (positions, `high` given and absent → `<doma:high/>`, `[]` → `<doma:fixValues/>`) | unpadded / string form |
 | Reference by name | `valueTable` / `superPackage` on an element carrying `uri`, `type`, `description`: the element holds `adtcore:name` alone; on `<doma:valueTableRef/>` it gains it | set `adtcore:name` and keep the old attributes |
-| Escaping | `&`, `<`, `>`, `"` in text and attribute values | unescaped write |
+| Escaping | `&`, `<`, `>`, the quote, LF/tab/CR — read back exactly by a conforming parser; malformed references refused | unescaped write; an unchecked reference |
 | Undefined is unchanged | a field left `undefined` leaves its element byte-equal | write `''` for undefined |
 
 A source scan (`noRegexInDocumentPatches.test.ts`, with the TypeScript parser like
