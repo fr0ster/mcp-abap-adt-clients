@@ -321,6 +321,34 @@ describe('a failing step logs its error text', () => {
     expect(thrown).not.toContain('SECRET01');
   });
 
+  it("replaces every echo of the step's own lock handle in SAP's text, keeping SAP's reason", async () => {
+    // The shape SAP answers a write with a handle it does not hold: the
+    // handle sent comes back inside the message, here twice over.
+    const NOT_LOCKED =
+      '<?xml version="1.0" encoding="utf-8"?>' +
+      '<exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework">' +
+      '<namespace id="com.sap.adt"/><type id="ExceptionResourceInvalidLockHandle"/>' +
+      '<message lang="EN">Resource INTF ZTHING is not locked (invalid lock handle: SEC RET01, sent SEC RET01)</message>' +
+      '<localizedMessage lang="EN">Resource INTF ZTHING is not locked (invalid lock handle: SEC RET01, sent SEC RET01)</localizedMessage>' +
+      '<properties><entry key="T100KEY-ID">SADT_RESOURCE</entry>' +
+      '<entry key="T100KEY-NO">026</entry>' +
+      '<entry key="T100KEY-V3">SEC RET01</entry></properties></exc:exception>';
+    const { thrown, logged } = await runAndCapture({
+      update: jest.fn(async () =>
+        failedOnTheWire(NOT_LOCKED, {
+          method: 'PUT',
+          url: '/sap/bc/adt/oo/interfaces/zthing/source/main?lockHandle=SEC%20RET01&corrNr=X',
+        }),
+      ),
+    });
+    const reason =
+      'SADT_RESOURCE/026 Resource INTF ZTHING is not locked (invalid lock handle: <lock handle>, sent <lock handle>)';
+    expect(thrown).toContain(reason);
+    expect(logged).toContain(reason);
+    expect(thrown).not.toContain('RET01');
+    expect(logged).not.toContain('RET01');
+  });
+
   it('names a body that is not an ADT document by its length only', async () => {
     const { thrown } = await runAndCapture({
       update: jest.fn(async () => failedOnTheWire('<html>gateway down</html>')),

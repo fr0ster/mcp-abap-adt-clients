@@ -75,16 +75,34 @@ export function failureOf(answer: IAdtResponse<unknown>, what: string): string {
  * What a failure says, for a caller that names the step in its own words:
  * the library's sentence, SAP's status, each message's T100 key and short text,
  * and the request's path — never its query, which carries the lock handle.
+ *
+ * SAP's text may echo the handle the step sent ("invalid lock handle: …"):
+ * every occurrence of that exact handle — read from the request's `lockHandle`
+ * parameter — becomes `<lock handle>`, and SAP's reason stays.
  */
 export function whatFailureSays(failure: IAdtError): string {
   const status = failure.response?.status;
   const said = sapSaid(failure.response?.data);
-  return (
+  const url = failure.request?.url;
+  const told =
     failure.message +
     (status === undefined ? '' : `; HTTP ${status}`) +
-    (said ? `; SAP: ${said}` : '') +
-    (failure.request?.url ? ` (${pathOf(failure.request.url)})` : '')
+    (said ? `; SAP: ${said}` : '');
+  const handle = url === undefined ? '' : lockHandleOf(url);
+  return (
+    (handle ? told.split(handle).join(LOCK_HANDLE) : told) +
+    (url ? ` (${pathOf(url)})` : '')
   );
+}
+
+/** What stands in a log line for the lock handle a step sent. */
+const LOCK_HANDLE = '<lock handle>';
+
+/** The `lockHandle` query parameter of a request URL, decoded; `''` when it has none. */
+function lockHandleOf(url: string): string {
+  const query = url.indexOf('?');
+  if (query < 0) return '';
+  return new URLSearchParams(url.slice(query + 1)).get('lockHandle') ?? '';
 }
 
 /** Each message SAP's document carries, `ID/NO text`; or how long a body that is no document was. */
