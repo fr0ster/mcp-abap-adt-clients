@@ -27,6 +27,8 @@ describe.each(RELEASES)('the shared rules (%s)', (release) => {
     ['blank', '  \n'],
     ['not XML', 'Request failed with status code 500'],
     ['cut short', read.slice(0, read.indexOf('<doma:content>') + 20)],
+    ['another element before the root', '<other/><doma:domain/>'],
+    ['another element after the root', `${read}<other/>`],
   ])('answers not-a-document for %s, without throwing', (_what, text) => {
     expect(patchDomainDocument(text, { description: 'x' })).toEqual({
       ok: false,

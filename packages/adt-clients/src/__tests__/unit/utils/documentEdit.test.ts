@@ -94,8 +94,23 @@ describe('scanDocument / childAt', () => {
     ['cut short', '<?xml version="1.0"?><r a="1"><c>'],
     ['closed by the wrong tag', '<r><c></r></c>'],
     ['a repeated attribute', '<r a="1" a="2"/>'],
+    ['it has two roots', '<a/><r/>'],
+    ['an element follows the root', '<r><c/></r>\n<other/>'],
+    ['an element follows a self-closing root', '<r/><other/>'],
+    ['text precedes the root', 'x<r/>'],
+    ['text follows the root', '<r/>x'],
+    ['CDATA precedes the root', '<![CDATA[x]]><r/>'],
+    ['CDATA follows the root', '<r/><![CDATA[x]]>'],
+    ['a DOCTYPE follows the root', '<r/><!DOCTYPE r>'],
   ])('is not a document when %s', (_what, text) => {
     expect(scanDocument(text)).toBeUndefined();
+  });
+
+  it('allows comments, processing instructions and white space around the root', () => {
+    const text =
+      '<?xml version="1.0"?>\n<!-- before -->\n<?pi a?>\n' +
+      '<r><c/></r>\n<!-- after -->\n<?pi b?>\n';
+    expect(rootOf(text).name).toBe('r');
   });
 });
 

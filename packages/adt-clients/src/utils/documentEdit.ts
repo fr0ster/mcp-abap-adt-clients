@@ -12,7 +12,9 @@
  * sits; an edit is a splice of those ranges and touches nothing else.
  *
  * Well-formedness is fast-xml-parser's `XMLValidator`'s call; the walk relies
- * on it and refuses only what it cannot place.
+ * on it, refuses what it cannot place, and refuses what the validator lets
+ * through outside the root: a second top-level element, text, CDATA or a
+ * DOCTYPE after the root.
  */
 import { XMLValidator } from 'fast-xml-parser';
 
@@ -73,6 +75,14 @@ function nameEndAt(text: string, from: number): number {
     at += 1;
   }
   return at;
+}
+
+/** Whether `[from, to)` holds white space only. */
+function isBlank(text: string, from: number, to: number): boolean {
+  for (let at = from; at < to; at += 1) {
+    if (!isSpace(text.charAt(at))) return false;
+  }
+  return true;
 }
 
 function skipSpace(text: string, from: number): number {
@@ -137,14 +147,23 @@ export function scanDocument(text: string): ElementLocation | undefined {
   let root: ElementLocation | undefined;
   let at = 0;
   while (at < text.length) {
-    const open = text.indexOf('<', at);
-    if (open < 0) break;
+    const found = text.indexOf('<', at);
+    const open = found < 0 ? text.length : found;
+    // Outside the root only white space, comments and processing
+    // instructions may stand (and a DOCTYPE before it); the validator lets a
+    // second top-level element through, so the walk refuses it here.
+    const outside = stack.length === 0;
+    if (outside && !isBlank(text, at, open)) return undefined;
+    if (found < 0) break;
     let next: number;
     if (text.startsWith('<?', open)) {
       next = after(text, '?>', open + 2);
     } else if (text.startsWith('<!--', open)) {
       next = after(text, '-->', open + 4);
+    } else if (outside && root !== undefined) {
+      return undefined;
     } else if (text.startsWith('<![CDATA[', open)) {
+      if (outside) return undefined;
       next = after(text, ']]>', open + 9);
     } else if (text.startsWith('<!', open)) {
       next = after(text, '>', open + 2);
