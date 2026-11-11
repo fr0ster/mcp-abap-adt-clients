@@ -91,8 +91,8 @@ Measured). Choosing a value is the caller's: label-length defaults, upper-casing
 | `conversionExit` | `string` | `doma:content/doma:outputInformation/doma:conversionExit` |
 | `signExists` | `boolean` | `doma:content/doma:outputInformation/doma:signExists` |
 | `lowercase` | `boolean` | `doma:content/doma:outputInformation/doma:lowercase` |
-| `valueTable` | `string` | `doma:content/doma:valueInformation/doma:valueTableRef` `@adtcore:name` (added when missing; `<doma:valueTableRef/>` is SAP's unset form, Measured) |
-| `fixedValues` | `ReadonlyArray<{ low: string; high?: string; text: string }>` | `doma:content/doma:valueInformation/doma:fixValues`, replaced whole: one `doma:fixValue` per entry holding `doma:position` (4 digits, 1-based), `doma:low`, `doma:high`, `doma:text`. `[]` gives `<doma:fixValues/>` |
+| `valueTable` | `string` | `doma:content/doma:valueInformation/doma:valueTableRef`: its attributes replaced by a single `adtcore:name` (see "A reference changed by name"; `<doma:valueTableRef/>` is SAP's unset form, Measured) |
+| `fixedValues` | `ReadonlyArray<{ low: string; high?: string; text: string }>` | `doma:content/doma:valueInformation/doma:fixValues`, replaced whole: one `doma:fixValue` per entry holding `doma:position` (4 digits, 1-based), `doma:low`, `doma:high` (`<doma:high/>` when `high` is absent), `doma:text`. `[]` gives `<doma:fixValues/>` |
 
 `doma:length` occurs twice, under `typeInformation` and `outputInformation` (Measured).
 Only the first is the caller's, and the output length is not touched. The server's
@@ -146,12 +146,13 @@ never touches them.
 | `masterSystem` | `string` | root `adtcore:masterSystem` |
 | `packageType` | `string` | `pak:attributes` `@pak:packageType` |
 | `recordChanges` | `boolean` | `pak:attributes` `@pak:recordChanges` |
-| `superPackage` | `string` | `pak:superPackage` `@adtcore:name` |
+| `superPackage` | `string` | `pak:superPackage`: its attributes replaced by a single `adtcore:name` (see "A reference changed by name") |
 | `softwareComponent` | `string` | `pak:transport/pak:softwareComponent` `@pak:name` |
 | `transportLayer` | `string` | `pak:transport/pak:transportLayer` `@pak:name` |
 
 `pak:softwareComponent` and `pak:transportLayer` sit under `pak:transport` on both systems
-(Measured), so their path has two steps. `adtcore:packageRef`, `pak:superPackage` and every
+(Measured), so their path is the fixed `pak:package/pak:transport/pak:softwareComponent` and
+`pak:package/pak:transport/pak:transportLayer`, never the first element of that name. `adtcore:packageRef`, `pak:superPackage` and every
 `pak:subPackages/pak:packageRef` carry an `adtcore:description` of another package
 (Measured). None of them is written for `description`.
 
@@ -164,6 +165,23 @@ never touches them.
 The messages (`mc:messages`) carry no `adtcore:description` on either system (Measured: one
 `adtcore:description` per document, the root's). The server's comment that "every message
 carries one too" does not hold for these reads.
+
+### A reference changed by name
+
+`valueTable` (domain) and `superPackage` (package) name another object. The element SAP
+answers carries that object's `adtcore:uri`, `adtcore:type` and, for a package,
+`adtcore:description` beside `adtcore:name` (Measured: `WAERS` →
+`<doma:valueTableRef adtcore:uri="…/tcurc" adtcore:type="TABL/DT" adtcore:name="TCURC"/>`;
+`ZADT_BLD_PKG03` → `pak:superPackage` with all four). On a change, the element's attributes
+are replaced by a single `adtcore:name`, so nothing of the old target is left behind; the
+element's other content and every other byte stay as read.
+
+That SAP accepts a reference carrying only the name is not yet measured. **It is the plan's
+first measurement**, before any patch code: a domain whose value table is set through a
+`doma:valueTableRef` holding only `adtcore:name`, and a package whose super package is set
+through a `pak:superPackage` holding only `adtcore:name`, each written and read back, on
+trial and on E19. If SAP refuses either one, the plan stops and reports back; no other form
+is chosen without the owner.
 
 ### The description is passed as given
 
@@ -235,7 +253,8 @@ while the test is written, and the PR records it.
 | All or nothing | a missing element gives `element-missing` naming the field and path, and no document | write the fields found, skip the missing one |
 | Not a document | `''`, blank, `<a>` cut short, non-XML: `not-a-document` | drop the validator |
 | Not this type | a domain document to `patchTableTypeDocument`: `not-this-type` | drop the root check |
-| Formatting | 6-digit lengths, 2-digit label lengths, `true` / `false`, `fixValues` block (positions, `high`, `[]` → `<doma:fixValues/>`) | unpadded / string form |
+| Formatting | 6-digit lengths, 2-digit label lengths, `true` / `false`, `fixValues` block (positions, `high` given and absent → `<doma:high/>`, `[]` → `<doma:fixValues/>`) | unpadded / string form |
+| Reference by name | `valueTable` / `superPackage` on an element carrying `uri`, `type`, `description`: the element holds `adtcore:name` alone; on `<doma:valueTableRef/>` it gains it | set `adtcore:name` and keep the old attributes |
 | Escaping | `&`, `<`, `>`, `"` in text and attribute values | unescaped write |
 | Undefined is unchanged | a field left `undefined` leaves its element byte-equal | write `''` for undefined |
 
@@ -254,7 +273,10 @@ changed field's stored value and the root's description:
   → write accepted): the table type's trial failure, now passing;
 - a description longer than the limit: what SAP stores is read back and asserted as
   truncated (the owner's statement, confirmed or reported back);
-- `fixedValues` with `high` and with `[]`; `valueTable` set on `<doma:valueTableRef/>`.
+- `fixedValues` with `high`, without it and with `[]`; `valueTable` set on
+  `<doma:valueTableRef/>` and changed from one table to another; `superPackage` changed —
+  each read back with SAP's own `uri` / `type` for the new target (the first measurement
+  above, now as a regression test).
 
 ### The other trial failures
 
@@ -271,8 +293,13 @@ changed field's stored value and the root's description:
 - **deletionCheck.test, transport request:** registered `it.skip` when
   `environment.default_transport` is empty, the title stating so (it is `""` on trial,
   Code: overlay).
-- **Transport.test, list through a saved search:** skips, stating that the account has no
-  saved transport search configuration (how it knows is open question 1 in the report).
+- **Transport.test, list through a saved search:** a new required overlay key,
+  `environment.transport_search_configured` (boolean; `false` on trial), states whether the
+  account holds a saved transport search configuration, as `environment.verify_lock_released`
+  states its fact. `false` registers the case `it.skip`, its title stating that the account
+  has no saved search configuration; `true` runs it and an empty list fails. The key goes
+  into `helpers/overlays/` (both forms), `check:config` and
+  `docs/development/TEST_CONFIG_SCHEMA.md`.
 
 ## 6. What mcp-abap-adt then removes (its own PR, after the release is published)
 
@@ -280,8 +307,11 @@ changed field's stored value and the root's description:
   `packagePatch.ts`; the patch half of `tableTypePatch.ts`
   (`readTableTypeDefinition` / `StoredTableTypeDefinition` move into `tableTypeStored.ts`,
   which stays on the server); `extractXmlString`, `patchXml*`, `patchIf` and
-  `XmlPatchError` from `xmlPatch.ts`; the unit tests of each. The domain fix 79f62d7c goes
-  with `domainPatch.ts`.
+  `XmlPatchError` — `xmlPatch.ts` is deleted whole; the unit tests of each. The domain fix
+  79f62d7c goes with `domainPatch.ts`.
+- `IncludeHighHandlers.test.ts`, the one remaining user of the server's `patchXmlAttribute`
+  (an include, outside the six types), moves to a root-scoped description helper in plain
+  string code, as adt-clients' `helpers/rootDescription.ts` is.
 - `handleUpdateMessageClass.ts`'s own `patchXmlAttribute`.
 - Every handler listed in the goal's facts (domain, data element, table type high
   create/update and low update; function group high update; package high/low update;
