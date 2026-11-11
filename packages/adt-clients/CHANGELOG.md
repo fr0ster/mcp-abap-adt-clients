@@ -24,6 +24,50 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [45.2.0] - 2026-11-11
+
+### Added
+
+- **A patch per document type**: `patchDomainDocument`,
+  `patchDataElementDocument`, `patchTableTypeDocument`,
+  `patchFunctionGroupDocument`, `patchPackageDocument` and
+  `patchMessageClassDocument`, with their changes types (`IDomainChanges`,
+  `IDomainFixedValue`, `IDataElementChanges`, `ITableTypeChanges`,
+  `IFunctionGroupChanges`, `IPackageChanges`, `IMessageClassChanges`) and
+  their answer (`DocumentPatch`, `DocumentPatchRefusal`). Each takes the
+  document `readMetadata` answered and the fields the caller names, and
+  answers that document with exactly those changes — every other byte as SAP
+  stored it — or a refusal (`not-a-document`, `not-this-type`,
+  `element-missing`) and no document. It sends no request: an update stays
+  `readMetadata`, the patch, `updateMetadata`. An element is found by its path
+  from the root, never by the first of its name; the description is written
+  on the root, and added there when a fresh object's read carries none; a
+  value table or a super package is changed by name alone, which SAP resolves
+  (measured on premise and on the cloud). The description is passed as given,
+  and SAP's answer to one over its limit reaches the caller as it is: a
+  refusal (`SWB_TOOL` `018`; `FUNC_ADT` `103` for a function group), or, for a
+  message class, the first 60 characters stored (measured on premise and on
+  the cloud). The fields and paths: `docs/usage/CLIENT_API_REFERENCE.md`,
+  "Patching a metadata document"; why: decision 19 in
+  `docs/architecture/DECISIONS.md`.
+- **`corpus/adt/documents/`**: the six types' metadata documents of both
+  releases, and a freshly created domain's, data element's and table type's
+  read-back (no description on the root), the patches' unit-test fixtures.
+
+### Changed
+
+- **The test suites patch through the shipped functions.** The internal,
+  never exported `src/utils/xmlPatch.ts` (a regex, first-match patcher) is
+  deleted with its test, and with it the `describe` command of
+  `scripts/transport-admin.ts`, its last user; no first-match patcher is left
+  in the repository.
+- **A test overlay states `environment.transport_search_configured`**
+  (required, boolean): whether the account holds a saved transport search
+  configuration. `false` skips the list-through-a-saved-search case, saying
+  why. The master-language case follows the library (no language configured,
+  none sent), and the transport-request deletion check skips, saying why,
+  when no transport is configured.
+
 ## [45.1.0] - 2026-11-11
 
 ### Added

@@ -1098,7 +1098,11 @@ await cls.unlock({ className: 'ZCL_X' }, handle);
 const domain = client.getDomain();
 const doc = await domain.readMetadata({ domainName: 'ZD' });
 if (!doc.ok) throw new Error(doc.getError().message);
-const patched = patchTheDescription(String(doc.getResult().value), 'new');
+const answer = patchDomainDocument(String(doc.getResult().value), {
+  description: 'new',
+});
+if (!answer.ok) throw new Error(`cannot patch: ${answer.refusal.kind}`);
+const patched = answer.document;
 
 const domainLock = await domain.lock({ domainName: 'ZD' });
 if (!domainLock.ok) throw new Error(domainLock.getError().message);
@@ -1150,7 +1154,11 @@ const domain = client.getDomain({ ...domainDocuments, metadata: wireItself });
 const doc = await domain.readMetadata({ domainName: 'ZD' }, { version: 'inactive' });
 if (!doc.ok) throw new Error(doc.getError().message);
 const etag = doc.getResult().value.headers.etag;
-const patched = patchTheDescription(String(doc.getResult().value.data), 'new');
+const answer = patchDomainDocument(String(doc.getResult().value.data), {
+  description: 'new',
+});
+if (!answer.ok) throw new Error(`cannot patch: ${answer.refusal.kind}`);
+const patched = answer.document;
 
 const domainLock = await domain.lock({ domainName: 'ZD' });
 if (!domainLock.ok) throw new Error(domainLock.getError().message);
@@ -1195,6 +1203,139 @@ write without `charset` is what the structure live suite checks (not yet run).
 
 SAP_BASIS 7.40 does not act on `If-Match` (see `@mcp-abap-adt/adt-clients-legacy`,
 `docs/LEGACY.md`).
+
+### Patching a metadata document
+
+For six document types the library ships the change: a pure function per type
+that takes the document `readMetadata` answered and the fields the caller names,
+and answers that document with exactly those changes. It sends no request, reads
+no clock and keeps nothing, so an update stays three calls — `readMetadata`, the
+patch, `updateMetadata` with the result as `options.source` (see "`update()`
+writes the whole content" above).
+
+```typescript
+import {
+  type DocumentPatch,
+  type IPackageChanges,
+  patchPackageDocument,
+} from '@mcp-abap-adt/adt-clients';
+
+const changes: IPackageChanges = { description: 'Sales', superPackage: 'ZSALES' };
+const answer: DocumentPatch<keyof IPackageChanges> = patchPackageDocument(read, changes);
+if (answer.ok) {
+  // answer.document goes to updateMetadata as options.source
+} else if (answer.refusal.kind === 'element-missing') {
+  // answer.refusal.field had nowhere to go: answer.refusal.path is not in the document
+}
+```
+
+| Type | Function | Changes type | Root element |
+|---|---|---|---|
+| Domain | `patchDomainDocument` | `IDomainChanges` | `doma:domain` |
+| Data element | `patchDataElementDocument` | `IDataElementChanges` | `blue:wbobj` |
+| Table type | `patchTableTypeDocument` | `ITableTypeChanges` | `ttyp:tableType` |
+| Function group | `patchFunctionGroupDocument` | `IFunctionGroupChanges` | `group:abapFunctionGroup` |
+| Package | `patchPackageDocument` | `IPackageChanges` | `pak:package` |
+| Message class | `patchMessageClassDocument` | `IMessageClassChanges` | `mc:messageClass` |
+
+**What a patch changes.** A field left `undefined` is not changed; any other
+value, `''` included, is written (`''` as `<x/>`, the form SAP answers for an
+empty value). Every byte outside the written ranges comes back as it was read:
+attribute order, quoting, entities, whitespace, and the attributes and elements
+the library does not know. An element is found by its path from the root, never
+by the first element of that name — a domain's output length, a package
+reference's description, a table type's value helps are never written in place
+of the field the caller named. The patch writes SAP's form of a typed value: a
+6-digit length or decimals (`000010`), a 2-digit label length (`06`),
+`true` / `false`, a 4-digit fixed-value position (`0001`). Choosing the value —
+defaults, upper-casing, label lengths — is the caller's.
+
+**The description** is written on the root element's `adtcore:description`, and
+added there when the read carries none (a freshly created, not yet activated
+domain, data element or table type reads back without it). It is **passed as
+given**: no truncation and no check of its length, and SAP's answer reaches
+the caller as it is. Measured on premise and on the cloud alike (2026-11-11),
+for a description ten characters over the limit:
+
+| Type | Limit | SAP's answer |
+|---|---|---|
+| Domain, data element, table type, package | 60 | `400 ExceptionInvalidData`, T100 `SWB_TOOL` `018` "The description is too long. Maximum length: 60 characters" (subtype `src_prop_decr_too_long`); nothing stored |
+| Function group | 40 (`adtcore:descriptionTextLimit="40"`) | `400`, T100 `FUNC_ADT` `103` "Description of <group> longer than 40 characters."; nothing stored |
+| Message class | 60 | accepted; SAP stores the first 60 characters |
+
+**A reference changed by name.** `valueTable` (domain) and `superPackage`
+(package) name another object. On a change the element's attributes are replaced
+by a single `adtcore:name`, so nothing of the old target stays; SAP resolves the
+name and its read-back carries its own `adtcore:uri` and `adtcore:type` (measured
+on premise and on the cloud, 2026-11-11).
+
+**What a patch answers.** `{ ok: true, document }`, or `{ ok: false, refusal }`
+and no document — all or nothing, so a half-patched document cannot be written.
+A refusal is returned, never thrown: its cause is SAP's document.
+
+| `refusal.kind` | When |
+|---|---|
+| `not-a-document` | The read is empty, blank, not XML or not well-formed — the empty `200` ADT answers for an object that is not ready yet |
+| `not-this-type` | The root is another element (`refusal.root`) |
+| `element-missing` | The first field, in the changes type's declaration order, whose element is not in the document (`refusal.field`, `refusal.path`) |
+
+With no field given the input comes back unchanged, after the same checks.
+
+#### Domain — `IDomainChanges`
+
+| Field | Type | Written to |
+|---|---|---|
+| `description` | `string` | root `adtcore:description` |
+| `dataType` | `string` | `doma:content/doma:typeInformation/doma:datatype` |
+| `length` | `number` | `doma:content/doma:typeInformation/doma:length` (6 digits; the output length is not touched) |
+| `decimals` | `number` | `doma:content/doma:typeInformation/doma:decimals` (6 digits) |
+| `conversionExit` | `string` | `doma:content/doma:outputInformation/doma:conversionExit` |
+| `signExists` | `boolean` | `doma:content/doma:outputInformation/doma:signExists` |
+| `lowercase` | `boolean` | `doma:content/doma:outputInformation/doma:lowercase` |
+| `valueTable` | `string` | `doma:content/doma:valueInformation/doma:valueTableRef`, by name |
+| `fixedValues` | `ReadonlyArray<IDomainFixedValue>` (`{ low, high?, text }`) | `doma:content/doma:valueInformation/doma:fixValues`, replaced whole: one `doma:fixValue` per entry (`doma:position` 1-based, 4 digits; `<doma:high/>` without `high`); `[]` gives `<doma:fixValues/>` |
+
+#### Data element — `IDataElementChanges`
+
+| Field | Type | Written to |
+|---|---|---|
+| `description` | `string` | root `adtcore:description` |
+| `typeKind` | `IDataElementConfig['typeKind']` | `dtel:dataElement/dtel:typeKind` |
+| `typeName` | `string` | `dtel:dataElement/dtel:typeName` |
+| `dataType` | `string` | `dtel:dataElement/dtel:dataType` |
+| `length`, `decimals` | `number` | `dtel:dataElement/dtel:dataTypeLength`, `dtel:dataTypeDecimals` (6 digits) |
+| `shortLabel`, `mediumLabel`, `longLabel`, `headingLabel` | `string` | `dtel:shortFieldLabel`, `dtel:mediumFieldLabel`, `dtel:longFieldLabel`, `dtel:headingFieldLabel` |
+| `shortLength`, `mediumLength`, `longLength`, `headingLength` | `number` | `dtel:shortFieldLength`, … (2 digits; never derived from the label) |
+| `searchHelp`, `searchHelpParameter`, `setGetParameter` | `string` | `dtel:searchHelp`, `dtel:searchHelpParameter`, `dtel:setGetParameter` |
+
+The `*MaxLength` elements are SAP's and are not written.
+
+#### Table type — `ITableTypeChanges`
+
+| Field | Type | Written to |
+|---|---|---|
+| `description` | `string` | root `adtcore:description` |
+| `rowTypeKind`, `rowTypeName` | `string` | `ttyp:rowType/ttyp:typeKind`, `ttyp:rowType/ttyp:typeName` |
+| `dataType` | `string` | `ttyp:rowType/ttyp:builtInType/ttyp:dataType` |
+| `length`, `decimals` | `number` | `ttyp:rowType/ttyp:builtInType/ttyp:length`, `…/ttyp:decimals` (6 digits) |
+| `accessType` | `string` | `ttyp:accessType` |
+| `keyDefinition`, `keyKind` | `string` | `ttyp:primaryKey/ttyp:definition`, `ttyp:primaryKey/ttyp:kind` |
+
+#### Function group — `IFunctionGroupChanges`, message class — `IMessageClassChanges`
+
+`description` alone, on the root (`group:abapFunctionGroup`, `mc:messageClass`).
+A message class's messages are written back as read.
+
+#### Package — `IPackageChanges`
+
+| Field | Type | Written to |
+|---|---|---|
+| `description`, `responsible`, `masterSystem` | `string` | root `adtcore:description`, `adtcore:responsible`, `adtcore:masterSystem` |
+| `packageType` | `string` | `pak:attributes` `@pak:packageType` |
+| `recordChanges` | `boolean` | `pak:attributes` `@pak:recordChanges` |
+| `superPackage` | `string` | `pak:superPackage`, by name |
+| `softwareComponent` | `string` | `pak:transport/pak:softwareComponent` `@pak:name` |
+| `transportLayer` | `string` | `pak:transport/pak:transportLayer` `@pak:name` |
 
 ### What `activate()` answers, and who judges it
 
