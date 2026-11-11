@@ -176,12 +176,13 @@ answers carries that object's `adtcore:uri`, `adtcore:type` and, for a package,
 are replaced by a single `adtcore:name`, so nothing of the old target is left behind; the
 element's other content and every other byte stay as read.
 
-That SAP accepts a reference carrying only the name is not yet measured. **It is the plan's
-first measurement**, before any patch code: a domain whose value table is set through a
-`doma:valueTableRef` holding only `adtcore:name`, and a package whose super package is set
-through a `pak:superPackage` holding only `adtcore:name`, each written and read back, on
-trial and on E19. If SAP refuses either one, the plan stops and reports back; no other form
-is chosen without the owner.
+SAP accepts a reference carrying only the name (**Measured**, 2026-11-11, the plan's A1
+probe, on ABAP Cloud and on premise alike): a domain's `doma:valueTableRef` holding only
+`adtcore:name`, written empty → table A and then A → table B, and a package's
+`pak:superPackage` holding only `adtcore:name`, moved from the build package to the shared
+package; every PUT answered ok, and each read-back carried SAP's own `adtcore:uri` and
+`adtcore:type` for the new target (and, for the package, its `adtcore:description`). The
+control in the full form SAP answers was accepted the same way.
 
 ### The description is passed as given
 
