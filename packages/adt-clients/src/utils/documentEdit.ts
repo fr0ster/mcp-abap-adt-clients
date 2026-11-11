@@ -273,8 +273,8 @@ export function scanDocument(text: string): ElementLocation | undefined {
     const found = text.indexOf('<', at);
     const open = found < 0 ? text.length : found;
     // Outside the root only white space, comments and processing
-    // instructions may stand (and a DOCTYPE before it); the validator lets a
-    // second top-level element through, so the walk refuses it here.
+    // instructions may stand; the validator lets a second top-level element
+    // through, so the walk refuses it here.
     const outside = stack.length === 0;
     if (outside && !isBlank(text, at, open)) return undefined;
     if (!outside && !isCharData(text, at, open)) return undefined;
@@ -293,7 +293,9 @@ export function scanDocument(text: string): ElementLocation | undefined {
       if (outside) return undefined;
       next = after(text, ']]>', open + 9);
     } else if (text.startsWith('<!', open)) {
-      next = after(text, '>', open + 2);
+      // A DOCTYPE or any other markup declaration, anywhere: SAP's documents
+      // carry none, and a DOCTYPE is how entity definitions enter.
+      return undefined;
     } else if (text.startsWith('</', open)) {
       const nameEnd = nameEndAt(text, open + 2);
       const close = after(text, '>', nameEnd);

@@ -233,7 +233,8 @@ domain's). The patch adds the attribute when it is missing, either way.
   escape the same way, through the same two functions (`src/utils/xml.ts`).
 - **A document the patch cannot safely edit is refused:** `not-a-document` guards the
   splice. The checks: one root element, with only white space, comments and processing
-  instructions outside it; every `&` starts a predefined entity or a character reference
+  instructions outside it; no DOCTYPE or other markup declaration anywhere (SAP's
+  documents carry none, and a DOCTYPE is how entity definitions enter); every `&` starts a predefined entity or a character reference
   to an XML Char; an attribute value holds no `<`; text holds no `]]>`; every character is
   an XML Char (§2.2, no lone surrogate); a comment holds no `--` and does not end in
   `--->` (§2.5). A leading BOM is accepted and kept. The patch is not a full XML 1.0

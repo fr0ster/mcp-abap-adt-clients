@@ -100,6 +100,17 @@ describe('scanDocument / childAt', () => {
     ['CDATA precedes the root', '<![CDATA[x]]><r/>'],
     ['CDATA follows the root', '<r/><![CDATA[x]]>'],
     ['a DOCTYPE follows the root', '<r/><!DOCTYPE r>'],
+    ['a DOCTYPE precedes the root', '<!DOCTYPE r><r/>'],
+    [
+      'a DOCTYPE follows the declaration',
+      '<?xml version="1.0"?>\n<!DOCTYPE r>\n<r/>',
+    ],
+    [
+      'a DOCTYPE with an internal subset precedes the root',
+      '<!DOCTYPE r [<!ELEMENT r ANY>]><r/>',
+    ],
+    ['a DOCTYPE stands inside the root', '<r><!DOCTYPE r></r>'],
+    ['a markup declaration stands inside the root', '<r><!ELEMENT r ANY></r>'],
     ['text holds a bare &', '<r>a & b</r>'],
     ['text holds an & with no ;', '<r>&amp</r>'],
     ['text holds an undefined entity', '<r>&foo;</r>'],

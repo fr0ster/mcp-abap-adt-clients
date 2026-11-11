@@ -31,6 +31,16 @@ describe.each(RELEASES)('the shared rules (%s)', (release) => {
     ['cut short', read.slice(0, read.indexOf('<doma:content>') + 20)],
     ['another element before the root', '<other/><doma:domain/>'],
     ['another element after the root', `${read}<other/>`],
+    ['a DOCTYPE before the root', '<!DOCTYPE doma:domain><doma:domain/>'],
+    [
+      'a DOCTYPE with an internal subset before the root',
+      '<!DOCTYPE doma:domain [<!ELEMENT doma:domain ANY>]><doma:domain/>',
+    ],
+    ['a DOCTYPE after the root', '<doma:domain/><!DOCTYPE doma:domain>'],
+    [
+      'a DOCTYPE in the document SAP sent',
+      read.replace('<doma:domain', '<!DOCTYPE doma:domain>\n<doma:domain'),
+    ],
     ['-- in a comment', '<doma:domain><!-- a--b --></doma:domain>'],
     ['a comment ending in --->', '<doma:domain><!-- a ---></doma:domain>'],
     ['a literal NUL in text', '<doma:domain>a\u0000b</doma:domain>'],
