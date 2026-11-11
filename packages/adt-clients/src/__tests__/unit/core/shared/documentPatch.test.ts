@@ -6,11 +6,19 @@
  * writes a description on the object's own root, adding it when the root
  * carries none — never on the package reference beside it.
  */
+import { XMLParser } from 'fast-xml-parser';
 import { patchDomainDocument } from '../../../../core/domain/patch';
+import {
+  applySplices,
+  type ElementLocation,
+  type Splice,
+  scanDocument,
+} from '../../../../utils/documentEdit';
 import {
   documentOf,
   onlyChanged,
   RELEASES,
+  replacing,
   without,
 } from '../documentFixtures';
 
@@ -120,4 +128,121 @@ describe.each(RELEASES)('the shared rules (%s)', (release) => {
     );
     expect(answer.document).toContain(PACKAGE_DESCRIPTION);
   });
+});
+
+/**
+ * What a conforming XML processor hands its application: line ends
+ * normalised to LF (XML 1.0 §2.11), then every literal white-space
+ * character in an attribute value read as a space (§3.3.3), then the
+ * references resolved. fast-xml-parser resolves the references but skips
+ * both normalisations, so they are applied to the text before it parses.
+ */
+function conformingRead(document: string): unknown {
+  const lines = document.split('\r\n').join('\n').split('\r').join('\n');
+  const root = scanDocument(lines);
+  if (root === undefined) throw new Error('not a document');
+  const splices: Splice[] = [];
+  const visit = (element: ElementLocation): void => {
+    for (const attribute of element.attributes) {
+      const raw = lines.slice(attribute.value.start, attribute.value.end);
+      splices.push({
+        ...attribute.value,
+        text: raw.split('\t').join(' ').split('\n').join(' '),
+      });
+    }
+    for (const child of element.children) visit(child);
+  };
+  visit(root);
+  return new XMLParser({
+    ignoreAttributes: false,
+    htmlEntities: true,
+    trimValues: false,
+    parseTagValue: false,
+    parseAttributeValue: false,
+  }).parse(applySplices(lines, splices));
+}
+
+/** The parsed node at `path`, each step an element or an `@_` attribute. */
+function readAt(node: unknown, path: readonly string[]): unknown {
+  let current = node;
+  for (const step of path) {
+    if (typeof current !== 'object' || current === null) return undefined;
+    let next: unknown;
+    for (const [key, value] of Object.entries(current)) {
+      if (key === step) next = value;
+    }
+    current = next;
+  }
+  return current;
+}
+
+describe.each(RELEASES)('values reach the reader as given (%s)', (release) => {
+  const read = documentOf(release, 'domain-shared');
+  const DESCRIPTION = ['doma:domain', '@_adtcore:description'];
+  const CONVERSION_EXIT = [
+    'doma:domain',
+    'doma:content',
+    'doma:outputInformation',
+    'doma:conversionExit',
+  ];
+
+  it.each([
+    ['a line feed', 'a\nb'],
+    ['a tab', 'a\tb'],
+    ['a carriage return', 'a\rb'],
+    ['CR LF', 'a\r\nb'],
+    ['all of them', 'a\nb\tc\rd\r\ne'],
+    ['the escaped characters', `a&b<c>d"e'f`],
+  ])('keeps %s in a double-quoted attribute and in text', (_what, value) => {
+    const answer = patchDomainDocument(read, {
+      description: value,
+      conversionExit: value,
+    });
+    if (!answer.ok) throw new Error('refused');
+    const parsed = conformingRead(answer.document);
+    expect(readAt(parsed, DESCRIPTION)).toBe(value);
+    expect(readAt(parsed, CONVERSION_EXIT)).toBe(value);
+  });
+
+  it.each([
+    ['all the white space', 'a\nb\tc\rd\r\ne'],
+    ['the escaped characters', `a&b<c>d"e'f`],
+  ])('keeps %s in a single-quoted attribute', (_what, value) => {
+    const quoted = replacing(
+      read,
+      ' adtcore:description="Shared domain — base of the group-activation chain"',
+      " adtcore:description='Shared domain'",
+    );
+    const answer = patchDomainDocument(quoted, { description: value });
+    if (!answer.ok) throw new Error('refused');
+    expect(readAt(conformingRead(answer.document), DESCRIPTION)).toBe(value);
+  });
+
+  it('keeps the white space in an attribute the patch adds', () => {
+    const value = 'a\nb\tc\rd';
+    const answer = patchDomainDocument(without(read, ROOT_DESCRIPTION), {
+      description: value,
+    });
+    if (!answer.ok) throw new Error('refused');
+    expect(readAt(conformingRead(answer.document), DESCRIPTION)).toBe(value);
+  });
+
+  it.each([
+    ['a bare &', 'a & b'],
+    ['an undefined entity', '&foo;'],
+    ['a malformed character reference', '&#xZZ;'],
+  ])(
+    'answers not-a-document for %s in a description SAP sent',
+    (_what, raw) => {
+      const broken = replacing(
+        read,
+        ' adtcore:description="Shared domain — base of the group-activation chain"',
+        ` adtcore:description="${raw}"`,
+      );
+      expect(patchDomainDocument(broken, { description: 'x' })).toEqual({
+        ok: false,
+        refusal: { kind: 'not-a-document' },
+      });
+    },
+  );
 });

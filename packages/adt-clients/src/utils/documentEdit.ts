@@ -13,8 +13,12 @@
  *
  * Well-formedness is fast-xml-parser's `XMLValidator`'s call; the walk relies
  * on it, refuses what it cannot place, and refuses what the validator lets
- * through outside the root: a second top-level element, text, CDATA or a
- * DOCTYPE after the root.
+ * through: outside the root, a second top-level element, text, CDATA or a
+ * DOCTYPE after the root; inside it, a reference that is not one of the five
+ * predefined entities or a character reference to an XML character (the
+ * validator reads no reference in an attribute value and takes any `&name;`
+ * in text), `<` in an attribute value and `]]>` in text. A conforming parser
+ * refuses each of them, so a patch must not answer them as a document.
  */
 import { XMLValidator } from 'fast-xml-parser';
 
@@ -85,6 +89,89 @@ function isBlank(text: string, from: number, to: number): boolean {
   return true;
 }
 
+const PREDEFINED_ENTITIES: readonly string[] = [
+  'amp',
+  'lt',
+  'gt',
+  'quot',
+  'apos',
+];
+
+/** Whether `code` is a `Char` of XML 1.0 (§2.2). */
+function isXmlChar(code: number): boolean {
+  return (
+    code === 0x9 ||
+    code === 0xa ||
+    code === 0xd ||
+    (code >= 0x20 && code <= 0xd7ff) ||
+    (code >= 0xe000 && code <= 0xfffd) ||
+    (code >= 0x10000 && code <= 0x10ffff)
+  );
+}
+
+/** The digit's value in `radix`, or -1 when it is not one. */
+function digitValue(code: number, radix: 10 | 16): number {
+  if (code >= 0x30 && code <= 0x39) return code - 0x30;
+  if (radix === 10) return -1;
+  if (code >= 0x61 && code <= 0x66) return code - 0x61 + 10;
+  if (code >= 0x41 && code <= 0x46) return code - 0x41 + 10;
+  return -1;
+}
+
+/**
+ * Whether `body` (between `&#` and `;`) references an XML character; no
+ * digit reads as 0 and a value past U+10FFFF is no character either.
+ */
+function isCharacterReference(body: string): boolean {
+  const radix = body.startsWith('x') ? 16 : 10;
+  const digits = radix === 16 ? body.slice(1) : body;
+  let code = 0;
+  for (let at = 0; at < digits.length; at += 1) {
+    const digit = digitValue(digits.charCodeAt(at), radix);
+    if (digit < 0) return false;
+    code = code * radix + digit;
+  }
+  return isXmlChar(code);
+}
+
+/**
+ * Whether every `&` in `[from, to)` starts a reference to a predefined entity
+ * or to an XML character (XML 1.0 §4.1). A document here declares no entity
+ * of its own: the walk refuses an internal DTD subset.
+ */
+function referencesWellFormed(text: string, from: number, to: number): boolean {
+  let reference = -1;
+  for (let at = from; at < to; at += 1) {
+    const char = text.charAt(at);
+    if (reference < 0) {
+      if (char === '&') reference = at;
+    } else if (char === ';') {
+      const body = text.slice(reference + 1, at);
+      const known = body.startsWith('#')
+        ? isCharacterReference(body.slice(1))
+        : PREDEFINED_ENTITIES.includes(body);
+      if (!known) return false;
+      reference = -1;
+    }
+  }
+  return reference < 0;
+}
+
+/** Whether `[from, to)` is well-formed character data (XML 1.0 §2.4). */
+function isCharData(text: string, from: number, to: number): boolean {
+  return (
+    !text.slice(from, to).includes(']]>') &&
+    referencesWellFormed(text, from, to)
+  );
+}
+
+/** Whether `[from, to)` is a well-formed attribute value (XML 1.0 §2.3). */
+function isAttributeValue(text: string, from: number, to: number): boolean {
+  return (
+    !text.slice(from, to).includes('<') && referencesWellFormed(text, from, to)
+  );
+}
+
 function skipSpace(text: string, from: number): number {
   let at = from;
   while (at < text.length && isSpace(text.charAt(at))) at += 1;
@@ -130,6 +217,7 @@ function readStartTag(text: string, start: number): OpenElement | undefined {
     if (quote !== '"' && quote !== "'") return undefined;
     const valueEnd = text.indexOf(quote, at + 1);
     if (valueEnd < 0) return undefined;
+    if (!isAttributeValue(text, at + 1, valueEnd)) return undefined;
     attributes.push({ name, value: { start: at + 1, end: valueEnd }, quote });
     at = valueEnd + 1;
   }
@@ -154,6 +242,7 @@ export function scanDocument(text: string): ElementLocation | undefined {
     // second top-level element through, so the walk refuses it here.
     const outside = stack.length === 0;
     if (outside && !isBlank(text, at, open)) return undefined;
+    if (!outside && !isCharData(text, at, open)) return undefined;
     if (found < 0) break;
     let next: number;
     if (text.startsWith('<?', open)) {
@@ -237,20 +326,35 @@ function replaceAll(value: string, from: string, to: string): string {
   return value.split(from).join(to);
 }
 
-/** Element text: `&`, `<` and `>` escaped. */
+/**
+ * Element text: `&`, `<` and `>` escaped, and a carriage return written as
+ * `&#13;` — a parser turns a literal CR or CR LF into LF (XML 1.0 §2.11).
+ */
 export function escapeText(value: string): string {
   return replaceAll(
-    replaceAll(replaceAll(value, '&', '&amp;'), '<', '&lt;'),
-    '>',
-    '&gt;',
+    replaceAll(
+      replaceAll(replaceAll(value, '&', '&amp;'), '<', '&lt;'),
+      '>',
+      '&gt;',
+    ),
+    '\r',
+    '&#13;',
   );
 }
 
-/** An attribute value: as text, plus the quote it is delimited with. */
+/**
+ * An attribute value: as text, plus the quote it is delimited with, and LF
+ * and tab written as `&#10;` and `&#9;` — a parser reads a literal one in an
+ * attribute value as a space (XML 1.0 §3.3.3).
+ */
 export function escapeAttribute(value: string, quote: '"' | "'"): string {
   return replaceAll(
-    escapeText(value),
-    quote,
-    quote === '"' ? '&quot;' : '&apos;',
+    replaceAll(
+      replaceAll(escapeText(value), quote, quote === '"' ? '&quot;' : '&apos;'),
+      '\n',
+      '&#10;',
+    ),
+    '\t',
+    '&#9;',
   );
 }

@@ -102,8 +102,37 @@ describe('scanDocument / childAt', () => {
     ['CDATA precedes the root', '<![CDATA[x]]><r/>'],
     ['CDATA follows the root', '<r/><![CDATA[x]]>'],
     ['a DOCTYPE follows the root', '<r/><!DOCTYPE r>'],
+    ['text holds a bare &', '<r>a & b</r>'],
+    ['text holds an & with no ;', '<r>&amp</r>'],
+    ['text holds an undefined entity', '<r>&foo;</r>'],
+    ['text holds an empty reference', '<r>&;</r>'],
+    ['text holds a hex reference with no digit', '<r>&#x;</r>'],
+    ['text holds a hex reference with a non-hex digit', '<r>&#xZZ;</r>'],
+    ['text holds a decimal reference with a letter', '<r>&#1a;</r>'],
+    ['text holds an upper-case X reference', '<r>&#X41;</r>'],
+    ['text references NUL', '<r>&#0;</r>'],
+    ['text references a surrogate', '<r>&#xD800;</r>'],
+    ['text references U+FFFE', '<r>&#xFFFE;</r>'],
+    ['text references past U+10FFFF', '<r>&#x110000;</r>'],
+    ['text holds ]]>', '<r>a]]>b</r>'],
+    ['an attribute holds a bare &', '<r a="a & b"/>'],
+    ['an attribute holds an undefined entity', '<r a="&foo;"/>'],
+    ['an attribute holds a bad hex reference', '<r a="&#xZZ;"/>'],
+    ['an attribute references NUL', "<r a='&#0;'/>"],
+    ['an attribute holds a decimal reference with a letter', '<r a="&#6a;"/>'],
+    ['an attribute holds an upper-case X reference', '<r a="&#X41;"/>'],
+    ['an attribute holds <', '<r a="a<b"/>'],
+    ['a nested attribute holds a bare &', '<r><c a="&"/></r>'],
+    ['it declares its own entity', '<!DOCTYPE r [<!ENTITY e "x">]><r>&e;</r>'],
   ])('is not a document when %s', (_what, text) => {
     expect(scanDocument(text)).toBeUndefined();
+  });
+
+  it('accepts the predefined entities and well-formed character references', () => {
+    const references =
+      '&amp;&lt;&gt;&quot;&apos;&#10;&#9;&#13;&#65;&#0065;&#x41;&#xe9;&#x1F600;&#x10FFFF;';
+    const text = `<r a="${references}" b='${references}'>${references}<c d="&amp;"/>&amp;</r>`;
+    expect(rootOf(text).name).toBe('r');
   });
 
   it('allows comments, processing instructions and white space around the root', () => {
@@ -151,6 +180,15 @@ describe('applySplices', () => {
 describe('escaping', () => {
   it('escapes text: &, < and >', () => {
     expect(escapeText(`a&b<c>d"e'f`)).toBe(`a&amp;b&lt;c&gt;d"e'f`);
+  });
+
+  it('writes a carriage return in text as a reference, LF and tab as they are', () => {
+    expect(escapeText('a\rb\r\nc\td\ne')).toBe('a&#13;b&#13;\nc\td\ne');
+  });
+
+  it('writes LF, tab and CR in an attribute value as references', () => {
+    expect(escapeAttribute('a\nb\tc\rd', '"')).toBe('a&#10;b&#9;c&#13;d');
+    expect(escapeAttribute('a\nb\tc\rd', "'")).toBe('a&#10;b&#9;c&#13;d');
   });
 
   it('escapes an attribute value by its own quote character', () => {
