@@ -112,7 +112,9 @@ export {
 } from './core/metadataExtension';
 export {
   AdtPackage,
+  type IPackageChanges,
   type PackageValues,
+  patchPackageDocument,
 } from './core/package';
 export {
   AdtProgram,
