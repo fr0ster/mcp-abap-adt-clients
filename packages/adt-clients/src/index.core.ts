@@ -67,6 +67,9 @@ export {
 export {
   AdtDomain,
   type DomainValues,
+  type IDomainChanges,
+  type IDomainFixedValue,
+  patchDomainDocument,
 } from './core/domain';
 export {
   AdtEnhancement,
