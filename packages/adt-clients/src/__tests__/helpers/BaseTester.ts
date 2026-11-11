@@ -243,6 +243,14 @@ export type TestableObject<TConfig> = IAdtCreatable<TConfig, unknown> &
   // is a thing ADT is free to refuse and say why.
   Partial<IAdtLockable<TConfig>>;
 
+/** What a write after the update addresses: the flow's config with the update's own fields. */
+function updateTargetOf<TConfig>(
+  config: TConfig,
+  update: Partial<TConfig> | undefined,
+): Partial<TConfig> {
+  return { ...config, ...update };
+}
+
 /** The object's names from its config — `className`, `domainName`, … */
 function describeObject(config: unknown): string {
   const names = Object.entries((config ?? {}) as Record<string, unknown>)
@@ -1451,10 +1459,7 @@ export class BaseTester<TConfig, TState = unknown> {
 
       if (options?.afterUpdate) {
         currentStep = 'after update';
-        const target = {
-          ...config,
-          ...options.updateConfig,
-        } as Partial<TConfig>;
+        const target = updateTargetOf(config, options.updateConfig);
         await options.afterUpdate({
           read: async () =>
             (await readMetadata('read metadata (after update)')) ?? '',
@@ -1470,7 +1475,7 @@ export class BaseTester<TConfig, TState = unknown> {
             );
             if (this.adtObject.activate) {
               expectResult(
-                await this.adtObject.activate(config as Partial<TConfig>, {
+                await this.adtObject.activate(config, {
                   headers: integrationHeadersOf(this.adtObject, 'activate'),
                   analyse: judged(analyseActivation),
                 }),
