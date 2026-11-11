@@ -17,8 +17,12 @@
  * DOCTYPE after the root; inside it, a reference that is not one of the five
  * predefined entities or a character reference to an XML character (the
  * validator reads no reference in an attribute value and takes any `&name;`
- * in text), `<` in an attribute value and `]]>` in text. A conforming parser
- * refuses each of them, so a patch must not answer them as a document.
+ * in text), `<` in an attribute value and `]]>` in text; anywhere, a
+ * character outside XML 1.0's `Char` (a lone surrogate included) and a
+ * comment holding `--` or ending in `--->`. A conforming parser refuses each
+ * of them, so a patch must not answer them as a document. A byte order mark
+ * at the very start is not text outside the root: it is accepted and, being
+ * outside every splice, sent back as it was.
  */
 import { XMLValidator } from 'fast-xml-parser';
 
@@ -107,6 +111,35 @@ function isXmlChar(code: number): boolean {
     (code >= 0xe000 && code <= 0xfffd) ||
     (code >= 0x10000 && code <= 0x10ffff)
   );
+}
+
+/**
+ * Whether every character of `text` is an XML Char, read in one pass: a
+ * surrogate counts only as the high half of a pair followed by its low half.
+ */
+function allXmlChars(text: string): boolean {
+  let at = 0;
+  while (at < text.length) {
+    const code = text.charCodeAt(at);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const low = text.charCodeAt(at + 1);
+      if (!(low >= 0xdc00 && low <= 0xdfff)) return false;
+      at += 2;
+    } else {
+      if (!isXmlChar(code)) return false;
+      at += 1;
+    }
+  }
+  return true;
+}
+
+/**
+ * Whether the comment body `[from, to)` holds no `--` and does not end in
+ * `-`, so its closer is not `--->` (XML 1.0 §2.5).
+ */
+function isCommentBody(text: string, from: number, to: number): boolean {
+  const body = text.slice(from, to);
+  return !body.includes('--') && !body.endsWith('-');
 }
 
 /** The digit's value in `radix`, or -1 when it is not one. */
@@ -230,10 +263,12 @@ function readStartTag(text: string, start: number): OpenElement | undefined {
 export function scanDocument(text: string): ElementLocation | undefined {
   if (text.trim() === '') return undefined;
   if (XMLValidator.validate(text) !== true) return undefined;
+  if (!allXmlChars(text)) return undefined;
 
   const stack: OpenElement[] = [];
   let root: ElementLocation | undefined;
-  let at = 0;
+  // A byte order mark at the very start is the encoding's, not text.
+  let at = text.charCodeAt(0) === 0xfeff ? 1 : 0;
   while (at < text.length) {
     const found = text.indexOf('<', at);
     const open = found < 0 ? text.length : found;
@@ -249,6 +284,9 @@ export function scanDocument(text: string): ElementLocation | undefined {
       next = after(text, '?>', open + 2);
     } else if (text.startsWith('<!--', open)) {
       next = after(text, '-->', open + 4);
+      if (next >= 0 && !isCommentBody(text, open + 4, next - 3)) {
+        return undefined;
+      }
     } else if (outside && root !== undefined) {
       return undefined;
     } else if (text.startsWith('<![CDATA[', open)) {

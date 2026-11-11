@@ -31,11 +31,43 @@ describe.each(RELEASES)('the shared rules (%s)', (release) => {
     ['cut short', read.slice(0, read.indexOf('<doma:content>') + 20)],
     ['another element before the root', '<other/><doma:domain/>'],
     ['another element after the root', `${read}<other/>`],
+    ['-- in a comment', '<doma:domain><!-- a--b --></doma:domain>'],
+    ['a comment ending in --->', '<doma:domain><!-- a ---></doma:domain>'],
+    ['a literal NUL in text', '<doma:domain>a\u0000b</doma:domain>'],
+    [
+      'a literal NUL in CDATA',
+      '<doma:domain><![CDATA[a\u0000b]]></doma:domain>',
+    ],
+    ['U+0001 in an attribute', '<doma:domain a="\u0001"/>'],
+    ['a lone surrogate in text', '<doma:domain>\ud800</doma:domain>'],
+    [
+      'a literal NUL in the document SAP sent',
+      read.replace('</doma:domain>', '\u0000</doma:domain>'),
+    ],
   ])('answers not-a-document for %s, without throwing', (_what, text) => {
     expect(patchDomainDocument(text, { description: 'x' })).toEqual({
       ok: false,
       refusal: { kind: 'not-a-document' },
     });
+  });
+
+  it('accepts a leading BOM before a bare root and keeps it', () => {
+    expect(
+      patchDomainDocument('\ufeff<doma:domain/>', { description: 'x' }),
+    ).toEqual({
+      ok: true,
+      document: '\ufeff<doma:domain adtcore:description="x"/>',
+    });
+  });
+
+  it('accepts a leading BOM before the namespaced root and keeps it', () => {
+    const plain = patchDomainDocument(read, { description: 'x', length: 4 });
+    const withBom = patchDomainDocument(`\ufeff${read}`, {
+      description: 'x',
+      length: 4,
+    });
+    if (!plain.ok || !withBom.ok) throw new Error('refused');
+    expect(withBom.document).toBe(`\ufeff${plain.document}`);
   });
 
   it('answers not-this-type for another type’s document, naming its root', () => {
