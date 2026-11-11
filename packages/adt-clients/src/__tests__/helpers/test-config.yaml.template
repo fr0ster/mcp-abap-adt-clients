@@ -1333,13 +1333,25 @@ create_data_element:
         #   - refToDictionaryType
         #   - refToClifType
         type_kind: "predefinedAbapType"
+        # CHAR 30, the type of the search help parameter below: activation
+        # refuses a parameter whose type differs from the element's ("Type of
+        # search help parameter … is incompatible with the data element").
         data_type: "CHAR"
-        length: 100
+        length: 30
         decimals: 0
         short_label: "Adt"
         medium_label: "Adt Data"
         long_label: "Adt Data Element"
         heading_label: "Adt Data Element"
+        # Input help references the test writes after the flow. SAP's own
+        # objects, present on cloud and onprem alike (each found by an ADT read
+        # on both): search help DD_DTEL with its parameter ROLLNAME, and
+        # SET/GET parameter ROL. The data element only references them. Onprem
+        # stores them; cloud activation refuses both, as it refuses any search
+        # help or SET/GET parameter: none is released for cloud development.
+        search_help: "DD_DTEL"
+        search_help_parameter: "ROLLNAME"
+        set_get_parameter: "ROL"
 
     - name: "lock_registry_data_element"
       enabled: true

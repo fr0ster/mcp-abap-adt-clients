@@ -97,6 +97,15 @@ const libraryLogger: ILogger = createLibraryLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
 
+/** A text the case must name — read from the test configuration, a file. */
+function requiredParam(params: Record<string, unknown>, key: string): string {
+  const value = params[key];
+  if (typeof value !== 'string' || value === '') {
+    throw new Error(`params.${key} is not configured for this case`);
+  }
+  return value;
+}
+
 describe('DataElement (using AdtClient)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
@@ -408,6 +417,33 @@ describe('DataElement (using AdtClient)', () => {
             headingLabel: params.heading_label ?? 'Heading',
             headingLength: 55,
           };
+          // SAP's own search help, its parameter and a SET/GET parameter,
+          // named by the case: the element only references them. Written after
+          // the flow, one reference at a time: cloud activation refuses every
+          // use of either — none is released for cloud development (measured)
+          // — so each answer is asserted as the system gives it.
+          const inputHelp = [
+            {
+              what: 'search help',
+              changes: {
+                searchHelp: requiredParam(params, 'search_help'),
+                searchHelpParameter: requiredParam(
+                  params,
+                  'search_help_parameter',
+                ),
+              },
+              stored: ['dtel:searchHelp', 'dtel:searchHelpParameter'],
+              cloudRefusal: `The use of Search Help ${requiredParam(params, 'search_help')} is not permitted.`,
+            },
+            {
+              what: 'SET/GET parameter',
+              changes: {
+                setGetParameter: requiredParam(params, 'set_get_parameter'),
+              },
+              stored: ['dtel:setGetParameter'],
+              cloudRefusal: `The use of PARA ${requiredParam(params, 'set_get_parameter')} is not permitted.`,
+            },
+          ];
           const typed =
             typeKind === 'domain'
               ? { typeName: String(domainName ?? '').toUpperCase() }
@@ -482,6 +518,28 @@ describe('DataElement (using AdtClient)', () => {
               expect(readRootDescription(await element.read())).toBe(
                 description,
               );
+
+              // Each reference patched into the document read after the
+              // flow, so every write changes its own fields alone.
+              for (const step of inputHelp) {
+                const withReference = patchedDocument(
+                  patchDataElementDocument(stored, step.changes),
+                  `data element ${step.what}`,
+                );
+                if (isCloudSystem) {
+                  await expect(element.write(withReference)).rejects.toThrow(
+                    step.cloudRefusal,
+                  );
+                  continue;
+                }
+                await element.write(withReference);
+                const written = await element.read();
+                expect(
+                  step.stored.map((name) =>
+                    contentAt(written, ['dtel:dataElement', name]),
+                  ),
+                ).toEqual(Object.values(step.changes));
+              }
             },
             updateConfig: {
               dataElementName: config.dataElementName,
