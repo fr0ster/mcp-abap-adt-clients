@@ -583,28 +583,29 @@ describe('DataElement (using AdtClient)', () => {
                 ]),
               ]).toEqual(['DEC', '000015', '000002']);
 
-              // Short and medium label lengths other than the flow's 10 and
-              // 20, still holding the case's labels.
+              // Label lengths other than a fresh element's 10, 20, 40 and 55
+              // (SAP's maximums, which the flow writes too), each still
+              // holding the case's label.
               await element.write(
                 patchedDocument(
                   patchDataElementDocument(stored, {
                     shortLength: 5,
                     mediumLength: 15,
+                    longLength: 25,
+                    headingLength: 30,
                   }),
                   'data element label lengths',
                 ),
               );
               written = await element.read();
-              expect([
-                contentAt(written, [
-                  'dtel:dataElement',
+              expect(
+                [
                   'dtel:shortFieldLength',
-                ]),
-                contentAt(written, [
-                  'dtel:dataElement',
                   'dtel:mediumFieldLength',
-                ]),
-              ]).toEqual(['05', '15']);
+                  'dtel:longFieldLength',
+                  'dtel:headingFieldLength',
+                ].map((name) => contentAt(written, ['dtel:dataElement', name])),
+              ).toEqual(['05', '15', '25', '30']);
 
               // Typed by a domain: the shared one, present on every system.
               // SAP stores the domain's own type beside its name (measured).
