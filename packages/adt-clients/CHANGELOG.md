@@ -54,6 +54,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   releases, and a freshly created domain's, data element's and table type's
   read-back (no description on the root), the patches' unit-test fixtures.
 
+### Fixed
+
+- **A create keeps LF, tab and CR in what it writes.** An attribute value
+  wrote them literally, and a conforming XML parser reads a literal LF, tab
+  or CR in an attribute value as a space (XML 1.0 §3.3.3), so a description
+  `"a\nb"` reached SAP as `"a b"`. Every XML body the library writes now
+  escapes through one pair of functions in `src/utils/xml.ts`: an attribute
+  value `&`, `<`, `>`, both quotes, and LF, tab and CR as `&#10;`, `&#9;`,
+  `&#13;`; element text `&`, `<`, `>` and CR as `&#13;` (§2.11 reads a literal
+  CR as LF). The creates, the message class and transport writes, the
+  feature toggle, authorization field and function include builders, the
+  debugger, profiler, abapGit and virtual-folder bodies and the document
+  patches share it; ten modules' own escapers and `documentEdit.ts`' pair are
+  gone.
+
 ### Changed
 
 - **The test suites patch through the shipped functions.** The internal,

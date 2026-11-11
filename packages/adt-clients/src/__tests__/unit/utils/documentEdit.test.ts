@@ -9,8 +9,6 @@
 import {
   applySplices,
   childAt,
-  escapeAttribute,
-  escapeText,
   scanDocument,
 } from '../../../utils/documentEdit';
 
@@ -174,29 +172,5 @@ describe('applySplices', () => {
       { start: 2, end: 2, text: ' b="2"' },
     ]);
     expect(out).toBe('<r a="1" b="2"/>');
-  });
-});
-
-describe('escaping', () => {
-  it('escapes text: &, < and >', () => {
-    expect(escapeText(`a&b<c>d"e'f`)).toBe(`a&amp;b&lt;c&gt;d"e'f`);
-  });
-
-  it('writes a carriage return in text as a reference, LF and tab as they are', () => {
-    expect(escapeText('a\rb\r\nc\td\ne')).toBe('a&#13;b&#13;\nc\td\ne');
-  });
-
-  it('writes LF, tab and CR in an attribute value as references', () => {
-    expect(escapeAttribute('a\nb\tc\rd', '"')).toBe('a&#10;b&#9;c&#13;d');
-    expect(escapeAttribute('a\nb\tc\rd', "'")).toBe('a&#10;b&#9;c&#13;d');
-  });
-
-  it('escapes an attribute value by its own quote character', () => {
-    expect(escapeAttribute(`a&b<c>d"e'f`, '"')).toBe(
-      `a&amp;b&lt;c&gt;d&quot;e'f`,
-    );
-    expect(escapeAttribute(`a&b<c>d"e'f`, "'")).toBe(
-      `a&amp;b&lt;c&gt;d"e&apos;f`,
-    );
   });
 });

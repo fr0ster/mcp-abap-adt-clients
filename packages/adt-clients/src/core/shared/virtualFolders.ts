@@ -10,17 +10,10 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { requestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr, escapeXmlText } from '../../utils/xml';
 import type { IGetVirtualFoldersContentsParams } from './types';
 
 const VIRTUAL_FOLDERS_NAMESPACE = 'http://www.sap.com/adt/ris/virtualFolders';
-
-const escapeXml = (value: string): string =>
-  value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
 
 const buildPreselectionXml = (
   preselection?: IGetVirtualFoldersContentsParams['preselection'],
@@ -32,9 +25,9 @@ const buildPreselectionXml = (
   return preselection
     .map((entry) => {
       const valuesXml = entry.values
-        .map((value) => `<vfs:value>${escapeXml(value)}</vfs:value>`)
+        .map((value) => `<vfs:value>${escapeXmlText(value)}</vfs:value>`)
         .join('');
-      return `<vfs:preselection facet="${escapeXml(entry.facet)}">${valuesXml}</vfs:preselection>`;
+      return `<vfs:preselection facet="${escapeXmlAttr(entry.facet)}">${valuesXml}</vfs:preselection>`;
     })
     .join('');
 };
@@ -45,7 +38,7 @@ const buildFacetOrderXml = (facetOrder: string[]): string => {
   }
 
   const facetsXml = facetOrder
-    .map((facet) => `<vfs:facet>${escapeXml(facet)}</vfs:facet>`)
+    .map((facet) => `<vfs:facet>${escapeXmlText(facet)}</vfs:facet>`)
     .join('');
   return `<vfs:facetorder>${facetsXml}</vfs:facetorder>`;
 };
@@ -53,7 +46,7 @@ const buildFacetOrderXml = (facetOrder: string[]): string => {
 const buildVirtualFoldersRequestXml = (
   params: IGetVirtualFoldersContentsParams,
 ): string => {
-  const objectSearchPattern = escapeXml(params.objectSearchPattern ?? '*');
+  const objectSearchPattern = escapeXmlAttr(params.objectSearchPattern ?? '*');
   const preselectionXml = buildPreselectionXml(params.preselection);
   const facetOrder = params.facetOrder ?? ['package', 'group', 'type'];
   const facetOrderXml = buildFacetOrderXml(facetOrder);

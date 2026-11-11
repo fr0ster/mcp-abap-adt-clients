@@ -227,9 +227,10 @@ domain's). The patch adds the attribute when it is missing, either way.
   This is why no parse-and-rebuild is used: the server's ordered round trip already
   rewrites some characters (`&apos;`, Code: mcp-abap-adt `xml/ordered`).
 - **Escaping:** element text escapes `&`, `<`, `>` and CR (`&#13;`). An attribute value
-  escapes `&`, `<`, `>`, the quote character the attribute is delimited with, and LF, tab and
-  CR (`&#10;`, `&#9;`, `&#13;`), so a conforming parser reads back exactly the value given
-  (XML 1.0 §2.11, §3.3.3). A new attribute is written with `"`.
+  escapes `&`, `<`, `>`, both quotes, and LF, tab and CR (`&#10;`, `&#9;`, `&#13;`), so a
+  conforming parser reads back exactly the value given (XML 1.0 §2.11, §3.3.3). A new
+  attribute is written with `"`. The creates and every other body the library writes
+  escape the same way, through the same two functions (`src/utils/xml.ts`).
 - **A document is well-formed or refused:** every `&` starts a predefined entity or a
   character reference to an XML Char; an attribute value holds no `<`; text holds no `]]>`.
   Anything else is `not-a-document`.

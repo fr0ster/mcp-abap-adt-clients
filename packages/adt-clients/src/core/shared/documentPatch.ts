@@ -15,11 +15,10 @@ import {
   applySplices,
   childAt,
   type ElementLocation,
-  escapeAttribute,
-  escapeText,
   type Splice,
   scanDocument,
 } from '../../utils/documentEdit';
+import { escapeXmlAttr, escapeXmlText } from '../../utils/xml';
 
 /** Why a patch returned no document. */
 export type DocumentPatchRefusal<F extends string> =
@@ -159,21 +158,19 @@ function splicesFor<F extends string>(
         (attribute) => attribute.name === edit.name,
       );
       if (found !== undefined) {
-        return [
-          { ...found.value, text: escapeAttribute(edit.value, found.quote) },
-        ];
+        return [{ ...found.value, text: escapeXmlAttr(edit.value) }];
       }
       const at = element.tagClose.start;
       return [
         {
           start: at,
           end: at,
-          text: ` ${edit.name}="${escapeAttribute(edit.value, '"')}"`,
+          text: ` ${edit.name}="${escapeXmlAttr(edit.value)}"`,
         },
       ];
     }
     case 'text':
-      return contentSplice(element, escapeText(edit.value));
+      return contentSplice(element, escapeXmlText(edit.value));
     case 'content':
       return contentSplice(element, edit.xml);
     case 'reference':
@@ -181,7 +178,7 @@ function splicesFor<F extends string>(
         {
           start: element.nameEnd,
           end: element.tagClose.start,
-          text: ` adtcore:name="${escapeAttribute(edit.name, '"')}"`,
+          text: ` adtcore:name="${escapeXmlAttr(edit.name)}"`,
         },
       ];
   }

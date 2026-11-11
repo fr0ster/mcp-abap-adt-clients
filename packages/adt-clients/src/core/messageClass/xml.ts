@@ -1,5 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
 import { TYPE_CODE } from '../../constants/typeCodes';
+import { escapeXmlAttr } from '../../utils/xml';
 
 export interface IParsedMessage {
   msgno: string;
@@ -92,13 +93,6 @@ export function parseMessageClass(xml: string): IParsedMessageClass {
   };
 }
 
-const esc = (s: string) =>
-  s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-
 /** Merge rawAttrs with named-field overrides into an attribute string. */
 function attrString(
   raw: Record<string, string> | undefined,
@@ -108,7 +102,7 @@ function attrString(
   for (const [k, v] of Object.entries(overrides))
     if (v !== undefined) merged[k] = v;
   return Object.entries(merged)
-    .map(([k, v]) => `${k}="${esc(v)}"`)
+    .map(([k, v]) => `${k}="${escapeXmlAttr(v)}"`)
     .join(' ');
 }
 
@@ -131,7 +125,7 @@ export function buildMessageClassXml(
     'adtcore:type': TYPE_CODE.messageClass,
   });
   const pkg = cls.packageName
-    ? `<adtcore:packageRef adtcore:name="${esc(cls.packageName)}"/>`
+    ? `<adtcore:packageRef adtcore:name="${escapeXmlAttr(cls.packageName)}"/>`
     : '';
   const msgs = cls.messages
     .map((m) => {

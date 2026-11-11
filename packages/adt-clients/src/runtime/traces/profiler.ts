@@ -25,6 +25,7 @@ import {
   ACCEPT_TRACE_XML,
 } from '../../constants/contentTypes';
 import { requestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr } from '../../utils/xml';
 
 // Declared once, in the contract; re-exported so importers here are unchanged.
 export type {
@@ -52,15 +53,6 @@ export const DEFAULT_PROFILER_TRACE_PARAMETERS: Omit<
   amdpTrace: true,
   maxTimeForTracing: 1800,
 };
-
-function escapeXmlAttr(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&apos;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;');
-}
 
 function toTraceId(value: string): string {
   const trimmed = value.trim();

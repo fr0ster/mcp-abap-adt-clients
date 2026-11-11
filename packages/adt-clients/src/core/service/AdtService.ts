@@ -57,6 +57,7 @@ import {
 import {
   createLanguage,
   escapeXmlAttr,
+  escapeXmlText,
   languageAttributes,
 } from '../../utils/xml';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
@@ -180,7 +181,7 @@ export class AdtServiceBinding<
   private buildTransportCheckXml(
     params: ITransportCheckServiceBindingParams,
   ): string {
-    const description = escapeXmlAttr(params.description ?? '');
+    const description = escapeXmlText(params.description ?? '');
     return `<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><PGMID>R3TR</PGMID><OBJECT>SRVB</OBJECT><OBJECTNAME>${params.objectName.toUpperCase()}</OBJECTNAME><OPERATION>${params.operation ?? 'I'}</OPERATION><DEVCLASS>${params.packageName.toUpperCase()}</DEVCLASS><CTEXT>${description}</CTEXT></DATA></asx:values></asx:abap>`;
   }
 

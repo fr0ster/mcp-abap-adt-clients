@@ -33,18 +33,11 @@ import type {
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { TRANSPORT_REQUEST } from '../../endpoints/objects';
 import { requestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr } from '../../utils/xml';
 import type { IAbapObjectEntry } from './types';
 
 const requestUrl = (number: string): string =>
   `${TRANSPORT_REQUEST.uri(number)}`;
-
-/** `&`, `<` and `"` in an attribute value would otherwise break the body. */
-const attribute = (value: string): string =>
-  value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 
 /**
  * The `tm:root` the object actions send.
@@ -66,17 +59,17 @@ function userActionDocument(
     const optional = [
       object.description === undefined
         ? ''
-        : ` tm:obj_desc="${attribute(object.description)}"`,
+        : ` tm:obj_desc="${escapeXmlAttr(object.description)}"`,
       object.position === undefined
         ? ''
-        : ` tm:position="${attribute(object.position)}"`,
+        : ` tm:position="${escapeXmlAttr(object.position)}"`,
     ].join('');
-    return `    <tm:abap_object tm:pgmid="${attribute(object.pgmid ?? 'R3TR')}" tm:type="${attribute(object.type)}" tm:name="${attribute(object.name)}"${optional}/>\n`;
+    return `    <tm:abap_object tm:pgmid="${escapeXmlAttr(object.pgmid ?? 'R3TR')}" tm:type="${escapeXmlAttr(object.type)}" tm:name="${escapeXmlAttr(object.name)}"${optional}/>\n`;
   };
 
   return (
     '<?xml version="1.0" encoding="ASCII"?>\n' +
-    `<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="${attribute(number)}" tm:useraction="${action}">\n` +
+    `<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="${escapeXmlAttr(number)}" tm:useraction="${action}">\n` +
     '  <tm:request>\n' +
     objects.map(entry).join('') +
     '  </tm:request>\n' +
@@ -215,7 +208,7 @@ export async function createTransportTask(
     timeout: 0,
     data:
       '<?xml version="1.0" encoding="ASCII"?>\n' +
-      `<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="${attribute(transportNumber)}" tm:targetuser="${attribute(targetUser.toUpperCase())}" tm:useraction="newtask"/>`,
+      `<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="${escapeXmlAttr(transportNumber)}" tm:targetuser="${escapeXmlAttr(targetUser.toUpperCase())}" tm:useraction="newtask"/>`,
     headers: requestHeaders(headers),
   });
 }
@@ -346,7 +339,7 @@ export async function changeTransportTaskType(
   taskNumber: string,
   type: AdtTaskType,
 ): Promise<IAdtWireResponse> {
-  const number = attribute(taskNumber);
+  const number = escapeXmlAttr(taskNumber);
   return connection.makeAdtRequest({
     url: requestUrl(taskNumber),
     method: 'PUT',
@@ -354,7 +347,7 @@ export async function changeTransportTaskType(
     data:
       '<?xml version="1.0" encoding="ASCII"?>\n' +
       `<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="${number}" tm:useraction="changetasktype">` +
-      `<tm:task tm:number="${number}" tm:type="${attribute(type)}"/>` +
+      `<tm:task tm:number="${number}" tm:type="${escapeXmlAttr(type)}"/>` +
       '</tm:root>',
     headers: requestHeaders(headers),
   });

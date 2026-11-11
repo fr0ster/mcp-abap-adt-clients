@@ -10,7 +10,8 @@
  * if (patched.ok) await domain.updateMetadata(config, { …, source: patched.document });
  * ```
  */
-import { escapeText } from '../../utils/documentEdit';
+
+import { escapeXmlText } from '../../utils/xml';
 import {
   DocumentEdits,
   type DocumentPatch,
@@ -55,7 +56,7 @@ type Field = keyof IDomainChanges;
 function element(name: string, value: string): string {
   return value === ''
     ? `<${name}/>`
-    : `<${name}>${escapeText(value)}</${name}>`;
+    : `<${name}>${escapeXmlText(value)}</${name}>`;
 }
 
 /** The `doma:fixValues` content: one `doma:fixValue` per entry, 1-based. */
