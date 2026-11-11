@@ -101,7 +101,7 @@ describe('cleanupRefusal, noteCleanupRefusal and raiseAfterCleanup', () => {
   it('answers what any other refusal or throw said', async () => {
     await expect(
       cleanupRefusal(async () => refused('locked by ZOTHER', 403), 'delete X'),
-    ).resolves.toBe('delete X failed [refusal]: locked by ZOTHER');
+    ).resolves.toBe('delete X failed [refusal]: locked by ZOTHER; HTTP 403');
     await expect(
       cleanupRefusal(async () => {
         throw new Error('socket closed');

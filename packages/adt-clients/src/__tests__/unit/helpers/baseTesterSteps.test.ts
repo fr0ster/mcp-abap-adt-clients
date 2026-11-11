@@ -158,6 +158,93 @@ describe('BaseTester flowTest reads every step answer', () => {
   });
 });
 
+describe('a failing step logs its error text', () => {
+  const EXCEPTION =
+    '<?xml version="1.0" encoding="utf-8"?>' +
+    '<exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework">' +
+    '<namespace id="com.sap.adt"/><type id="ExceptionResourceFailure"/>' +
+    '<message lang="EN">Interface ZTHING could not be saved</message>' +
+    '<localizedMessage lang="EN">Interface ZTHING could not be saved</localizedMessage>' +
+    '<properties><entry key="T100KEY-ID">SEO_X</entry>' +
+    '<entry key="T100KEY-NO">042</entry></properties></exc:exception>';
+  const failedOnTheWire = (data: unknown): Answer =>
+    ({
+      ok: false,
+      getError: () => ({
+        origin: 'connection',
+        message: 'Request failed with status code 500',
+        response: { status: 500, data },
+        request: {
+          method: 'PUT',
+          url: '/sap/bc/adt/oo/interfaces/zthing/source/main?lockHandle=SECRET01&corrNr=X',
+        },
+      }),
+    }) as Answer;
+
+  async function runAndCapture(update: jest.Mock): Promise<{
+    thrown: string;
+    logged: string;
+  }> {
+    const lines: string[] = [];
+    const write = jest
+      .spyOn(process.stdout, 'write')
+      .mockImplementation((chunk: string | Uint8Array) => {
+        lines.push(String(chunk));
+        return true;
+      });
+    let thrown = '';
+    try {
+      await testerOver(fakeHandler({ update })).flowTest(
+        config,
+        {},
+        { updateConfig },
+      );
+    } catch (error) {
+      thrown = error instanceof Error ? error.message : String(error);
+    } finally {
+      write.mockRestore();
+    }
+    return { thrown, logged: lines.join('') };
+  }
+
+  it("logs SAP's status, message key and short text with the step", async () => {
+    const { thrown, logged } = await runAndCapture(
+      jest.fn(async () => failedOnTheWire(EXCEPTION)),
+    );
+    const step = logged
+      .split('\n')
+      .find((line) => line.includes('✗ update FAILED'));
+    expect(step).toBeDefined();
+    for (const part of [
+      'Request failed with status code 500',
+      'HTTP 500',
+      'SEO_X/042',
+      'Interface ZTHING could not be saved',
+      '/sap/bc/adt/oo/interfaces/zthing/source/main',
+    ]) {
+      expect(step).toContain(part);
+      expect(thrown).toContain(part);
+    }
+  });
+
+  it('never logs the request query, where the lock handle travels', async () => {
+    const { thrown, logged } = await runAndCapture(
+      jest.fn(async () => failedOnTheWire(EXCEPTION)),
+    );
+    expect(logged).not.toContain('SECRET01');
+    expect(thrown).not.toContain('SECRET01');
+  });
+
+  it('names a body that is not an ADT document by its length only', async () => {
+    const { thrown } = await runAndCapture(
+      jest.fn(async () => failedOnTheWire('<html>gateway down</html>')),
+    );
+    expect(thrown).toContain('HTTP 500');
+    expect(thrown).toContain('25 characters, not an ADT document');
+    expect(thrown).not.toContain('gateway down');
+  });
+});
+
 describe('BaseTester modifyFlowTest reads every step answer', () => {
   it('fails at a refused update and activates nothing', async () => {
     const handler = fakeHandler({

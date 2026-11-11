@@ -10,7 +10,10 @@
  * These two exist so the failure message is the server's own sentence.
  */
 
-import { readDeletionRefusal } from '@mcp-abap-adt/adt-strategies';
+import {
+  readAdtRefusal,
+  readDeletionRefusal,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 
 /**
@@ -52,14 +55,55 @@ export function saysAbsent(failure: IAdtError): boolean {
   );
 }
 
-/** The sentence {@link expectResult} throws, for a caller that collects it. */
+/**
+ * The sentence {@link expectResult} throws, for a caller that collects it.
+ *
+ * It carries what a reader of the run's log needs to tell why a step failed:
+ * the library's words, SAP's status and — when the body is an ADT document —
+ * each message's T100 key and short text. A failure the library classed as a
+ * connection failure still has SAP's answer on it, and that answer was missing
+ * from the log. The request is named by its path alone: the query carries the
+ * lock handle, which no log may hold.
+ */
 export function failureOf(answer: IAdtResponse<unknown>, what: string): string {
   if (answer.ok) return '';
   const failure = answer.getError();
+  const status = failure.response?.status;
+  const said = sapSaid(failure.response?.data);
   return (
     `${what} failed [${failure.origin}]: ${failure.message}` +
-    (failure.request?.url ? ` (${failure.request.url})` : '')
+    (status === undefined ? '' : `; HTTP ${status}`) +
+    (said ? `; SAP: ${said}` : '') +
+    (failure.request?.url ? ` (${pathOf(failure.request.url)})` : '')
   );
+}
+
+/** Each message SAP's document carries, `ID/NO text`; or how long a body that is no document was. */
+function sapSaid(data: unknown): string {
+  if (data === undefined || data === null || data === '') return '';
+  const refusal = readAdtRefusal(data);
+  if (refusal === null) {
+    return typeof data === 'string'
+      ? `${data.length} characters, not an ADT document`
+      : '';
+  }
+  return refusal.messages
+    .map((message) =>
+      message.t100
+        ? `${message.t100.id}/${message.t100.no} ${message.text}`
+        : message.text,
+    )
+    .join(' | ');
+}
+
+/** The URL's path: no scheme, no host, no query. */
+function pathOf(url: string): string {
+  const query = url.indexOf('?');
+  const bare = query < 0 ? url : url.slice(0, query);
+  const scheme = bare.indexOf('://');
+  if (scheme < 0) return bare;
+  const path = bare.indexOf('/', scheme + 3);
+  return path < 0 ? '/' : bare.slice(path);
 }
 
 /**
