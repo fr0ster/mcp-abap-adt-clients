@@ -242,6 +242,42 @@ describe('TableType (using AdtClient)', () => {
             expect(readRootDescription(await tableType.read())).toBe(
               description,
             );
+
+            // A built-in row type, one write each, through the shipped patch:
+            // the row type's kind and name, and the built-in type's data
+            // type, length and decimals. Each is read back as SAP stored it
+            // (measured on cloud and onprem: SAP's six digits).
+            const builtIn = [
+              {
+                changes: { dataType: 'CHAR', length: 10, decimals: 0 },
+                stored: ['CHAR', '000010', '000000'],
+              },
+              {
+                changes: { dataType: 'DEC', length: 15, decimals: 2 },
+                stored: ['DEC', '000015', '000002'],
+              },
+            ];
+            const BUILT_IN = ['ttyp:rowType', 'ttyp:builtInType'];
+            for (const rowType of builtIn) {
+              await tableType.write(
+                patchedDocument(
+                  patchTableTypeDocument(await tableType.read(), {
+                    rowTypeKind: 'predefinedAbapType',
+                    rowTypeName: '',
+                    ...rowType.changes,
+                  }),
+                  `table type built-in ${rowType.changes.dataType}`,
+                ),
+              );
+              const written = await tableType.read();
+              expect([
+                contentAt(written, ['ttyp:rowType', 'ttyp:typeKind']),
+                contentAt(written, ['ttyp:rowType', 'ttyp:typeName']),
+                contentAt(written, [...BUILT_IN, 'ttyp:dataType']),
+                contentAt(written, [...BUILT_IN, 'ttyp:length']),
+                contentAt(written, [...BUILT_IN, 'ttyp:decimals']),
+              ]).toEqual(['predefinedAbapType', '', ...rowType.stored]);
+            }
           },
           updateConfig: config
             ? {
