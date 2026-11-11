@@ -320,6 +320,33 @@ describe('Domain (using AdtClient)', () => {
               swbToolTooLong(60),
             );
             expect(readRootDescription(await domain.read())).toBe(description);
+
+            // A conversion exit on the character type: SAP's own ALPHA. A
+            // fresh domain holds none.
+            stored = await writeAndRead(domain, stored, {
+              conversionExit: 'ALPHA',
+            });
+            expect(contentAt(stored, [...OUTPUT, 'doma:conversionExit'])).toBe(
+              'ALPHA',
+            );
+
+            // A packed number with decimals and a sign; a fresh domain holds
+            // 000000 decimals and no sign. The exit and lowercase belong to
+            // the character type, so they are cleared with it.
+            stored = await writeAndRead(domain, stored, {
+              dataType: 'DEC',
+              length: 15,
+              decimals: 2,
+              signExists: true,
+              conversionExit: '',
+              lowercase: false,
+            });
+            expect([
+              contentAt(stored, [...TYPE, 'doma:datatype']),
+              contentAt(stored, [...TYPE, 'doma:length']),
+              contentAt(stored, [...TYPE, 'doma:decimals']),
+              contentAt(stored, [...OUTPUT, 'doma:signExists']),
+            ]).toEqual(['DEC', '000015', '000002', 'true']);
           },
           updateConfig: {
             domainName: config.domainName,
