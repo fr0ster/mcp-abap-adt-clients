@@ -103,8 +103,10 @@ export {
 export {
   AdtMessageClass,
   AdtMessageClassMessage,
+  type IMessageClassChanges,
   type MessageClassMessageValues,
   type MessageClassValues,
+  patchMessageClassDocument,
 } from './core/messageClass';
 export {
   AdtMetadataExtension,
