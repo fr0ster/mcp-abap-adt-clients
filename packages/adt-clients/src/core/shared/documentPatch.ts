@@ -62,6 +62,74 @@ export function digits(n: number, width: number): string {
   return String(n).padStart(width, '0');
 }
 
+/**
+ * The edits of one patch, collected in the order the changes type declares
+ * its fields; a value left `undefined` adds nothing.
+ */
+export class DocumentEdits<F extends string> {
+  readonly list: DocumentEdit<F>[] = [];
+
+  /** An attribute of the element at `path` (`[]`: the root). */
+  attribute(
+    field: F,
+    path: readonly string[],
+    name: string,
+    value: string | undefined,
+  ): this {
+    if (value !== undefined) {
+      this.list.push({ field, path, kind: 'attribute', name, value });
+    }
+    return this;
+  }
+
+  /** The element's text. */
+  text(field: F, path: readonly string[], value: string | undefined): this {
+    if (value !== undefined) {
+      this.list.push({ field, path, kind: 'text', value });
+    }
+    return this;
+  }
+
+  /** A number in SAP's fixed width. */
+  digits(
+    field: F,
+    path: readonly string[],
+    value: number | undefined,
+    width: number,
+  ): this {
+    return this.text(
+      field,
+      path,
+      value === undefined ? undefined : digits(value, width),
+    );
+  }
+
+  /** A flag as SAP writes it: `true` / `false`. */
+  flag(field: F, path: readonly string[], value: boolean | undefined): this {
+    return this.text(
+      field,
+      path,
+      value === undefined ? undefined : String(value),
+    );
+  }
+
+  /** A reference to another object, changed by its name alone. */
+  reference(field: F, path: readonly string[], name: string | undefined): this {
+    if (name !== undefined) {
+      this.list.push({ field, path, kind: 'reference', name });
+    }
+    return this;
+  }
+
+  /** The element's content as XML the patch built. */
+  content(field: F, path: readonly string[], xml: string | undefined): this {
+    if (xml !== undefined) {
+      this.list.push({ field, path, kind: 'content', xml });
+    }
+    return this;
+  }
+}
+
 /** The element's content replaced, in SAP's form for an empty one. */
 function contentSplice(element: ElementLocation, xml: string): Splice[] {
   const selfClosing = element.content === undefined;

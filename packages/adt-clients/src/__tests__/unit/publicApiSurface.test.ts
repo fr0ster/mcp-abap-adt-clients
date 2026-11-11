@@ -195,6 +195,7 @@ const RUNTIME_EXPORTS = [
   'nothingIsARefusal',
   'PACKAGE',
   'packageDocuments',
+  'patchDataElementDocument',
   'patchDomainDocument',
   'Profiler',
   'profilerDocuments',

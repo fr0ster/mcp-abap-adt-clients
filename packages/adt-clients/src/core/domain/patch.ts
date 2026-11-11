@@ -12,7 +12,7 @@
  */
 import { escapeText } from '../../utils/documentEdit';
 import {
-  type DocumentEdit,
+  DocumentEdits,
   type DocumentPatch,
   digits,
   patchDocument,
@@ -78,60 +78,42 @@ export function patchDomainDocument(
   document: string,
   changes: IDomainChanges,
 ): DocumentPatch<Field> {
-  const edits: DocumentEdit<Field>[] = [];
-  const text = (field: Field, path: string[], value: string | undefined) => {
-    if (value !== undefined) edits.push({ field, path, kind: 'text', value });
-  };
-  if (changes.description !== undefined) {
-    edits.push({
-      field: 'description',
-      path: [],
-      kind: 'attribute',
-      name: 'adtcore:description',
-      value: changes.description,
-    });
-  }
-  text('dataType', [...TYPE_INFORMATION, 'doma:datatype'], changes.dataType);
-  text(
-    'length',
-    [...TYPE_INFORMATION, 'doma:length'],
-    changes.length === undefined ? undefined : digits(changes.length, 6),
-  );
-  text(
-    'decimals',
-    [...TYPE_INFORMATION, 'doma:decimals'],
-    changes.decimals === undefined ? undefined : digits(changes.decimals, 6),
-  );
-  text(
-    'conversionExit',
-    [...OUTPUT_INFORMATION, 'doma:conversionExit'],
-    changes.conversionExit,
-  );
-  text(
-    'signExists',
-    [...OUTPUT_INFORMATION, 'doma:signExists'],
-    changes.signExists === undefined ? undefined : String(changes.signExists),
-  );
-  text(
-    'lowercase',
-    [...OUTPUT_INFORMATION, 'doma:lowercase'],
-    changes.lowercase === undefined ? undefined : String(changes.lowercase),
-  );
-  if (changes.valueTable !== undefined) {
-    edits.push({
-      field: 'valueTable',
-      path: [...VALUE_INFORMATION, 'doma:valueTableRef'],
-      kind: 'reference',
-      name: changes.valueTable,
-    });
-  }
-  if (changes.fixedValues !== undefined) {
-    edits.push({
-      field: 'fixedValues',
-      path: [...VALUE_INFORMATION, 'doma:fixValues'],
-      kind: 'content',
-      xml: fixValuesXml(changes.fixedValues),
-    });
-  }
-  return patchDocument(document, ROOT, edits);
+  const edits = new DocumentEdits<Field>()
+    .attribute('description', [], 'adtcore:description', changes.description)
+    .text('dataType', [...TYPE_INFORMATION, 'doma:datatype'], changes.dataType)
+    .digits('length', [...TYPE_INFORMATION, 'doma:length'], changes.length, 6)
+    .digits(
+      'decimals',
+      [...TYPE_INFORMATION, 'doma:decimals'],
+      changes.decimals,
+      6,
+    )
+    .text(
+      'conversionExit',
+      [...OUTPUT_INFORMATION, 'doma:conversionExit'],
+      changes.conversionExit,
+    )
+    .flag(
+      'signExists',
+      [...OUTPUT_INFORMATION, 'doma:signExists'],
+      changes.signExists,
+    )
+    .flag(
+      'lowercase',
+      [...OUTPUT_INFORMATION, 'doma:lowercase'],
+      changes.lowercase,
+    )
+    .reference(
+      'valueTable',
+      [...VALUE_INFORMATION, 'doma:valueTableRef'],
+      changes.valueTable,
+    )
+    .content(
+      'fixedValues',
+      [...VALUE_INFORMATION, 'doma:fixValues'],
+      changes.fixedValues === undefined
+        ? undefined
+        : fixValuesXml(changes.fixedValues),
+    );
+  return patchDocument(document, ROOT, edits.list);
 }

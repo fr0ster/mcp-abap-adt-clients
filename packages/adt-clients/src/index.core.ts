@@ -59,6 +59,8 @@ export { startClassUnitTestRunSync } from './core/class/run';
 export {
   AdtDataElement,
   type DataElementValues,
+  type IDataElementChanges,
+  patchDataElementDocument,
 } from './core/dataElement';
 export {
   AdtDdl,
