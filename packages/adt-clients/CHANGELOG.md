@@ -82,6 +82,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   why. The master-language case follows the library (no language configured,
   none sent), and the transport-request deletion check skips, saying why,
   when no transport is configured.
+- **On `fast-xml-parser` `^5.12.0`** (was `^5.9.3`), past GHSA-474x-hrwr-fgx4
+  (5.11.2 and earlier); `adt-strategies` and `adt-clients-legacy` declare the
+  same range. Its `XMLValidator` is unchanged; the parser's changes touch only
+  `captureMetaData` and `stopNodes`, which the library does not use.
 
 ## [45.1.0] - 2026-11-11
 
