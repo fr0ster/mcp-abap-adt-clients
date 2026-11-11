@@ -1,0 +1,20 @@
+{
+  "case": "read-domain-shared-s4-2025",
+  "step": 1,
+  "stepTag": "read-metadata",
+  "capturedAt": "2026-11-11",
+  "note": "The metadata document as SAP answered it, byte for byte: a domain of the shared test dependencies, active. Fixture of the shipped document patches (src/core/<type>/patch.ts); user ids and the system id are replaced by the placeholders.",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/ddic/domains/zac_shr_ga_dom",
+    "params": null,
+    "headers": {},
+    "headersNote": "The request headers were not recorded with the body; the address is the one the read used."
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {},
+    "bodyFile": "read-domain-shared--01-read-metadata.body.txt"
+  }
+}
