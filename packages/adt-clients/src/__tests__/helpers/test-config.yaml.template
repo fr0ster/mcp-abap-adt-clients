@@ -143,7 +143,7 @@ environment:
                                               #   transport TARGET, or creating anything in a package on
                                               #   a transport layer is refused with `CTS_WBO_API 048`.
   default_master_system: ""                   # ← CHANGE: SAP system ID (on-prem only, cloud gets it automatically)
-  default_master_language: ""                 # Master/original language for created objects (e.g. "DE", "ZH"). "" → EN. Must be a language installed on the system, else SAP normalizes it to the system default.
+  default_master_language: ""                 # Master/original language for created objects (e.g. "DE", "ZH"). "" → none: the create names no language and SAP uses the logon language. Must be a language installed on the system, else SAP normalizes it to the system default.
   skip_cleanup: false    # Skip cleanup after test (objects left for analysis) - can be overridden per test case
   verify_lock_released: true                  # ← CHANGE: after each UNLOCK, a second ABAP session LOCKs the object
                                               #   to prove the lock was released. On: any refusal (404 included)
@@ -158,6 +158,10 @@ environment:
                                               #   (/sap/bc/adt/xslt/validation). On: any refusal (404 included)
                                               #   fails. Off: not sent, and the run says so. false where the
                                               #   system has no such resource (404, measured on premise).
+  transport_search_configured: true           # ← CHANGE: whether the account holds a saved transport search
+                                              #   configuration. On: the list-through-a-saved-search case runs,
+                                              #   and an empty list fails. Off: registered as skipped, its title
+                                              #   saying so. false on a fresh ABAP Cloud account (none saved).
   connection_type: "<CONNECTION_TYPE>"        # ← CHANGE: the wire, "http" or "rfc". Stated, never guessed:
                                               #   absent or another value is refused. RFC is on-prem only.
                                               #   Over RFC the session .env states the address and no SAP_URL:

@@ -67,6 +67,11 @@ import {
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
 import { transportParsing } from '../../../helpers/transportParsing';
+import {
+  TRANSPORT_SEARCH_KEY,
+  transportSearchConfigured,
+  transportSearchStated,
+} from '../../../helpers/transportSearch';
 
 const {
   getEnabledTestCase,
@@ -871,8 +876,13 @@ describe('AdtRequest', () => {
   });
 
   describe('List transports', () => {
-    gateOn(() => true)(
-      'should list transport requests through a saved search configuration',
+    // Whether the account holds a saved search is the configuration's to
+    // state: a fresh ABAP Cloud account holds none, and then there is nothing
+    // to list through.
+    gateOn(() => transportSearchConfigured())(
+      transportSearchStated() === false
+        ? `should list transport requests through a saved search configuration — skipped: ${TRANSPORT_SEARCH_KEY} is false, the account has no saved search configuration`
+        : 'should list transport requests through a saved search configuration',
       async () => {
         logTestStart(testsLogger, 'AdtRequest - list transports', {
           name: 'list_transports',
@@ -891,6 +901,18 @@ describe('AdtRequest', () => {
           // list() MUST surface its number — if list() regresses to an empty
           // root, this fails, because we independently know the request is
           // there.
+          // A listing runs a saved search the caller names. The test takes the
+          // system's first one, which is the choice `list` used to make itself
+          // when a system held exactly one. Read before anything is created:
+          // the configuration says there is one, and an empty list fails here.
+          const configs = expectResult(
+            await client
+              .getRequest(transportParsing)
+              .searchConfigurations({ analyse: analyseException }),
+            'transport search configurations',
+          );
+          expect(configs.length).toBeGreaterThan(0);
+
           let knownTransportNumber: string | null = null;
           const definition = getTestDefinition();
           const testCase = definition
@@ -920,16 +942,6 @@ describe('AdtRequest', () => {
           }
 
           logTestStep('list', testsLogger);
-          // A listing runs a saved search the caller names. The test takes the
-          // system's first one, which is the choice `list` used to make itself
-          // when a system held exactly one.
-          const configs = expectResult(
-            await client
-              .getRequest(transportParsing)
-              .searchConfigurations({ analyse: analyseException }),
-            'transport search configurations',
-          );
-          expect(configs.length).toBeGreaterThan(0);
           // The shipped reading of a listing is the parsed tree, so the
           // assertions below are about requests rather than about a document.
           const tree = expectResult(
