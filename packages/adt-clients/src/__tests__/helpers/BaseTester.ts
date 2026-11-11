@@ -251,6 +251,11 @@ function updateTargetOf<TConfig>(
   return { ...config, ...update };
 }
 
+/** A thrown value's words: its message, or the value itself. */
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 /** The object's names from its config — `className`, `domainName`, … */
 function describeObject(config: unknown): string {
   const names = Object.entries((config ?? {}) as Record<string, unknown>)
@@ -593,6 +598,8 @@ export class BaseTester<TConfig, TState = unknown> {
       config: Partial<TConfig>,
       options: IAdtOperationOptions,
     ) => Promise<R>,
+    /** The write's label, which a failure after a refused write starts with. */
+    what: string,
   ): Promise<R> {
     if (!(this.adtObject.lock && this.adtObject.unlock)) {
       // No lock resource for this type. The write goes out without a handle,
@@ -613,43 +620,88 @@ export class BaseTester<TConfig, TState = unknown> {
         lockHandle: handle,
       });
     } catch (error) {
-      await this.releaseAfterWrite(config, handle, true);
+      // The write's throw stays the step's error; what failed after it is
+      // added to it, never thrown over it.
+      const after = await this.releaseAfterFailedWrite(config, handle);
+      if (after && error instanceof Error) {
+        error.message = `${error.message}; then ${after}`;
+      }
       throw error;
     }
-    if (await this.releaseAfterWrite(config, handle, written.ok === false)) {
+    if (written.ok) {
+      await this.releaseAfterWrite(config, handle);
       // Only after an UNLOCK that answered ok: that is the answer that can be
       // wrong — a stateless UNLOCK answers 200 and releases nothing.
       await this.expectLockReleased(config);
+      return written;
     }
+    // A refused write: SAP's answer to it is the step's error, and a refused
+    // UNLOCK or a failed lock-release check after it is added to that answer.
+    // Thrown over it, the check's failure was all the log held.
+    const after = await this.releaseAfterFailedWrite(config, handle);
+    if (after) throw new Error(`${failureOf(written, what)}; then ${after}`);
     return written;
   }
 
   /**
-   * UNLOCK after a write, answering whether it was released.
+   * UNLOCK after a write that answered ok; a refused UNLOCK fails the test.
    *
-   * A refused UNLOCK fails the test: the handle left held is what makes the
-   * next run's create answer 403 with nothing appearing to hold it. When the
-   * write itself failed, that failure is the one the caller raises, so this
-   * one is logged beside it instead of replacing it.
+   * The handle left held is what makes the next run's create answer 403 with
+   * nothing appearing to hold it.
    */
   private async releaseAfterWrite(
     config: Partial<TConfig>,
     handle: string,
-    writeFailed: boolean,
-  ): Promise<boolean> {
-    if (!this.adtObject.unlock) return false;
+  ): Promise<void> {
+    const refusal = await this.unlockAfterWrite(config, handle);
+    if (refusal) throw new Error(refusal);
+  }
+
+  /**
+   * UNLOCK after a write that failed, and prove it released the lock: what
+   * failed on the way, as one sentence — `''` when nothing did. Nothing here
+   * throws, so the write's failure stays the step's error.
+   */
+  private async releaseAfterFailedWrite(
+    config: Partial<TConfig>,
+    handle: string,
+  ): Promise<string> {
+    let refusal: string;
+    try {
+      refusal = await this.unlockAfterWrite(config, handle);
+    } catch (error) {
+      return `unlock after update threw: ${messageOf(error)}; the handle may still be held`;
+    }
+    if (refusal) {
+      this.log(LogLevel.WARN, refusal);
+      return refusal;
+    }
+    try {
+      await this.expectLockReleased(config);
+    } catch (error) {
+      return `the lock-release check failed: ${messageOf(error)}`;
+    }
+    return '';
+  }
+
+  /**
+   * UNLOCK after a write: `''` when released, else SAP's refusal as one
+   * sentence. A throw of the call itself passes through.
+   */
+  private async unlockAfterWrite(
+    config: Partial<TConfig>,
+    handle: string,
+  ): Promise<string> {
+    if (!this.adtObject.unlock) return '';
     const released = await this.adtObject.unlock(config, handle, {
       analyse: analyseException,
     });
     this.objectLocked = false;
     this.lockHandle = undefined;
-    if (released.ok) return true;
+    if (released.ok) return '';
     // SAP's answer, by `failureOf`: the request's query is the lock handle,
     // which no log line may hold.
-    const refusal = `${failureOf(released, 'unlock after update')}; the handle may still be held`;
-    if (!writeFailed) throw new Error(refusal);
-    this.log(LogLevel.WARN, refusal);
-    return false;
+    return `${failureOf(released, 'unlock after update')}; the handle may still be held`;
   }
 
   /**
@@ -1245,6 +1297,7 @@ export class BaseTester<TConfig, TState = unknown> {
             { ...config, ...options.updateConfig } as Partial<TConfig>,
             updateOptions,
             (c, o) => this.writeWhatItHas(c, o),
+            'update',
           ),
           'update',
         );
@@ -1426,6 +1479,7 @@ export class BaseTester<TConfig, TState = unknown> {
             target,
             { source: patched, timeout: options.timeout },
             (c, o) => this.writeMetadata(c, o),
+            'updateMetadata',
           ),
           'updateMetadata',
         );
@@ -1458,6 +1512,7 @@ export class BaseTester<TConfig, TState = unknown> {
                 target,
                 { source: document, timeout: options.timeout },
                 (c, o) => this.writeMetadata(c, o),
+                'updateMetadata (after update)',
               ),
               'updateMetadata (after update)',
             );
@@ -1477,6 +1532,7 @@ export class BaseTester<TConfig, TState = unknown> {
               target,
               { source: document, timeout: options.timeout },
               (c, o) => this.writeMetadata(c, o),
+              'attempt metadata write (after update)',
             );
           },
         });
@@ -2065,6 +2121,7 @@ export class BaseTester<TConfig, TState = unknown> {
         { ...config, ...options?.updateConfig } as Partial<TConfig>,
         updateOptions,
         (c, o) => this.writeWhatItHas(c, o),
+        'update',
       );
       expectResult(updateState, 'update');
       await this.waitDelay(
