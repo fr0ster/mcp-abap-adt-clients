@@ -6,13 +6,30 @@
  */
 let mockEnvironment: () => unknown;
 
+// Only the configuration is replaced, and the real helper is never loaded:
+// loading it reads the session file `MCP_ENV_PATH` names into process.env
+// (`loadTestEnv` at import), after `beforeEach` cleared the keys.
 jest.mock('../../helpers/test-helper', () => ({
-  ...jest.requireActual('../../helpers/test-helper'),
   getEnvironmentConfig: () => mockEnvironment(),
 }));
 
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { sapIsConfigured, statedTarget } from '../../helpers/sapConfigured';
 import { getConfig, targetOf } from '../../helpers/sessionConfig';
+
+/**
+ * The environment this file runs in is its own. A live run names a session
+ * file (`MCP_ENV_PATH`) whose `SAP_URL` would reach these cases if anything
+ * they load read it; this file names one of its own holding a `SAP_URL`, so a
+ * read of the session file is red on every machine, CI included.
+ */
+const sessionDirectory = mkdtempSync(join(tmpdir(), 'config-boundary-'));
+const sessionFile = join(sessionDirectory, 'session.env');
+writeFileSync(sessionFile, 'SAP_URL=https://session-file.example\n');
+process.env.MCP_ENV_PATH = sessionFile;
+afterAll(() => rmSync(sessionDirectory, { recursive: true, force: true }));
 
 const KEYS = [
   'SAP_URL',

@@ -20,7 +20,10 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { IDataElementConfig } from '../../../../core/dataElement';
+import {
+  type IDataElementConfig,
+  patchDataElementDocument,
+} from '../../../../core/dataElement';
 import { getDataElement } from '../../../../core/dataElement/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
@@ -33,7 +36,16 @@ import {
   missingCaseMessage,
 } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
+import {
+  descriptionOfLength,
+  expectDescriptionRefused,
+  overTheLimit,
+  swbToolTooLong,
+} from '../../../helpers/descriptionLimit';
+import { contentAt } from '../../../helpers/documentAt';
 import { judged } from '../../../helpers/judged';
+import { patchedDocument } from '../../../helpers/patchedDocument';
+import { readRootDescription } from '../../../helpers/rootDescription';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -64,8 +76,20 @@ const {
   createDependencyDomain,
   extractValidationErrorMessage,
   getEnvironmentConfig,
-  dataElementDocumentFor,
+  ensureSharedDependency,
+  getSharedDependenciesConfig,
 } = require('../../../helpers/test-helper');
+
+/** The first shared domain: the one a data element is typed by. */
+function sharedDomain(): { name: string; datatype: string; length: number } {
+  const domains: Array<{ name: string; datatype: string; length: number }> =
+    getSharedDependenciesConfig()?.domains ?? [];
+  const [first] = domains;
+  if (!first) {
+    throw new Error('shared_dependencies.domains needs a domain');
+  }
+  return first;
+}
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -85,6 +109,15 @@ const libraryLogger: ILogger = createLibraryLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
+
+/** A text the case must name — read from the test configuration, a file. */
+function requiredParam(params: Record<string, unknown>, key: string): string {
+  const value = params[key];
+  if (typeof value !== 'string' || value === '') {
+    throw new Error(`params.${key} is not configured for this case`);
+  }
+  return value;
+}
 
 describe('DataElement (using AdtClient)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
@@ -376,19 +409,235 @@ describe('DataElement (using AdtClient)', () => {
 
         try {
           // Use BaseTester.flowTest() for standardized CRUD flow
+          // Exactly the 60 characters a data element's description holds:
+          // stored whole. One more is refused by SAP, asserted after the
+          // update.
+          const description = descriptionOfLength(
+            `${config.description || ''} (updated)`,
+            60,
+          );
+          const typeKind = config.typeKind ?? 'domain';
+          const params = testCase.params;
+          // The labels the case configures, each at its full length: the
+          // caller sets a length, the patch never derives one.
+          const labels = {
+            shortLabel: params.short_label ?? 'Short',
+            shortLength: 10,
+            mediumLabel: params.medium_label ?? 'Medium',
+            mediumLength: 20,
+            longLabel: params.long_label ?? 'Long',
+            longLength: 40,
+            headingLabel: params.heading_label ?? 'Heading',
+            headingLength: 55,
+          };
+          // SAP's own search help, its parameter and a SET/GET parameter,
+          // named by the case: the element only references them. Written after
+          // the flow, one reference at a time: cloud activation refuses every
+          // use of either — none is released for cloud development (measured)
+          // — so each answer is asserted as the system gives it.
+          const inputHelp = [
+            {
+              what: 'search help',
+              changes: {
+                searchHelp: requiredParam(params, 'search_help'),
+                searchHelpParameter: requiredParam(
+                  params,
+                  'search_help_parameter',
+                ),
+              },
+              stored: ['dtel:searchHelp', 'dtel:searchHelpParameter'],
+              cloudRefusal: `The use of Search Help ${requiredParam(params, 'search_help')} is not permitted.`,
+            },
+            {
+              what: 'SET/GET parameter',
+              changes: {
+                setGetParameter: requiredParam(params, 'set_get_parameter'),
+              },
+              stored: ['dtel:setGetParameter'],
+              cloudRefusal: `The use of PARA ${requiredParam(params, 'set_get_parameter')} is not permitted.`,
+            },
+          ];
+          const typed =
+            typeKind === 'domain'
+              ? { typeName: String(domainName ?? '').toUpperCase() }
+              : {
+                  dataType: String(config.dataType ?? 'CHAR').toUpperCase(),
+                  length: config.length,
+                  decimals: config.decimals,
+                };
           await tester.flowTest(config, testCase.params, {
             // The create is a shell — `<dtel:typeKind/>` empty — and the
             // update is what gives it a type; without one activation refuses
             // it: "No domain or data type was defined" (measured).
-            updateTakesDocument: (current) =>
-              dataElementDocumentFor(current, {
-                description: `${config.description || ''} (updated)`,
-                type_kind: config.typeKind,
-                domain_name: domainName,
-                data_type: config.dataType,
-                length: config.length,
-                decimals: config.decimals,
-              }),
+            updateTakesDocument: (current) => {
+              testsLogger.info?.(
+                `the read before the update ${readRootDescription(current) === undefined ? 'carries no' : 'carries a'} root description`,
+              );
+              return patchedDocument(
+                patchDataElementDocument(current, {
+                  description,
+                  typeKind,
+                  ...typed,
+                  ...labels,
+                }),
+                'data element update',
+              );
+            },
+            afterUpdate: async (element) => {
+              const stored = await element.read();
+              expect(readRootDescription(stored)).toBe(description);
+              const at = (name: string) =>
+                contentAt(stored, ['dtel:dataElement', name]);
+              expect(at('dtel:typeKind')).toBe(typeKind);
+              if (typed.typeName !== undefined) {
+                expect(at('dtel:typeName')).toBe(typed.typeName);
+              }
+              if (typed.dataType !== undefined) {
+                expect(at('dtel:dataType')).toBe(typed.dataType);
+                // SAP's six digits; a fresh element holds 000000 for both.
+                expect([
+                  at('dtel:dataTypeLength'),
+                  at('dtel:dataTypeDecimals'),
+                ]).toEqual([
+                  String(typed.length).padStart(6, '0'),
+                  String(typed.decimals).padStart(6, '0'),
+                ]);
+              }
+              expect([
+                at('dtel:shortFieldLabel'),
+                at('dtel:shortFieldLength'),
+                at('dtel:mediumFieldLabel'),
+                at('dtel:mediumFieldLength'),
+                at('dtel:longFieldLabel'),
+                at('dtel:longFieldLength'),
+                at('dtel:headingFieldLabel'),
+                at('dtel:headingFieldLength'),
+              ]).toEqual([
+                labels.shortLabel,
+                '10',
+                labels.mediumLabel,
+                '20',
+                labels.longLabel,
+                '40',
+                labels.headingLabel,
+                '55',
+              ]);
+
+              // Over the limit: passed as given, refused by SAP, and the
+              // stored description stays.
+              expectDescriptionRefused(
+                await element.attempt(
+                  patchedDocument(
+                    patchDataElementDocument(stored, {
+                      description: overTheLimit(60),
+                    }),
+                    'data element description over the limit',
+                  ),
+                ),
+                swbToolTooLong(60),
+              );
+              expect(readRootDescription(await element.read())).toBe(
+                description,
+              );
+
+              // Each reference patched into the document read after the
+              // flow, so every write changes its own fields alone.
+              for (const step of inputHelp) {
+                const withReference = patchedDocument(
+                  patchDataElementDocument(stored, step.changes),
+                  `data element ${step.what}`,
+                );
+                if (isCloudSystem) {
+                  await expect(element.write(withReference)).rejects.toThrow(
+                    step.cloudRefusal,
+                  );
+                  continue;
+                }
+                await element.write(withReference);
+                const written = await element.read();
+                expect(
+                  step.stored.map((name) =>
+                    contentAt(written, ['dtel:dataElement', name]),
+                  ),
+                ).toEqual(Object.values(step.changes));
+              }
+
+              // A packed number with decimals: a fresh element holds 000000.
+              await element.write(
+                patchedDocument(
+                  patchDataElementDocument(stored, {
+                    dataType: 'DEC',
+                    length: 15,
+                    decimals: 2,
+                  }),
+                  'data element DEC 15,2',
+                ),
+              );
+              let written = await element.read();
+              expect([
+                contentAt(written, ['dtel:dataElement', 'dtel:dataType']),
+                contentAt(written, ['dtel:dataElement', 'dtel:dataTypeLength']),
+                contentAt(written, [
+                  'dtel:dataElement',
+                  'dtel:dataTypeDecimals',
+                ]),
+              ]).toEqual(['DEC', '000015', '000002']);
+
+              // Label lengths other than a fresh element's 10, 20, 40 and 55
+              // (SAP's maximums, which the flow writes too), each still
+              // holding the case's label.
+              await element.write(
+                patchedDocument(
+                  patchDataElementDocument(stored, {
+                    shortLength: 5,
+                    mediumLength: 15,
+                    longLength: 25,
+                    headingLength: 30,
+                  }),
+                  'data element label lengths',
+                ),
+              );
+              written = await element.read();
+              expect(
+                [
+                  'dtel:shortFieldLength',
+                  'dtel:mediumFieldLength',
+                  'dtel:longFieldLength',
+                  'dtel:headingFieldLength',
+                ].map((name) => contentAt(written, ['dtel:dataElement', name])),
+              ).toEqual(['05', '15', '25', '30']);
+
+              // Typed by a domain: the shared one, present on every system.
+              // SAP stores the domain's own type beside its name (measured).
+              const domain = sharedDomain();
+              await ensureSharedDependency(
+                client,
+                'domains',
+                domain.name,
+                testsLogger,
+              );
+              await element.write(
+                patchedDocument(
+                  patchDataElementDocument(stored, {
+                    typeKind: 'domain',
+                    typeName: domain.name,
+                  }),
+                  'data element typed by a domain',
+                ),
+              );
+              written = await element.read();
+              expect([
+                contentAt(written, ['dtel:dataElement', 'dtel:typeKind']),
+                contentAt(written, ['dtel:dataElement', 'dtel:typeName']),
+                contentAt(written, ['dtel:dataElement', 'dtel:dataType']),
+                contentAt(written, ['dtel:dataElement', 'dtel:dataTypeLength']),
+              ]).toEqual([
+                'domain',
+                domain.name,
+                domain.datatype,
+                String(domain.length).padStart(6, '0'),
+              ]);
+            },
             updateConfig: {
               dataElementName: config.dataElementName,
               packageName: config.packageName!,

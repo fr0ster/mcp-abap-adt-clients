@@ -9,12 +9,14 @@
  * recorded, and `finish()` throws them all at the end, each named.
  */
 
+import type { IAdtFailure } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { whatFailureSays } from './contract';
 import { closeOwnTestConnection } from './sessionConfig';
 
-type Answer = { ok: boolean; getError(): { message?: string } };
-
-function isRefused(value: unknown): value is Answer {
+// An action's answer is `unknown` here — a step may answer anything — so
+// whether it is a refusal is read at run time.
+function isRefused(value: unknown): value is IAdtFailure {
   return (
     typeof value === 'object' &&
     value !== null &&
@@ -39,7 +41,7 @@ export class CleanupSteps {
     try {
       const answer = await action();
       if (options.checkAnswer && isRefused(answer)) {
-        throw new Error(answer.getError().message ?? 'refused');
+        throw new Error(whatFailureSays(answer.getError()));
       }
     } catch (error) {
       this.failures.push({ step, error });

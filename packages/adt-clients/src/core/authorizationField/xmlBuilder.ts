@@ -9,19 +9,8 @@
  */
 
 import { limitDescription } from '../../utils/internalUtils';
+import { escapeXmlAttr, escapeXmlText } from '../../utils/xml';
 import type { ICreateAuthorizationFieldParams } from './types';
-
-/**
- * Escape XML-significant characters in attribute values / text content.
- * Attributes may contain double quotes, hence the "&quot;" replacement.
- */
-function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
 
 /**
  * Build a single `<auth:tag>value</auth:tag>` line, omitted when value is
@@ -32,7 +21,7 @@ function tag(name: string, value: string | undefined): string {
   if (value === undefined || value === null || value === '') {
     return '';
   }
-  return `    <auth:${name}>${escapeXml(String(value))}</auth:${name}>\n`;
+  return `    <auth:${name}>${escapeXmlText(String(value))}</auth:${name}>\n`;
 }
 
 /**
@@ -41,16 +30,16 @@ function tag(name: string, value: string | undefined): string {
 export function buildAuthorizationFieldXml(
   args: ICreateAuthorizationFieldParams,
 ): string {
-  const description = escapeXml(
+  const description = escapeXmlAttr(
     limitDescription(args.description || args.authorization_field_name),
   );
   const name = args.authorization_field_name.toUpperCase();
   const pkg = (args.package_name || '').toUpperCase();
   const masterSystemAttr = args.master_system
-    ? ` adtcore:masterSystem="${escapeXml(args.master_system)}"`
+    ? ` adtcore:masterSystem="${escapeXmlAttr(args.master_system)}"`
     : '';
   const responsibleAttr = args.responsible
-    ? ` adtcore:responsible="${escapeXml(args.responsible)}"`
+    ? ` adtcore:responsible="${escapeXmlAttr(args.responsible)}"`
     : '';
 
   const content =
@@ -70,8 +59,8 @@ export function buildAuthorizationFieldXml(
     tag('col_searchhelp_descr', args.col_searchhelp_descr);
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<auth:auth xmlns:auth="http://www.sap.com/iam/auth" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="${escapeXml(name)}" adtcore:type="AUTH" adtcore:description="${description}"${masterSystemAttr}${responsibleAttr}>
-  <adtcore:packageRef adtcore:name="${escapeXml(pkg)}"/>
+<auth:auth xmlns:auth="http://www.sap.com/iam/auth" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="${escapeXmlAttr(name)}" adtcore:type="AUTH" adtcore:description="${description}"${masterSystemAttr}${responsibleAttr}>
+  <adtcore:packageRef adtcore:name="${escapeXmlAttr(pkg)}"/>
   <auth:content>
 ${content}  </auth:content>
 </auth:auth>`;

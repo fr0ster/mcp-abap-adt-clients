@@ -357,6 +357,7 @@ describe('the legacy entry reads the overlay the live tests read', () => {
         '"environment.verify_lock_released": true',
         '"environment.read_message_class_after_create": true',
         '"environment.validate_transformation_names": true',
+        '"environment.transport_search_configured": true',
         '"shared_dependencies.package": "ZSHARED"',
         '"shared_dependencies.super_package": "ZPKG"',
         '"shared_dependencies.software_component": "HOME"',

@@ -99,6 +99,8 @@ The one place an object's ADT address is built: a record per kind (`PROGRAM`, `P
 
 **One endpoint, one member**: every member issues exactly one ADT request. `create` is the POST; `update` is the write and carries `options.lockHandle` as given; `delete` is the DELETE; `checkDeletion` is the approval ADT wants first; `lock`/`unlock` are the lock window. Nothing composes them for the caller. The one exception is activation: after a silent checklist (`activationExecuted="false"` with no message), `activate` and `activateObjects` read `GET /sap/bc/adt/activation/inactiveobjects` once, limited to the named references (`README.md`, "Activation: what activated, and which endpoint").
 
+An object's metadata document is changed by the library's `patch<Type>Document(document, changes)` (no request); the caller reads, patches and writes in three calls. No code outside the patches edits a document by first match.
+
 A multi-step operation is therefore the consumer's sequence, in the order it chooses:
 
 ```typescript

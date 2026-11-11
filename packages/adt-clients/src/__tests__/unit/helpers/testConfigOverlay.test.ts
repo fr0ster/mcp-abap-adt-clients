@@ -31,6 +31,7 @@ const BASE = [
   '  verify_lock_released: true   # ← CHANGE',
   '  read_message_class_after_create: true   # ← CHANGE',
   '  validate_transformation_names: true   # ← CHANGE',
+  '  transport_search_configured: true   # ← CHANGE',
   'shared_dependencies:',
   '  package: "ZAC_SHR_PKG"   # ← CHANGE',
   '  super_package: "<DEV_PACKAGE>"   # ← CHANGE',
@@ -76,6 +77,7 @@ const FULL_OVERLAY: Record<string, string | boolean> = {
   'environment.verify_lock_released': false,
   'environment.read_message_class_after_create': false,
   'environment.validate_transformation_names': false,
+  'environment.transport_search_configured': false,
   'shared_dependencies.package': 'ZSHR',
   'shared_dependencies.super_package': 'ZPKG',
   'shared_dependencies.software_component': 'SWC',
@@ -163,6 +165,28 @@ describe('merging the base and the overlay', () => {
     put(OVERLAY_FILE, overlayText(rest));
     expect(refusal(() => loadTestConfigFrom(directory))).toContain(
       'missing key "shared_dependencies.package"',
+    );
+  });
+
+  it('refuses an overlay that does not state whether the account has a saved transport search', () => {
+    const { 'environment.transport_search_configured': _omitted, ...rest } =
+      FULL_OVERLAY;
+    put(OVERLAY_FILE, overlayText(rest));
+    expect(refusal(() => loadTestConfigFrom(directory))).toContain(
+      'missing key "environment.transport_search_configured"',
+    );
+  });
+
+  it('refuses a saved-transport-search statement that is not a boolean', () => {
+    put(
+      OVERLAY_FILE,
+      overlayText({
+        ...FULL_OVERLAY,
+        'environment.transport_search_configured': 'yes',
+      }),
+    );
+    expect(refusal(() => loadTestConfigFrom(directory))).toContain(
+      'environment.transport_search_configured',
     );
   });
 

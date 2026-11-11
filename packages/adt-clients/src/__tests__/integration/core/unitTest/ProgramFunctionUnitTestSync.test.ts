@@ -47,6 +47,7 @@ import {
 } from '../../../helpers/abapUnitRun';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { configuredCase, gate } from '../../../helpers/caseGate';
+import { withCleanup } from '../../../helpers/cleanupSteps';
 import { expectResult, releasing } from '../../../helpers/contract';
 import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
@@ -282,181 +283,188 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
         logTestStep('delete (leftovers)', testsLogger);
         await deletePrograms();
 
-        try {
-          logTestStep('create include', testsLogger);
-          expectResult(
-            await include.create(
-              {
-                ...incl,
-                packageName,
-                transportRequest,
-                description: 'ABAP Unit: async and sync runners',
-              },
-              {
-                analyse: analyseException,
-                headers: integrationHeadersOf(include, 'create'),
-              },
-            ),
-            'create include',
-          );
-          const includeHandle = String(
+        await withCleanup(
+          async () => {
+            logTestStep('create include', testsLogger);
             expectResult(
-              await include.lock(incl, { analyse: analyseException }),
-              'lock include',
-            ),
-          );
-          await releasing(
-            async () =>
-              expectResult(
-                await include.update(
-                  { ...incl, transportRequest },
-                  {
-                    analyse: analyseException,
-                    headers: integrationHeadersOf(include, 'update'),
-                    lockHandle: includeHandle,
-                    source: params.include_source,
-                  },
-                ),
-                'write the include',
-              ),
-            () =>
-              include.unlock(incl, includeHandle, {
-                analyse: analyseException,
-              }),
-            'unlock after write the include',
-          );
-
-          for (const [p, source] of [
-            [ownProgram, params.own_program_source],
-            [inclProgram, params.include_program_source],
-          ] as const) {
-            logTestStep(`create ${p.programName}`, testsLogger);
-            expectResult(
-              await program.create(
+              await include.create(
                 {
-                  ...p,
+                  ...incl,
                   packageName,
                   transportRequest,
                   description: 'ABAP Unit: async and sync runners',
                 },
                 {
                   analyse: analyseException,
-                  headers: integrationHeadersOf(program, 'create'),
+                  headers: integrationHeadersOf(include, 'create'),
                 },
               ),
-              `create ${p.programName}`,
+              'create include',
             );
-            const handle = String(
+            const includeHandle = String(
               expectResult(
-                await program.lock(p, { analyse: analyseException }),
-                `lock ${p.programName}`,
+                await include.lock(incl, { analyse: analyseException }),
+                'lock include',
               ),
             );
             await releasing(
               async () =>
                 expectResult(
-                  await program.update(
-                    { ...p, transportRequest },
+                  await include.update(
+                    { ...incl, transportRequest },
                     {
                       analyse: analyseException,
-                      headers: integrationHeadersOf(program, 'update'),
-                      lockHandle: handle,
-                      source,
+                      headers: integrationHeadersOf(include, 'update'),
+                      lockHandle: includeHandle,
+                      source: params.include_source,
                     },
                   ),
-                  `write ${p.programName}`,
+                  'write the include',
                 ),
-              () => program.unlock(p, handle, { analyse: analyseException }),
-              `unlock after write ${p.programName}`,
-            );
-          }
-
-          logTestStep('activate', testsLogger);
-          expectResult(
-            await include.activate(incl, {
-              analyse: judged(analyseActivation),
-              headers: integrationHeadersOf(include, 'activate'),
-            }),
-            'activate include',
-          );
-          for (const p of [ownProgram, inclProgram]) {
-            expectResult(
-              await program.activate(p, {
-                analyse: judged(analyseActivation),
-                headers: integrationHeadersOf(program, 'activate'),
-              }),
-              `activate ${p.programName}`,
-            );
-          }
-
-          const runner = new AdtExecutor(
-            connection,
-            libraryLogger,
-          ).getProgramTestRunner({
-            ...abapUnitRunnerDocuments,
-            run: unitTestRunId,
-          });
-
-          for (const [p, testClass] of [
-            [ownProgram, 'LTC_OWN'],
-            [inclProgram, 'LTC_INCL'],
-          ] as const) {
-            logTestStep(`run and runSync ${p.programName}`, testsLogger);
-            const compared = await compare(
-              `PROG ${p.programName}`,
-              runner,
-              p.programName,
               () =>
-                runner.runSync(p.programName, { analyse: analyseException }),
-            );
-            expect(verdicts(compared.async)).toEqual({
-              methods: [
-                `${testClass}.${params.failing_method}`,
-                `${testClass}.${params.passing_method}`,
-              ],
-              alerts: ['failedAssertion'],
-              failed: [`${testClass}.${params.failing_method}`],
-            });
-            expect(verdicts(compared.sync)).toEqual(verdicts(compared.async));
-          }
-
-          // The options are sent, not dropped: the tests are RISK LEVEL
-          // HARMLESS, so a run that excludes harmless runs none of them.
-          logTestStep('runSync, harmless excluded', testsLogger);
-          const filtered = readRunResult(
-            String(
-              expectResult(
-                await runner.runSync(ownProgram.programName, {
+                include.unlock(incl, includeHandle, {
                   analyse: analyseException,
-                  riskLevel: { harmless: false },
                 }),
-                'runSync without harmless tests',
-              ),
-            ),
-          );
-          // None ran, and the run itself raised no failure.
-          expect(filtered.methods).toEqual([]);
-          expect(filtered.failures).toEqual([]);
-        } finally {
-          logTestStep('delete (cleanup)', testsLogger);
-          await deletePrograms();
-          for (const p of [ownProgram, inclProgram]) {
-            expect(
-              presenceOf(
-                await program.read(p, undefined, { analyse: analyseException }),
-                `program ${p.programName}`,
-              ),
-            ).toEqual({ present: false });
-          }
-          expect(
-            presenceOf(
-              await include.read(incl, undefined, {
-                analyse: analyseException,
+              'unlock after write the include',
+            );
+
+            for (const [p, source] of [
+              [ownProgram, params.own_program_source],
+              [inclProgram, params.include_program_source],
+            ] as const) {
+              logTestStep(`create ${p.programName}`, testsLogger);
+              expectResult(
+                await program.create(
+                  {
+                    ...p,
+                    packageName,
+                    transportRequest,
+                    description: 'ABAP Unit: async and sync runners',
+                  },
+                  {
+                    analyse: analyseException,
+                    headers: integrationHeadersOf(program, 'create'),
+                  },
+                ),
+                `create ${p.programName}`,
+              );
+              const handle = String(
+                expectResult(
+                  await program.lock(p, { analyse: analyseException }),
+                  `lock ${p.programName}`,
+                ),
+              );
+              await releasing(
+                async () =>
+                  expectResult(
+                    await program.update(
+                      { ...p, transportRequest },
+                      {
+                        analyse: analyseException,
+                        headers: integrationHeadersOf(program, 'update'),
+                        lockHandle: handle,
+                        source,
+                      },
+                    ),
+                    `write ${p.programName}`,
+                  ),
+                () => program.unlock(p, handle, { analyse: analyseException }),
+                `unlock after write ${p.programName}`,
+              );
+            }
+
+            logTestStep('activate', testsLogger);
+            expectResult(
+              await include.activate(incl, {
+                analyse: judged(analyseActivation),
+                headers: integrationHeadersOf(include, 'activate'),
               }),
-              `include ${incl.includeName}`,
-            ),
-          ).toEqual({ present: false });
-        }
+              'activate include',
+            );
+            for (const p of [ownProgram, inclProgram]) {
+              expectResult(
+                await program.activate(p, {
+                  analyse: judged(analyseActivation),
+                  headers: integrationHeadersOf(program, 'activate'),
+                }),
+                `activate ${p.programName}`,
+              );
+            }
+
+            const runner = new AdtExecutor(
+              connection,
+              libraryLogger,
+            ).getProgramTestRunner({
+              ...abapUnitRunnerDocuments,
+              run: unitTestRunId,
+            });
+
+            for (const [p, testClass] of [
+              [ownProgram, 'LTC_OWN'],
+              [inclProgram, 'LTC_INCL'],
+            ] as const) {
+              logTestStep(`run and runSync ${p.programName}`, testsLogger);
+              const compared = await compare(
+                `PROG ${p.programName}`,
+                runner,
+                p.programName,
+                () =>
+                  runner.runSync(p.programName, { analyse: analyseException }),
+              );
+              expect(verdicts(compared.async)).toEqual({
+                methods: [
+                  `${testClass}.${params.failing_method}`,
+                  `${testClass}.${params.passing_method}`,
+                ],
+                alerts: ['failedAssertion'],
+                failed: [`${testClass}.${params.failing_method}`],
+              });
+              expect(verdicts(compared.sync)).toEqual(verdicts(compared.async));
+            }
+
+            // The options are sent, not dropped: the tests are RISK LEVEL
+            // HARMLESS, so a run that excludes harmless runs none of them.
+            logTestStep('runSync, harmless excluded', testsLogger);
+            const filtered = readRunResult(
+              String(
+                expectResult(
+                  await runner.runSync(ownProgram.programName, {
+                    analyse: analyseException,
+                    riskLevel: { harmless: false },
+                  }),
+                  'runSync without harmless tests',
+                ),
+              ),
+            );
+            // None ran, and the run itself raised no failure.
+            expect(filtered.methods).toEqual([]);
+            expect(filtered.failures).toEqual([]);
+          },
+          async (steps) => {
+            await steps.run('delete (cleanup)', async () => {
+              logTestStep('delete (cleanup)', testsLogger);
+              await deletePrograms();
+              for (const p of [ownProgram, inclProgram]) {
+                expect(
+                  presenceOf(
+                    await program.read(p, undefined, {
+                      analyse: analyseException,
+                    }),
+                    `program ${p.programName}`,
+                  ),
+                ).toEqual({ present: false });
+              }
+              expect(
+                presenceOf(
+                  await include.read(incl, undefined, {
+                    analyse: analyseException,
+                  }),
+                  `include ${incl.includeName}`,
+                ),
+              ).toEqual({ present: false });
+            });
+          },
+        );
         logTestSuccess(testsLogger, TITLE);
       } finally {
         logTestEnd(testsLogger, TITLE);
@@ -525,219 +533,229 @@ describe('ABAP Unit on reports and function groups: run (async) and runSync (syn
         logTestStep('delete (leftover)', testsLogger);
         await deleteGroup();
 
-        try {
-          logTestStep('create group', testsLogger);
-          expectResult(
-            await fugr.create(
-              {
-                ...group,
-                packageName,
-                transportRequest,
-                description: 'ABAP Unit: async and sync runners',
-              },
-              {
-                analyse: analyseException,
-                headers: integrationHeadersOf(fugr, 'create'),
-              },
-            ),
-            'create group',
-          );
-          for (const [m, source] of [
-            [module, params.function_module_source],
-            [untested, params.untested_module_source],
-          ] as const) {
-            logTestStep(`create ${m.functionModuleName}`, testsLogger);
+        await withCleanup(
+          async () => {
+            logTestStep('create group', testsLogger);
             expectResult(
-              await fm.create(
+              await fugr.create(
                 {
-                  ...m,
+                  ...group,
+                  packageName,
                   transportRequest,
                   description: 'ABAP Unit: async and sync runners',
                 },
                 {
                   analyse: analyseException,
-                  headers: integrationHeadersOf(fm, 'create'),
+                  headers: integrationHeadersOf(fugr, 'create'),
                 },
               ),
-              `create ${m.functionModuleName}`,
+              'create group',
             );
-            const handle = String(
+            for (const [m, source] of [
+              [module, params.function_module_source],
+              [untested, params.untested_module_source],
+            ] as const) {
+              logTestStep(`create ${m.functionModuleName}`, testsLogger);
               expectResult(
-                await fm.lock(m, { analyse: analyseException }),
-                `lock ${m.functionModuleName}`,
+                await fm.create(
+                  {
+                    ...m,
+                    transportRequest,
+                    description: 'ABAP Unit: async and sync runners',
+                  },
+                  {
+                    analyse: analyseException,
+                    headers: integrationHeadersOf(fm, 'create'),
+                  },
+                ),
+                `create ${m.functionModuleName}`,
+              );
+              const handle = String(
+                expectResult(
+                  await fm.lock(m, { analyse: analyseException }),
+                  `lock ${m.functionModuleName}`,
+                ),
+              );
+              await releasing(
+                async () =>
+                  expectResult(
+                    await fm.update(
+                      { ...m, transportRequest },
+                      {
+                        analyse: analyseException,
+                        headers: integrationHeadersOf(fm, 'update'),
+                        lockHandle: handle,
+                        source,
+                      },
+                    ),
+                    `write ${m.functionModuleName}`,
+                  ),
+                () => fm.unlock(m, handle, { analyse: analyseException }),
+                `unlock after write ${m.functionModuleName}`,
+              );
+            }
+
+            logTestStep('create test include', testsLogger);
+            expectResult(
+              await finc.create(
+                {
+                  ...include,
+                  transportRequest,
+                  description: 'ABAP Unit tests',
+                },
+                {
+                  analyse: analyseException,
+                  headers: integrationHeadersOf(finc, 'create'),
+                },
+              ),
+              'create include',
+            );
+            const includeHandle = String(
+              expectResult(
+                await finc.lock(include, { analyse: analyseException }),
+                'lock include',
               ),
             );
             await releasing(
               async () =>
                 expectResult(
-                  await fm.update(
-                    { ...m, transportRequest },
+                  await finc.update(
+                    { ...include, transportRequest },
                     {
                       analyse: analyseException,
-                      headers: integrationHeadersOf(fm, 'update'),
-                      lockHandle: handle,
-                      source,
+                      headers: integrationHeadersOf(finc, 'update'),
+                      lockHandle: includeHandle,
+                      source: params.include_source,
                     },
                   ),
-                  `write ${m.functionModuleName}`,
+                  'write the test classes',
                 ),
-              () => fm.unlock(m, handle, { analyse: analyseException }),
-              `unlock after write ${m.functionModuleName}`,
+              () =>
+                finc.unlock(include, includeHandle, {
+                  analyse: analyseException,
+                }),
+              'unlock after write the test classes',
             );
-          }
 
-          logTestStep('create test include', testsLogger);
-          expectResult(
-            await finc.create(
-              {
-                ...include,
-                transportRequest,
-                description: 'ABAP Unit tests',
-              },
-              {
-                analyse: analyseException,
-                headers: integrationHeadersOf(finc, 'create'),
-              },
-            ),
-            'create include',
-          );
-          const includeHandle = String(
-            expectResult(
-              await finc.lock(include, { analyse: analyseException }),
-              'lock include',
-            ),
-          );
-          await releasing(
-            async () =>
+            logTestStep('activate', testsLogger);
+            for (const m of [module, untested]) {
               expectResult(
-                await finc.update(
-                  { ...include, transportRequest },
-                  {
-                    analyse: analyseException,
-                    headers: integrationHeadersOf(finc, 'update'),
-                    lockHandle: includeHandle,
-                    source: params.include_source,
-                  },
-                ),
-                'write the test classes',
-              ),
-            () =>
-              finc.unlock(include, includeHandle, {
-                analyse: analyseException,
-              }),
-            'unlock after write the test classes',
-          );
-
-          logTestStep('activate', testsLogger);
-          for (const m of [module, untested]) {
+                await fm.activate(m, {
+                  analyse: judged(analyseActivation),
+                  headers: integrationHeadersOf(fm, 'activate'),
+                }),
+                `activate ${m.functionModuleName}`,
+              );
+            }
             expectResult(
-              await fm.activate(m, {
+              await finc.activate(include, {
                 analyse: judged(analyseActivation),
-                headers: integrationHeadersOf(fm, 'activate'),
+                headers: integrationHeadersOf(finc, 'activate'),
               }),
-              `activate ${m.functionModuleName}`,
+              'activate include',
             );
-          }
-          expectResult(
-            await finc.activate(include, {
-              analyse: judged(analyseActivation),
-              headers: integrationHeadersOf(finc, 'activate'),
-            }),
-            'activate include',
-          );
-          expectResult(
-            await fugr.activate(group, {
-              analyse: judged(analyseActivation),
-              headers: integrationHeadersOf(fugr, 'activate'),
-            }),
-            'activate group',
-          );
-
-          const executor = new AdtExecutor(connection, libraryLogger);
-          const documents = { ...abapUnitRunnerDocuments, run: unitTestRunId };
-          const groupRunner = executor.getFunctionGroupTestRunner(documents);
-          const moduleRunner = executor.getFunctionModuleTestRunner(documents);
-
-          const moduleMethods = (params.module_methods as string[]).map(
-            (m) => `LTC_MODULE.${m}`,
-          );
-          const otherMethods = (params.other_methods as string[]).map(
-            (m) => `LTC_OTHER.${m}`,
-          );
-          const failed = [`LTC_MODULE.${params.failing_method}`];
-
-          logTestStep('run and runSync (group)', testsLogger);
-          const groupRun = await compare(
-            `FUGR ${functionGroupName}`,
-            groupRunner,
-            functionGroupName,
-            () =>
-              groupRunner.runSync(functionGroupName, {
-                analyse: analyseException,
+            expectResult(
+              await fugr.activate(group, {
+                analyse: judged(analyseActivation),
+                headers: integrationHeadersOf(fugr, 'activate'),
               }),
-          );
-          expect(verdicts(groupRun.async)).toEqual({
-            methods: [...moduleMethods, ...otherMethods].sort(),
-            alerts: ['failedAssertion'],
-            failed,
-          });
-          expect(verdicts(groupRun.sync)).toEqual(verdicts(groupRun.async));
+              'activate group',
+            );
 
-          logTestStep('run and runSync (module under test)', testsLogger);
-          const moduleRun = await compare(
-            `FUNC ${module.functionModuleName}`,
-            moduleRunner,
-            module.functionModuleName,
-            () => moduleRunner.runSync(module, { analyse: analyseException }),
-          );
+            const executor = new AdtExecutor(connection, libraryLogger);
+            const documents = {
+              ...abapUnitRunnerDocuments,
+              run: unitTestRunId,
+            };
+            const groupRunner = executor.getFunctionGroupTestRunner(documents);
+            const moduleRunner =
+              executor.getFunctionModuleTestRunner(documents);
 
-          logTestStep(
-            'run and runSync (module no test exercises)',
-            testsLogger,
-          );
-          const untestedRun = await compare(
-            `FUNC ${untested.functionModuleName}`,
-            moduleRunner,
-            untested.functionModuleName,
-            () => moduleRunner.runSync(untested, { analyse: analyseException }),
-          );
+            const moduleMethods = (params.module_methods as string[]).map(
+              (m) => `LTC_MODULE.${m}`,
+            );
+            const otherMethods = (params.other_methods as string[]).map(
+              (m) => `LTC_OTHER.${m}`,
+            );
+            const failed = [`LTC_MODULE.${params.failing_method}`];
 
-          // Measured on premise (SAP_BASIS 816, 2026-10-23): neither runner
-          // keeps to the tests that exercise the module. A module's run, on
-          // /runs (`osl:object type="FUNC"`) and on /testruns (the module's
-          // URI) alike, runs every test of its group — LTC_OTHER, which calls
-          // no module, included — and so does the run of a module no test
-          // calls. /testruns reports the group (`FUGR/F`). These expectations
-          // record that; a system that filters turns them red.
-          testsLogger.info?.('What a module run covers', {
-            moduleAsync: moduleRun.async.methods,
-            moduleSync: moduleRun.sync.methods,
-            untestedAsync: untestedRun.async.methods,
-            untestedSync: untestedRun.sync.methods,
-          });
-          for (const run of [moduleRun, untestedRun]) {
-            expect(verdicts(run.async)).toEqual(verdicts(groupRun.async));
-            expect(verdicts(run.sync)).toEqual(verdicts(groupRun.sync));
-            expect(run.sync.programTypes).toEqual(['FUGR/F']);
-          }
-        } finally {
-          logTestStep('delete (cleanup)', testsLogger);
-          await deleteGroup();
-          expect(
-            presenceOf(
-              await fugr.readMetadata(group, { analyse: analyseException }),
-              `function group ${functionGroupName}`,
-            ),
-          ).toEqual({ present: false });
-          for (const m of [module, untested]) {
-            expect(
-              presenceOf(
-                await fm.readMetadata(m, { analyse: analyseException }),
-                `module ${m.functionModuleName}`,
-              ),
-            ).toEqual({ present: false });
-          }
-        }
+            logTestStep('run and runSync (group)', testsLogger);
+            const groupRun = await compare(
+              `FUGR ${functionGroupName}`,
+              groupRunner,
+              functionGroupName,
+              () =>
+                groupRunner.runSync(functionGroupName, {
+                  analyse: analyseException,
+                }),
+            );
+            expect(verdicts(groupRun.async)).toEqual({
+              methods: [...moduleMethods, ...otherMethods].sort(),
+              alerts: ['failedAssertion'],
+              failed,
+            });
+            expect(verdicts(groupRun.sync)).toEqual(verdicts(groupRun.async));
+
+            logTestStep('run and runSync (module under test)', testsLogger);
+            const moduleRun = await compare(
+              `FUNC ${module.functionModuleName}`,
+              moduleRunner,
+              module.functionModuleName,
+              () => moduleRunner.runSync(module, { analyse: analyseException }),
+            );
+
+            logTestStep(
+              'run and runSync (module no test exercises)',
+              testsLogger,
+            );
+            const untestedRun = await compare(
+              `FUNC ${untested.functionModuleName}`,
+              moduleRunner,
+              untested.functionModuleName,
+              () =>
+                moduleRunner.runSync(untested, { analyse: analyseException }),
+            );
+
+            // Measured on premise (SAP_BASIS 816, 2026-10-23): neither runner
+            // keeps to the tests that exercise the module. A module's run, on
+            // /runs (`osl:object type="FUNC"`) and on /testruns (the module's
+            // URI) alike, runs every test of its group — LTC_OTHER, which calls
+            // no module, included — and so does the run of a module no test
+            // calls. /testruns reports the group (`FUGR/F`). These expectations
+            // record that; a system that filters turns them red.
+            testsLogger.info?.('What a module run covers', {
+              moduleAsync: moduleRun.async.methods,
+              moduleSync: moduleRun.sync.methods,
+              untestedAsync: untestedRun.async.methods,
+              untestedSync: untestedRun.sync.methods,
+            });
+            for (const run of [moduleRun, untestedRun]) {
+              expect(verdicts(run.async)).toEqual(verdicts(groupRun.async));
+              expect(verdicts(run.sync)).toEqual(verdicts(groupRun.sync));
+              expect(run.sync.programTypes).toEqual(['FUGR/F']);
+            }
+          },
+          async (steps) => {
+            await steps.run('delete (cleanup)', async () => {
+              logTestStep('delete (cleanup)', testsLogger);
+              await deleteGroup();
+              expect(
+                presenceOf(
+                  await fugr.readMetadata(group, { analyse: analyseException }),
+                  `function group ${functionGroupName}`,
+                ),
+              ).toEqual({ present: false });
+              for (const m of [module, untested]) {
+                expect(
+                  presenceOf(
+                    await fm.readMetadata(m, { analyse: analyseException }),
+                    `module ${m.functionModuleName}`,
+                  ),
+                ).toEqual({ present: false });
+              }
+            });
+          },
+        );
         logTestSuccess(testsLogger, TITLE);
       } finally {
         logTestEnd(testsLogger, TITLE);

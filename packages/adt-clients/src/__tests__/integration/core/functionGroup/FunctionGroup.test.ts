@@ -20,14 +20,24 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { IFunctionGroupConfig } from '../../../../core/functionGroup';
+import {
+  type IFunctionGroupConfig,
+  patchFunctionGroupDocument,
+} from '../../../../core/functionGroup';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult, failureOf } from '../../../helpers/contract';
+import {
+  descriptionOfLength,
+  expectDescriptionRefused,
+  overTheLimit,
+} from '../../../helpers/descriptionLimit';
 import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
+import { patchedDocument } from '../../../helpers/patchedDocument';
+import { readRootDescription } from '../../../helpers/rootDescription';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -227,6 +237,41 @@ describe('FunctionGroup (using AdtClient)', () => {
           updateEditsSource: {
             edit: (current) => `${SOURCE_MARKER}\n${current}`,
             marker: SOURCE_MARKER,
+          },
+          // Exactly the 40 characters a function group's description holds
+          // (`adtcore:descriptionTextLimit="40"`): stored whole. One more is
+          // passed as given by the patch and refused by SAP.
+          afterUpdate: async (group) => {
+            const description = descriptionOfLength(
+              `${config.description || ''} (patched)`,
+              40,
+            );
+            await group.write(
+              patchedDocument(
+                patchFunctionGroupDocument(await group.read(), {
+                  description,
+                }),
+                'function group description',
+              ),
+            );
+            const stored = await group.read();
+            expect(readRootDescription(stored)).toBe(description);
+            expectDescriptionRefused(
+              await group.attempt(
+                patchedDocument(
+                  patchFunctionGroupDocument(stored, {
+                    description: overTheLimit(40),
+                  }),
+                  'function group description over the limit',
+                ),
+              ),
+              {
+                id: 'FUNC_ADT',
+                no: '103',
+                values: [config.functionGroupName.toUpperCase(), '40'],
+              },
+            );
+            expect(readRootDescription(await group.read())).toBe(description);
           },
           updateConfig: {
             functionGroupName: config.functionGroupName,

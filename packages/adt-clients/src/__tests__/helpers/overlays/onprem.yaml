@@ -28,6 +28,8 @@
 "environment.read_message_class_after_create": true
 # Validate a transformation's name before its create (on: any refusal fails; off: not sent, said in the run). false where the system has no /sap/bc/adt/xslt/validation (404).
 "environment.validate_transformation_names": true
+# Whether the account holds a saved transport search configuration (on: the list-through-a-saved-search case runs, and an empty list fails; off: registered as skipped, saying so). true where the user has one (the list case then runs, and an empty list fails).
+"environment.transport_search_configured": true
 # Name of the shared package on THIS system (created by `npm run shared:setup` inside super_package).
 "shared_dependencies.package": "<SHARED_PACKAGE>"
 # Parent of the shared package; normally the same as environment.default_package.

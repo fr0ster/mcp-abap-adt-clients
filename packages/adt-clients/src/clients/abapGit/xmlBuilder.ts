@@ -12,26 +12,19 @@ import type {
   IAbapGitLinkArgs,
   IAbapGitPullArgs,
 } from '@mcp-abap-adt/interfaces-adt';
+import { escapeXmlText } from '../../utils/xml';
 
 const NS_ABAPGITREPO = 'http://www.sap.com/adt/abapgit/repositories';
 const NS_ABAPGIT_EXTERNAL_REPO = 'http://www.sap.com/adt/abapgit/externalRepo';
 
-function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 function childRepo(tag: string, value: string | undefined): string {
   if (value === undefined || value === null) return '';
-  return `<abapgitrepo:${tag}>${escapeXml(value)}</abapgitrepo:${tag}>`;
+  return `<abapgitrepo:${tag}>${escapeXmlText(value)}</abapgitrepo:${tag}>`;
 }
 
 function childExternalRepo(tag: string, value: string | undefined): string {
   if (value === undefined || value === null) return '';
-  return `<abapgitexternalrepo:${tag}>${escapeXml(value)}</abapgitexternalrepo:${tag}>`;
+  return `<abapgitexternalrepo:${tag}>${escapeXmlText(value)}</abapgitexternalrepo:${tag}>`;
 }
 
 export function buildLinkBody(args: IAbapGitLinkArgs): string {

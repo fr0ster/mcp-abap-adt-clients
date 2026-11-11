@@ -3,9 +3,10 @@
  * test, and a refusal after a failed body is added to that failure instead of
  * being dropped or replacing it.
  */
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtFailure, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import {
   cleanupRefusal,
+  expectResult,
   noteCleanupRefusal,
   raiseAfterCleanup,
   releasing,
@@ -87,6 +88,74 @@ describe('releasing', () => {
   });
 });
 
+/** SAP's refusal of a request, as the library answers it: an ADT exception document. */
+function refusedBySap(
+  method: string,
+  path: string,
+  key: { id: string; no: string },
+  text: string,
+): IAdtFailure {
+  const data =
+    '<?xml version="1.0" encoding="utf-8"?>' +
+    '<exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework">' +
+    '<namespace id="com.sap.adt"/><type id="ExceptionResourceFailure"/>' +
+    `<message lang="EN">${text}</message>` +
+    `<localizedMessage lang="EN">${text}</localizedMessage>` +
+    `<properties><entry key="T100KEY-ID">${key.id}</entry>` +
+    `<entry key="T100KEY-NO">${key.no}</entry></properties></exc:exception>`;
+  return {
+    ok: false,
+    getError: () => ({
+      origin: 'refusal',
+      message: 'Request failed with status code 400',
+      response: { status: 400, statusText: 'Bad Request', headers: {}, data },
+      request: { method, url: `${path}?lockHandle=SECRET%2BHANDLE&corrNr=X` },
+    }),
+  };
+}
+
+describe('a write and its unlock both refused under releasing', () => {
+  it("keeps the write's refusal as the step's error and adds the unlock's, both SAP answers, no lock handle", async () => {
+    const path = '/sap/bc/adt/messageclass/zthing';
+    const failure = releasing(
+      async () =>
+        expectResult(
+          refusedBySap(
+            'PUT',
+            path,
+            { id: 'SMSG_W', no: '017' },
+            'Write refused for SECRET+HANDLE',
+          ),
+          'write the patched class',
+        ),
+      async () =>
+        refusedBySap(
+          'POST',
+          path,
+          { id: 'SMSG_U', no: '023' },
+          'Unlock refused',
+        ),
+      'unlock class after the description patch',
+    );
+    const thrown = await failure.then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+    if (!(thrown instanceof Error)) throw new Error('releasing did not fail');
+    expect(thrown.message).toMatch(
+      /^write the patched class failed \[refusal\]/,
+    );
+    expect(thrown.message).toContain(
+      'SAP: SMSG_W/017 Write refused for <lock handle>',
+    );
+    expect(thrown.message).toContain(
+      '; then unlock class after the description patch failed [refusal]',
+    );
+    expect(thrown.message).toContain('SAP: SMSG_U/023 Unlock refused');
+    expect(thrown.message).not.toContain('SECRET');
+  });
+});
+
 describe('cleanupRefusal, noteCleanupRefusal and raiseAfterCleanup', () => {
   it('answers nothing for a removal, and for an object already absent', async () => {
     await expect(cleanupRefusal(async () => ok(), 'delete')).resolves.toBe('');
@@ -101,7 +170,7 @@ describe('cleanupRefusal, noteCleanupRefusal and raiseAfterCleanup', () => {
   it('answers what any other refusal or throw said', async () => {
     await expect(
       cleanupRefusal(async () => refused('locked by ZOTHER', 403), 'delete X'),
-    ).resolves.toBe('delete X failed [refusal]: locked by ZOTHER');
+    ).resolves.toBe('delete X failed [refusal]: locked by ZOTHER; HTTP 403');
     await expect(
       cleanupRefusal(async () => {
         throw new Error('socket closed');

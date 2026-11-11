@@ -8,19 +8,12 @@
  */
 
 import { TYPE_CODE } from '../../constants/typeCodes';
+import { escapeXmlAttr } from '../../utils/xml';
 import type { ICreateFeatureToggleParams } from './types';
 
 const NS_BLUE = 'http://www.sap.com/wbobj/blue';
 const NS_ADTCORE = 'http://www.sap.com/adt/core';
 const NS_ABAPSOURCE = 'http://www.sap.com/adt/abapsource';
-
-function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
 
 export function buildFeatureToggleXml(
   params: ICreateFeatureToggleParams,
@@ -30,17 +23,19 @@ export function buildFeatureToggleXml(
   const pkg = params.package_name as string;
 
   const adtcoreAttrs = [
-    `adtcore:name="${escapeXml(name)}"`,
+    `adtcore:name="${escapeXmlAttr(name)}"`,
     `adtcore:type="${TYPE_CODE.featureToggle}"`,
-    `adtcore:description="${escapeXml(description)}"`,
+    `adtcore:description="${escapeXmlAttr(description)}"`,
   ];
   if (params.master_system) {
     adtcoreAttrs.push(
-      `adtcore:masterSystem="${escapeXml(params.master_system)}"`,
+      `adtcore:masterSystem="${escapeXmlAttr(params.master_system)}"`,
     );
   }
   if (params.responsible) {
-    adtcoreAttrs.push(`adtcore:responsible="${escapeXml(params.responsible)}"`);
+    adtcoreAttrs.push(
+      `adtcore:responsible="${escapeXmlAttr(params.responsible)}"`,
+    );
   }
 
   return (
@@ -48,7 +43,7 @@ export function buildFeatureToggleXml(
     `<blue:blueSource xmlns:blue="${NS_BLUE}" xmlns:adtcore="${NS_ADTCORE}" xmlns:abapsource="${NS_ABAPSOURCE}" ` +
     adtcoreAttrs.join(' ') +
     `>` +
-    (pkg ? `<adtcore:packageRef adtcore:name="${escapeXml(pkg)}"/>` : '') +
+    (pkg ? `<adtcore:packageRef adtcore:name="${escapeXmlAttr(pkg)}"/>` : '') +
     `</blue:blueSource>`
   );
 }

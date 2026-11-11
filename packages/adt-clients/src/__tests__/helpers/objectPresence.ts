@@ -21,7 +21,12 @@
  */
 
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { deletionRefusedIn, failureOf, saysAbsent } from './contract';
+import {
+  deletionRefusedIn,
+  failureOf,
+  saysAbsent,
+  whatFailureSays,
+} from './contract';
 
 export type ObjectPresence =
   | { present: true }
@@ -57,7 +62,7 @@ export function presenceOf(
   }
   return {
     present: 'unknown',
-    reason: `Cannot verify ${what} [${failure.origin}]: ${failure.message}`,
+    reason: `Cannot verify ${what} [${failure.origin}]: ${whatFailureSays(failure)}`,
   };
 }
 

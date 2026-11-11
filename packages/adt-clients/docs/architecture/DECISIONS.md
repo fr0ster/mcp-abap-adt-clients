@@ -943,3 +943,49 @@ the tables.
 **What would change it.** A release whose answers the tables cannot describe
 as a variant, or one ADT answer that serves a code differently per system of
 the same release.
+
+## 19. A metadata document is changed by the library's patch, which the caller calls
+
+**Problem.** Since 19.0.0 an update writes the whole document and nothing is
+read on the caller's behalf, so a caller changing one field of a domain, a data
+element, a table type, a function group, a package or a message class patched
+the XML itself. Every caller did it by first match: the first `doma:length`
+(the type length only because of document order), the first
+`adtcore:description` (a package reference's, when the root of a fresh object
+carries none). The library's own tests did the same through a regex helper, and
+the server carried a second copy of it.
+
+**Decided.** `@mcp-abap-adt/adt-clients` exports a pure function per type,
+`patch<Type>Document(document, changes)`: the document the caller read, the
+fields the caller names, typed per type; the answer is that document with
+exactly those changes, or a refusal (`not-a-document`, `not-this-type`,
+`element-missing`) and no document. An element is found by its path from the
+root and an attribute on the root, added when the read lacks it; every other
+byte comes back as read, because the change is a splice, not a rebuild. No
+regular expression and no parse-and-rebuild: a linear scanner in plain string
+code locates and splices. An update stays three calls: `readMetadata`, the
+patch, `updateMetadata`. The description is passed as given; SAP's answer to
+one over its limit — a refusal for five of the types, the first 60 characters
+stored for a message class — reaches the caller as SAP sent it.
+
+**Against.** A member that reads, patches and writes. That is the step decision
+15 removed — `updateMetadata` on a message class read the class and patched a
+field into it — and it does not come back: it is two requests behind one
+member, a read the caller did not ask for, and a document the caller never saw
+written. A patch the caller calls by name is none of those; it sends no
+request and decides nothing about SAP's answer.
+
+**Why it stays true.** `noRegexInDocumentPatches.test.ts` refuses a regex in
+the patches and the scanner; the unit tests run each rule on SAP's recorded
+documents of both releases (`corpus/adt/documents/`) and each was shown to go
+red under its mutation; the six types' live suites patch through the shipped
+functions and read back what SAP stored. No first-match patcher is left in the
+repository.
+
+**What it costs.** A field SAP adds to a document is reached only once its path
+is added to the type's patch; until then the caller patches that one field
+itself.
+
+**What would change it.** A system whose documents use other prefixes or
+another nesting for the same fields: the patch refuses them `element-missing`
+rather than writing elsewhere, and the path table grows a variant.

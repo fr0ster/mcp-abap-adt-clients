@@ -37,6 +37,7 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import { escapeXmlAttr } from '../../utils/xml';
 
 const MAIN = '/sap/bc/adt/amdp/debugger/main';
 const NAMESPACE = 'xmlns:amdpdbg="http://www.sap.com/adt/amdp/debugger"';
@@ -51,14 +52,6 @@ export const AMDP_EVENTS_ACCEPT = [4, 3, 2, 1]
 
 export const AMDP_BREAKPOINTS_CONTENT_TYPE =
   'application/vnd.sap.adt.amdp.dbg.bpsync.v1+xml';
-
-function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
 
 /**
  * Start a debug session for a user's AMDP calls.
@@ -93,7 +86,7 @@ export function buildAmdpBreakpointsXml(
   const rows = breakpoints
     .map(
       (bp) =>
-        `    <amdpdbg:breakpoint xmlns:adtcore="http://www.sap.com/adt/core" amdpdbg:clientId="${escapeXml(bp.clientId)}" adtcore:uri="${escapeXml(bp.uri)}"/>`,
+        `    <amdpdbg:breakpoint xmlns:adtcore="http://www.sap.com/adt/core" amdpdbg:clientId="${escapeXmlAttr(bp.clientId)}" adtcore:uri="${escapeXmlAttr(bp.uri)}"/>`,
     )
     .join('\n');
   return (

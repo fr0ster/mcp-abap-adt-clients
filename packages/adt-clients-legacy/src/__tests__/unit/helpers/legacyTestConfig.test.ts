@@ -36,6 +36,7 @@ const FULL_OVERLAY: Record<string, string | boolean> = {
   'environment.verify_lock_released': false,
   'environment.read_message_class_after_create': false,
   'environment.validate_transformation_names': false,
+  'environment.transport_search_configured': false,
   'shared_dependencies.package': 'ZSHR',
   'shared_dependencies.super_package': 'ZPKG',
   'shared_dependencies.software_component': 'SWC',

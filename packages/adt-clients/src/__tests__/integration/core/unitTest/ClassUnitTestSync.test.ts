@@ -38,6 +38,7 @@ import {
 } from '../../../helpers/abapUnitRun';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { configuredCase, gate } from '../../../helpers/caseGate';
+import { withCleanup } from '../../../helpers/cleanupSteps';
 import { expectResult, releasing } from '../../../helpers/contract';
 import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
@@ -201,169 +202,176 @@ describe('ABAP Unit on a class: run (async) and runSync (sync)', () => {
           'create the class',
         );
 
-        try {
-          logTestStep('update (source)', testsLogger);
-          const handle = String(
-            expectResult(
-              await cls.lock(config, { analyse: analyseException }),
-              'lock',
-            ),
-          );
-          await releasing(
-            async () =>
+        await withCleanup(
+          async () => {
+            logTestStep('update (source)', testsLogger);
+            const handle = String(
               expectResult(
-                await cls.update(config, {
-                  analyse: analyseException,
-                  headers: integrationHeadersOf(cls, 'update'),
-                  source: testCase.params.source_code,
-                  lockHandle: handle,
-                }),
-                'write the class source',
+                await cls.lock(config, { analyse: analyseException }),
+                'lock',
               ),
-            () => cls.unlock(config, handle, { analyse: analyseException }),
-            'unlock after write the class source',
-          );
-
-          logTestStep('update (testclasses)', testsLogger);
-          const includeHandle = String(
-            expectResult(
-              await cls.lock(config, { analyse: analyseException }),
-              'lock for testclasses',
-            ),
-          );
-          await releasing(
-            async () =>
-              expectResult(
-                await client.getLocalTestClass().update(config, {
-                  analyse: analyseException,
-                  headers: integrationHeadersOf(
-                    client.getLocalTestClass(),
-                    'update',
-                  ),
-                  source: testCase.params.test_class_source,
-                  lockHandle: includeHandle,
-                }),
-                'write the testclasses include',
-              ),
-            () =>
-              cls.unlock(config, includeHandle, { analyse: analyseException }),
-            'unlock after write the testclasses include',
-          );
-
-          logTestStep('activate', testsLogger);
-          expectResult(
-            await cls.activate(config, {
-              analyse: judged(analyseActivation),
-              headers: integrationHeadersOf(cls, 'activate'),
-            }),
-            'activate the class',
-          );
-
-          const runner = new AdtExecutor(
-            connection,
-            libraryLogger,
-          ).getClassTestRunner({
-            ...classTestRunnerDocuments,
-            run: unitTestRunId,
-          });
-
-          logTestStep('run (asynchronous)', testsLogger);
-          const asyncStarted = Date.now();
-          const asyncRun = await runToCompletion(runner, className);
-          const asyncMs = Date.now() - asyncStarted;
-          const asyncReading = readRunResult(asyncRun.result);
-          // The reparse keeps what the run reported, at every scope.
-          expect(asyncReading.alerts).toEqual(asyncRun.alerts);
-
-          logTestStep('runSync (synchronous)', testsLogger);
-          const syncStarted = Date.now();
-          const syncDocument = String(
-            expectResult(
-              await runner.runSync(className, { analyse: analyseException }),
-              'runSync',
-            ),
-          );
-          const syncMs = Date.now() - syncStarted;
-          const syncReading = readRunResult(syncDocument);
-
-          const report = {
-            system: isCloudSystem ? 'cloud' : 'onprem',
-            async: {
-              ...asyncReading,
-              root: rootOf(asyncRun.result),
-              ms: asyncMs,
-            },
-            sync: { ...syncReading, root: rootOf(syncDocument), ms: syncMs },
-          };
-          testsLogger.info?.('Runners compared', report);
-          if (process.env.UNIT_SYNC_REPORT) {
-            fs.appendFileSync(
-              process.env.UNIT_SYNC_REPORT,
-              `${JSON.stringify(report)}\n`,
             );
-          }
+            await releasing(
+              async () =>
+                expectResult(
+                  await cls.update(config, {
+                    analyse: analyseException,
+                    headers: integrationHeadersOf(cls, 'update'),
+                    source: testCase.params.source_code,
+                    lockHandle: handle,
+                  }),
+                  'write the class source',
+                ),
+              () => cls.unlock(config, handle, { analyse: analyseException }),
+              'unlock after write the class source',
+            );
 
-          const expected = {
-            methods: [
-              testCase.params.passing_method,
-              testCase.params.failing_method,
-            ].sort(),
-            failed: [testCase.params.failing_method],
-          };
-          expect(asyncReading.methods).toEqual(expected.methods);
-          expect(asyncReading.failed).toEqual(expected.failed);
-          expect(asyncReading.alerts).toEqual(['failedAssertion']);
-          expect(syncReading).toEqual(asyncReading);
-
-          // The options are sent, not dropped: the tests are RISK LEVEL
-          // HARMLESS, so a run that excludes harmless runs none of them — on
-          // both runners.
-          logTestStep('both runners, harmless excluded', testsLogger);
-          // A fresh object per call: one shared object handed to a helper
-          // could be changed before the member call reads it.
-          const noHarmless = () => ({ riskLevel: { harmless: false } });
-          const asyncFiltered = readRunResult(
-            (await runToCompletion(runner, className, noHarmless())).result,
-          );
-          const syncFiltered = readRunResult(
-            String(
+            logTestStep('update (testclasses)', testsLogger);
+            const includeHandle = String(
               expectResult(
-                await runner.runSync(className, {
-                  analyse: analyseException,
-                  ...noHarmless(),
-                }),
-                'runSync without harmless tests',
+                await cls.lock(config, { analyse: analyseException }),
+                'lock for testclasses',
               ),
-            ),
-          );
-          testsLogger.info?.('Harmless excluded', {
-            async: asyncFiltered,
-            sync: syncFiltered,
-          });
-          // None ran, and the run itself raised no failure: an empty method
-          // list beside a run- or class-level failure is a run that failed,
-          // not one that excluded everything.
-          expect(asyncFiltered.methods).toEqual([]);
-          expect(asyncFiltered.failures).toEqual([]);
-          expect(syncFiltered.methods).toEqual([]);
-          expect(syncFiltered.failures).toEqual([]);
-        } finally {
-          logTestStep('delete (cleanup)', testsLogger);
-          expectResult(
-            await cls.delete(config, {
-              analyse: judged(analyseDeletion),
-              headers: integrationHeadersOf(cls, 'delete'),
-            }),
-            'delete the class',
-          );
-          const after = presenceOf(
-            await cls.read({ className }, undefined, {
-              analyse: analyseException,
-            }),
-            `class ${className}`,
-          );
-          expect(after).toEqual({ present: false });
-        }
+            );
+            await releasing(
+              async () =>
+                expectResult(
+                  await client.getLocalTestClass().update(config, {
+                    analyse: analyseException,
+                    headers: integrationHeadersOf(
+                      client.getLocalTestClass(),
+                      'update',
+                    ),
+                    source: testCase.params.test_class_source,
+                    lockHandle: includeHandle,
+                  }),
+                  'write the testclasses include',
+                ),
+              () =>
+                cls.unlock(config, includeHandle, {
+                  analyse: analyseException,
+                }),
+              'unlock after write the testclasses include',
+            );
+
+            logTestStep('activate', testsLogger);
+            expectResult(
+              await cls.activate(config, {
+                analyse: judged(analyseActivation),
+                headers: integrationHeadersOf(cls, 'activate'),
+              }),
+              'activate the class',
+            );
+
+            const runner = new AdtExecutor(
+              connection,
+              libraryLogger,
+            ).getClassTestRunner({
+              ...classTestRunnerDocuments,
+              run: unitTestRunId,
+            });
+
+            logTestStep('run (asynchronous)', testsLogger);
+            const asyncStarted = Date.now();
+            const asyncRun = await runToCompletion(runner, className);
+            const asyncMs = Date.now() - asyncStarted;
+            const asyncReading = readRunResult(asyncRun.result);
+            // The reparse keeps what the run reported, at every scope.
+            expect(asyncReading.alerts).toEqual(asyncRun.alerts);
+
+            logTestStep('runSync (synchronous)', testsLogger);
+            const syncStarted = Date.now();
+            const syncDocument = String(
+              expectResult(
+                await runner.runSync(className, { analyse: analyseException }),
+                'runSync',
+              ),
+            );
+            const syncMs = Date.now() - syncStarted;
+            const syncReading = readRunResult(syncDocument);
+
+            const report = {
+              system: isCloudSystem ? 'cloud' : 'onprem',
+              async: {
+                ...asyncReading,
+                root: rootOf(asyncRun.result),
+                ms: asyncMs,
+              },
+              sync: { ...syncReading, root: rootOf(syncDocument), ms: syncMs },
+            };
+            testsLogger.info?.('Runners compared', report);
+            if (process.env.UNIT_SYNC_REPORT) {
+              fs.appendFileSync(
+                process.env.UNIT_SYNC_REPORT,
+                `${JSON.stringify(report)}\n`,
+              );
+            }
+
+            const expected = {
+              methods: [
+                testCase.params.passing_method,
+                testCase.params.failing_method,
+              ].sort(),
+              failed: [testCase.params.failing_method],
+            };
+            expect(asyncReading.methods).toEqual(expected.methods);
+            expect(asyncReading.failed).toEqual(expected.failed);
+            expect(asyncReading.alerts).toEqual(['failedAssertion']);
+            expect(syncReading).toEqual(asyncReading);
+
+            // The options are sent, not dropped: the tests are RISK LEVEL
+            // HARMLESS, so a run that excludes harmless runs none of them — on
+            // both runners.
+            logTestStep('both runners, harmless excluded', testsLogger);
+            // A fresh object per call: one shared object handed to a helper
+            // could be changed before the member call reads it.
+            const noHarmless = () => ({ riskLevel: { harmless: false } });
+            const asyncFiltered = readRunResult(
+              (await runToCompletion(runner, className, noHarmless())).result,
+            );
+            const syncFiltered = readRunResult(
+              String(
+                expectResult(
+                  await runner.runSync(className, {
+                    analyse: analyseException,
+                    ...noHarmless(),
+                  }),
+                  'runSync without harmless tests',
+                ),
+              ),
+            );
+            testsLogger.info?.('Harmless excluded', {
+              async: asyncFiltered,
+              sync: syncFiltered,
+            });
+            // None ran, and the run itself raised no failure: an empty method
+            // list beside a run- or class-level failure is a run that failed,
+            // not one that excluded everything.
+            expect(asyncFiltered.methods).toEqual([]);
+            expect(asyncFiltered.failures).toEqual([]);
+            expect(syncFiltered.methods).toEqual([]);
+            expect(syncFiltered.failures).toEqual([]);
+          },
+          async (steps) => {
+            await steps.run('delete (cleanup)', async () => {
+              logTestStep('delete (cleanup)', testsLogger);
+              expectResult(
+                await cls.delete(config, {
+                  analyse: judged(analyseDeletion),
+                  headers: integrationHeadersOf(cls, 'delete'),
+                }),
+                'delete the class',
+              );
+              const after = presenceOf(
+                await cls.read({ className }, undefined, {
+                  analyse: analyseException,
+                }),
+                `class ${className}`,
+              );
+              expect(after).toEqual({ present: false });
+            });
+          },
+        );
         logTestSuccess(testsLogger, TITLE);
       } finally {
         logTestEnd(testsLogger, TITLE);

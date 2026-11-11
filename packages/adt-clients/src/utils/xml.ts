@@ -1,34 +1,70 @@
 /**
- * Escape a value for safe interpolation into an XML attribute.
+ * The one escaping every XML body this library writes goes through: element
+ * text by {@link escapeXmlText}, an attribute value by {@link escapeXmlAttr}.
+ * Both work one character at a time — no regular expression. A value that is
+ * cut to a length (a description to 60 characters) is cut first and escaped
+ * after, so a reference is never cut in two.
  *
- * Covers all five attribute metacharacters, one character at a time — no
- * regular expression. A value that is cut to a length (a description to 60
- * characters) is cut first and escaped after, so an entity is never cut in two.
+ * A conforming XML parser hands its application a literal CR or CR LF as LF
+ * (XML 1.0 §2.11), and a literal LF, tab or CR in an attribute value as a
+ * space (§3.3.3); written as character references they reach the reader as
+ * given.
  */
-export function escapeXmlAttr(value: string): string {
+
+/** A character's reference, or `undefined` when text writes it as it is. */
+function textReference(character: string): string | undefined {
+  switch (character) {
+    case '&':
+      return '&amp;';
+    case '<':
+      return '&lt;';
+    case '>':
+      return '&gt;';
+    case '\r':
+      return '&#13;';
+    default:
+      return undefined;
+  }
+}
+
+/** A character's reference in an attribute value, either quote delimiting it. */
+function attributeReference(character: string): string | undefined {
+  switch (character) {
+    case '"':
+      return '&quot;';
+    case "'":
+      return '&apos;';
+    case '\n':
+      return '&#10;';
+    case '\t':
+      return '&#9;';
+    default:
+      return textReference(character);
+  }
+}
+
+function escapeWith(
+  value: string,
+  reference: (character: string) => string | undefined,
+): string {
   let escaped = '';
   for (const character of value) {
-    switch (character) {
-      case '&':
-        escaped += '&amp;';
-        break;
-      case '<':
-        escaped += '&lt;';
-        break;
-      case '>':
-        escaped += '&gt;';
-        break;
-      case '"':
-        escaped += '&quot;';
-        break;
-      case "'":
-        escaped += '&apos;';
-        break;
-      default:
-        escaped += character;
-    }
+    escaped += reference(character) ?? character;
   }
   return escaped;
+}
+
+/** Element text: `&`, `<`, `>` and CR (`&#13;`); LF and tab stay as they are. */
+export function escapeXmlText(value: string): string {
+  return escapeWith(value, textReference);
+}
+
+/**
+ * An attribute value, delimited by either quote: `&`, `<`, `>`, `"`, `'`, and
+ * LF, tab and CR (`&#10;`, `&#9;`, `&#13;`).
+ */
+export function escapeXmlAttr(value: string): string {
+  return escapeWith(value, attributeReference);
 }
 
 /**

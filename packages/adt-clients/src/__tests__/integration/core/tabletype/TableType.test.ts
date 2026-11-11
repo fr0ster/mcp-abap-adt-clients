@@ -16,13 +16,25 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { ITableTypeConfig } from '../../../../core/tabletype';
+import {
+  type ITableTypeChanges,
+  type ITableTypeConfig,
+  patchTableTypeDocument,
+} from '../../../../core/tabletype';
 import { getTableTypeSource } from '../../../../core/tabletype/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { patchXmlAttribute } from '../../../../utils/xmlPatch';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
+import {
+  descriptionOfLength,
+  expectDescriptionRefused,
+  overTheLimit,
+  swbToolTooLong,
+} from '../../../helpers/descriptionLimit';
+import { contentAt } from '../../../helpers/documentAt';
+import { patchedDocument } from '../../../helpers/patchedDocument';
+import { readRootDescription } from '../../../helpers/rootDescription';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -43,6 +55,7 @@ import {
 } from '../../../helpers/testProgressLogger';
 
 const {
+  ensureSharedDependency,
   resolvePackageName,
   resolveTransportRequest,
   getTimeout,
@@ -159,13 +172,133 @@ describe('TableType (using AdtClient)', () => {
 
         // TableType is XML-based, no sourceCode needed
         // Update config contains XML parameters (rowTypeName, etc.)
+        const params = tester.getTestCaseDefinition()?.params ?? {};
+        // Exactly the 60 characters a table type's description holds: stored
+        // whole. One more is refused by SAP, asserted after the update.
+        const description = descriptionOfLength(
+          `${config?.description || ''} (updated)`,
+          60,
+        );
+        if (params.row_type_name) {
+          await ensureSharedDependency(
+            client,
+            'structures',
+            params.row_type_name,
+            testsLogger,
+          );
+        }
+        // The fields the case configures, each written by the patch.
+        const changes: ITableTypeChanges = {
+          description,
+          rowTypeKind: params.row_type_kind,
+          rowTypeName: params.row_type_name,
+          accessType: params.access_type,
+          keyDefinition: params.primary_key_definition,
+          keyKind: params.primary_key_kind,
+        };
+
         await tester.flowTestAuto({
-          updateTakesDocument: (current) =>
-            patchXmlAttribute(
-              current,
-              'adtcore:description',
-              `${config?.description || ''} (updated)`.slice(0, 60),
-            ),
+          // A fresh table type reads back with no root description (measured
+          // on ABAP Cloud): the patch adds it on ttyp:tableType.
+          updateTakesDocument: (current) => {
+            testsLogger.info?.(
+              `the read before the update ${readRootDescription(current) === undefined ? 'carries no' : 'carries a'} root description`,
+            );
+            return patchedDocument(
+              patchTableTypeDocument(current, changes),
+              'table type update',
+            );
+          },
+          afterUpdate: async (tableType) => {
+            const stored = await tableType.read();
+            expect(readRootDescription(stored)).toBe(description);
+            expect([
+              contentAt(stored, ['ttyp:rowType', 'ttyp:typeKind']),
+              contentAt(stored, ['ttyp:rowType', 'ttyp:typeName']),
+              contentAt(stored, ['ttyp:accessType']),
+              contentAt(stored, ['ttyp:primaryKey', 'ttyp:definition']),
+              contentAt(stored, ['ttyp:primaryKey', 'ttyp:kind']),
+            ]).toEqual([
+              changes.rowTypeKind,
+              changes.rowTypeName,
+              changes.accessType,
+              changes.keyDefinition,
+              changes.keyKind,
+            ]);
+
+            // Over the limit: passed as given, refused by SAP, and the stored
+            // description stays.
+            expectDescriptionRefused(
+              await tableType.attempt(
+                patchedDocument(
+                  patchTableTypeDocument(stored, {
+                    description: overTheLimit(60),
+                  }),
+                  'table type description over the limit',
+                ),
+              ),
+              swbToolTooLong(60),
+            );
+            expect(readRootDescription(await tableType.read())).toBe(
+              description,
+            );
+
+            // The access and the primary key other than a fresh table type's
+            // standard / standard / nonUnique, which the flow writes too: a
+            // sorted table with a unique key of the whole row.
+            await tableType.write(
+              patchedDocument(
+                patchTableTypeDocument(stored, {
+                  accessType: 'sorted',
+                  keyDefinition: 'rowType',
+                  keyKind: 'unique',
+                }),
+                'table type sorted unique',
+              ),
+            );
+            const sorted = await tableType.read();
+            expect([
+              contentAt(sorted, ['ttyp:accessType']),
+              contentAt(sorted, ['ttyp:primaryKey', 'ttyp:definition']),
+              contentAt(sorted, ['ttyp:primaryKey', 'ttyp:kind']),
+            ]).toEqual(['sorted', 'rowType', 'unique']);
+
+            // A built-in row type, one write each, through the shipped patch:
+            // the row type's kind and name, and the built-in type's data
+            // type, length and decimals. Each is read back as SAP stored it
+            // (measured on cloud and onprem: SAP's six digits).
+            const builtIn = [
+              {
+                changes: { dataType: 'CHAR', length: 10, decimals: 0 },
+                stored: ['CHAR', '000010', '000000'],
+              },
+              {
+                changes: { dataType: 'DEC', length: 15, decimals: 2 },
+                stored: ['DEC', '000015', '000002'],
+              },
+            ];
+            const BUILT_IN = ['ttyp:rowType', 'ttyp:builtInType'];
+            for (const rowType of builtIn) {
+              await tableType.write(
+                patchedDocument(
+                  patchTableTypeDocument(await tableType.read(), {
+                    rowTypeKind: 'predefinedAbapType',
+                    rowTypeName: '',
+                    ...rowType.changes,
+                  }),
+                  `table type built-in ${rowType.changes.dataType}`,
+                ),
+              );
+              const written = await tableType.read();
+              expect([
+                contentAt(written, ['ttyp:rowType', 'ttyp:typeKind']),
+                contentAt(written, ['ttyp:rowType', 'ttyp:typeName']),
+                contentAt(written, [...BUILT_IN, 'ttyp:dataType']),
+                contentAt(written, [...BUILT_IN, 'ttyp:length']),
+                contentAt(written, [...BUILT_IN, 'ttyp:decimals']),
+              ]).toEqual(['predefinedAbapType', '', ...rowType.stored]);
+            }
+          },
           updateConfig: config
             ? {
                 tableTypeName: config.tableTypeName,

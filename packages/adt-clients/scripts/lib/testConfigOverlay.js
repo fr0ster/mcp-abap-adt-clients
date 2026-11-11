@@ -143,6 +143,12 @@ const ALLOWED_OVERLAY_KEYS = Object.freeze(
       'environment.validate_transformation_names',
       { required: true, type: 'boolean' },
     ],
+    // Whether the account holds a saved transport search configuration: a
+    // fresh one holds none, and the listing that runs one has nothing to run.
+    [
+      'environment.transport_search_configured',
+      { required: true, type: 'boolean' },
+    ],
     // The shared package (the template's "Lego library").
     ['shared_dependencies.package', { required: true }],
     ['shared_dependencies.super_package', { required: true }],

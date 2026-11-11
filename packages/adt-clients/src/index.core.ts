@@ -59,6 +59,8 @@ export { startClassUnitTestRunSync } from './core/class/run';
 export {
   AdtDataElement,
   type DataElementValues,
+  type IDataElementChanges,
+  patchDataElementDocument,
 } from './core/dataElement';
 export {
   AdtDdl,
@@ -67,6 +69,9 @@ export {
 export {
   AdtDomain,
   type DomainValues,
+  type IDomainChanges,
+  type IDomainFixedValue,
+  patchDomainDocument,
 } from './core/domain';
 export {
   AdtEnhancement,
@@ -80,6 +85,8 @@ export {
 export {
   AdtFunctionGroup,
   type FunctionGroupValues,
+  type IFunctionGroupChanges,
+  patchFunctionGroupDocument,
 } from './core/functionGroup';
 export {
   AdtFunctionInclude,
@@ -96,8 +103,10 @@ export {
 export {
   AdtMessageClass,
   AdtMessageClassMessage,
+  type IMessageClassChanges,
   type MessageClassMessageValues,
   type MessageClassValues,
+  patchMessageClassDocument,
 } from './core/messageClass';
 export {
   AdtMetadataExtension,
@@ -105,7 +114,9 @@ export {
 } from './core/metadataExtension';
 export {
   AdtPackage,
+  type IPackageChanges,
   type PackageValues,
+  patchPackageDocument,
 } from './core/package';
 export {
   AdtProgram,
@@ -151,6 +162,10 @@ export {
   AdtContentTypesModern,
 } from './core/shared/contentTypes';
 export type {
+  DocumentPatch,
+  DocumentPatchRefusal,
+} from './core/shared/documentPatch';
+export type {
   AdtHandlerOptions,
   AdtLoggedOptions,
   AdtShippedOptions,
@@ -167,6 +182,8 @@ export {
 } from './core/table';
 export {
   AdtDdicTableType,
+  type ITableTypeChanges,
+  patchTableTypeDocument,
   type TableTypeValues,
 } from './core/tabletype';
 export {

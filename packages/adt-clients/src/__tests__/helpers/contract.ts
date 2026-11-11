@@ -10,7 +10,10 @@
  * These two exist so the failure message is the server's own sentence.
  */
 
-import { readDeletionRefusal } from '@mcp-abap-adt/adt-strategies';
+import {
+  readAdtRefusal,
+  readDeletionRefusal,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 
 /**
@@ -31,10 +34,10 @@ export function expectResult<T>(answer: IAdtResponse<T>, what: string): T {
  * used to refuse is a behaviour change, and `expect(...).rejects.toThrow()` no
  * longer catches it now that failures come back instead of flying past.
  */
-export function expectFailure<T>(
-  answer: IAdtResponse<T>,
+export function expectFailure<T, E extends IAdtError>(
+  answer: IAdtResponse<T, E>,
   what: string,
-): IAdtError {
+): E {
   if (answer.ok) {
     throw new Error(`${what} was expected to fail, but it answered a result`);
   }
@@ -52,14 +55,82 @@ export function saysAbsent(failure: IAdtError): boolean {
   );
 }
 
-/** The sentence {@link expectResult} throws, for a caller that collects it. */
+/**
+ * The sentence {@link expectResult} throws, for a caller that collects it.
+ *
+ * It carries what a reader of the run's log needs to tell why a step failed:
+ * the library's words, SAP's status and — when the body is an ADT document —
+ * each message's T100 key and short text. A failure the library classed as a
+ * connection failure still has SAP's answer on it, and that answer was missing
+ * from the log. The request is named by its path alone: the query carries the
+ * lock handle, which no log may hold.
+ */
 export function failureOf(answer: IAdtResponse<unknown>, what: string): string {
   if (answer.ok) return '';
   const failure = answer.getError();
+  return `${what} failed [${failure.origin}]: ${whatFailureSays(failure)}`;
+}
+
+/**
+ * What a failure says, for a caller that names the step in its own words:
+ * the library's sentence, SAP's status, each message's T100 key and short text,
+ * and the request's path — never its query, which carries the lock handle.
+ *
+ * SAP's text may echo the handle the step sent ("invalid lock handle: …"):
+ * every occurrence of that exact handle — read from the request's `lockHandle`
+ * parameter — becomes `<lock handle>`, and SAP's reason stays.
+ */
+export function whatFailureSays(failure: IAdtError): string {
+  const status = failure.response?.status;
+  const said = sapSaid(failure.response?.data);
+  const url = failure.request?.url;
+  const told =
+    failure.message +
+    (status === undefined ? '' : `; HTTP ${status}`) +
+    (said ? `; SAP: ${said}` : '');
+  const handle = url === undefined ? '' : lockHandleOf(url);
   return (
-    `${what} failed [${failure.origin}]: ${failure.message}` +
-    (failure.request?.url ? ` (${failure.request.url})` : '')
+    (handle ? told.split(handle).join(LOCK_HANDLE) : told) +
+    (url ? ` (${pathOf(url)})` : '')
   );
+}
+
+/** What stands in a log line for the lock handle a step sent. */
+const LOCK_HANDLE = '<lock handle>';
+
+/** The `lockHandle` query parameter of a request URL, decoded; `''` when it has none. */
+function lockHandleOf(url: string): string {
+  const query = url.indexOf('?');
+  if (query < 0) return '';
+  return new URLSearchParams(url.slice(query + 1)).get('lockHandle') ?? '';
+}
+
+/** Each message SAP's document carries, `ID/NO text`; or how long a body that is no document was. */
+function sapSaid(data: unknown): string {
+  if (data === undefined || data === null || data === '') return '';
+  const refusal = readAdtRefusal(data);
+  if (refusal === null) {
+    return typeof data === 'string'
+      ? `${data.length} characters, not an ADT document`
+      : '';
+  }
+  return refusal.messages
+    .map((message) =>
+      message.t100
+        ? `${message.t100.id}/${message.t100.no} ${message.text}`
+        : message.text,
+    )
+    .join(' | ');
+}
+
+/** The URL's path: no scheme, no host, no query. */
+function pathOf(url: string): string {
+  const query = url.indexOf('?');
+  const bare = query < 0 ? url : url.slice(0, query);
+  const scheme = bare.indexOf('://');
+  if (scheme < 0) return bare;
+  const path = bare.indexOf('/', scheme + 3);
+  return path < 0 ? '/' : bare.slice(path);
 }
 
 /**

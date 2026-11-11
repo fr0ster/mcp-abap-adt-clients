@@ -16,16 +16,28 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { IPackageConfig } from '../../../../core/package';
+import {
+  type IPackageChanges,
+  type IPackageConfig,
+  patchPackageDocument,
+} from '../../../../core/package';
 import { deletePackage } from '../../../../core/package/delete';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { patchXmlAttribute } from '../../../../utils/xmlPatch';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate, gateStandardObject } from '../../../helpers/caseGate';
-import { expectResult } from '../../../helpers/contract';
+import { expectFailure, expectResult } from '../../../helpers/contract';
+import {
+  descriptionOfLength,
+  expectDescriptionRefused,
+  overTheLimit,
+  swbToolTooLong,
+} from '../../../helpers/descriptionLimit';
+import { documentAt } from '../../../helpers/documentAt';
 import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
+import { patchedDocument } from '../../../helpers/patchedDocument';
+import { readRootDescription } from '../../../helpers/rootDescription';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -46,6 +58,7 @@ import {
 } from '../../../helpers/testProgressLogger';
 
 const {
+  getSharedDependenciesConfig,
   getTestCaseDefinition,
   resolveMasterSystem,
   resolvePackageName,
@@ -53,6 +66,10 @@ const {
   resolveStandardObject,
   getTimeout,
 } = require('../../../helpers/test-helper');
+
+const ATTRIBUTES = ['pak:attributes'];
+const SOFTWARE_COMPONENT = ['pak:transport', 'pak:softwareComponent'];
+const TRANSPORT_LAYER = ['pak:transport', 'pak:transportLayer'];
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -225,6 +242,12 @@ describe('Package (using AdtClient)', () => {
       'should execute full workflow and store all results',
       async () => {
         const config = await tester.requireConfig();
+        // Exactly the 60 characters a package's description holds: stored
+        // whole. One more is refused by SAP, asserted after the update.
+        const description = descriptionOfLength(
+          `${config.description || ''} (updated)`,
+          60,
+        );
 
         await tester.flowTestAuto({
           // **The update in its own ABAP session** (issue #176): the create
@@ -238,11 +261,205 @@ describe('Package (using AdtClient)', () => {
             ({ connection, client } = await tester.recycleSession());
           },
           updateTakesDocument: (current) =>
-            patchXmlAttribute(
-              current,
-              'adtcore:description',
-              `${config.description || ''} (updated)`.slice(0, 60),
+            patchedDocument(
+              patchPackageDocument(current, { description }),
+              'package update',
             ),
+          // The super package moved by name alone; SAP resolves the reference
+          // (measured): the read-back carries its own uri and type.
+          afterUpdate: async (pkg) => {
+            expect(readRootDescription(await pkg.read())).toBe(description);
+            // A write from the session that wrote last is refused (#176).
+            ({ connection, client } = await tester.recycleSession());
+            const target = getSharedDependenciesConfig()?.package;
+            if (!target) throw new Error('shared_dependencies.package not set');
+            await pkg.write(
+              patchedDocument(
+                patchPackageDocument(await pkg.read(), {
+                  superPackage: target,
+                }),
+                'package move',
+              ),
+            );
+            const stored = await pkg.read();
+            const reference =
+              documentAt(stored, ['pak:superPackage'])?.attributes ?? {};
+            expect([
+              reference['adtcore:uri'],
+              reference['adtcore:type'],
+              reference['adtcore:name'],
+            ]).toEqual([
+              `/sap/bc/adt/packages/${target.toLowerCase()}`,
+              'DEVC/K',
+              target,
+            ]);
+
+            // Over the limit: passed as given, refused by SAP, and the stored
+            // description stays.
+            ({ connection, client } = await tester.recycleSession());
+            expectDescriptionRefused(
+              await pkg.attempt(
+                patchedDocument(
+                  patchPackageDocument(stored, {
+                    description: overTheLimit(60),
+                  }),
+                  'package description over the limit',
+                ),
+              ),
+              swbToolTooLong(60),
+            );
+            expect(readRootDescription(await pkg.read())).toBe(description);
+
+            // Every other field, one write each, through the shipped patch.
+            // Where the system offers no other value, the patch writes its own
+            // (the user who created the package, the master system, the
+            // software component, the transport layer SAP answered) and SAP
+            // stores it. A change SAP does not allow is refused, and the
+            // stored value stays (measured 2026-11-11):
+            //   packageType → `main` under a development super package:
+            //     onprem 400 `00/001` "Package type cannot be changed.
+            //     Superpackage … is not a structure package or main package.",
+            //     cloud 404 `PAK/188` "No authorization to change the package type";
+            //   recordChanges flipped: onprem (transportable) 400 `TR/432`
+            //     "Change recording must be activated", cloud (local) 404
+            //     `TR/434` "No change recording for local packages";
+            //   transportLayer → '' while recording: onprem 400 `TR/609`
+            //     "Transport layer  does not exist" (cloud has no other layer).
+            const attributeOf = (
+              document: string,
+              at: readonly string[],
+              name: string,
+            ) => documentAt(document, at)?.attributes[name];
+            const attemptChange = async (
+              changes: IPackageChanges,
+              what: string,
+            ) => {
+              ({ connection, client } = await tester.recycleSession());
+              return pkg.attempt(
+                patchedDocument(
+                  patchPackageDocument(await pkg.read(), changes),
+                  what,
+                ),
+              );
+            };
+            const own = await pkg.read();
+            const kept: ReadonlyArray<{
+              changes: IPackageChanges;
+              at: readonly string[];
+              name: string;
+              value: string | undefined;
+            }> = [
+              {
+                changes: {
+                  responsible: attributeOf(own, [], 'adtcore:createdBy'),
+                },
+                at: [],
+                name: 'adtcore:responsible',
+                value: attributeOf(own, [], 'adtcore:createdBy'),
+              },
+              {
+                changes: {
+                  masterSystem: attributeOf(own, [], 'adtcore:masterSystem'),
+                },
+                at: [],
+                name: 'adtcore:masterSystem',
+                value: attributeOf(own, [], 'adtcore:masterSystem'),
+              },
+              {
+                changes: {
+                  softwareComponent: attributeOf(
+                    own,
+                    SOFTWARE_COMPONENT,
+                    'pak:name',
+                  ),
+                },
+                at: SOFTWARE_COMPONENT,
+                name: 'pak:name',
+                value: attributeOf(own, SOFTWARE_COMPONENT, 'pak:name'),
+              },
+              {
+                changes: {
+                  transportLayer: attributeOf(own, TRANSPORT_LAYER, 'pak:name'),
+                },
+                at: TRANSPORT_LAYER,
+                name: 'pak:name',
+                value: attributeOf(own, TRANSPORT_LAYER, 'pak:name'),
+              },
+            ];
+            for (const step of kept) {
+              const field = Object.keys(step.changes).join();
+              expect(step.value).toBeDefined();
+              ({ connection, client } = await tester.recycleSession());
+              await pkg.write(
+                patchedDocument(
+                  patchPackageDocument(await pkg.read(), step.changes),
+                  `package ${field}`,
+                ),
+              );
+              expect(attributeOf(await pkg.read(), step.at, step.name)).toBe(
+                step.value,
+              );
+            }
+
+            const recording =
+              attributeOf(own, ATTRIBUTES, 'pak:recordChanges') === 'true';
+            const refused: ReadonlyArray<{
+              changes: IPackageChanges;
+              at: readonly string[];
+              name: string;
+              status: number;
+              t100: unknown;
+            }> = [
+              {
+                changes: { packageType: 'main' },
+                at: ATTRIBUTES,
+                name: 'pak:packageType',
+                ...(isCloudSystem
+                  ? { status: 404, t100: { id: 'PAK', no: '188' } }
+                  : {
+                      status: 400,
+                      t100: expect.objectContaining({ id: '00', no: '001' }),
+                    }),
+              },
+              {
+                changes: { recordChanges: !recording },
+                at: ATTRIBUTES,
+                name: 'pak:recordChanges',
+                status: isCloudSystem ? 404 : 400,
+                t100: {
+                  id: 'TR',
+                  no: isCloudSystem ? '434' : '432',
+                  values: [config.packageName],
+                },
+              },
+              ...(isCloudSystem
+                ? []
+                : [
+                    {
+                      changes: { transportLayer: '' },
+                      at: TRANSPORT_LAYER,
+                      name: 'pak:name',
+                      status: 400,
+                      t100: { id: 'TR', no: '609' },
+                    },
+                  ]),
+            ];
+            for (const step of refused) {
+              const field = Object.keys(step.changes).join();
+              const before = attributeOf(await pkg.read(), step.at, step.name);
+              const failure = expectFailure(
+                await attemptChange(step.changes, `package ${field}`),
+                `package ${field}`,
+              );
+              expect(failure.response?.status).toBe(step.status);
+              expect(failure.messages.map((m) => m.t100)).toContainEqual(
+                step.t100,
+              );
+              expect(attributeOf(await pkg.read(), step.at, step.name)).toBe(
+                before,
+              );
+            }
+          },
           // Packages do not require activation in ADT
           activateOnCreate: true,
           activateOnUpdate: true,

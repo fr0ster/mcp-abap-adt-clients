@@ -746,6 +746,49 @@ await cls.update(target, { headers: SOURCE, source: edited, lockHandle });
 await cls.unlock(target, lockHandle);
 ```
 
+For the domain, the data element, the table type, the function group, the
+package and the message class the library ships the change itself:
+`patch<Type>Document(document, changes)` takes the document you read and the
+fields you name, typed per type, and answers that document with exactly those
+changes — every other byte as SAP stored it. It sends no request, so the update
+stays three calls: read, patch, write.
+
+```typescript
+import { patchDomainDocument } from '@mcp-abap-adt/adt-clients';
+
+const domain = client.getDomain();
+const target = { domainName: 'ZD' };
+
+const read = await domain.readMetadata(target);
+if (!read.ok) throw new Error(read.getError().message);
+const patched = patchDomainDocument(String(read.getResult().value), {
+  description: 'Order status',
+  length: 2,
+  fixedValues: [{ low: 'O', text: 'Open' }, { low: 'C', text: 'Closed' }],
+});
+if (!patched.ok) throw new Error(`cannot patch: ${patched.refusal.kind}`);
+
+const locked = await domain.lock(target);
+if (!locked.ok) throw new Error(locked.getError().message);
+const lockHandle = locked.getResult().value;
+await domain.updateMetadata(target, {
+  headers: DOMAIN,
+  source: patched.document,
+  lockHandle,
+});
+await domain.unlock(target, lockHandle);
+```
+
+A patch answers a refusal instead of throwing — `not-a-document` (empty,
+blank, not well-formed: the empty `200` of a not-yet-ready object),
+`not-this-type`, or `element-missing` naming the field and its path — and then
+no document, so nothing half-patched can be written. The description is passed
+as given, and SAP's answer to one over the limit (60 characters, 40 for a
+function group) is yours as SAP sent it: a refusal for five of the types, the
+first 60 characters stored for a message class. The
+fields and their paths are in `docs/usage/CLIENT_API_REFERENCE.md`, "Patching a
+metadata document".
+
 Watch the read. ADT answers a read of a not-yet-ready object with **HTTP 200 and
 an empty body**, never a 404, so what you edit may be nothing at all.
 
@@ -1310,6 +1353,10 @@ const CLASS_DOCUMENT: IAdtHeaders = {
 const SOURCE: IAdtHeaders = {
   accept: 'text/plain',
   contentType: 'text/plain; charset=utf-8',
+};
+const DOMAIN: IAdtHeaders = {
+  accept: 'application/vnd.sap.adt.domains.v2+xml',
+  contentType: 'application/vnd.sap.adt.domains.v2+xml',
 };
 const ACTIVATION: IAdtHeaders = {
   accept: 'application/xml',

@@ -43,6 +43,7 @@ import { XMLParser } from 'fast-xml-parser';
 import { buildBatchPayload, createBatchBoundary } from '../../batch/wire';
 import { DEBUGGER } from '../../endpoints/objects';
 import { requestHeaders } from '../../utils/requestHeaders';
+import { escapeXmlAttr, escapeXmlText } from '../../utils/xml';
 
 const ADT_NAMESPACES =
   'xmlns:dbg="http://www.sap.com/adt/debugger" xmlns:adtcore="http://www.sap.com/adt/core"';
@@ -54,14 +55,6 @@ export const DEBUGGER_VARIABLES_CONTENT_TYPE =
 /** Without the `dataname` suffix the server answers 406. */
 export const DEBUGGER_CHILD_VARIABLES_CONTENT_TYPE =
   'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.debugger.ChildVariables';
-
-function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
 
 function query(params: Record<string, string | number | boolean>): string {
   return new URLSearchParams(
@@ -98,9 +91,9 @@ function identityQuery(
 function identityAttributes(identity: IDebuggerIdentity): string {
   const user =
     identity.debuggingMode === 'user'
-      ? ` requestUser="${escapeXml(identity.requestUser)}"`
+      ? ` requestUser="${escapeXmlAttr(identity.requestUser)}"`
       : '';
-  return `debuggingMode="${identity.debuggingMode}" scope="external"${user} terminalId="${escapeXml(identity.terminalId)}" ideId="${escapeXml(identity.ideId)}"`;
+  return `debuggingMode="${identity.debuggingMode}" scope="external"${user} terminalId="${escapeXmlAttr(identity.terminalId)}" ideId="${escapeXmlAttr(identity.ideId)}"`;
 }
 
 // --- breakpoints ---------------------------------------------------------------
@@ -109,13 +102,13 @@ function identityAttributes(identity: IDebuggerIdentity): string {
 function breakpointTarget(bp: IDebuggerBreakpoint): string {
   switch (bp.kind) {
     case 'line':
-      return `adtcore:uri="${escapeXml(bp.uri)}"`;
+      return `adtcore:uri="${escapeXmlAttr(bp.uri)}"`;
     case 'exception':
-      return `exceptionClass="${escapeXml(bp.exceptionClass)}"`;
+      return `exceptionClass="${escapeXmlAttr(bp.exceptionClass)}"`;
     case 'statement':
-      return `statement="${escapeXml(bp.statement)}"`;
+      return `statement="${escapeXmlAttr(bp.statement)}"`;
     case 'message':
-      return `msgId="${escapeXml(bp.msgId)}" msgNo="${escapeXml(bp.msgNo)}" msgTy="${escapeXml(bp.msgTy)}"`;
+      return `msgId="${escapeXmlAttr(bp.msgId)}" msgNo="${escapeXmlAttr(bp.msgNo)}" msgTy="${escapeXmlAttr(bp.msgTy)}"`;
   }
 }
 
@@ -130,13 +123,15 @@ function breakpointRow(bp: IDebuggerBreakpoint, only: string): string {
       `condition is accepted on a line breakpoint only, not on kind "${bp.kind}"`,
     );
   }
-  const cond = condition ? ` condition="${escapeXml(condition)}"` : '';
+  const cond = condition ? ` condition="${escapeXmlAttr(condition)}"` : '';
   // The caller's tag, on any kind. The server echoes it on every row of the
   // answer, placed and refused, and does not keep the request's order (refused
   // rows first) - measured on premise (2026-10-11), BASIS 816 - so it is what
   // pairs an answer row with the request row that made it.
   const tag =
-    bp.clientId !== undefined ? ` clientId="${escapeXml(bp.clientId)}"` : '';
+    bp.clientId !== undefined
+      ? ` clientId="${escapeXmlAttr(bp.clientId)}"`
+      : '';
   return `  <breakpoint kind="${bp.kind}" ${breakpointTarget(bp)}${cond}${tag}${only}/>`;
 }
 
@@ -166,7 +161,7 @@ export function buildSyncBreakpointsXml(
   const scope =
     sync.scope === 'full'
       ? '<syncScope mode="full"/>'
-      : `<syncScope mode="partial">${sync.objects.map((uri) => `<adtcore:objectReference adtcore:uri="${escapeXml(uri)}"/>`).join('')}</syncScope>`;
+      : `<syncScope mode="partial">${sync.objects.map((uri) => `<adtcore:objectReference adtcore:uri="${escapeXmlAttr(uri)}"/>`).join('')}</syncScope>`;
   const rows = sync.breakpoints.map((bp) => breakpointRow(bp, '')).join('\n');
   return (
     '<?xml version="1.0" encoding="UTF-8"?>\n' +
@@ -521,7 +516,7 @@ export function buildChildVariablesXml(parentIds: readonly string[]): string {
   const rows = parentIds
     .map(
       (id) =>
-        `    <STPDA_ADT_VARIABLE_HIERARCHY><PARENT_ID>${escapeXml(id)}</PARENT_ID></STPDA_ADT_VARIABLE_HIERARCHY>`,
+        `    <STPDA_ADT_VARIABLE_HIERARCHY><PARENT_ID>${escapeXmlText(id)}</PARENT_ID></STPDA_ADT_VARIABLE_HIERARCHY>`,
     )
     .join('\n');
   return (
@@ -555,7 +550,7 @@ export function buildVariablesXml(variableIds: readonly string[]): string {
   const rows = variableIds
     .map(
       (id) =>
-        `  <STPDA_ADT_VARIABLE><ID>${escapeXml(id)}</ID></STPDA_ADT_VARIABLE>`,
+        `  <STPDA_ADT_VARIABLE><ID>${escapeXmlText(id)}</ID></STPDA_ADT_VARIABLE>`,
     )
     .join('\n');
   return (

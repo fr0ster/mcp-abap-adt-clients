@@ -27,6 +27,7 @@ import type { ISapRfcLogon } from '@mcp-abap-adt/interfaces-auth-sap';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtClient } from '../../clients/AdtClient';
 import { getSystemInformation } from '../../utils/systemInfo';
+import { failureOf } from './contract';
 import {
   RFC_ADDRESS_KEYS,
   RFC_APPLICATION_SERVER_KEYS,
@@ -394,7 +395,7 @@ export async function resolveSystemContext(
 
   if (isCloud) {
     const answer = await getSystemInformation(connection);
-    if (!answer.ok) throw new Error(answer.getError().message);
+    if (!answer.ok) throw new Error(failureOf(answer, 'system information'));
     const found = answer.getResult().value;
     const systemInfo = found.present ? found.info : undefined;
     return {

@@ -1,5 +1,5 @@
 /**
- * Delete or re-describe transport requests, by number.
+ * Delete transport requests, by number.
  *
  * Deliberately by explicit number and never by a filter: a wildcard over
  * someone's transport requests is not a mistake you get to undo. ADT deletes
@@ -7,7 +7,6 @@
  * the server protecting the objects, not this script failing.
  *
  *   ../../node_modules/.bin/ts-node scripts/transport-admin.ts delete DEVK900001 DEVK900002
- *   ../../node_modules/.bin/ts-node scripts/transport-admin.ts describe DEVK900001 "adt-clients tests"
  */
 
 import * as fs from 'node:fs';
@@ -20,7 +19,6 @@ import {
 } from '../src/__tests__/helpers/sessionConfig';
 import { createConnectionLogger } from '../src/__tests__/helpers/testLogger';
 import { AdtClient } from '../src/clients/AdtClient';
-import { patchXmlAttribute } from '../src/utils/xmlPatch';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
 if (fs.existsSync(envPath)) {
@@ -29,12 +27,9 @@ if (fs.existsSync(envPath)) {
 
 async function main(): Promise<void> {
   const [action, ...rest] = process.argv.slice(2);
-  if (action !== 'delete' && action !== 'describe') {
+  if (action !== 'delete') {
     // biome-ignore lint/suspicious/noConsole: a script reports to whoever ran it
-    console.log(
-      'usage: transport-admin.ts delete <NUMBER…>\n' +
-        '       transport-admin.ts describe <NUMBER> "<description>"',
-    );
+    console.log('usage: transport-admin.ts delete <NUMBER…>');
     return;
   }
 
@@ -42,42 +37,6 @@ async function main(): Promise<void> {
   const connection = await createTestConnection(logger);
   try {
     const requests = new AdtClient(connection, logger).getRequest();
-
-    if (action === 'describe') {
-      const [transportNumber, description] = rest;
-      // **The write sends the whole document, and it always did** — this used
-      // to pass a `description` field, which no request builder here reads, so
-      // the PUT went out with an undefined body and the script reported
-      // "described" regardless. The description is ADT's only mutable field on
-      // a request, and the document carries every server-managed field beside
-      // it, so: read, patch, write.
-      const current = await requests.readMetadata({ transportNumber });
-      if (!current.ok) {
-        // biome-ignore lint/suspicious/noConsole: a script reports to whoever ran it
-        console.log(
-          `  ${transportNumber}: [${current.getError().origin}] ${current.getError().message}`,
-        );
-        return;
-      }
-      const answer = await requests.updateMetadata(
-        { transportNumber },
-        {
-          headers: headersOf(requests, 'updateMetadata'),
-          source: patchXmlAttribute(
-            String(current.getResult().value),
-            'tm:desc',
-            description,
-          ),
-        },
-      );
-      // biome-ignore lint/suspicious/noConsole: same
-      console.log(
-        answer.ok
-          ? `  ${transportNumber}: described`
-          : `  ${transportNumber}: [${answer.getError().origin}] ${answer.getError().message}`,
-      );
-      return;
-    }
 
     for (const transportNumber of rest) {
       const answer = await requests.delete(
