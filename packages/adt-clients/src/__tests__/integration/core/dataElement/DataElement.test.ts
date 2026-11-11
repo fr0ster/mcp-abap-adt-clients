@@ -481,6 +481,14 @@ describe('DataElement (using AdtClient)', () => {
               }
               if (typed.dataType !== undefined) {
                 expect(at('dtel:dataType')).toBe(typed.dataType);
+                // SAP's six digits; a fresh element holds 000000 for both.
+                expect([
+                  at('dtel:dataTypeLength'),
+                  at('dtel:dataTypeDecimals'),
+                ]).toEqual([
+                  String(typed.length).padStart(6, '0'),
+                  String(typed.decimals).padStart(6, '0'),
+                ]);
               }
               expect([
                 at('dtel:shortFieldLabel'),
