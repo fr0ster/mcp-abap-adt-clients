@@ -36,6 +36,12 @@ import {
   missingCaseMessage,
 } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
+import {
+  descriptionOfLength,
+  expectDescriptionRefused,
+  overTheLimit,
+  swbToolTooLong,
+} from '../../../helpers/descriptionLimit';
 import { contentAt } from '../../../helpers/documentAt';
 import { judged } from '../../../helpers/judged';
 import { patchedDocument } from '../../../helpers/patchedDocument';
@@ -381,11 +387,12 @@ describe('DataElement (using AdtClient)', () => {
 
         try {
           // Use BaseTester.flowTest() for standardized CRUD flow
-          // Longer than the 60 characters SAP keeps: passed as given, and the
-          // read-back shows what SAP stored.
-          const description = `${config.description || ''} (updated)`.padEnd(
-            70,
-            '.',
+          // Exactly the 60 characters a data element's description holds:
+          // stored whole. One more is refused by SAP, asserted after the
+          // update.
+          const description = descriptionOfLength(
+            `${config.description || ''} (updated)`,
+            60,
           );
           const typeKind = config.typeKind ?? 'domain';
           const params = testCase.params;
@@ -429,9 +436,7 @@ describe('DataElement (using AdtClient)', () => {
             },
             afterUpdate: async (element) => {
               const stored = await element.read();
-              expect(readRootDescription(stored)).toBe(
-                description.slice(0, 60),
-              );
+              expect(readRootDescription(stored)).toBe(description);
               const at = (name: string) =>
                 contentAt(stored, ['dtel:dataElement', name]);
               expect(at('dtel:typeKind')).toBe(typeKind);
@@ -460,6 +465,23 @@ describe('DataElement (using AdtClient)', () => {
                 labels.headingLabel,
                 '55',
               ]);
+
+              // Over the limit: passed as given, refused by SAP, and the
+              // stored description stays.
+              expectDescriptionRefused(
+                await element.attempt(
+                  patchedDocument(
+                    patchDataElementDocument(stored, {
+                      description: overTheLimit(60),
+                    }),
+                    'data element description over the limit',
+                  ),
+                ),
+                swbToolTooLong(60),
+              );
+              expect(readRootDescription(await element.read())).toBe(
+                description,
+              );
             },
             updateConfig: {
               dataElementName: config.dataElementName,

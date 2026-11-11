@@ -40,6 +40,10 @@ import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate } from '../../../helpers/caseGate';
 import { expectResult, failureOf, saysAbsent } from '../../../helpers/contract';
+import {
+  descriptionOfLength,
+  overTheLimit,
+} from '../../../helpers/descriptionLimit';
 import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
 import { patchedDocument } from '../../../helpers/patchedDocument';
@@ -412,32 +416,33 @@ describe('MessageClass (using AdtClient)', () => {
 
           // ── Step 6b: The class's description, through the shipped patch ───
           // Read, patch, write under the class's lock: the description on
-          // mc:messageClass, longer than the 60 SAP keeps, and the message
-          // row in the same document written back as read.
+          // mc:messageClass, exactly the 60 characters it holds, and the
+          // message row in the same document written back as read.
           logTestStep('patch the class description', testsLogger);
-          const description = `${config.description || ''} (patched)`.padEnd(
-            70,
-            '.',
+          const description = descriptionOfLength(
+            `${config.description || ''} (patched)`,
+            60,
           );
-          const classRead = String(
-            expectResult(
-              await mcHandler.readMetadata(
+          const readClass = async (what: string) =>
+            String(
+              expectResult(
+                await mcHandler.readMetadata(
+                  { name: msgClassName },
+                  { analyse: analyseException },
+                ),
+                what,
+              ) ?? '',
+            );
+          const writeClass = async (document: string) => {
+            const classHandle = expectResult(
+              await mcHandler.lock(
                 { name: msgClassName },
                 { analyse: analyseException },
               ),
-              'read class before the description patch',
-            ) ?? '',
-          );
-          const classHandle = expectResult(
-            await mcHandler.lock(
-              { name: msgClassName },
-              { analyse: analyseException },
-            ),
-            'lock class for the description patch',
-          );
-          try {
-            expectResult(
-              await mcHandler.updateMetadata(
+              'lock class for the description patch',
+            );
+            try {
+              return await mcHandler.updateMetadata(
                 {
                   name: msgClassName,
                   transportRequest: config.transportRequest,
@@ -446,34 +451,55 @@ describe('MessageClass (using AdtClient)', () => {
                   analyse: analyseException,
                   headers: integrationHeadersOf(mcHandler, 'updateMetadata'),
                   lockHandle: classHandle,
-                  source: patchedDocument(
-                    patchMessageClassDocument(classRead, { description }),
-                    'message class description',
-                  ),
+                  source: document,
                 },
+              );
+            } finally {
+              expectResult(
+                await mcHandler.unlock({ name: msgClassName }, classHandle, {
+                  analyse: analyseException,
+                }),
+                'unlock class after the description patch',
+              );
+            }
+          };
+          expectResult(
+            await writeClass(
+              patchedDocument(
+                patchMessageClassDocument(
+                  await readClass('read class before the description patch'),
+                  { description },
+                ),
+                'message class description',
               ),
-              'write the patched class',
-            );
-          } finally {
-            expectResult(
-              await mcHandler.unlock({ name: msgClassName }, classHandle, {
-                analyse: analyseException,
-              }),
-              'unlock class after the description patch',
-            );
-          }
-          const classStored = String(
-            expectResult(
-              await mcHandler.readMetadata(
-                { name: msgClassName },
-                { analyse: analyseException },
+            ),
+            'write the patched class',
+          );
+          const classStored = await readClass(
+            'read class after the description patch',
+          );
+          expect(readRootDescription(classStored)).toBe(description);
+          // Over the limit: passed as given by the patch. A message class's
+          // write is accepted, and SAP stores the first 60 characters
+          // (measured on the cloud and on premise).
+          expectResult(
+            await writeClass(
+              patchedDocument(
+                patchMessageClassDocument(classStored, {
+                  description: overTheLimit(60),
+                }),
+                'message class description over the limit',
               ),
-              'read class after the description patch',
-            ) ?? '',
+            ),
+            'write a description over the limit',
           );
-          expect(readRootDescription(classStored)).toBe(
-            description.slice(0, 60),
-          );
+          expect(
+            readRootDescription(
+              await readClass(
+                'read class after the description over the limit',
+              ),
+            ),
+          ).toBe(overTheLimit(60).slice(0, 60));
           expect(
             parseMessageClass(classStored).messages.find(
               (m: IParsedMessage) => m.msgno === msgNo,

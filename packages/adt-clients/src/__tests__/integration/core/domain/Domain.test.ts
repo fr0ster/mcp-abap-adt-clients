@@ -26,6 +26,12 @@ import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester, type IUpdatedObject } from '../../../helpers/BaseTester';
 import { gate, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
+import {
+  descriptionOfLength,
+  expectDescriptionRefused,
+  overTheLimit,
+  swbToolTooLong,
+} from '../../../helpers/descriptionLimit';
 import { contentAt, documentAt } from '../../../helpers/documentAt';
 import { patchedDocument } from '../../../helpers/patchedDocument';
 import { readRootDescription } from '../../../helpers/rootDescription';
@@ -229,11 +235,11 @@ describe('Domain (using AdtClient)', () => {
           decimals?: number;
         };
 
-        // Longer than the 60 characters SAP keeps: the patch passes it as
-        // given, and the read-back shows what SAP stored.
-        const description = `${config.description || ''} (updated)`.padEnd(
-          70,
-          '.',
+        // Exactly the 60 characters a domain's description holds: stored
+        // whole. One more is refused by SAP, asserted after the update.
+        const description = descriptionOfLength(
+          `${config.description || ''} (updated)`,
+          60,
         );
         // The value tables a domain can name: the shared ones.
         const [tableA, tableB] = sharedTables();
@@ -269,7 +275,7 @@ describe('Domain (using AdtClient)', () => {
           },
           afterUpdate: async (domain) => {
             let stored = await domain.read();
-            expect(readRootDescription(stored)).toBe(description.slice(0, 60));
+            expect(readRootDescription(stored)).toBe(description);
             expect(contentAt(stored, [...TYPE, 'doma:datatype'])).toBe(
               config.datatype || 'CHAR',
             );
@@ -299,6 +305,21 @@ describe('Domain (using AdtClient)', () => {
               valueTable: tableB,
             });
             expect(valueTableOf(stored)).toEqual(referenceTo(tableB));
+
+            // Over the limit: the patch passes it as given, SAP refuses it,
+            // and the stored description stays.
+            expectDescriptionRefused(
+              await domain.attempt(
+                patchedDocument(
+                  patchDomainDocument(stored, {
+                    description: overTheLimit(60),
+                  }),
+                  'domain description over the limit',
+                ),
+              ),
+              swbToolTooLong(60),
+            );
+            expect(readRootDescription(await domain.read())).toBe(description);
           },
           updateConfig: {
             domainName: config.domainName,

@@ -26,6 +26,12 @@ import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
+import {
+  descriptionOfLength,
+  expectDescriptionRefused,
+  overTheLimit,
+  swbToolTooLong,
+} from '../../../helpers/descriptionLimit';
 import { documentAt } from '../../../helpers/documentAt';
 import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
@@ -231,11 +237,11 @@ describe('Package (using AdtClient)', () => {
       'should execute full workflow and store all results',
       async () => {
         const config = await tester.requireConfig();
-        // Longer than the 60 characters SAP keeps: passed as given, and the
-        // read-back shows what SAP stored.
-        const description = `${config.description || ''} (updated)`.padEnd(
-          70,
-          '.',
+        // Exactly the 60 characters a package's description holds: stored
+        // whole. One more is refused by SAP, asserted after the update.
+        const description = descriptionOfLength(
+          `${config.description || ''} (updated)`,
+          60,
         );
 
         await tester.flowTestAuto({
@@ -257,9 +263,7 @@ describe('Package (using AdtClient)', () => {
           // The super package moved by name alone; SAP resolves the reference
           // (measured): the read-back carries its own uri and type.
           afterUpdate: async (pkg) => {
-            expect(readRootDescription(await pkg.read())).toBe(
-              description.slice(0, 60),
-            );
+            expect(readRootDescription(await pkg.read())).toBe(description);
             // A write from the session that wrote last is refused (#176).
             ({ connection, client } = await tester.recycleSession());
             const target = getSharedDependenciesConfig()?.package;
@@ -284,6 +288,22 @@ describe('Package (using AdtClient)', () => {
               'DEVC/K',
               target,
             ]);
+
+            // Over the limit: passed as given, refused by SAP, and the stored
+            // description stays.
+            ({ connection, client } = await tester.recycleSession());
+            expectDescriptionRefused(
+              await pkg.attempt(
+                patchedDocument(
+                  patchPackageDocument(stored, {
+                    description: overTheLimit(60),
+                  }),
+                  'package description over the limit',
+                ),
+              ),
+              swbToolTooLong(60),
+            );
+            expect(readRootDescription(await pkg.read())).toBe(description);
           },
           // Packages do not require activation in ADT
           activateOnCreate: true,

@@ -26,6 +26,12 @@ import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult } from '../../../helpers/contract';
+import {
+  descriptionOfLength,
+  expectDescriptionRefused,
+  overTheLimit,
+  swbToolTooLong,
+} from '../../../helpers/descriptionLimit';
 import { contentAt } from '../../../helpers/documentAt';
 import { patchedDocument } from '../../../helpers/patchedDocument';
 import { readRootDescription } from '../../../helpers/rootDescription';
@@ -167,11 +173,11 @@ describe('TableType (using AdtClient)', () => {
         // TableType is XML-based, no sourceCode needed
         // Update config contains XML parameters (rowTypeName, etc.)
         const params = tester.getTestCaseDefinition()?.params ?? {};
-        // Longer than the 60 characters SAP keeps: passed as given, and the
-        // read-back shows what SAP stored.
-        const description = `${config?.description || ''} (updated)`.padEnd(
-          70,
-          '.',
+        // Exactly the 60 characters a table type's description holds: stored
+        // whole. One more is refused by SAP, asserted after the update.
+        const description = descriptionOfLength(
+          `${config?.description || ''} (updated)`,
+          60,
         );
         if (params.row_type_name) {
           await ensureSharedDependency(
@@ -205,7 +211,7 @@ describe('TableType (using AdtClient)', () => {
           },
           afterUpdate: async (tableType) => {
             const stored = await tableType.read();
-            expect(readRootDescription(stored)).toBe(description.slice(0, 60));
+            expect(readRootDescription(stored)).toBe(description);
             expect([
               contentAt(stored, ['ttyp:rowType', 'ttyp:typeKind']),
               contentAt(stored, ['ttyp:rowType', 'ttyp:typeName']),
@@ -219,6 +225,23 @@ describe('TableType (using AdtClient)', () => {
               changes.keyDefinition,
               changes.keyKind,
             ]);
+
+            // Over the limit: passed as given, refused by SAP, and the stored
+            // description stays.
+            expectDescriptionRefused(
+              await tableType.attempt(
+                patchedDocument(
+                  patchTableTypeDocument(stored, {
+                    description: overTheLimit(60),
+                  }),
+                  'table type description over the limit',
+                ),
+              ),
+              swbToolTooLong(60),
+            );
+            expect(readRootDescription(await tableType.read())).toBe(
+              description,
+            );
           },
           updateConfig: config
             ? {

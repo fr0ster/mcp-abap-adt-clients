@@ -655,12 +655,13 @@ describe('AdtRequest', () => {
             );
           }
 
+          const description = 'AdtRequest object-list round trip';
           const madeIt = await domain.create(
             {
               domainName,
               packageName,
               transportRequest: sharedRequest,
-              description: 'AdtRequest object-list round trip',
+              description,
             },
             {
               analyse: analyseException,
@@ -703,8 +704,16 @@ describe('AdtRequest', () => {
               `${domainName} was created but its document read back empty`,
             );
           }
+          // The fresh read carries no root description (only the package
+          // reference's), and a write without one is refused `SWB_TOOL` `019`
+          // "The description is missing" (measured on premise): the patch
+          // writes it on the root.
           const typed = patchedDocument(
-            patchDomainDocument(shellDocument, { dataType: 'CHAR', length: 4 }),
+            patchDomainDocument(shellDocument, {
+              description,
+              dataType: 'CHAR',
+              length: 4,
+            }),
             `type ${domainName}`,
           );
           const domainLock = await domain.lock(

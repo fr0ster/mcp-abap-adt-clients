@@ -31,10 +31,10 @@ export function expectResult<T>(answer: IAdtResponse<T>, what: string): T {
  * used to refuse is a behaviour change, and `expect(...).rejects.toThrow()` no
  * longer catches it now that failures come back instead of flying past.
  */
-export function expectFailure<T>(
-  answer: IAdtResponse<T>,
+export function expectFailure<T, E extends IAdtError>(
+  answer: IAdtResponse<T, E>,
   what: string,
-): IAdtError {
+): E {
   if (answer.ok) {
     throw new Error(`${what} was expected to fail, but it answered a result`);
   }

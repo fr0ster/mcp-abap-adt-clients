@@ -29,6 +29,11 @@ import { integrationHeadersOf } from '../../../helpers/adtHeaders';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { gate, gateStandardObject } from '../../../helpers/caseGate';
 import { expectResult, failureOf } from '../../../helpers/contract';
+import {
+  descriptionOfLength,
+  expectDescriptionRefused,
+  overTheLimit,
+} from '../../../helpers/descriptionLimit';
 import { judged } from '../../../helpers/judged';
 import { presenceOf } from '../../../helpers/objectPresence';
 import { patchedDocument } from '../../../helpers/patchedDocument';
@@ -233,13 +238,13 @@ describe('FunctionGroup (using AdtClient)', () => {
             edit: (current) => `${SOURCE_MARKER}\n${current}`,
             marker: SOURCE_MARKER,
           },
-          // The description beyond the 40 a function group keeps
-          // (`adtcore:descriptionTextLimit="40"`): passed as given by the
-          // patch, and the read-back shows what SAP stored.
+          // Exactly the 40 characters a function group's description holds
+          // (`adtcore:descriptionTextLimit="40"`): stored whole. One more is
+          // passed as given by the patch and refused by SAP.
           afterUpdate: async (group) => {
-            const description = `${config.description || ''} (patched)`.padEnd(
-              45,
-              '.',
+            const description = descriptionOfLength(
+              `${config.description || ''} (patched)`,
+              40,
             );
             await group.write(
               patchedDocument(
@@ -249,9 +254,24 @@ describe('FunctionGroup (using AdtClient)', () => {
                 'function group description',
               ),
             );
-            expect(readRootDescription(await group.read())).toBe(
-              description.slice(0, 40),
+            const stored = await group.read();
+            expect(readRootDescription(stored)).toBe(description);
+            expectDescriptionRefused(
+              await group.attempt(
+                patchedDocument(
+                  patchFunctionGroupDocument(stored, {
+                    description: overTheLimit(40),
+                  }),
+                  'function group description over the limit',
+                ),
+              ),
+              {
+                id: 'FUNC_ADT',
+                no: '103',
+                values: [config.functionGroupName.toUpperCase(), '40'],
+              },
             );
+            expect(readRootDescription(await group.read())).toBe(description);
           },
           updateConfig: {
             functionGroupName: config.functionGroupName,
