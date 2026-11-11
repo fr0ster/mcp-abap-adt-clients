@@ -1,13 +1,14 @@
-# Goal: an update takes the changes, and the library writes them
+# Goal: the library patches an object's document from the changes
 
 ## Goal
 
 Every create, read, update and delete of an ABAP object is done by adt-clients. For the
 domain, the data element, the table type, the function group, the package and the message
-class, a caller updates the object's metadata by naming what it changes — the description,
-and each type's own fields — and adt-clients writes exactly that onto the object's document,
-leaving everything else as SAP stored it. A consumer no longer reads the document, patches
-XML and writes it back itself: mcp-abap-adt calls the library and keeps no patcher of its
+class, adt-clients exports a patch per type that takes the document the caller read and the
+changes the caller names — the description, and each type's own fields — and returns that
+document with exactly those changes, everything else as SAP stored it. A caller updates by
+reading the metadata, patching it with the library and writing it with the library's update;
+it no longer patches XML itself: mcp-abap-adt calls the library and keeps no patcher of its
 own. A description is set on the object's own root element, on every system — also where
 SAP's read-back carries no description there and a nested reference (`adtcore:packageRef`)
 carries another object's. The library's integration suite passes on ABAP Cloud (trial) and
@@ -16,8 +17,9 @@ and transport-deletion-check cases either pass or skip stating why.
 
 ## Invariants
 
-- **The update contract takes changes, not a document.** The caller names the fields it
-  changes, typed per object type; it does not pass XML.
+- **A patch takes changes, not XML.** The caller names the fields it changes, typed per
+  object type; the patch is a function of the read document and the changes, and sends no
+  request. The existing read and update members keep their contracts.
 - **Attributes the caller changes are written on the object's root,** and added there when
   the document the change applies to does not carry them. A nested element's attribute of
   the same name (a package reference's description, a value help's description) is never
@@ -26,12 +28,13 @@ and transport-deletion-check cases either pass or skip stating why.
   element the caller did not name reaches SAP as SAP stored it, the ones the library does
   not know included.
 - **One endpoint, one method.** Every member issues exactly one ADT request, as the
-  repository's base principle states.
+  repository's base principle states; reading, patching and writing stay three steps.
 - **Static types first.** What the compiler can prove is not checked at run time; no casts,
   `any`, `@ts-ignore` or non-null `!` in the code this change writes. A runtime check stays
   only for what comes from outside the type system — SAP's documents above all. No regular
   expression in production code: XML is read and written with the parser or plain string
-  code.
+  code; the library's tests patch documents through the shipped patches, not a
+  first-match helper of their own.
 - **No timeouts, retries or polling** added by the library. A failed request is its own
   answer.
 - **Proved live, per type, on both kinds of system.** Each of the six types' update is run
