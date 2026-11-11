@@ -1,14 +1,19 @@
 /**
  * Integration test for master/original language on create (fr0ster/mcp-abap-adt#105).
  *
- * Verifies that the language configured via `environment.default_master_language`
- * in test-config.yaml is:
- *   1. sent on the create request (adtcore:language + adtcore:masterLanguage), and
- *   2. persisted on the created object (round-trip read).
+ * Two cases, following the library: a create names a language only when one
+ * is configured (`createLanguage` answers `undefined` for none, and
+ * `languageAttributes` then writes nothing — by design since 2026-11-04).
+ *   1. Without a configured language the create body carries neither
+ *      `adtcore:masterLanguage` nor `adtcore:language` (runs everywhere: the
+ *      client is built with no language).
+ *   2. With `environment.default_master_language` configured the body carries
+ *      it and the created object keeps it (round-trip read). Registered as
+ *      skipped, saying so, where no language is configured.
  *
  * On a system where the configured language is not installed, SAP normalizes the
  * master language to the system default — so set `default_master_language` only to
- * a language the target system actually has (leave "" → EN, which every system has).
+ * a language the target system actually has.
  *
  * Run: npm test -- integration/core/masterLanguage
  */
@@ -36,6 +41,7 @@ import {
 } from '../../../helpers/sessionConfig';
 
 const {
+  getEnvironmentConfig,
   resolvePackageName,
   resolveTransportRequest,
   getTimeout,
@@ -58,14 +64,28 @@ function masterLangOf(xml: string): string | undefined {
   return xml.match(/adtcore:masterLanguage="([^"]*)"/)?.[1];
 }
 
+function languageOf(xml: string): string | undefined {
+  return xml.match(/adtcore:language="([^"]*)"/)?.[1];
+}
+
+/** The language the configuration states for created objects, if any. */
+function configuredLanguage(): string | undefined {
+  try {
+    return getEnvironmentConfig()?.default_master_language || undefined;
+  } catch {
+    // No configuration here: the gate below registers nothing that runs.
+    return undefined;
+  }
+}
+
 describe('Master language on create (#105)', () => {
   let connection: IAbapConnection;
-  let client: AdtClient;
-  let expectedLang = 'EN';
-  let sentLang: string | undefined;
+  let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
+  let sentBody: string | undefined;
   const className = 'ZCL_AC_MASTERLANG_IT';
   let packageName = 'ZADT_BLD_PKG03';
   let transportRequest = '';
+  const configured = configuredLanguage();
 
   beforeAll(async () => {
     if (!process.env.SAP_URL) {
@@ -74,12 +94,11 @@ describe('Master language on create (#105)', () => {
     connection = await createTestConnection(silentLogger);
 
     const isCloud = await isCloudEnvironment(connection);
-    const systemContext = await resolveSystemContext(connection, isCloud);
-    expectedLang = systemContext.masterLanguage || 'EN';
+    systemContext = await resolveSystemContext(connection, isCloud);
     packageName = resolvePackageName();
     transportRequest = resolveTransportRequest(undefined);
 
-    // Capture the language actually sent on the class create POST.
+    // Capture the body actually sent on the class create POST.
     const original = connection.makeAdtRequest.bind(connection);
     (connection as { makeAdtRequest: typeof original }).makeAdtRequest = async (
       options,
@@ -89,94 +108,133 @@ describe('Master language on create (#105)', () => {
         (options as { method?: string }).method === 'POST' &&
         body.includes('class:abapClass')
       ) {
-        sentLang = masterLangOf(body);
+        sentBody = body;
       }
       return original(options);
     };
-
-    ({ client } = await createTestAdtClient(
-      connection,
-      silentLogger,
-      systemContext,
-    ));
   }, getTimeout('connection') ?? 60000);
 
-  gateOn(() => true)(
-    'creates a class whose master language matches test-config default_master_language',
-    async () => {
-      const cls = client.getClass();
+  /**
+   * Create the probe class through a client of `context`, run `check` on what
+   * was sent and stored, and delete the class — every answer read.
+   *
+   * **Every answer is read.** The delete, the create and the cleanup used to
+   * be awaited and dropped. On premise (BASIS 816) a create without a
+   * transport made SAP generate a request of its own and record the class
+   * there; from then on every delete was refused with CTS_WBO_API 019
+   * "already locked in request", every create answered "already exists", and
+   * the test passed on the leftover for five days without creating anything.
+   */
+  async function withProbeClass(
+    context: Awaited<ReturnType<typeof resolveSystemContext>>,
+    check: (cls: ReturnType<AdtClient['getClass']>) => Promise<void>,
+  ): Promise<void> {
+    const { client } = await createTestAdtClient(
+      connection,
+      silentLogger,
+      context,
+    );
+    const cls = client.getClass();
+    const deleteClass = async (what: string) =>
+      expectResult(
+        await cls.delete(
+          { className, transportRequest },
+          {
+            headers: integrationHeadersOf(cls, 'delete'),
+            analyse: judged(analyseDeletion),
+          },
+        ),
+        what,
+      );
 
-      // **Every answer is read.** The delete, the create and the cleanup used
-      // to be awaited and dropped. On premise (BASIS 816) a create without a transport made
-      // SAP generate a request of its own (DEVK907127, 2026-09-21) and record
-      // the class there; from then on every delete was refused with
-      // CTS_WBO_API 019 "already locked in request", every create answered
-      // "already exists", and the test passed on the leftover for five days
-      // without creating anything. It surfaced only when an enqueue lock on
-      // that leftover made the activation fail.
-      const deleteClass = async (what: string) =>
-        expectResult(
-          await cls.delete(
+    // Idempotent: remove a leftover from a run that died before cleanup.
+    const existing = await cls.readMetadata(
+      { className },
+      { analyse: analyseException },
+    );
+    if (existing.ok) {
+      await deleteClass('delete leftover');
+    } else if (existing.getError().response?.status !== 404) {
+      expectResult(existing, 'look for a leftover');
+    }
+
+    sentBody = undefined;
+    let bodyPassed = false;
+    try {
+      expectResult(
+        await cls.create(
+          {
+            className,
+            packageName,
+            transportRequest,
+            description: 'master language integration probe',
+          },
+          {
+            analyse: analyseException,
+            headers: integrationHeadersOf(cls, 'create'),
+          },
+        ),
+        'create',
+      );
+      await check(cls);
+      bodyPassed = true;
+    } catch (error) {
+      // The body failed: its error is the one to report. A refused cleanup
+      // is added to it rather than dropped, and does not replace it.
+      await noteCleanupRefusal(
+        error,
+        () =>
+          cls.delete(
             { className, transportRequest },
             {
               headers: integrationHeadersOf(cls, 'delete'),
               analyse: judged(analyseDeletion),
             },
           ),
-          what,
-        );
-
-      // Idempotent: remove a leftover from a run that died before cleanup.
-      const existing = await cls.readMetadata(
-        { className },
-        { analyse: analyseException },
+        'cleanup delete',
       );
-      if (existing.ok) {
-        await deleteClass('delete leftover');
-      } else if (existing.getError().response?.status !== 404) {
-        expectResult(existing, 'look for a leftover');
+      throw error;
+    } finally {
+      // A cleanup that fails is a red test — the leftover is what broke this
+      // test before.
+      if (bodyPassed) {
+        await deleteClass('cleanup delete');
       }
+    }
+  }
 
-      let bodyPassed = false;
-      try {
-        expectResult(
-          await cls.create(
-            {
-              className,
-              packageName,
-              transportRequest,
-              description: 'master language integration probe',
-            },
-            {
-              analyse: analyseException,
-              headers: integrationHeadersOf(cls, 'create'),
-            },
-          ),
-          'create',
-        );
+  gateOn(() => true)(
+    'creates a class with no language named when none is configured',
+    async () => {
+      await withProbeClass(
+        { ...systemContext, masterLanguage: undefined },
+        async () => {
+          const sent = sentBody ?? '';
+          expect(sent).toContain('class:abapClass');
+          expect(masterLangOf(sent)).toBeUndefined();
+          expect(languageOf(sent)).toBeUndefined();
+        },
+      );
+    },
+    getTimeout('create') ?? 120000,
+  );
 
-        // 1. The create request must carry the configured language.
-        expect(sentLang).toBe(expectedLang);
+  gateOn(() => configured !== undefined)(
+    configured === undefined
+      ? 'creates a class in the configured master language — skipped: no environment.default_master_language is configured for this system'
+      : `creates a class in the configured master language (${configured})`,
+    async () => {
+      await withProbeClass(systemContext, async (cls) => {
+        const sent = sentBody ?? '';
+        // 1. The create request carries the configured language.
+        expect(masterLangOf(sent)).toBe(configured);
+        expect(languageOf(sent)).toBe(configured);
 
-        // 2. Round-trip: the persisted master language must match — but only
-        //    when the configured language is installed on the system (else SAP
-        //    normalizes it).
-        //
-        //    **Give it a version first.** This used to retry the read eight
-        //    times over sixteen seconds, believing a freshly created object was
-        //    "not immediately readable". It is not a timing problem. A bare
-        //    POST makes a repository entry with no version of anything in it —
-        //    no source, no active version, no inactive one — and a read of that
-        //    refuses with `400 ExceptionResourceWrongData`, "Resource  ZAC_…:
-        //    wrong input data for processing", however the version is asked
-        //    for. A version is what makes it readable, and either one will do:
-        //    writing the source is enough (a class reads at
-        //    `version=inactive` while still under its lock), and activating the
-        //    empty shell works too. This test has no source to write, so it
-        //    activates.
-        //
-        //    So all eight attempts failed on every run, this assertion never
-        //    ran, and the run paid sixteen seconds for the privilege.
+        // 2. Round-trip: the persisted master language matches. A bare POST
+        //    makes a repository entry with no version of anything in it, and
+        //    a read of that refuses with `400 ExceptionResourceWrongData`; a
+        //    version is what makes it readable, and activating the empty
+        //    shell gives it one.
         expectResult(
           await cls.activate(
             { className },
@@ -187,37 +245,12 @@ describe('Master language on create (#105)', () => {
           ),
           'activate',
         );
-
         const meta = expectResult(
           await cls.readMetadata({ className }, { analyse: analyseException }),
           'meta',
         );
-        const persisted = masterLangOf(String(meta ?? ''));
-        expect(persisted).toBe(expectedLang);
-        bodyPassed = true;
-      } catch (error) {
-        // The body failed: its error is the one to report. A refused cleanup
-        // is added to it rather than dropped, and does not replace it.
-        await noteCleanupRefusal(
-          error,
-          () =>
-            cls.delete(
-              { className, transportRequest },
-              {
-                headers: integrationHeadersOf(cls, 'delete'),
-                analyse: judged(analyseDeletion),
-              },
-            ),
-          'cleanup delete',
-        );
-        throw error;
-      } finally {
-        // A cleanup that fails is a red test — the leftover is what broke this
-        // test before.
-        if (bodyPassed) {
-          await deleteClass('cleanup delete');
-        }
-      }
+        expect(masterLangOf(String(meta ?? ''))).toBe(configured);
+      });
     },
     getTimeout('create') ?? 120000,
   );
