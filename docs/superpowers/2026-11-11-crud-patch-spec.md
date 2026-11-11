@@ -231,9 +231,13 @@ domain's). The patch adds the attribute when it is missing, either way.
   conforming parser reads back exactly the value given (XML 1.0 §2.11, §3.3.3). A new
   attribute is written with `"`. The creates and every other body the library writes
   escape the same way, through the same two functions (`src/utils/xml.ts`).
-- **A document is well-formed or refused:** every `&` starts a predefined entity or a
-  character reference to an XML Char; an attribute value holds no `<`; text holds no `]]>`.
-  Anything else is `not-a-document`.
+- **A document the patch cannot safely edit is refused:** `not-a-document` guards the
+  splice. The checks: one root element, with only white space, comments and processing
+  instructions outside it; every `&` starts a predefined entity or a character reference
+  to an XML Char; an attribute value holds no `<`; text holds no `]]>`; every character is
+  an XML Char (§2.2, no lone surrogate); a comment holds no `--` and does not end in
+  `--->` (§2.5). A leading BOM is accepted and kept. The patch is not a full XML 1.0
+  validator: its input is what SAP returned, and it adds only correctly escaped values.
 - Nothing is held as `unknown` and narrowed by casts. The scanner returns typed ranges,
   and a missing path is a typed absence. No `as`, `any`, `@ts-ignore` or `!` in the new
   code.
