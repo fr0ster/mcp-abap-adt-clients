@@ -36,6 +36,16 @@ After this change:
    silently for a statement the caller did not write. A refusal never gives a wrong
    answer.
 
+**Choices for the owner to confirm.** Three of the items above are choices of this goal,
+not consequences of the measurements:
+
+- **Break points: whitespace and right after a comma** (item 2) — the comma because the
+  issue's `IN ('…','…')` list has no whitespace; any further break point is open for the
+  spec.
+- **A literal longer than 255 characters as given is refused** (item 3) — the library's
+  cautious choice; one with runs of blanks might fit once SAP collapses them.
+- **A statement with a `"` inside a literal is refused** (item 4), whatever its length.
+
 The mcp-abap-adt server's `GetSqlQuery` (and `GetTableContents`, which reads the same
 endpoint through the same member) gets the fix by taking the adt-clients release that
 carries it; the server's code does not change for it.
