@@ -36,6 +36,7 @@
  * first such refusal, and the failure it would have returned is logged instead.
  */
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type { AdtSessionLoss } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   failed,
@@ -91,11 +92,18 @@ export async function chain<T, E extends IAdtError = IAdtError>(
     };
   };
 
+  // The connection's mark of a step's answer. After a marked answer the
+  // connection rejects every later request, so a chain that still succeeds
+  // has it from the last request it judged; its failure is the failing
+  // request's own, and carries that request's facts.
+  let lost: AdtSessionLoss | undefined;
   const scope: IChainScope = {
     async step<S>(answer: Promise<IAdtResponse<S>>): Promise<S> {
       const a = await answer;
       if (!a.ok) throw new ChainAbandoned(a.getError());
-      return a.getResult().value;
+      const result = a.getResult();
+      lost = result.sessionLost ?? lost;
+      return result.value;
     },
     onScopeEnd: (undo) => register(undos, undo),
     onFailure: (undo) => register(rollbacks, undo),
@@ -130,7 +138,7 @@ export async function chain<T, E extends IAdtError = IAdtError>(
   }
   await unwind(undos);
   if (cleanupRefusal) throw cleanupRefusal.error;
-  return succeeded<T, E>(value);
+  return succeeded<T, E>(value, lost);
 
   async function abandon(error: unknown): Promise<IAdtResponse<T, E>> {
     // Cleanups first, rollbacks after — the order a single reverse-ordered list
