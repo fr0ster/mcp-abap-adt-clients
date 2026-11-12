@@ -39,7 +39,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   getter is never run) and checked: `key` a string, `group` and `code`
   integers, `codeString` one of `RFC_RCS`; one field that fails, or an
   inspection that throws, leaves `rfc` absent, and the classifier never
-  throws. An HTTP failure, a refusal and SAP's `401` carry none. Every other
+  throws. It is present whenever the thrown connection error carries a
+  well-formed one, whatever else that error carries, and absent otherwise
+  (the errors of an HTTP connection carry none); a refusal and SAP's `401`
+  never carry it. Every other
   field of the failure is unchanged, and every member that answers through
   the default error strategy carries it.
 

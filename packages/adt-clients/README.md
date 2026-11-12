@@ -1066,10 +1066,12 @@ failed in an RFC call and the thrown value carries the connection's `rfc`
 carries a copy as `rfc`: `key`, `group`, `code` and `codeString`, one of
 `RFC_RCS`. Each field is read as an own data property (a getter is never run)
 and checked — `key` a string, `group` and `code` integers, `codeString` on the
-list — and one field that fails leaves `rfc` absent. An HTTP failure, a
-refusal and SAP's `401` carry none. Tell the outcome from the fields, never
-from `message` — freeing the debugger over RFC, for one, ends with the system
-closing the conversation:
+list — and one field that fails leaves `rfc` absent. It is present whenever
+the thrown connection error carries a well-formed one, whatever else that
+error carries, and absent otherwise; the errors of an HTTP connection carry
+none. A refusal and SAP's `401` never carry it. Tell the outcome from the
+fields, never from `message` — freeing the debugger over RFC, for one, ends
+with the system closing the conversation:
 
 ```typescript
 const answer = await debuggerApi.terminateDebugger();
