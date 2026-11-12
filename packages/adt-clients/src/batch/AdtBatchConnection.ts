@@ -5,7 +5,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { BATCH } from '../endpoints/objects';
-import { isUnansweredCredentialRefusal } from '../utils/adtResponse';
+import { isUnansweredCredentialRefusal, markOf } from '../utils/adtResponse';
 import { markEnvelopeFailure } from '../utils/requestTrace';
 import { buildBatchPayload, innerRequest, parseBatchResponse } from './wire';
 
@@ -150,6 +150,10 @@ export class AdtBatchConnection implements IAbapConnection {
           },
         });
         const parts = parseBatchResponse(response);
+        // Each part's request travelled in the envelope, so the envelope's
+        // answer is its answer: the connection's mark on it marks every part,
+        // a resolved part's answer and a refused part's error alike.
+        const mark = markOf(response);
         for (const [index, part] of active.entries()) {
           const answer = parts[index];
           if (!answer)
@@ -159,12 +163,12 @@ export class AdtBatchConnection implements IAbapConnection {
               ),
             );
           else if (answer.status >= 200 && answer.status < 300)
-            part.resolve(answer);
+            part.resolve({ ...answer, ...mark });
           else
             part.reject(
               Object.assign(
                 new Error(`Request failed with status code ${answer.status}`),
-                { response: answer },
+                { response: answer, ...mark },
               ),
             );
         }
