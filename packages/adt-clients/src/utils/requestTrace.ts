@@ -88,6 +88,27 @@ function isEnvelopeFailure(error: unknown): boolean {
   );
 }
 
+/**
+ * Write the request onto a thrown object where it takes it: set an existing
+ * writable `request` (its attributes stay as they are), else define an own
+ * one. Refused or throwing, it writes nothing; the caller rethrows the value
+ * either way.
+ */
+function annotate(error: unknown, asked: IAdtRequestTrace): void {
+  if (typeof error !== 'object' || error === null) return;
+  try {
+    if (Reflect.set(error, 'request', asked)) return;
+    Reflect.defineProperty(error, 'request', {
+      value: asked,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+  } catch {
+    // A Proxy's trap refused by throwing: the value goes on as it came.
+  }
+}
+
 /** Connections already carrying the trace. */
 const traced = new WeakSet<IAbapConnection>();
 
@@ -137,9 +158,16 @@ export function withRequestTrace(connection: IAbapConnection): IAbapConnection {
       // in a chain of six. Written onto the error rather than composed into a
       // new one: replacing it would discard the response riding alongside.
       //
-      // No check that the thrown thing can carry a field. A transport that
-      // throws a string is broken in a way this wrapper must not paper over,
-      // and the TypeError says so where a silent skip would not.
+      // Only written where the thrown value takes it, and whatever happens
+      // the value is rethrown as it came: SAP's refusal — and the connection's
+      // `sessionLost` mark on it — must reach the caller, never a TypeError
+      // of this wrapper's. A primitive takes no field. A refusal connection
+      // 23.0.0 layers over a frozen error (`Object.create`) inherits a
+      // read-only `request`, which an assignment cannot shadow (it throws in
+      // strict mode) but a definition can. So an existing writable `request`
+      // is set first, its attributes unchanged; when setting is refused, one
+      // is defined; when that is refused too (a frozen value) or throws (a
+      // Proxy's trap), the value goes on unannotated.
       //
       // A credential refusal SAP was never asked about is not annotated: it is
       // the connection's own object, rethrown to the caller as it came, and
@@ -148,7 +176,7 @@ export function withRequestTrace(connection: IAbapConnection): IAbapConnection {
       // it already names the request that failed — the envelope's own.
       if (isUnansweredCredentialRefusal(error) || isEnvelopeFailure(error))
         throw error;
-      (error as { request?: unknown }).request = asked;
+      annotate(error, asked);
       throw error;
     }
 

@@ -221,3 +221,130 @@ describe('a batch envelope failure', () => {
     });
   });
 });
+
+describe('what the trace cannot write onto comes through as it came', () => {
+  // Connection 23.0.0 answers a frozen refusal it must mark with an object
+  // layered over it (`Object.create(refusal, { sessionLost })`): the
+  // refusal's own `request` is then an inherited read-only field, which a
+  // plain assignment cannot shadow and, in strict mode, throws for.
+  const throwing = (error: unknown): IAbapConnection =>
+    ({
+      makeAdtRequest: async () => {
+        throw error;
+      },
+    }) as unknown as IAbapConnection;
+  const part = {
+    url: '/sap/bc/adt/oo/classes/zcl_x',
+    method: 'GET',
+  } as Parameters<IAbapConnection['makeAdtRequest']>[0];
+  const asked = { method: 'GET', url: '/sap/bc/adt/oo/classes/zcl_x' };
+  const REPLACED = 'ADT_SESSION_REPLACED';
+
+  async function rejection(thrown: unknown): Promise<unknown> {
+    return withRequestTrace(throwing(thrown))
+      .makeAdtRequest(part)
+      .then(
+        () => {
+          throw new Error('expected a rejection');
+        },
+        (error: unknown) => error,
+      );
+  }
+
+  it('a layered refusal over a frozen error keeps its mark and gets its own request', async () => {
+    const frozen = Object.freeze(
+      Object.assign(new Error('Request failed with status code 400'), {
+        response: { status: 400, statusText: 'x', headers: {}, data: '' },
+        request: { aNativeRequestObject: true },
+      }),
+    );
+    const layered = Object.create(frozen, {
+      sessionLost: {
+        value: REPLACED,
+        enumerable: true,
+        configurable: true,
+        writable: false,
+      },
+    });
+
+    const error = await rejection(layered);
+
+    expect(error).toBe(layered);
+    expect(Object.getOwnPropertyDescriptor(error, 'sessionLost')?.value).toBe(
+      REPLACED,
+    );
+    expect(Object.getOwnPropertyDescriptor(error, 'request')?.value).toEqual(
+      asked,
+    );
+  });
+
+  it('an own non-configurable writable request is replaced, its attributes unchanged', async () => {
+    const thrown = new Error('refused');
+    Object.defineProperty(thrown, 'request', {
+      value: { aNativeRequestObject: true },
+      writable: true,
+      enumerable: false,
+      configurable: false,
+    });
+
+    const error = await rejection(thrown);
+
+    expect(error).toBe(thrown);
+    const descriptor = Object.getOwnPropertyDescriptor(thrown, 'request');
+    expect(descriptor?.value).toEqual(asked);
+    expect(descriptor?.writable).toBe(true);
+    expect(descriptor?.enumerable).toBe(false);
+    expect(descriptor?.configurable).toBe(false);
+  });
+
+  it('a frozen error is rethrown as the same value, unannotated', async () => {
+    const frozen = Object.freeze(new Error('offline'));
+
+    const error = await rejection(frozen);
+
+    expect(error).toBe(frozen);
+    expect('request' in frozen).toBe(false);
+  });
+
+  it('a Proxy whose defineProperty trap throws is rethrown as the same value', async () => {
+    const target = Object.freeze(
+      Object.assign(new Error('refused'), { request: { native: true } }),
+    );
+    const proxy = new Proxy(Object.create(target), {
+      defineProperty() {
+        throw new Error('trap');
+      },
+      set() {
+        return false;
+      },
+    });
+
+    const error = await rejection(proxy);
+
+    expect(error).toBe(proxy);
+  });
+
+  it('a thrown string is rethrown as the same value', async () => {
+    const error = await rejection('the transport threw a string');
+
+    expect(error).toBe('the transport threw a string');
+  });
+
+  it('a marked success keeps its mark', async () => {
+    const connection = {
+      makeAdtRequest: async () =>
+        ({
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          data: '',
+          sessionLost: REPLACED,
+        }) as IAdtWireResponse,
+    } as unknown as IAbapConnection;
+
+    const answer = await withRequestTrace(connection).makeAdtRequest(part);
+
+    expect(answer.sessionLost).toBe(REPLACED);
+    expect(answer.request).toEqual(asked);
+  });
+});
