@@ -66,9 +66,13 @@ Files: `packages/adt-clients/src/__tests__/unit/shared/sqlLines.test.ts` (new),
    is a break point a literal-blind wrap would take; the same for the `''` and doubled
    backtick fixtures, whose doubled delimiter is followed by an inner blank.
 4. Deliberate breaks, one at a time, each turning named tests red, then reverted:
-   - the scanner leaves `quote` at any `'` (no `''`), and separately never enters
-     `quote` (the 100/300 `'…'` cases with inner blanks and commas, the `''` case);
-   - the same two for `backtick` (the `` `…` `` cases, the doubled-backtick case);
+   - the scanner never enters `quote` (the 100/300 `'…'` cases with inner blanks and
+     commas);
+   - the scanner consumes `''` as one pair and then leaves `quote` (a literal
+     `'A'' B, C…'` whose `''` is followed by inner blanks and commas before column 72,
+     and its closing `'` after it: the inner break point is taken and the test is red);
+   - the same two for `backtick` (the `` `…` `` cases; a doubled backtick consumed as a
+     pair that then leaves `backtick`, in the same kind of fixture);
    - a `"` comment's text counted towards 72 (the code-of-60-plus-comment-of-300 case
      is wrapped instead of returned as it is);
    - the "not before `*`" rule removed (the `SELECT *` / `COUNT( * )` cases);
@@ -120,9 +124,11 @@ Files: `packages/adt-clients/src/__tests__/helpers/test-config.yaml.template`
 
 1. Add the cases, `available_in: ["onprem"]`, each asserting the rows of the answer
    (not only that it is a document):
-   - `execute_sql_query_long_line` — the issue's shape over `TDEVC`, `'$TMP'` among
-     30-character items, one line of more than 255 characters: a success holding the
-     `$TMP` row;
+   - `execute_sql_query_long_line` — the issue's shape over `TDEVC`: an `IN` list of
+     30-character items on one line, with `'$TMP'` the item that spans column 255 (it
+     begins at 252 and ends at 257) and the closing `)` after it; the case asserts these
+     positions of its fixture string (`indexOf` on the string) before it sends it, so the live case is
+     the cut literal and nothing else: a success holding the `$TMP` row;
    - `execute_sql_query_tail_past_255` — `IN ('$TMP',…)` closed at 255, then
      ` AND devclass = 'NOPE'`: a success holding no row;
    - `execute_sql_query_concat_long_literal` — one line of fewer than 255 characters and
@@ -186,10 +192,11 @@ Files: `packages/adt-clients/docs/usage/CLIENT_API_REFERENCE.md`,
    (`npm run release:publish`). The CHANGELOG date is checked against the release day
    before the tag.
 4. After the owner's publish: a clean install from the registry outside the repository
-   (a new directory in the scratchpad: `npm init -y`, then
-   `npm install @mcp-abap-adt/adt-clients@45.5.1 --ignore-scripts`), the lockfile there
-   checked for anything not resolved from the registry, and the package's entry loaded
-   with `node -e` requiring it; the directory deleted afterwards. A registry that lags is
+   (a new directory in the scratchpad: `npm init -y`, a `package.json` script
+   `"smoke": "node -e \"require('@mcp-abap-adt/adt-clients')\""` written into it, then
+   `npm install @mcp-abap-adt/adt-clients@45.5.1 --ignore-scripts` and `npm run smoke`),
+   the lockfile there checked for anything not resolved from the registry; the directory
+   deleted afterwards. A registry that lags is
    "not visible yet", rechecked, never a reason to republish.
 
 ## After the release — the server follow-up (mcp-abap-adt, its own PR)
