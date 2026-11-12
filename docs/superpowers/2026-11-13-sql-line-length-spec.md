@@ -200,6 +200,12 @@ gated like its two existing cases, with two new cases in
   that crosses 255 once unwrapped: a success, and the document holds the `$TMP` row.
 - `execute_sql_query_tail_past_255` — `IN ('$TMP',…)` closed at 255, then
   ` AND devclass = 'NOPE'`: a success, and the document holds no row (today: one row).
+- `execute_sql_query_concat_long_literal` — one line of more than 72 and fewer than 255
+  characters, `SELECT devclass, concat('<a literal of 100 characters>','B') AS x FROM
+  tdevc WHERE devclass = '$TMP'`: a success whose row holds the literal followed by `B`
+  — today SAP reads the line whole, so the answer must be the same once wrapped; a
+  failure there is reported to the owner as the sign that blanks and commas are not
+  enough, not fixed by new break points.
 
 The ABAP Cloud system refuses the endpoint by its policy; the cases are `onprem` only and
 skip elsewhere with their reason, as the existing two do.
