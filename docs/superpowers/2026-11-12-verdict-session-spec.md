@@ -154,10 +154,14 @@ section 1), else the resolved wire's, read as typed.
   connection's fields as they came. **Attribution**: the part's request travelled in the
   envelope, so the envelope's answer is its answer.
 - **`withRequestTrace`** (`src/utils/requestTrace.ts`, lines 140–152): `request` is written
-  only onto a thrown object (`typeof error === 'object' && error !== null`), with
-  `Reflect.defineProperty` (writable, enumerable, configurable) inside `try`, as the batch
-  connection already writes it (lines 199–206); a `false` answer (a non-extensible value) or
-  a throw (a Proxy's `defineProperty` trap) leaves the value unannotated, and the value is
+  only onto a thrown object (`typeof error === 'object' && error !== null`), inside `try`, in
+  two steps: first `Reflect.set(error, 'request', asked)` — today's assignment, answering
+  `false` instead of throwing, so an existing writable `request` (configurable or not) is
+  updated with its attributes unchanged; when that answers `false` (an inherited read-only
+  `request`, as on a layered refusal), `Reflect.defineProperty` with a writable, enumerable,
+  configurable descriptor, as the batch connection already writes it (lines 199–206), which
+  makes an own property. A second `false` (a non-extensible value, an own read-only
+  `request`) or a throw (a Proxy's trap) leaves the value unannotated, and the value is
   rethrown as it came. A primitive is rethrown as it came. A plain assignment onto a layered
   refusal throws `TypeError` (**Measured**, section 1) and would replace SAP's refusal and
   its mark with that `TypeError`. The success path (`{ ...response, request }`, line 158)
@@ -234,7 +238,9 @@ connection stubs that throw or resolve the shapes of section 1:
 - batch: a marked envelope → every part's success and refusal carry it;
 - `withRequestTrace` on a layered refusal over a frozen error → the refusal and its mark
   come through, with `request` set; on a frozen error, a Proxy whose `defineProperty` trap
-  throws, and a thrown string → each rethrown as the same value, unannotated;
+  throws, and a thrown string → each rethrown as the same value, unannotated; an own
+  non-configurable writable `request` → replaced with the asked request, its attributes
+  unchanged;
 - `EPIPE` thrown as own `code` → `connectionCause: 'EPIPE'`; `connectionCause.test.ts`
   moves `EPIPE` from the off-list cases to the listed ones (it iterates
   `ADT_CONNECTION_CAUSES`);
