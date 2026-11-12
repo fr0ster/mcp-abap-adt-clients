@@ -1060,6 +1060,24 @@ if (!answer.ok && answer.getError().connectionCause !== undefined) {
 }
 ```
 
+**A connection failure carries what the RFC SDK said.** When the request
+failed in an RFC call and the thrown value carries the connection's `rfc`
+(`IRfcErrorInfo`, `@mcp-abap-adt/interfaces-adt-connection`), the failure
+carries a copy as `rfc`: `key`, `group`, `code` and `codeString`, one of
+`RFC_RCS`. Each field is read as an own data property (a getter is never run)
+and checked — `key` a string, `group` and `code` integers, `codeString` on the
+list — and one field that fails leaves `rfc` absent. An HTTP failure, a
+refusal and SAP's `401` carry none. Tell the outcome from the fields, never
+from `message` — freeing the debugger over RFC, for one, ends with the system
+closing the conversation:
+
+```typescript
+const answer = await debuggerApi.terminateDebugger();
+if (!answer.ok && answer.getError().rfc?.codeString === 'RFC_CLOSED') {
+  // the system closed the RFC conversation
+}
+```
+
 **What throws, and what does not.** The boundary is the cause. A failure caused
 by SAP's answer comes back through the strategies, with the response attached —
 never as an exception, and never rewrapped into one that drops the response.

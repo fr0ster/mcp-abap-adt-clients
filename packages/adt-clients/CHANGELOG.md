@@ -24,6 +24,33 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [45.3.0] - 2026-11-12
+
+### Added
+
+- **`IAdtError.rfc`** (`@mcp-abap-adt/interfaces-adt` 27.2.0) on a
+  connection failure: when a request failed in an RFC call and the thrown
+  value carries the connection's `rfc` (`IRfcErrorInfo`,
+  `@mcp-abap-adt/interfaces-adt-connection` 4.1.0), the failure carries a
+  fresh copy of its four fields — `key`, `group`, `code`, `codeString` — so a
+  caller tells the system closing the conversation (`codeString`
+  `RFC_CLOSED`, as freeing the debugger over RFC ends) from any other failure
+  without reading the message. Each field is read as an own data property (a
+  getter is never run) and checked: `key` a string, `group` and `code`
+  integers, `codeString` one of `RFC_RCS`; one field that fails, or an
+  inspection that throws, leaves `rfc` absent, and the classifier never
+  throws. An HTTP failure, a refusal and SAP's `401` carry none. Every other
+  field of the failure is unchanged, and every member that answers through
+  the default error strategy carries it.
+
+### Changed
+
+- **On `@mcp-abap-adt/interfaces-adt` `^27.2.0`** (was `^27.1.0`) and
+  **`@mcp-abap-adt/interfaces-adt-connection` `^4.1.0`** (was `^4.0.0`), for
+  the field above; `adt-strategies` and `adt-clients-legacy` declare the
+  same ranges in the repository (their unit tests and type checks need one
+  copy of each contract package).
+
 ## [45.2.0] - 2026-11-11
 
 ### Added

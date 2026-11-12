@@ -1509,7 +1509,10 @@ The other types send the handler's own request.
 
 `IAdtError` always carries `origin` and `message`; `code`, `adtType`,
 `namespace`, `response` and `request` are filled in as far as the error strategy
-could. `origin` is the part to act on, and there are two — both describing the
+could; a connection failure also carries `connectionCause` (a listed network
+code) and `rfc` (the RFC SDK's fields) when the thrown value named them
+(README, "A connection failure names its cause by code" and "A connection
+failure carries what the RFC SDK said"). `origin` is the part to act on, and there are two — both describing the
 server, because that is the only thing this contract is a verdict about:
 
 | origin | what happened | remedy |
