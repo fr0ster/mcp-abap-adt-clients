@@ -100,6 +100,18 @@ rest fits or has no usable break point. A comment that ends the physical line st
 the last output line of it; its length is not counted (goal: "a line long only because
 of its comment is left as it is").
 
+**A token** is the text between two usable break points (or a line's start or end and
+a break point). The wrap never cuts a token; a token longer than 72 goes whole on an
+output line of its own — that is what "a token longer than 72 goes on its own line as
+is" means here. A literal is always inside one token and so is never cut. A literal is
+alone on its line when blanks or commas surround it (an `IN ('…','…')` list, a
+comparison `= '…'`); when the caller wrote it against other code with no break point
+between — `concat('…','B')` (the `concat(` before it), `'…' * 2` (no break before `*`)
+— the literal travels whole inside its token, with that code on the same line. Adding
+break points next to a literal (after `(`, before `)`) is not done: the owner's break
+points are blanks and commas, and a break where the caller wrote no blank is made only
+after a comma.
+
 **What is written.** Each inserted break is one LF (`\n`), whatever separator the
 statement uses elsewhere; SAP reads LF, CRLF and CR alike (**Measured**). Every character
 that is not part of a replaced blank run is copied as it is, in order: literals, comments,
@@ -119,10 +131,13 @@ broken.
 4. *No line starts a comment it did not start*: every output line whose first non-blank
    character is `*` was such a line in the input; no `"` comment begins on a different
    line than it did.
-5. *Width*: every output line whose code holds a usable break point at or before 72 has a
+5. *Greedy*: on an overlong line the break taken is the last usable one at which the
+   output line's code is at most 72 — never an earlier one — and the first usable one
+   after 72 only when there is none at or before it.
+6. *Width*: every output line whose code holds a usable break point at or before 72 has a
    code length of at most 72; a longer output line holds a single token (a literal or a
    run with no usable break point) plus, at most, the comment that ends it.
-6. *Linear*: one pass; the output is built by appending slices of the input and LFs.
+7. *Linear*: one pass; the output is built by appending slices of the input and LFs.
 
 ## 4. Tests
 
@@ -130,8 +145,15 @@ Unit tests (Jest, as every adt-clients unit test today), no SAP.
 
 - **`src/__tests__/unit/shared/sqlLines.test.ts`** — `wrapSqlLines` alone:
   - the issue's statement (334 characters, `IN ('AAA…',…,'GGG…','Z_FLIGHT_ADDITIONAL')`):
-    every output line at most 72 characters; each `'…'` item whole; the breaks right after
-    the commas; properties 2 and 3;
+    the exact expected output string (each break right after the comma that is the last
+    one at or before 72); properties 2 and 3;
+  - the greedy choice, each with its exact expected output: a blank run and a comma both
+    before 72 (the later one taken); a break point ending exactly at 72 (taken) and one at
+    73 (not taken, the earlier one is); no break point at or before 72 (the first one after
+    it taken); a comma followed by blanks (the blank run replaced, the comma kept on the
+    first line);
+  - `concat('<100 characters>','B')` and `'<100 characters>' * 2` in a long line: the
+    literal whole, with the code of its token on the same line (the exact output);
   - the silently-truncated statement (`IN ('$TMP',…)` closed at 255, then
     ` AND devclass = 'NOPE'`): the `AND devclass = 'NOPE'` condition on a line at most 72
     characters into the output, whole;
@@ -153,10 +175,20 @@ Unit tests (Jest, as every adt-clients unit test today), no SAP.
   - the property checks of section 3 over every case above.
 - **`src/__tests__/unit/shared/sqlQueryWrapsLines.test.ts`** — `getSqlQuery` through
   `AdtUtils` over a recording connection (as `sqlToolsSetNoTimeout.test.ts` builds one):
-  the issue's statement goes out wrapped (the `data` the connection received is
-  `wrapSqlLines` of it, and differs from it); a short statement goes out as the same
-  string; the URL, method, headers and `timeout: 0` are what they were; `getTableContents`
-  sends its statement as given.
+  the `data` the connection received is asserted directly, as a string, for:
+  - the issue's statement — the exact expected wrapped text;
+  - the silently-truncated statement — the exact expected wrapped text;
+  - literals of 100 and of 300 characters, `'…'` and `` `…` ``, in a long `IN` list —
+    each literal found in the sent text byte-identical and alone on one line (the owner's
+    pin, at the request boundary);
+  - a long statement with a literal holding `"` — sent whole, wrapped like the rest; the
+    connection stub then answers SAP's 400 (`ExceptionDataPreviewGeneral`, the measured
+    "Literals across more than one line are not allowed."), and the member's failure is
+    that answer as `answering` reads it today, after exactly one request;
+  - a short statement — the same string as given;
+  - every case: the URL, method, headers and `timeout: 0` as before, one request.
+
+  `getTableContents` sends its statement as given (a long one too).
 - **`sqlToolsSetNoTimeout.test.ts`** stays as it is.
 
 Integration (live, the on-premise system; `src/__tests__/integration/shared/sqlQuery.test.ts`,
