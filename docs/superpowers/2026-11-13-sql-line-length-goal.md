@@ -13,38 +13,24 @@ worse, runs **with part of its text gone** and answers rows the caller did not a
 
 After this change:
 
-1. **A statement whose every line fits is sent exactly as given**, byte for byte. A line
-   fits when its code — everything before a comment that ends the line — is at most 255
-   characters, counted so that the count is never below SAP's (one per character as
-   given; a tab as the spec measures it, see Open for the spec); the comment itself may run past 255 (SAP drops only
-   comment text there: measured harmless).
-2. **A statement with a line that does not fit is sent with line breaks placed so that
-   every line fits**, each break placed at whitespace or right after a comma — never
-   inside a string literal, never inside a comment, never where it would turn code into a
-   comment. Only the placement of whitespace changes; what SAP executes is the statement
-   the caller wrote. The commas of a compact `IN ('…','…')` list are break points, so the
-   issue's statement is laid out and answered.
-3. **A statement that cannot be laid out so** — a token (a string literal with its
-   delimiters, above all) longer than 255 characters, or a line whose code before the
-   first possible break is longer — **is refused before any request**,
-   as a failure of the member's answer carrying fixed words of the library's, not SAP's
-   message and not the statement's text.
-4. **A statement with a `"` inside a string literal is refused before any request**, in
-   fixed words, whatever its length: SAP does not read such a literal as written (every
-   measured case refused; the inferred reason is that SAP takes the `"` as a comment
-   start), and where the `"` lies in text SAP would drop past 255, sending it could answer
-   silently for a statement the caller did not write. A refusal never gives a wrong
-   answer.
+1. **A statement whose every line is at most 72 characters is sent exactly as given**,
+   byte for byte.
+2. **A line longer than 72 characters is wrapped:** it is broken at the nearest
+   whitespace, or right after a comma, at or before the 72nd character — outside string
+   literals and outside comments, never so that a line begins (after its leading
+   whitespace) with `*`, and never moving a comment off the line it began on. A token
+   with no break point within 72 characters (a long string literal, above all) goes on a
+   line of its own, as it is, and the wrap goes on after it. Only the placement of
+   whitespace changes; what SAP executes is the statement the caller wrote. The commas of
+   a compact `IN ('…','…')` list are break points, so the issue's statement is wrapped
+   and answered.
+3. **The library refuses nothing for its layout.** A string literal longer than 255
+   characters, or a `"` inside a literal, is sent as it is (wrapped like everything
+   else), and SAP's answer reaches the caller as SAP's answer.
 
-**Choices for the owner to confirm.** Three of the items above are choices of this goal,
-not consequences of the measurements:
-
-- **Break points: whitespace and right after a comma** (item 2) — the comma because the
-  issue's `IN ('…','…')` list has no whitespace; any further break point is open for the
-  spec.
-- **A literal longer than 255 characters as given is refused** (item 3) — the library's
-  cautious choice; one with runs of blanks might fit once SAP collapses them.
-- **A statement with a `"` inside a literal is refused** (item 4), whatever its length.
+72 characters is the width ABAP source has long been written to — far below the 255 at
+which SAP cuts a line — so a wrapped line stays well inside what SAP reads, whatever SAP's
+own count of its whitespace.
 
 The mcp-abap-adt server's `GetSqlQuery` (and `GetTableContents`, which reads the same
 endpoint through the same member) gets the fix by taking the adt-clients release that
@@ -53,31 +39,27 @@ carries it; the server's code does not change for it.
 ## Invariants
 
 - **The fix lives in adt-clients.** Every ADT request is built there; the member that
-  posts the statement is the one that lays it out. No caller lays out SQL for it.
+  posts the statement is the one that wraps it. No caller wraps SQL for it.
 - **The statement's meaning never changes.** The library inserts line breaks (or turns a
   whitespace character into one) between tokens and does nothing else: no character of a
   string literal or a comment is touched, added or removed; no token is added, removed,
-  reordered, re-cased or rewritten; no comment is moved off its line. A break is never
-  placed so that a line begins (after its leading whitespace) with `*`.
-- **Untouched when it fits.** A statement whose every line fits (goal item 1) and that
-  is not refused (goal items 3 and 4) goes on the wire as the caller's string, unchanged.
+  reordered, re-cased or rewritten; no comment is moved off its line; no line is made to
+  begin with `*`.
+- **Untouched when it fits.** A statement with no line longer than 72 characters goes on
+  the wire as the caller's string, unchanged.
 - **No regular expression.** The statement is read by one linear scanner, character by
   character, that knows the string literals (`'…'` with `''` inside, `` `…` `` with
   ` `` ` inside) and the comments (`"` outside a literal to the end of the line, a line
-  whose first non-blank character is `*`). A `"` it meets inside a literal makes the
-  statement one that is refused (goal item 4).
+  whose first non-blank character is `*`).
 - **Static types first.** The statement is typed by the contract (`IGetSqlQueryParams`
-  from `@mcp-abap-adt/interfaces-adt`, `sql_query: string`); the layout is a typed
-  function from string to its result. No cast, `any`, non-null `!`, `@ts-ignore` or
-  runtime check of what the compiler proves.
-- **Refused before any request, in fixed words.** A statement that cannot be laid out, or
-  that has a `"` inside a literal, is
-  answered as a failure (`IAdtResponse`, as `adt-clients-legacy` answers an unsupported
-  operation without a request) whose message is fixed words of the library's. It does not
-  carry the statement, a literal, or anything of it; no request is sent for it.
-- **No retry, no timeout, one request.** A statement that is laid out is sent once, as
-  today; nothing is resent in another layout when SAP refuses it; the request keeps
-  `timeout: 0` (no deadline of the library's).
+  from `@mcp-abap-adt/interfaces-adt`, `sql_query: string`); the wrap is a typed function
+  from string to string. No cast, `any`, non-null `!`, `@ts-ignore` or runtime check of
+  what the compiler proves.
+- **No refusal of the library's.** Every statement the member is given is sent — wrapped
+  or as given — and answered by SAP; the library adds no failure of its own for SQL text.
+- **No retry, no timeout, one request.** A statement is sent once, as today; nothing is
+  resent in another layout when SAP refuses it; the request keeps `timeout: 0` (no
+  deadline of the library's).
 - **Everything else answers as today.** The endpoint, `rowNumber`, headers, the reading of
   the answer (`results.query`), `analyse`, and what a success or a SAP refusal looks like
   stay as they are. The server's tool answer (`sql_query` echoes what the caller passed)
@@ -164,56 +146,49 @@ charset=utf-8`, read-only statements on `TDEVC`), **Code** (read in the source n
   between its quotes (255 with them) alone on its line is answered, one of 254 (256) is
   refused, `'…'` and `` `…` `` alike.
 - **Inference.** A string literal without blanks longer than 255 characters with its
-  delimiters cannot be sent on any line. One with runs of blanks might fit once SAP
-  collapses them, but then SAP has already changed the literal's content (the field-list
-  rows); the library refuses every literal longer than 255 characters as given — a
-  conservative choice of its own, not a measured impossibility.
+  delimiters cannot be read whole by SAP on any line; SAP refuses it, and that answer is
+  SAP's to give.
 - **Measured.** A `"` inside a `'…'` or `` `…` `` literal makes SAP refuse the statement
   (the three `"`-inside rows). **Inference:** SAP reads that `"` as a comment start (the
-  message of the two-line row shows line 1 cut at the `"`).
+  message of the two-line row shows line 1 cut at the `"`), which leaves the literal
+  unterminated on its line; a wrap after it does not make that literal terminated, so SAP
+  refuses such a statement wrapped or not.
 - **Measured.** A line whose first non-blank character is `*` is a comment, and a break
   before a `*` (`SELECT *`, `COUNT(*)`) breaks the statement (the 500 rows).
 
-### The rule the fix follows
+### Why 72 is enough
 
-Count the code of each line of the statement (lines separated by LF, CRLF or CR; the code
-is what comes before a comment that ends the line) in characters, as given — the library
-deliberately does not rely on SAP's collapsing of whitespace, so that its count is not
-below SAP's (for spaces and line breaks the rows show SAP's count is no higher; for tabs
-that is still to be measured, see Open for the spec), and it may break a line SAP would
-have read whole, which changes nothing. When a
-line's code is longer than 255 characters, break it at whitespace or right after a comma,
-outside string literals and outside comments, never before a `*`, so that every line's
-code holds at most 255 characters; a comment stays on the line it began on. A token that
-alone is longer than 255 characters (a string literal with its delimiters, above all)
-cannot be laid out, and the statement is refused before any request. A statement with a
-`"` inside a literal is refused before any request.
+- **Inference.** A line of at most 72 characters as given is far inside SAP's 255:
+  collapsing whitespace only shortens it (the space and leading-space rows), a character
+  is one whether it takes one UTF-8 byte or more (the `Ä` rows), and a UTF-16 count is
+  never below a code-point count. No row suggests a tab counts wider than one character
+  (the tab row cuts later, not earlier, than the raw count); even at three columns a tab
+  would leave a 72-character line inside 255.
+- **Inference.** A token on a line of its own fits SAP's line whenever it is at most 255
+  characters (the field-list literal rows); one that is longer is SAP's to refuse.
+- **Measured.** A comment that runs past 255 does no harm (the long-comment rows), so a
+  comment line, or a comment that ends a line, is left as it is whatever its length.
 
 ## Open for the spec
 
-- **Further break points.** Beyond whitespace and after a comma (required by the goal):
-  whether `(` / `)` and other token boundaries without whitespace are break points
-  (`a=b`, `@var`, `~`, `->`), each measured before it is used.
-- **Where on a line to break.** The last break point at or before 255 (fewest lines), or
-  every break point once a line is too long; what a broken line's continuation starts with
-  (an LF and nothing, or the original whitespace kept); which separator the library writes
-  (LF, or the separator the statement already uses).
-- **How characters are counted.** UTF-16 code units (JavaScript's `length`) or code
-  points; whether SAP counts a character outside the Basic Multilingual Plane as one or
-  two — measured.
-- **Tabs.** Whether SAP counts a tab as one character or wider (the tab row fails where
-  the raw line is already longer than 255, which settles neither) — measured, and the
-  library's count of a tab set so it is not below SAP's.
-- **The refusal's shape.** `origin`, `code` (an `AdtObjectErrorCodes` member or a new
-  one), the fixed words, and whether `request` is present (no request was sent); how the
-  server's `GetSqlQuery` answers it.
+- **Where exactly a line breaks.** The last break point at or before 72 (fewest lines);
+  whether the whitespace at a break is replaced by the line break or kept before it;
+  trailing whitespace; which separator the library writes (LF, or the separator the
+  statement already uses — LF, CRLF and CR are all read by SAP).
+- **How a line is counted.** Whether a comment that ends a line counts towards its 72
+  (it is never broken, and runs past 255 harmlessly), and what is measured in characters
+  (UTF-16 code units, JavaScript's `length`, is the conservative count).
 - **`getTableContents` (`/datapreview/ddic`).** It posts a caller's statement the same
-  way; whether the same limit applies there (to be measured) and whether the same layout
-  goes in, in this change.
-- **The evidence.** Unit tests of the scanner and the layout (every measured row above,
-  each break point and each refusal), the request's body pinned at the connection stub,
-  and a live run of the issue's statement and of the silently truncated one through the
-  member against the on-premise system; the ABAP Cloud system answers the endpoint only
-  where its policy allows, so its run is stated or skipped with its reason.
-- **Documentation**: `packages/adt-clients/README.md` and `packages/adt-clients/docs/usage/CLIENT_API_REFERENCE.md` (what `getSqlQuery`
-  sends and refuses), CHANGELOG.
+  way; whether the same limit applies there (code reading or a read-only measurement) and
+  whether the same wrap goes in, in this change.
+- **The evidence.** Unit tests of the scanner and the wrap — the issue's statement, the
+  statement whose condition past 255 was silently dropped, literals with `''` and
+  ` `` `, comments of both kinds, a `*` that must not start a line, a token longer than
+  72, a literal longer than 255 and a `"` inside a literal sent as they are, a statement
+  that fits sent byte for byte — the request's body pinned at the connection stub, and a
+  live run of the issue's statement and of the silently truncated one through the member
+  against the on-premise system; the ABAP Cloud system answers the endpoint only where
+  its policy allows, so its run is stated or skipped with its reason.
+- **Documentation**: `packages/adt-clients/README.md` and
+  `packages/adt-clients/docs/usage/CLIENT_API_REFERENCE.md` (what `getSqlQuery` sends),
+  CHANGELOG.
