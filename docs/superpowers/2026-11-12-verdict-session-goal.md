@@ -80,8 +80,10 @@ Labels: **Measured** (observed by running), **Code** (read in the source named).
 - **Code.** `answeringExchange` (lines 371–430): on a success the wire is handed to the
   result strategy (`read(wire)`, line 429) and the answer is `succeeded(value)`
   (lines 56–63), whose `IAdtResult` holds `value` alone. A `sessionLost` on the wire
-  reaches the consumer only if its result strategy keeps the wire: `wireItself` does,
-  `rawDocument` and `nothing` (`src/utils/resultStrategy.ts`, lines 37–70) do not.
+  reaches the consumer only if its result strategy carries it into the value it answers
+  (`IResultStrategy<T>` takes the wire and answers any `T`; interfaces-adt 27.2.0,
+  `IAdtResponse.ts`, line 361): of the shipped ones `wireItself` does, `rawDocument` and
+  `nothing` (`src/utils/resultStrategy.ts`, lines 37–70) do not.
   `analyse` receives the wire as its second argument (lines 402–405).
 - **Code.** On a failure with a response attached, the wire is taken from the thrown
   value's `response` (line 391) and `IAdtError.response` carries it (line 267), so a mark
@@ -161,16 +163,17 @@ Labels: **Measured** (observed by running), **Code** (read in the source named).
   the result strategy (and then which shipped strategies keep it), or another carrier —
   and what this means for a consumer's own `IAdtResponse` implementation.
 - **A refusal read from a 2xx answer.** When a document on a successful wire is a refusal
-  (`AdtSAPError`, a strategy's `asFailure`, a shipped `analyse`), whether that failure
-  carries the wire's `sessionLost`, and who fills it — the library before `analyse`, or
-  each strategy.
+  (`AdtSAPError`, a strategy's `asFailure`, a shipped `analyse`), how that failure carries
+  the wire's `sessionLost`, and who fills it — the library before `analyse`, or each
+  strategy.
 - **When `analyse` replaces a verdict.** A consumer's `analyse` may answer a verdict of its
   own instead of the library's (`adtResponse.ts`, lines 406–407); shipped `enrich` keeps the
   fields by spreading, a replacement need not. Who makes the fields reach the answer then,
   and which wins when the strategy's verdict names a different value.
 - **When `analyse` clears a verdict.** A failure carrying the session code or the mark
-  that `analyse` clears to a success read from the same wire: whether the mark survives
-  on the success.
+  that `analyse` clears to a success read from the same wire: how the mark reaches the
+  success — and, where the verdict and the wire came from different requests, which
+  request's mark the answer carries.
 - **Members of more than one request.** A chain (`chain.ts`), activation's second read
   (`activationUtils.ts`), the message-class write, a batch envelope's failure shared by
   every part: which request's mark or code the member's answer carries.
