@@ -4,6 +4,20 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [0.9.4] - 2026-11-12
+
+Released with `@mcp-abap-adt/adt-clients` 45.5.0.
+
+### Changed
+
+- **The `@mcp-abap-adt/adt-clients` range is `^45.5.0`** (was `^45.4.0`),
+  peer and dev, with `@mcp-abap-adt/interfaces-adt-connection` `^5.0.0` (was
+  `^4.2.0`; `makeAdtRequest` takes no type parameter, and `AdtClientLegacy`
+  takes a connection written to it), `@mcp-abap-adt/interfaces-adt`
+  `^27.4.0` (was `^27.3.0`) and the `@mcp-abap-adt/adt-strategies`
+  devDependency `^0.23.0`, so a consumer installs one copy of each. No member
+  changes.
+
 ## [0.9.3] - 2026-11-12
 
 Released with `@mcp-abap-adt/adt-clients` 45.4.0.

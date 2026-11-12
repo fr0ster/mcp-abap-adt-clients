@@ -23,26 +23,26 @@ import {
 export interface IDomainFixedValue {
   readonly low: string;
   /** Absent: `<doma:high/>`. */
-  readonly high?: string;
+  readonly high?: string | undefined;
   readonly text: string;
 }
 
 /** What a patch may change; a field left `undefined` is not touched. */
 export interface IDomainChanges {
   /** The root's `adtcore:description`, passed as given. */
-  readonly description?: string;
-  readonly dataType?: string;
+  readonly description?: string | undefined;
+  readonly dataType?: string | undefined;
   /** The type length (`typeInformation`), written as SAP's six digits. */
-  readonly length?: number;
+  readonly length?: number | undefined;
   /** Written as SAP's six digits. */
-  readonly decimals?: number;
-  readonly conversionExit?: string;
-  readonly signExists?: boolean;
-  readonly lowercase?: boolean;
+  readonly decimals?: number | undefined;
+  readonly conversionExit?: string | undefined;
+  readonly signExists?: boolean | undefined;
+  readonly lowercase?: boolean | undefined;
   /** The value table's name; the reference keeps nothing of the old one. */
-  readonly valueTable?: string;
+  readonly valueTable?: string | undefined;
   /** Replaces every fixed value; `[]` leaves none. */
-  readonly fixedValues?: ReadonlyArray<IDomainFixedValue>;
+  readonly fixedValues?: ReadonlyArray<IDomainFixedValue> | undefined;
 }
 
 const ROOT = 'doma:domain';

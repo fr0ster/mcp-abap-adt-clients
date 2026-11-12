@@ -396,12 +396,12 @@ export function cleanupOf(connection: IAbapConnection): IAbapConnection {
 }
 
 /** One request, through a gate (or what sends only through one). */
-export function send<T = unknown, D = unknown>(
+export function send(
   connection: IAbapConnection,
   request: IAbapRequestOptions,
-): Promise<IAdtWireResponse<T, D>> {
+): Promise<IAdtWireResponse> {
   assertGated(connection, 'send');
-  return connection.makeAdtRequest<T, D>(request);
+  return connection.makeAdtRequest(request);
 }
 
 /** The status a failed request carries, if any. */

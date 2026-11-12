@@ -16,22 +16,22 @@ import {
 /** What a patch may change; a field left `undefined` is not touched. */
 export interface ITableTypeChanges {
   /** The root's `adtcore:description`, passed as given. */
-  readonly description?: string;
+  readonly description?: string | undefined;
   /** `ttyp:rowType/ttyp:typeKind`. */
-  readonly rowTypeKind?: string;
+  readonly rowTypeKind?: string | undefined;
   /** `ttyp:rowType/ttyp:typeName`. */
-  readonly rowTypeName?: string;
+  readonly rowTypeName?: string | undefined;
   /** The built-in type's data type. */
-  readonly dataType?: string;
+  readonly dataType?: string | undefined;
   /** The built-in type's length, SAP's six digits. */
-  readonly length?: number;
+  readonly length?: number | undefined;
   /** The built-in type's decimals, SAP's six digits. */
-  readonly decimals?: number;
-  readonly accessType?: string;
+  readonly decimals?: number | undefined;
+  readonly accessType?: string | undefined;
   /** `ttyp:primaryKey/ttyp:definition`. */
-  readonly keyDefinition?: string;
+  readonly keyDefinition?: string | undefined;
   /** `ttyp:primaryKey/ttyp:kind`. */
-  readonly keyKind?: string;
+  readonly keyKind?: string | undefined;
 }
 
 const ROOT = 'ttyp:tableType';

@@ -15,7 +15,7 @@ import {
 /** What a patch may change; a field left `undefined` is not touched. */
 export interface IMessageClassChanges {
   /** The root's `adtcore:description`, passed as given. */
-  readonly description?: string;
+  readonly description?: string | undefined;
 }
 
 /** The message class's document with `changes` written, or why it cannot be. */

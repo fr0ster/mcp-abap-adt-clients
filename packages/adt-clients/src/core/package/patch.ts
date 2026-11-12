@@ -17,21 +17,21 @@ import {
 /** What a patch may change; a field left `undefined` is not touched. */
 export interface IPackageChanges {
   /** The root's `adtcore:description`, passed as given. */
-  readonly description?: string;
+  readonly description?: string | undefined;
   /** The root's `adtcore:responsible`. */
-  readonly responsible?: string;
+  readonly responsible?: string | undefined;
   /** The root's `adtcore:masterSystem`. */
-  readonly masterSystem?: string;
+  readonly masterSystem?: string | undefined;
   /** `pak:attributes/@pak:packageType`. */
-  readonly packageType?: string;
+  readonly packageType?: string | undefined;
   /** `pak:attributes/@pak:recordChanges`, `true` / `false`. */
-  readonly recordChanges?: boolean;
+  readonly recordChanges?: boolean | undefined;
   /** The super package's name; the reference keeps nothing of the old one. */
-  readonly superPackage?: string;
+  readonly superPackage?: string | undefined;
   /** `pak:transport/pak:softwareComponent/@pak:name`. */
-  readonly softwareComponent?: string;
+  readonly softwareComponent?: string | undefined;
   /** `pak:transport/pak:transportLayer/@pak:name`. */
-  readonly transportLayer?: string;
+  readonly transportLayer?: string | undefined;
 }
 
 const ROOT = 'pak:package';
