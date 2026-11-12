@@ -15,7 +15,8 @@ After this change:
 
 1. **A statement whose every line fits is sent exactly as given**, byte for byte. A line
    fits when its code — everything before a comment that ends the line — is at most 255
-   characters, counted as given; the comment itself may run past 255 (SAP drops only
+   characters, counted so that the count is never below SAP's (one per character as
+   given; a tab as the spec measures it, see Open for the spec); the comment itself may run past 255 (SAP drops only
    comment text there: measured harmless).
 2. **A statement with a line that does not fit is sent with line breaks placed so that
    every line fits**, each break placed at whitespace or right after a comma — never
@@ -28,9 +29,12 @@ After this change:
    first possible break is longer — **is refused before any request**,
    as a failure of the member's answer carrying fixed words of the library's, not SAP's
    message and not the statement's text.
-4. **A statement with a `"` inside a string literal is sent as given**, never laid out:
-   SAP refuses it today (measured) for a reason the layout cannot repair, and the library
-   neither guesses which reading SAP takes nor answers for SAP.
+4. **A statement with a `"` inside a string literal is refused before any request**, in
+   fixed words, whatever its length: SAP does not read such a literal as written (every
+   measured case refused; the inferred reason is that SAP takes the `"` as a comment
+   start), and where the `"` lies in text SAP would drop past 255, sending it could answer
+   silently for a statement the caller did not write. A refusal never gives a wrong
+   answer.
 
 The mcp-abap-adt server's `GetSqlQuery` (and `GetTableContents`, which reads the same
 endpoint through the same member) gets the fix by taking the adt-clients release that
@@ -45,19 +49,19 @@ carries it; the server's code does not change for it.
   string literal or a comment is touched, added or removed; no token is added, removed,
   reordered, re-cased or rewritten; no comment is moved off its line. A break is never
   placed so that a line begins (after its leading whitespace) with `*`.
-- **Untouched when it fits.** A statement whose every line fits (goal item 1), and one
-  with a `"` inside a literal (goal item 4), goes on the wire as the caller's string,
-  unchanged.
+- **Untouched when it fits.** A statement whose every line fits (goal item 1) and that
+  is not refused (goal items 3 and 4) goes on the wire as the caller's string, unchanged.
 - **No regular expression.** The statement is read by one linear scanner, character by
   character, that knows the string literals (`'…'` with `''` inside, `` `…` `` with
   ` `` ` inside) and the comments (`"` outside a literal to the end of the line, a line
   whose first non-blank character is `*`). A `"` it meets inside a literal makes the
-  statement one that is sent as given (goal item 4).
+  statement one that is refused (goal item 4).
 - **Static types first.** The statement is typed by the contract (`IGetSqlQueryParams`
   from `@mcp-abap-adt/interfaces-adt`, `sql_query: string`); the layout is a typed
   function from string to its result. No cast, `any`, non-null `!`, `@ts-ignore` or
   runtime check of what the compiler proves.
-- **Refused before any request, in fixed words.** A statement that cannot be laid out is
+- **Refused before any request, in fixed words.** A statement that cannot be laid out, or
+  that has a `"` inside a literal, is
   answered as a failure (`IAdtResponse`, as `adt-clients-legacy` answers an unsupported
   operation without a request) whose message is fixed words of the library's. It does not
   carry the statement, a literal, or anything of it; no request is sent for it.
@@ -172,7 +176,7 @@ outside string literals and outside comments, never before a `*`, so that every 
 code holds at most 255 characters; a comment stays on the line it began on. A token that
 alone is longer than 255 characters (a string literal with its delimiters, above all)
 cannot be laid out, and the statement is refused before any request. A statement with a
-`"` inside a literal is sent as given.
+`"` inside a literal is refused before any request.
 
 ## Open for the spec
 
