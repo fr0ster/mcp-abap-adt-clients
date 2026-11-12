@@ -15,13 +15,19 @@ After this change:
 
 1. **A statement whose every line is at most 72 characters is sent exactly as given**,
    byte for byte.
-2. **A line longer than 72 characters is wrapped:** it is broken at the nearest
+2. **A line whose code is longer than 72 characters is wrapped:** it is broken at the nearest
    whitespace, or right after a comma, at or before the 72nd character — outside string
    literals and outside comments, never so that a line begins (after its leading
    whitespace) with `*`, and never moving a comment off the line it began on. A token
    with no break point within 72 characters (a long string literal, above all) goes on a
-   line of its own, as it is, and the wrap goes on after it. Only the placement of
-   whitespace changes; what SAP executes is the statement the caller wrote. The commas of
+   line of its own, as it is, and the wrap goes on after it. A comment that ends a line
+   is not counted towards the 72 and is never broken or moved (it may run past 255
+   harmlessly, measured), so a line long only because of its comment is left as it is.
+   **A string literal is never cut**, whatever its length: a break is placed only outside
+   `'…'` and `` `…` `` literals, and a literal longer than 72 characters goes whole on a
+   line of its own. Only the placement of whitespace changes; SAP reads the statement the
+   caller wrote, laid out on shorter lines — except what SAP cannot read on any layout (a
+   literal longer than 255, a `"` inside a literal, item 3). The commas of
    a compact `IN ('…','…')` list are break points, so the issue's statement is wrapped
    and answered.
 3. **The library refuses nothing for its layout.** A string literal longer than 255
@@ -29,8 +35,9 @@ After this change:
    else), and SAP's answer reaches the caller as SAP's answer.
 
 72 characters is the width ABAP source has long been written to — far below the 255 at
-which SAP cuts a line — so a wrapped line stays well inside what SAP reads, whatever SAP's
-own count of its whitespace.
+which SAP cuts a line — so a wrapped line stays well inside what SAP reads. The two
+exceptions are kept as they are by decision: a token longer than 255 on its own line
+(SAP's to refuse) and a comment that runs past 255 (harmless).
 
 The mcp-abap-adt server's `GetSqlQuery` (and `GetTableContents`, which reads the same
 endpoint through the same member) gets the fix by taking the adt-clients release that
@@ -45,7 +52,10 @@ carries it; the server's code does not change for it.
   string literal or a comment is touched, added or removed; no token is added, removed,
   reordered, re-cased or rewritten; no comment is moved off its line; no line is made to
   begin with `*`.
-- **Untouched when it fits.** A statement with no line longer than 72 characters goes on
+- **A literal is never split.** No break is ever placed inside a `'…'` or `` `…` ``
+  literal (nor inside a comment); every literal of the statement appears in the sent
+  text byte-identical and on one line, whatever its length.
+- **Untouched when it fits.** A statement with no line whose code is longer than 72 characters goes on
   the wire as the caller's string, unchanged.
 - **No regular expression.** The statement is read by one linear scanner, character by
   character, that knows the string literals (`'…'` with `''` inside, `` `…` `` with
@@ -158,16 +168,14 @@ charset=utf-8`, read-only statements on `TDEVC`), **Code** (read in the source n
 
 ### Why 72 is enough
 
-- **Inference.** A line of at most 72 characters as given is far inside SAP's 255:
-  collapsing whitespace only shortens it (the space and leading-space rows), a character
-  is one whether it takes one UTF-8 byte or more (the `Ä` rows), and a UTF-16 count is
-  never below a code-point count. No row suggests a tab counts wider than one character
-  (the tab row cuts later, not earlier, than the raw count); even at three columns a tab
-  would leave a 72-character line inside 255.
+- **Inference.** A line of at most 72 characters of code as given is far inside SAP's 255:
+  collapsing whitespace only shortens it (the space and leading-space rows), and SAP
+  counts characters, not UTF-8 bytes (the `Ä` rows). Tabs and the finer points of
+  character counting are not measured further; a 72-character line leaves a margin of
+  more than three to one.
 - **Inference.** A token on a line of its own fits SAP's line whenever it is at most 255
   characters (the field-list literal rows); one that is longer is SAP's to refuse.
-- **Measured.** A comment that runs past 255 does no harm (the long-comment rows), so a
-  comment line, or a comment that ends a line, is left as it is whatever its length.
+- **Measured.** A comment that runs past 255 does no harm (the long-comment rows).
 
 ## Open for the spec
 
@@ -175,16 +183,16 @@ charset=utf-8`, read-only statements on `TDEVC`), **Code** (read in the source n
   whether the whitespace at a break is replaced by the line break or kept before it;
   trailing whitespace; which separator the library writes (LF, or the separator the
   statement already uses — LF, CRLF and CR are all read by SAP).
-- **How a line is counted.** Whether a comment that ends a line counts towards its 72
-  (it is never broken, and runs past 255 harmlessly), and what is measured in characters
-  (UTF-16 code units, JavaScript's `length`, is the conservative count).
+- **How a line's code is counted.** In what unit (JavaScript's `length`, or code points),
+  and how a line made only of a comment, or ending in one, is read by the scanner.
 - **`getTableContents` (`/datapreview/ddic`).** It posts a caller's statement the same
   way; whether the same limit applies there (code reading or a read-only measurement) and
   whether the same wrap goes in, in this change.
 - **The evidence.** Unit tests of the scanner and the wrap — the issue's statement, the
   statement whose condition past 255 was silently dropped, literals with `''` and
   ` `` `, comments of both kinds, a `*` that must not start a line, a token longer than
-  72, a literal longer than 255 and a `"` inside a literal sent as they are, a statement
+  72, literals of 100 and of 300 characters byte-identical and on one line in the sent
+  text, a literal longer than 255 and a `"` inside a literal sent as they are, a statement
   that fits sent byte for byte — the request's body pinned at the connection stub, and a
   live run of the issue's statement and of the silently truncated one through the member
   against the on-premise system; the ABAP Cloud system answers the endpoint only where
