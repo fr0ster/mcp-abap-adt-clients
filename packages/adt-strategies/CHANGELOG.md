@@ -14,6 +14,19 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.23.0] - 2026-11-12
+
+Released with `@mcp-abap-adt/adt-clients` 45.5.0.
+
+### Changed
+
+- **On `@mcp-abap-adt/interfaces-adt-connection` `^5.0.0`** (was `^4.2.0`;
+  `IAbapConnection.makeAdtRequest` takes no type parameter) and
+  `@mcp-abap-adt/interfaces-adt` `^27.4.0` (was `^27.3.0`), the ranges
+  adt-clients 45.5.0 declares, so a consumer installs one copy of each. The
+  strategies read `IAdtWireResponse`, whose shape does not change; no
+  reading or verdict changes.
+
 ## [0.22.3] - 2026-11-12
 
 Released with `@mcp-abap-adt/adt-clients` 45.4.0.

@@ -1238,7 +1238,13 @@ if (answer.ok) {
 | Package | `patchPackageDocument` | `IPackageChanges` | `pak:package` |
 | Message class | `patchMessageClassDocument` | `IMessageClassChanges` | `mc:messageClass` |
 
-**What a patch changes.** A field left `undefined` is not changed; any other
+**What a patch changes.** A field left `undefined` is not changed. The fields
+of `IDomainChanges` (with `IDomainFixedValue.high`), `IDataElementChanges`,
+`ITableTypeChanges`, `IFunctionGroupChanges`, `IPackageChanges` and
+`IMessageClassChanges` are declared
+`?: T | undefined` (since 45.5.0), so under `exactOptionalPropertyTypes` a value
+that may be absent is passed as it is: an absent key and a key holding
+`undefined` mean the same. Any other
 value, `''` included, is written (`''` as `<x/>`, the form SAP answers for an
 empty value). Every byte outside the written ranges comes back as it was read:
 attribute order, quoting, entities, whitespace, and the attributes and elements

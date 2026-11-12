@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "rootDir": "..",
+    // The fields this package declares `?: T | undefined` are checked under
+    // the option their consumers compile with. The typechecks import the
+    // package by its name, so they read the built declarations (skipLibCheck)
+    // and the package's own sources, written without the option, are not
+    // part of this program.
+    "exactOptionalPropertyTypes": true
+  },
+  "include": ["src/__tests__/typechecks/exact/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

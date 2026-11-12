@@ -16,27 +16,27 @@ import {
 /** What a patch may change; a field left `undefined` is not touched. */
 export interface IDataElementChanges {
   /** The root's `adtcore:description`, passed as given. */
-  readonly description?: string;
-  readonly typeKind?: IDataElementConfig['typeKind'];
+  readonly description?: string | undefined;
+  readonly typeKind?: IDataElementConfig['typeKind'] | undefined;
   /** Written as given. */
-  readonly typeName?: string;
-  readonly dataType?: string;
+  readonly typeName?: string | undefined;
+  readonly dataType?: string | undefined;
   /** `dtel:dataTypeLength`, SAP's six digits. */
-  readonly length?: number;
+  readonly length?: number | undefined;
   /** `dtel:dataTypeDecimals`, SAP's six digits. */
-  readonly decimals?: number;
-  readonly shortLabel?: string;
-  readonly mediumLabel?: string;
-  readonly longLabel?: string;
-  readonly headingLabel?: string;
+  readonly decimals?: number | undefined;
+  readonly shortLabel?: string | undefined;
+  readonly mediumLabel?: string | undefined;
+  readonly longLabel?: string | undefined;
+  readonly headingLabel?: string | undefined;
   /** SAP's two digits; never derived from the label. */
-  readonly shortLength?: number;
-  readonly mediumLength?: number;
-  readonly longLength?: number;
-  readonly headingLength?: number;
-  readonly searchHelp?: string;
-  readonly searchHelpParameter?: string;
-  readonly setGetParameter?: string;
+  readonly shortLength?: number | undefined;
+  readonly mediumLength?: number | undefined;
+  readonly longLength?: number | undefined;
+  readonly headingLength?: number | undefined;
+  readonly searchHelp?: string | undefined;
+  readonly searchHelpParameter?: string | undefined;
+  readonly setGetParameter?: string | undefined;
 }
 
 const ROOT = 'blue:wbobj';

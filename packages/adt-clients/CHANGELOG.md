@@ -24,6 +24,39 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [45.5.0] - 2026-11-12
+
+### Changed
+
+- **On `@mcp-abap-adt/interfaces-adt-connection` `^5.0.0`** (was `^4.2.0`),
+  whose `IAbapConnection.makeAdtRequest(options)` takes no type parameter and
+  answers `Promise<IAdtWireResponse>` (`data: unknown`). A connection written
+  to that signature is now taken by `AdtClient`, `createAdtClient` and every
+  other member that takes a connection; one whose method is still generic
+  (`@mcp-abap-adt/connection`'s) is taken as before, so no caller breaks. And
+  on `@mcp-abap-adt/interfaces-adt` `^27.4.0` (was `^27.3.0`), which depends
+  on it and declares its optional fields `?: T | undefined`.
+- **The library hands no type argument on.** The connection an activation
+  sends through (it keeps the request it sent, for the read after a silent
+  checklist), the request trace wrapped around every connection
+  (`withRequestTrace`) and the header probe's `send` call
+  `makeAdtRequest(options)` with none; `AdtBatchConnection.makeAdtRequest`
+  keeps its signature, which v5's `IAbapConnection` accepts.
+- **The document patches' inputs take `undefined`.** Every field of
+  `IDomainChanges` (and `IDomainFixedValue.high`), `IDataElementChanges`,
+  `ITableTypeChanges`, `IFunctionGroupChanges`, `IPackageChanges` and
+  `IMessageClassChanges` is declared `?: T | undefined`, so a caller compiling with
+  `exactOptionalPropertyTypes` passes a value that may be absent as it is. A
+  patch already left a field holding `undefined` untouched; nothing it writes
+  changes.
+- **`@mcp-abap-adt/adt-strategies` devDependency `^0.23.0`** (was
+  `^0.22.3`), the sibling on the same ranges.
+- **`@mcp-abap-adt/connection` devDependency `^24.0.0`** (was `^20.0.0`),
+  the connector on interfaces-adt-connection `^5.0.0`, so the repository's
+  tree holds one version of the connection contract (5.0.0). The tests and
+  the development tools (`tools/`, `scripts/`) use it; the published
+  package does not depend on it.
+
 ## [45.4.0] - 2026-11-12
 
 ### Added

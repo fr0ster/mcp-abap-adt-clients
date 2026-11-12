@@ -141,15 +141,14 @@ export function withRequestTrace(connection: IAbapConnection): IAbapConnection {
 
   const base = connection.makeAdtRequest.bind(connection);
 
-  connection.makeAdtRequest = async function makeAdtRequestTraced<
-    T = unknown,
-    D = unknown,
-  >(request: IAbapRequestOptions): Promise<IAdtWireResponse<T, D>> {
+  connection.makeAdtRequest = async function makeAdtRequestTraced(
+    request: IAbapRequestOptions,
+  ): Promise<IAdtWireResponse> {
     const asked = { method: request?.method, url: request?.url };
 
-    let response: IAdtWireResponse<T, D>;
+    let response: IAdtWireResponse;
     try {
-      response = await base<T, D>(request);
+      response = await base(request);
     } catch (error: unknown) {
       // The path a refusal most often takes. `recogniseFailure` reads `request`
       // off whatever was thrown, and what the transport puts there is its own

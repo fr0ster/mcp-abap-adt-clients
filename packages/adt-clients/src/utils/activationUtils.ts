@@ -231,9 +231,9 @@ function keepingRequests(
     getBaseUrl: () => connection.getBaseUrl(),
     getSessionId: () => connection.getSessionId(),
     setSessionType: (type) => connection.setSessionType(type),
-    makeAdtRequest: <T, D>(options: IAbapRequestOptions) => {
+    makeAdtRequest: (options: IAbapRequestOptions) => {
       sent.push(options);
-      return connection.makeAdtRequest<T, D>(options);
+      return connection.makeAdtRequest(options);
     },
   };
 }
