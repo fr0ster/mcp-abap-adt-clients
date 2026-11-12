@@ -20,7 +20,12 @@
  */
 
 import { analyseDebuggerFreed } from '@mcp-abap-adt/adt-strategies';
-import { ADT_NO_FAILURE, type IAnalyse } from '@mcp-abap-adt/interfaces-adt';
+import {
+  ADT_NO_FAILURE,
+  type IAdtError,
+  type IAnalyse,
+  type IResultStrategy,
+} from '@mcp-abap-adt/interfaces-adt';
 import {
   ADT_SESSION_ERROR,
   type IAbapConnection,
@@ -30,9 +35,14 @@ import {
   AbapDebugger,
   abapDebuggerDocuments,
 } from '../../../runtime/debugger/AbapDebugger';
+import { AdtSAPError } from '../../../utils/adtErrors';
 import { answering } from '../../../utils/adtResponse';
 import { noopLogger } from '../../../utils/noopLogger';
-import { rawDocument } from '../../../utils/resultStrategy';
+import {
+  nothing,
+  rawDocument,
+  wireItself,
+} from '../../../utils/resultStrategy';
 
 const REPLACED = ADT_SESSION_ERROR.SESSION_REPLACED;
 
@@ -288,5 +298,150 @@ describe('the debugger stop on a spent connection', () => {
     expect(answer.getError().sessionError).toBe(
       ADT_SESSION_ERROR.NOT_CONNECTED,
     );
+  });
+});
+
+/** A 2xx answer, marked as connection 23.0.0 marks a stateless success. */
+function markedWire(data = '<document/>'): IAdtWireResponse {
+  return {
+    data,
+    status: 200,
+    statusText: 'OK',
+    headers: {},
+    sessionLost: REPLACED,
+  };
+}
+
+describe('a refusal read from a 2xx document carries the answer\'s mark', () => {
+  it('AdtSAPError on a marked answer', async () => {
+    const failure = await failureOf(
+      new AdtSAPError(
+        'the object is locked',
+        '<exc:exception/>',
+        undefined,
+        undefined,
+        markedWire(),
+      ),
+    );
+
+    expect(failure.origin).toBe('refusal');
+    expect(failure.sessionLost).toBe(REPLACED);
+  });
+
+  it('AdtSAPError on an unmarked answer', async () => {
+    const { sessionLost: _, ...unmarked } = markedWire();
+    const failure = await failureOf(
+      new AdtSAPError(
+        'the object is locked',
+        '<exc:exception/>',
+        undefined,
+        undefined,
+        unmarked,
+      ),
+    );
+
+    expect('sessionLost' in failure).toBe(false);
+  });
+
+  it('a marked 401 thrown as itself takes the connection branch', async () => {
+    const thrown = Object.assign(refusal(401), { sessionLost: REPLACED });
+
+    const failure = await failureOf(thrown);
+
+    expect(failure.origin).toBe('connection');
+    expect(failure.response?.status).toBe(401);
+    expect(failure.sessionLost).toBe(REPLACED);
+  });
+});
+
+describe('a success carries the mark of the answer it was read from', () => {
+  async function successOf<T>(
+    wire: IAdtWireResponse,
+    read: IResultStrategy<T>,
+  ) {
+    const answer = await answering(async () => wire, read);
+    if (!answer.ok) throw new Error('expected a success');
+    return answer.getResult();
+  }
+
+  it('whatever the reading: rawDocument', async () => {
+    expect((await successOf(markedWire(), rawDocument)).sessionLost).toBe(
+      REPLACED,
+    );
+  });
+
+  it('whatever the reading: nothing', async () => {
+    expect((await successOf(markedWire(), nothing)).sessionLost).toBe(
+      REPLACED,
+    );
+  });
+
+  it('whatever the reading: wireItself', async () => {
+    expect((await successOf(markedWire(), wireItself)).sessionLost).toBe(
+      REPLACED,
+    );
+  });
+
+  it('an unmarked answer leaves no key on the result', async () => {
+    const { sessionLost: _, ...unmarked } = markedWire();
+    const result = await successOf(unmarked, rawDocument);
+
+    expect(result).toEqual({ value: '<document/>' });
+    expect('sessionLost' in result).toBe(false);
+  });
+
+  it('a cleared verdict on a marked refusal: the success carries its mark', async () => {
+    const clearsEverything: IAnalyse = () => ADT_NO_FAILURE;
+    const answer = await answering(
+      async () => {
+        throw markedInPlace();
+      },
+      rawDocument,
+      clearsEverything,
+    );
+
+    expect(answer.ok).toBe(true);
+    if (!answer.ok) throw new Error('expected a success');
+    expect(answer.getResult().value).toBe('<exc:exception/>');
+    expect(answer.getResult().sessionLost).toBe(REPLACED);
+  });
+
+  it('a cleared verdict on a layered refusal: the success carries its mark', async () => {
+    const clearsEverything: IAnalyse = () => ADT_NO_FAILURE;
+    const answer = await answering(
+      async () => {
+        throw markedLayered();
+      },
+      rawDocument,
+      clearsEverything,
+    );
+
+    if (!answer.ok) throw new Error('expected a success');
+    expect(answer.getResult().sessionLost).toBe(REPLACED);
+  });
+});
+
+describe('a verdict a consumer\'s strategy answers is answered as it came', () => {
+  class ConsumerFailure implements IAdtError {
+    readonly origin = 'refusal' as const;
+    readonly message = 'the consumer says no';
+    describe(): string {
+      return this.message;
+    }
+  }
+
+  it('the same object, its prototype intact, on a marked answer', async () => {
+    const own = new ConsumerFailure();
+    const replaces: IAnalyse<ConsumerFailure> = () => own;
+
+    const answer = await answering(async () => markedWire(), rawDocument, replaces);
+
+    expect(answer.ok).toBe(false);
+    if (answer.ok) throw new Error('expected a failure');
+    expect(answer.getError()).toBe(own);
+    expect(Object.getPrototypeOf(answer.getError())).toBe(
+      ConsumerFailure.prototype,
+    );
+    expect(answer.getError().describe()).toBe('the consumer says no');
   });
 });

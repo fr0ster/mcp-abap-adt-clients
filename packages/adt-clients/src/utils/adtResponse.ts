@@ -60,10 +60,15 @@ import { AdtSAPError } from './adtErrors';
  */
 export function succeeded<T, E extends IAdtError = IAdtError>(
   value: T,
+  sessionLost?: AdtSessionLoss,
 ): IAdtResponse<T, E> {
+  // The connection's mark of the answer the value was read from, beside the
+  // value: it reaches the caller whatever reading made `value`. No key when
+  // there is no mark, so a result reads as it did before the mark existed.
+  const result = sessionLost === undefined ? { value } : { value, sessionLost };
   return {
     ok: true,
-    getResult: () => ({ value }),
+    getResult: () => result,
   };
 }
 
@@ -253,6 +258,18 @@ export function sessionLostOf(error: unknown): AdtSessionLoss | undefined {
 }
 
 /**
+ * The connection's `sessionLost` on an answer, as a field to spread — none when
+ * the answer carries no mark. The answer is the connection's
+ * `IAdtWireResponse`, typed by its contract, so the field is read as typed.
+ */
+export function markOf(
+  answer: IAdtWireResponse | undefined,
+): Pick<IAdtError, 'sessionLost'> {
+  const sessionLost = answer?.sessionLost;
+  return sessionLost === undefined ? {} : { sessionLost };
+}
+
+/**
  * The default error strategy: what this library recognises as a failure.
  *
  * Origin is not decoration — the two have different remedies, and a caller
@@ -270,6 +287,8 @@ export function sessionLostOf(error: unknown): AdtSessionLoss | undefined {
  */
 export function recogniseFailure(error: unknown): IAdtError {
   if (error instanceof AdtSAPError) {
+    // A refusal read from a 2xx document: the answer it was read from is the
+    // connection's `IAdtWireResponse`, typed, so its mark is read as typed.
     return {
       origin: 'refusal',
       message: error.message,
@@ -277,6 +296,7 @@ export function recogniseFailure(error: unknown): IAdtError {
       namespace: error.namespace,
       response: error.response,
       request: error.request,
+      ...markOf(error.response),
     };
   }
 
@@ -430,10 +450,15 @@ export async function answeringExchange<T, E extends IAdtError = IAdtError>(
   let wire: IAdtWireResponse | undefined;
   let verdict: IAdtError | AdtNoFailure = ADT_NO_FAILURE;
   let context: IAdtAnalyseContext | undefined;
+  // The connection's mark of the member's own request: on the refusal it
+  // threw (connection 23.0.0 marks the error, not its response), else on the
+  // answer it resolved. A success read from that answer carries it.
+  let lost: AdtSessionLoss | undefined;
 
   try {
     const exchange = await run();
     wire = exchange.answer;
+    lost = wire.sessionLost;
     context = exchange.context;
     if (exchange.failure) verdict = exchange.failure;
   } catch (error: unknown) {
@@ -443,6 +468,7 @@ export async function answeringExchange<T, E extends IAdtError = IAdtError>(
     if (isUnansweredCredentialRefusal(error)) throw error;
     verdict = recogniseFailure(error);
     wire = (error as IWithResponse)?.response;
+    lost = sessionLostOf(error) ?? wire?.sessionLost;
   }
 
   // Two casts below, and one reason for both: `E` is only ever given a value by
@@ -480,7 +506,7 @@ export async function answeringExchange<T, E extends IAdtError = IAdtError>(
   }
 
   // Outside any catch, on purpose. The reading's own exception is the reading's.
-  return succeeded<T, E>(read(wire));
+  return succeeded<T, E>(read(wire), lost);
 }
 
 /**
