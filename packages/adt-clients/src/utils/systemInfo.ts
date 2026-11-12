@@ -200,8 +200,7 @@ export async function getSystemInformation<E extends IAdtError = IAdtError>(
         : verdict) as E,
     );
   }
-  if (!isSuccessStatus(wire.status))
-    return succeeded({ present: false }, lost);
+  if (!isSuccessStatus(wire.status)) return succeeded({ present: false }, lost);
   return succeeded({ present: true, info: recordOf(body) }, lost);
 }
 

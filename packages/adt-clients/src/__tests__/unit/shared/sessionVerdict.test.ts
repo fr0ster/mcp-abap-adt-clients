@@ -126,9 +126,7 @@ describe('a connection failure carries the session code', () => {
   });
 
   it('carries none for an inherited code', async () => {
-    const thrown = Object.create(
-      sessionError(ADT_SESSION_ERROR.NOT_CONNECTED),
-    );
+    const thrown = Object.create(sessionError(ADT_SESSION_ERROR.NOT_CONNECTED));
 
     const failure = await failureOf(thrown);
 
@@ -275,17 +273,20 @@ describe('the debugger stop on a spent connection', () => {
   it.each([
     ['no analyser', undefined],
     ['analyseDebuggerFreed', analyseDebuggerFreed],
-  ])('terminateDebugger through %s answers ADT_NOT_CONNECTED', async (_, analyse) => {
-    const answer = await spentDebugger().terminateDebugger(
-      analyse === undefined ? undefined : { analyse },
-    );
+  ])(
+    'terminateDebugger through %s answers ADT_NOT_CONNECTED',
+    async (_, analyse) => {
+      const answer = await spentDebugger().terminateDebugger(
+        analyse === undefined ? undefined : { analyse },
+      );
 
-    expect(answer.ok).toBe(false);
-    if (answer.ok) throw new Error('expected a failure');
-    expect(answer.getError().sessionError).toBe(
-      ADT_SESSION_ERROR.NOT_CONNECTED,
-    );
-  });
+      expect(answer.ok).toBe(false);
+      if (answer.ok) throw new Error('expected a failure');
+      expect(answer.getError().sessionError).toBe(
+        ADT_SESSION_ERROR.NOT_CONNECTED,
+      );
+    },
+  );
 
   it('a consumer clearing the verdict cannot make a success of no answer', async () => {
     const clearsEverything: IAnalyse = () => ADT_NO_FAILURE;
@@ -312,7 +313,7 @@ function markedWire(data = '<document/>'): IAdtWireResponse {
   };
 }
 
-describe('a refusal read from a 2xx document carries the answer\'s mark', () => {
+describe("a refusal read from a 2xx document carries the answer's mark", () => {
   it('AdtSAPError on a marked answer', async () => {
     const failure = await failureOf(
       new AdtSAPError(
@@ -371,9 +372,7 @@ describe('a success carries the mark of the answer it was read from', () => {
   });
 
   it('whatever the reading: nothing', async () => {
-    expect((await successOf(markedWire(), nothing)).sessionLost).toBe(
-      REPLACED,
-    );
+    expect((await successOf(markedWire(), nothing)).sessionLost).toBe(REPLACED);
   });
 
   it('whatever the reading: wireItself', async () => {
@@ -421,7 +420,7 @@ describe('a success carries the mark of the answer it was read from', () => {
   });
 });
 
-describe('a verdict a consumer\'s strategy answers is answered as it came', () => {
+describe("a verdict a consumer's strategy answers is answered as it came", () => {
   class ConsumerFailure implements IAdtError {
     readonly origin = 'refusal' as const;
     readonly message = 'the consumer says no';
@@ -434,7 +433,11 @@ describe('a verdict a consumer\'s strategy answers is answered as it came', () =
     const own = new ConsumerFailure();
     const replaces: IAnalyse<ConsumerFailure> = () => own;
 
-    const answer = await answering(async () => markedWire(), rawDocument, replaces);
+    const answer = await answering(
+      async () => markedWire(),
+      rawDocument,
+      replaces,
+    );
 
     expect(answer.ok).toBe(false);
     if (answer.ok) throw new Error('expected a failure');

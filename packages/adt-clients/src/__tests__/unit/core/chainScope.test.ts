@@ -132,7 +132,7 @@ describe('chain: the session mark', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
-  it('a marked last step: the chain\'s success carries the mark', async () => {
+  it("a marked last step: the chain's success carries the mark", async () => {
     const answer = await chain(logger, async ({ step }) => {
       await step(Promise.resolve(succeeded('locked')));
       return step(Promise.resolve(succeeded('written', REPLACED)));
@@ -146,7 +146,7 @@ describe('chain: the session mark', () => {
     });
   });
 
-  it('no marked step: no key on the chain\'s result', async () => {
+  it("no marked step: no key on the chain's result", async () => {
     const answer = await chain(logger, async ({ step }) =>
       step(Promise.resolve(succeeded('written'))),
     );
@@ -155,7 +155,7 @@ describe('chain: the session mark', () => {
     expect('sessionLost' in answer.getResult()).toBe(false);
   });
 
-  it('a marked step, then a step refused ADT_NOT_CONNECTED: the failing request\'s facts', async () => {
+  it("a marked step, then a step refused ADT_NOT_CONNECTED: the failing request's facts", async () => {
     const answer = await chain(logger, async ({ step }) => {
       await step(Promise.resolve(succeeded('locked', REPLACED)));
       return step(

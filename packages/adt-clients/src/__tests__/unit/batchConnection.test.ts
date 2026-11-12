@@ -717,7 +717,7 @@ describe('an envelope that fails as a whole', () => {
   });
 });
 
-describe('the envelope answer\'s session mark', () => {
+describe("the envelope answer's session mark", () => {
   // Each part's request travelled in the envelope, so the envelope's answer
   // is its answer: a mark on it (connection 23.0.0) marks every part.
   const REPLACED = 'ADT_SESSION_REPLACED' as const;
@@ -734,7 +734,12 @@ describe('the envelope answer\'s session mark', () => {
     const settled = [
       batch.makeAdtRequest(req),
       batch.makeAdtRequest({ ...req, url: '/test2' }),
-    ].map((p) => p.then((answer) => answer, (error: unknown) => error));
+    ].map((p) =>
+      p.then(
+        (answer) => answer,
+        (error: unknown) => error,
+      ),
+    );
     await batch.execute();
     return Promise.all(settled);
   }
@@ -746,9 +751,9 @@ describe('the envelope answer\'s session mark', () => {
     expect((answer as IAdtWireResponse).sessionLost).toBe(REPLACED);
     expect(refusal).toBeInstanceOf(Error);
     expect((refusal as { sessionLost?: unknown }).sessionLost).toBe(REPLACED);
-    expect(
-      (refusal as { response?: IAdtWireResponse }).response?.status,
-    ).toBe(500);
+    expect((refusal as { response?: IAdtWireResponse }).response?.status).toBe(
+      500,
+    );
   });
 
   it('an unmarked envelope marks no part', async () => {

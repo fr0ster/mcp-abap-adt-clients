@@ -285,7 +285,7 @@ describe('the session mark: each answer names the request it is built from', () 
       code: ADT_SESSION_ERROR.NOT_CONNECTED,
     });
 
-  it('a marked activation whose read is refused: the read\'s code, no mark', async () => {
+  it("a marked activation whose read is refused: the read's code, no mark", async () => {
     const answer = await answeringActivation(
       connectionAnswering({ ...SILENT, sessionLost: REPLACED }, spent()),
       activate,
@@ -300,7 +300,7 @@ describe('the session mark: each answer names the request it is built from', () 
     expect('sessionLost' in answer.getError()).toBe(false);
   });
 
-  it('cleared, the success carries the activation answer\'s mark', async () => {
+  it("cleared, the success carries the activation answer's mark", async () => {
     const clears: IAnalyse = () => ADT_NO_FAILURE;
     const answer = await answeringActivation(
       connectionAnswering({ ...SILENT, sessionLost: REPLACED }, spent()),
