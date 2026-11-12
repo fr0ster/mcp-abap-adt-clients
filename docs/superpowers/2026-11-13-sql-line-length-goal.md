@@ -121,7 +121,7 @@ charset=utf-8`, read-only statements on `TDEVC`), **Code** (read in the source n
 | 50 tabs after `SELECT`, raw end 256 | 400 | the text-literal message (`'ZZZZZZZZZZZZZZZZZZZZ   INT…`) |
 | A literal of `Ä` first; the crossing literal ends at character 250, UTF-8 byte 280 | 200 | no error |
 | A literal of `Ä` crossing character 255 | 400 | the text-literal message |
-| A field-list literal on its own line: 252 / 253 characters (254 / 255 with quotes) | 200 / 200 | the literal's value |
+| A field-list literal on its own line: 252 / 253 characters (254 / 255 with quotes); a backtick literal of 253 | 200 / 200 / 200 | the literal's value |
 | The same, 254 characters (256 with quotes); a backtick literal of 254 | 400 / 400 | `Only one SELECT statement is allowed.` |
 | A `'…'` literal of 31 characters or more compared with `devclass` (CHAR 30), short line | 400 | `An exception with the type CX_ADT_DATAPREVIEW_COMMON was raised, but was not handled locally …` |
 | Field-list literal `'A    B'`, `'A<LF>B'`, `'A<CRLF>B'`, `'A<TAB>B'`, `` `A    B` `` | 200 | each answered `A B` |
@@ -145,8 +145,9 @@ charset=utf-8`, read-only statements on `TDEVC`), **Code** (read in the source n
   message for the non-last line shows `'ZZZ )`, the `)` from line 2), and appends
   `INTO TABLE @DATA(…)` after the last line (the text in every cut-literal message, and the
   trailing `"` comment that hides it).
-- **Inference.** A line break between tokens does not change what SAP executes: the lines
-  are joined with a space. A line break inserted where there was no whitespace — after the
+- **Inference.** A line break between tokens, outside a comment and not before a `*`,
+  does not change what SAP executes: the lines are joined with a space (a break before a
+  `*` makes a comment line, and a line break ends a `"` comment — the rows below). A line break inserted where there was no whitespace — after the
   comma of an `IN` list — works (the LF/CRLF/CR rows).
 - **Measured.** A line of 255 characters is read whole and one of 256 is not, when the
   256th character is code (the 255/256 rows); a field-list literal of 253 characters
