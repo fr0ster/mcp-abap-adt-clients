@@ -256,7 +256,8 @@ export function recogniseFailure(error: unknown): IAdtError {
   const connectionCause = connectionCauseOf(error);
   // What the RFC SDK said, by its fields, so a caller can tell "the system
   // closed the conversation" (`RFC_CLOSED`) without reading the message.
-  // Absent for an HTTP failure and for anything not carrying a well-formed one.
+  // Present whenever the thrown value carries a well-formed one, whatever else
+  // it carries; absent otherwise (an HTTP wire's errors carry none).
   const rfc = rfcOf(error);
   return {
     origin: 'connection',
