@@ -14,6 +14,11 @@
  * codeString `RFC_CLOSED`, group 4, code 6.
  */
 
+import {
+  analyseDebuggerFreed,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import { ADT_NO_FAILURE, type IAnalyse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { RFC_RCS } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
@@ -104,7 +109,18 @@ describe('a connection failure carries the RFC SDK fields', () => {
     });
   });
 
-  it('carries no rfc for an HTTP failure', async () => {
+  it('carries both for an HTTP response and a well-formed rfc', async () => {
+    const response = { data: '', status: 500, statusText: 'x', headers: {} };
+    const thrown = Object.assign(rfcError(closedFields()), { response });
+
+    const failure = await failureOf(thrown);
+
+    expect(failure.origin).toBe('connection');
+    expect(failure.response).toBe(response);
+    expect(failure.rfc).toEqual(closedFields());
+  });
+
+  it('carries no rfc for an HTTP failure that carries none', async () => {
     const thrown = Object.assign(new Error('Request failed with 500'), {
       response: { data: '', status: 500, statusText: 'x', headers: {} },
     });
@@ -291,7 +307,8 @@ describe('a connection failure carries the RFC SDK fields', () => {
 });
 
 describe('a member answers the RFC fields of the call that failed', () => {
-  it('terminateDebugger: the system closed the conversation', async () => {
+  /** A debugger whose connection rejects every request as the closed call. */
+  function closedDebugger() {
     const connection: IAbapConnection = {
       connect: async () => undefined,
       getBaseUrl: async () => undefined,
@@ -301,12 +318,32 @@ describe('a member answers the RFC fields of the call that failed', () => {
         throw rfcError(closedFields(), 'RFC_CLOSED: connection closed');
       },
     };
-    const debugger_ = new AbapDebugger(connection, {
+    return new AbapDebugger(connection, {
       logger: noopLogger,
       results: abapDebuggerDocuments,
     });
+  }
 
-    const answer = await debugger_.terminateDebugger();
+  // A consumer that clears every verdict: with no answer to read, the
+  // original verdict stands, rfc included.
+  const clearsEverything: IAnalyse = () => ADT_NO_FAILURE;
+
+  it.each([
+    ['analyseDebuggerFreed', analyseDebuggerFreed],
+    ['analyseException', analyseException],
+    ['a consumer analyser answering ADT_NO_FAILURE', clearsEverything],
+  ])('terminateDebugger through %s keeps rfc', async (_, analyse) => {
+    const answer = await closedDebugger().terminateDebugger({ analyse });
+
+    expect(answer.ok).toBe(false);
+    if (answer.ok) throw new Error('expected a failure');
+    expect(answer.getError().origin).toBe('connection');
+    expect(answer.getError().rfc?.codeString).toBe('RFC_CLOSED');
+    expect(answer.getError().rfc).toEqual(closedFields());
+  });
+
+  it('terminateDebugger: the system closed the conversation', async () => {
+    const answer = await closedDebugger().terminateDebugger();
 
     expect(answer.ok).toBe(false);
     if (answer.ok) throw new Error('expected a failure');
