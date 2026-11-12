@@ -51,6 +51,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   changes.
 - **`@mcp-abap-adt/adt-strategies` devDependency `^0.23.0`** (was
   `^0.22.3`), the sibling on the same ranges.
+- **`@mcp-abap-adt/connection` devDependency `^24.0.0`** (was `^20.0.0`),
+  the connector on interfaces-adt-connection `^5.0.0`, so the repository's
+  tree holds one copy of the connection contract. It is used by the tests
+  alone; the published package does not depend on it.
 
 ## [45.4.0] - 2026-11-12
 
