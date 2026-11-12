@@ -27,8 +27,8 @@ After this change:
    `'…'` and `` `…` `` literals, and a literal longer than 72 characters goes whole on a
    line of its own. Only the placement of whitespace changes; SAP reads the statement the
    caller wrote, laid out on shorter lines — what SAP then makes of a literal longer than
-   255 characters or of a `"` inside a literal (item 3) is SAP's own reading, the same
-   on any layout. The commas of
+   255 characters or of a `"` inside a literal (item 3) is SAP's own reading, and SAP's
+   answer is passed on as it is. The commas of
    a compact `IN ('…','…')` list are break points, so the issue's statement is wrapped
    and answered.
 3. **The library refuses nothing for its layout.** A string literal longer than 255
@@ -48,8 +48,8 @@ carries it; the server's code does not change for it.
 
 - **The fix lives in adt-clients.** Every ADT request is built there; the member that
   posts the statement is the one that wraps it. No caller wraps SQL for it.
-- **The statement's meaning never changes.** The library inserts line breaks (or turns a
-  whitespace character into one) between tokens and does nothing else: no character of a
+- **The statement's meaning never changes.** The library inserts line breaks between tokens
+  (or replaces the whitespace between two tokens with one) and does nothing else: no character of a
   string literal or a comment is touched, added or removed; no token is added, removed,
   reordered, re-cased or rewritten; no comment is moved off its line; no line is made to
   begin with `*`.
@@ -163,9 +163,8 @@ charset=utf-8`, read-only statements on `TDEVC`), **Code** (read in the source n
   SAP's to give.
 - **Measured.** A `"` inside a `'…'` or `` `…` `` literal makes SAP refuse the statement
   (the three `"`-inside rows). **Inference:** SAP reads that `"` as a comment start (the
-  message of the two-line row shows line 1 cut at the `"`), which leaves the literal
-  unterminated on its line; a wrap after it does not make that literal terminated, so SAP
-  refuses such a statement wrapped or not.
+  message of the two-line row shows line 1 cut at the `"`). How SAP reads such a
+  statement once wrapped is not measured; the library passes SAP's answer on.
 - **Measured.** A line whose first non-blank character is `*` is a comment, and a break
   before a `*` (`SELECT *`, `COUNT(*)`) breaks the statement (the 500 rows).
 
