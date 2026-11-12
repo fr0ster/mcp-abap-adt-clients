@@ -61,7 +61,21 @@ function asFailure(
     messages: refusal.messages,
     response: answer,
     request: requestOf(answer),
+    ...sessionLostOn(answer),
   };
+}
+
+/**
+ * The connection's `sessionLost` on the answer a refusal was read from, as the
+ * refusal's own field — present only when the answer carries it. The answer is
+ * the connection's `IAdtWireResponse`, typed by its contract, so the field is
+ * read as typed.
+ */
+function sessionLostOn(
+  answer: IAdtWireResponse | undefined,
+): Pick<IAdtError, 'sessionLost'> {
+  const sessionLost = answer?.sessionLost;
+  return sessionLost === undefined ? {} : { sessionLost };
 }
 
 /**
@@ -367,6 +381,7 @@ export const analyseUnitTestStart: IAnalyse<IAdtMessageFailure> = (
     messages: [{ type: 'E', text: message }],
     response: answer,
     request: requestOf(answer),
+    ...sessionLostOn(answer),
   };
 };
 
