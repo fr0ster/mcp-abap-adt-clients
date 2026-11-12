@@ -21,8 +21,8 @@ After this change:
    every line fits**, each break placed at whitespace or right after a comma — never
    inside a string literal, never inside a comment, never where it would turn code into a
    comment. Only the placement of whitespace changes; what SAP executes is the statement
-   the caller wrote. A statement whose tokens each fit is never refused for want of a
-   break point: the commas of a compact `IN ('…','…')` list are break points.
+   the caller wrote. The commas of a compact `IN ('…','…')` list are break points, so the
+   issue's statement is laid out and answered.
 3. **A statement that cannot be laid out so** — a token (a string literal with its
    delimiters, above all) longer than 255 characters, or a line whose code before the
    first possible break is longer — **is refused before any request**,
@@ -148,9 +148,11 @@ charset=utf-8`, read-only statements on `TDEVC`), **Code** (read in the source n
   256th character is code (the 255/256 rows); a field-list literal of 253 characters
   between its quotes (255 with them) alone on its line is answered, one of 254 (256) is
   refused, `'…'` and `` `…` `` alike.
-- **Inference.** No string literal longer than 255 characters with its delimiters can be
-  sent on any line, since a line keeps at most 255 characters after collapsing and a
-  literal's own characters are no fewer than its non-blank ones.
+- **Inference.** A string literal without blanks longer than 255 characters with its
+  delimiters cannot be sent on any line. One with runs of blanks might fit once SAP
+  collapses them, but then SAP has already changed the literal's content (the field-list
+  rows); the library refuses every literal longer than 255 characters as given — a
+  conservative choice of its own, not a measured impossibility.
 - **Measured.** A `"` inside a `'…'` or `` `…` `` literal makes SAP refuse the statement
   (the three `"`-inside rows). **Inference:** SAP reads that `"` as a comment start (the
   message of the two-line row shows line 1 cut at the `"`).
@@ -161,8 +163,10 @@ charset=utf-8`, read-only statements on `TDEVC`), **Code** (read in the source n
 
 Count the code of each line of the statement (lines separated by LF, CRLF or CR; the code
 is what comes before a comment that ends the line) in characters, as given — the library
-deliberately does not rely on SAP's collapsing of whitespace, so its count is never below
-SAP's and it may break a line SAP would have read whole, which changes nothing. When a
+deliberately does not rely on SAP's collapsing of whitespace, so that its count is not
+below SAP's (for spaces and line breaks the rows show SAP's count is no higher; for tabs
+that is still to be measured, see Open for the spec), and it may break a line SAP would
+have read whole, which changes nothing. When a
 line's code is longer than 255 characters, break it at whitespace or right after a comma,
 outside string literals and outside comments, never before a `*`, so that every line's
 code holds at most 255 characters; a comment stays on the line it began on. A token that
@@ -182,8 +186,9 @@ cannot be laid out, and the statement is refused before any request. A statement
 - **How characters are counted.** UTF-16 code units (JavaScript's `length`) or code
   points; whether SAP counts a character outside the Basic Multilingual Plane as one or
   two — measured.
-- **Tabs.** Whether a tab counts as one character or as SAP's collapsed width — measured
-  so that the library's count is never below SAP's.
+- **Tabs.** Whether SAP counts a tab as one character or wider (the tab row fails where
+  the raw line is already longer than 255, which settles neither) — measured, and the
+  library's count of a tab set so it is not below SAP's.
 - **The refusal's shape.** `origin`, `code` (an `AdtObjectErrorCodes` member or a new
   one), the fixed words, and whether `request` is present (no request was sent); how the
   server's `GetSqlQuery` answers it.
