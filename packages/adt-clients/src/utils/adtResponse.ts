@@ -39,10 +39,15 @@ import {
   ADT_NO_FAILURE,
 } from '@mcp-abap-adt/interfaces-adt';
 import type {
+  AdtSessionErrorCode,
+  AdtSessionLoss,
   IAdtWireResponse,
   IRfcErrorInfo,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { RFC_RCS } from '@mcp-abap-adt/interfaces-adt-connection';
+import {
+  ADT_SESSION_ERROR,
+  RFC_RCS,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtSAPError } from './adtErrors';
 
 /**
@@ -207,6 +212,46 @@ function rfcOf(error: unknown): IRfcErrorInfo | undefined {
   }
 }
 
+/** The connection's session error codes, as a list to compare with. */
+const SESSION_ERROR_CODES: ReadonlyArray<AdtSessionErrorCode> =
+  Object.values(ADT_SESSION_ERROR);
+
+/**
+ * The connection's session error code `error` was thrown with, when it is one
+ * of `ADT_SESSION_ERROR`; any other code, none, or a code that is not an own
+ * data property is `undefined`.
+ *
+ * Read like {@link connectionCauseOf}: by {@link ownValue} — a getter never
+ * runs — and found by comparison, so the answer is typed by the list itself.
+ * An inspection that throws (a Proxy's trap) is no code.
+ */
+function sessionErrorOf(error: unknown): AdtSessionErrorCode | undefined {
+  let code: unknown;
+  try {
+    code = ownValue(error, 'code');
+  } catch {
+    return undefined;
+  }
+  return SESSION_ERROR_CODES.find((listed) => listed === code);
+}
+
+/**
+ * The connection's `sessionLost` mark on what was thrown: SAP's refusal of a
+ * request whose answer showed the session replaced. Connection 23.0.0 sets it
+ * as an own data property — on the refusal itself, or on an object layered
+ * over a frozen refusal — so it is read by {@link ownValue} and kept only when
+ * it is `ADT_SESSION_REPLACED`. An inspection that throws is no mark.
+ */
+export function sessionLostOf(error: unknown): AdtSessionLoss | undefined {
+  let mark: unknown;
+  try {
+    mark = ownValue(error, 'sessionLost');
+  } catch {
+    return undefined;
+  }
+  return mark === ADT_SESSION_ERROR.SESSION_REPLACED ? mark : undefined;
+}
+
 /**
  * The default error strategy: what this library recognises as a failure.
  *
@@ -259,6 +304,13 @@ export function recogniseFailure(error: unknown): IAdtError {
   // Present whenever the thrown value carries a well-formed one, whatever else
   // it carries; absent otherwise (an HTTP wire's errors carry none).
   const rfc = rfcOf(error);
+  // What the connection said about the SAP session, by its fields, so a
+  // caller tells a spent connection without reading the message: the session
+  // code it was thrown with, and the mark of a refusal whose answer showed
+  // the session replaced. On a layered refusal only the mark is the object's
+  // own; its code is SAP's HTTP code, never a session code.
+  const sessionError = sessionErrorOf(error);
+  const sessionLost = sessionLostOf(error);
   return {
     origin: 'connection',
     message:
@@ -271,6 +323,8 @@ export function recogniseFailure(error: unknown): IAdtError {
     request: carried?.request,
     ...(connectionCause === undefined ? {} : { connectionCause }),
     ...(rfc === undefined ? {} : { rfc }),
+    ...(sessionError === undefined ? {} : { sessionError }),
+    ...(sessionLost === undefined ? {} : { sessionLost }),
   };
 }
 
