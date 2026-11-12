@@ -76,8 +76,10 @@ Files: `packages/adt-clients/src/__tests__/unit/shared/sqlLines.test.ts` (new),
    - a `"` comment's text counted towards 72 (the code-of-60-plus-comment-of-300 case
      is wrapped instead of returned as it is);
    - the "not before `*`" rule removed — fixtures in which the blank before `*` is the
-     last break point at or before column 72 (`SELECT *` and `COUNT( * )` placed so the
-     `*` stands at column 70), each with its exact expected output: red;
+     last break point at or before column 72 and the next break point lies after 72
+     (`SELECT *` and `COUNT( *)` placed so the blank before `*` stands at column 70,
+     with code running from the `*` past column 72 with no blank or comma in it), each
+     with its exact expected output: red;
    - the "not before a comment" rule removed — a fixture of a token longer than 72, then
      blanks, then a `"` comment, so the blank run before the comment is the first break
      point after 72 and the wrap would take it; its exact expected output keeps the
@@ -142,18 +144,23 @@ Files: `packages/adt-clients/src/__tests__/helpers/test-config.yaml.template`
      `B`. Unwrapped, SAP reads this line whole, so its answer before and after the wrap
      must be the same; it is the check that breaking at blanks and commas is enough for
      a literal written against other code.
-   Each case writes to the test logger, before it sends, the wrapped text it expects the
-   member to send (`wrapSqlLines` of its fixture — the same function the member calls)
-   with each line's length, and, on a failure, SAP's status, `adtType` and message as
-   the member's answer carries them, so a failure leaves its evidence in the run's log
+   Each case runs the member over the test's connection wrapped by a recording
+   connection in the test (test code only, as the unit tests record a request): the
+   `data` actually sent, with each line's length, goes to the test logger, labelled
+   "sent"; the case also logs `wrapSqlLines` of its fixture labelled "expected after the
+   fix" (in the before run the two differ, in the after run they are equal, and the case
+   asserts that equality after step 2); on a failure it logs SAP's status, `adtType` and
+   message as the member's answer carries them, so a failure leaves its evidence in the run's log
    without another live run. The fixtures hold only `TDEVC` package names.
 2. Before each run: say the step is ready for its live run and wait for the go. Then check
    the connection without logon — a plain `curl` of the discovery URL without
    credentials, which is not project tooling: `401` with the realm naming the on-premise
    system — and
    run only this file from the worktree, in `packages/adt-clients`:
-   `MCP_ENV_PATH=~/.config/mcp-abap-adt/sessions/e19-tunnel.env MCP_TEST_OVERLAY=<the main checkout's packages/adt-clients/src/__tests__/helpers/test-config.overlay.e19.yaml, absolute> npm test -- src/__tests__/integration/shared/sqlQuery.test.ts`.
-   The cases come from the tracked template (item 1); the overlay is the existing
+   `DEBUG_ADT_TESTS=true MCP_ENV_PATH=~/.config/mcp-abap-adt/sessions/e19-tunnel.env MCP_TEST_OVERLAY=<the main checkout's packages/adt-clients/src/__tests__/helpers/test-config.overlay.e19.yaml, absolute> npm test -- src/__tests__/integration/shared/sqlQuery.test.ts`.
+   `DEBUG_ADT_TESTS=true` switches on the test logger (`createTestsLogger()` is silent
+   without it), so the evidence of item 1 reaches the run's log. The cases come from the
+   tracked template (item 1); the overlay is the existing
    per-system one, read, not copied or changed. Any credential refusal stops everything.
 3. **The before** (between steps 1 and 2): the long-line case fails (`400`), the
    tail-past-255 case fails (one row where none is right), the concat case passes (SAP
@@ -164,7 +171,7 @@ Files: `packages/adt-clients/src/__tests__/helpers/test-config.yaml.template`
    enough" signal**: the plan stops here; the failure goes to the owner with SAP's answer
    and the sent text, and nothing is fixed in this task (no new break points, no change of
    the rule). No case is dropped, and step 4 and step 5 wait for the owner's decision.
-5. Results (status, rows, the sent text's line lengths, read from the run's log) go into
+5. Results (status, rows, the "sent" text's line lengths of both runs, read from the run's log) go into
    the PR description, not a file. The run's log is kept in the scratchpad until then. Commit `test(sql): live cases for the long line, the tail past 255 and a literal
    in concat`; push; watch CI (the cases skip there with their reason).
 
