@@ -9,8 +9,10 @@ done as written stops and goes back to the owner.
 
 - **npm scripts only.** No `npx`, `npm exec`, `node_modules/.bin`, `ts-node`, `timeout`.
   At the root: `npm run build`, `npm run test:check`, `npm run lint:check`, `npm test`,
-  `npm run check`. A single unit file: `npm run test:unit -- <path>` in
-  `packages/adt-clients`.
+  `npm run check`. A single test file, in `packages/adt-clients`:
+  `MCP_ENV_PATH=/tmp/nonexistent-env npm test -- <path of the file>` (`npm test` is
+  `jest --runInBand`, so the one path given is the only one selected; its `pretest` runs
+  the integration typecheck and `check:config`, which needs no overlay for unit tests).
 - **Registry dependencies only.** No dependency is added or changed by this work. If an
   install happens, the lockfile is checked: `"link": true` only for the repository's own
   three packages; nothing else linked or resolved from a path. Lockfiles are regenerated
@@ -37,7 +39,9 @@ done as written stops and goes back to the owner.
   `npm run check:packed`, `npm run check:publish`, `npm run check:publish:root`
   (`.github/workflows/ci.yml`).
 - **The main checkout is not switched.** Work happens in
-  `.worktrees/sql-line-length` (branch `fix/sql-line-length`, PR #312).
+  `.worktrees/sql-line-length` (branch `fix/sql-line-length`, PR #312). The main
+  checkout stays on `main`; it is only fast-forwarded after the merge (step 5) and read
+  for its local overlay (step 3).
 
 ## Step 1 — the scanner and the wrap, tests first
 
@@ -56,18 +60,28 @@ Files: `packages/adt-clients/src/__tests__/unit/shared/sqlLines.test.ts` (new),
    `comment` / `star-line`, LF / CR / CRLF, the fits check by `length`, the two kinds of
    break point and the three rules that make one unusable, the greedy rule, LF written,
    everything else copied. `SQL_LINE_WIDTH = 72` the one constant. Green.
+   The literal fixtures are built so that a scanner blind to literals would break inside
+   them: the 100- and 300-character literals (both delimiters) hold blanks and commas
+   every ten characters, and begin before column 72, so their first inner blank or comma
+   is a break point a literal-blind wrap would take; the same for the `''` and doubled
+   backtick fixtures, whose doubled delimiter is followed by an inner blank.
 4. Deliberate breaks, one at a time, each turning named tests red, then reverted:
-   - a break allowed inside `'…'` (the 100/300 literal cases, the issue's statement);
-   - a break allowed inside `` `…` ``; `''` read as the end of a literal; doubled
-     backtick read as the end;
-   - a `"` comment's text counted towards 72 (the code-plus-long-comment case);
-   - a break allowed before `*` (the `SELECT *` / `COUNT( * )` cases);
-   - a break allowed before a comment (the long-line-ending-with-a-comment case);
-   - the first usable break taken in place of the last (the greedy cases);
-   - the fits check removed, always rebuilding (the identity cases: same string);
-   - CRLF read as two breaks (the CRLF case);
-   - a caller's line break inside a literal treated as the end of the literal (the
-     caller's-break-inside-a-literal case).
+   - the scanner leaves `quote` at any `'` (no `''`), and separately never enters
+     `quote` (the 100/300 `'…'` cases with inner blanks and commas, the `''` case);
+   - the same two for `backtick` (the `` `…` `` cases, the doubled-backtick case);
+   - a `"` comment's text counted towards 72 (the code-of-60-plus-comment-of-300 case
+     is wrapped instead of returned as it is);
+   - the "not before `*`" rule removed (the `SELECT *` / `COUNT( * )` cases);
+   - the "not before a comment" rule removed (the long-line-ending-with-a-comment case);
+   - the first usable break at or before 72 taken in place of the last (the greedy cases
+     with two candidates);
+   - the width 71 in place of 72, and separately 73 (the 72- and 73-character cases and
+     the break-point-at-72 case);
+   - CR alone not read as a line break (a statement of short lines separated by CR alone
+     whose whole length is above 72: wrapped instead of returned as it is);
+   - a caller's line break inside a literal read as the end of the literal (a literal
+     with an inner LF followed, on the next physical line, by `*` and a blank: a
+     `star-line` read wrongly, so the following text is not wrapped as code).
 5. `npm run test:check`, `npm run lint:check`. Commit
    `fix(sql): wrapSqlLines — wrap a statement's long lines at 72, outside literals and comments`.
 
@@ -95,6 +109,11 @@ Files: `packages/adt-clients/src/__tests__/unit/shared/sqlQueryWrapsLines.test.t
 
 ## Step 3 — the live check on the on-premise system
 
+This step's first run happens **between step 1 and step 2** (the cases written, the
+member still sending the statement as given), its second after step 2. So the before and
+after are run by the same test file in the same worktree, and no other checkout is
+needed.
+
 Files: `packages/adt-clients/src/__tests__/helpers/test-config.yaml.template`
 (three new `sql_query` cases), `packages/adt-clients/src/__tests__/integration/shared/sqlQuery.test.ts`
 (three new gated cases).
@@ -112,21 +131,21 @@ Files: `packages/adt-clients/src/__tests__/helpers/test-config.yaml.template`
      `B`. Unwrapped, SAP reads this line whole, so its answer before and after the wrap
      must be the same; it is the check that breaking at blanks and commas is enough for
      a literal written against other code.
-2. Before the run: say the step is ready for its live run and wait for the go. Then check
+2. Before each run: say the step is ready for its live run and wait for the go. Then check
    the connection without logon (`401` with the realm naming the on-premise system), and
-   run only this file from the worktree:
-   `MCP_ENV_PATH=~/.config/mcp-abap-adt/sessions/e19-tunnel.env npm test -- integration/shared/sqlQuery`
-   in `packages/adt-clients`, with the worktree's own gitignored `test-config.yaml`
-   (copied from the main checkout's and extended with the three cases). Any credential
-   refusal stops everything.
-3. Run the three statements once against today's code too (the main checkout at
-   `adt-clients-v45.5.0`, read only, the same file and config) to record the before:
-   the first fails `400`, the second answers one row, the third answers its row. If the
-   third is refused already before the change, its form is SAP's syntax question, not the
-   wrap's: that is reported, and the case is not counted as evidence either way.
-4. **A case that fails live after the change is the "not enough" signal**: it is reported
-   to the owner with SAP's answer and the sent text, and not fixed in this task (no new
-   break points, no change of the rule). Only a case that passes is committed as a test.
+   run only this file from the worktree, in `packages/adt-clients`:
+   `MCP_ENV_PATH=~/.config/mcp-abap-adt/sessions/e19-tunnel.env MCP_TEST_OVERLAY=<the main checkout's packages/adt-clients/src/__tests__/helpers/test-config.overlay.e19.yaml, absolute> npm test -- src/__tests__/integration/shared/sqlQuery.test.ts`.
+   The cases come from the tracked template (item 1); the overlay is the existing
+   per-system one, read, not copied or changed. Any credential refusal stops everything.
+3. **The before** (between steps 1 and 2): the long-line case fails (`400`), the
+   tail-past-255 case fails (one row where none is right), the concat case passes (SAP
+   reads its line whole). If the concat case is refused already here, its form is SAP's
+   syntax question, not the wrap's: that is reported to the owner, and the plan waits for
+   the owner's choice of form before going on.
+4. **The after** (after step 2): all three must pass. **A case that fails is the "not
+   enough" signal**: the plan stops here; the failure goes to the owner with SAP's answer
+   and the sent text, and nothing is fixed in this task (no new break points, no change of
+   the rule). No case is dropped, and step 4 and step 5 wait for the owner's decision.
 5. Results (status, rows, the sent text's line lengths) go into the PR description, not a
    file. Commit `test(sql): live cases for the long line, the tail past 255 and a literal
    in concat`; push; watch CI (the cases skip there with their reason).
@@ -151,7 +170,10 @@ Files: `packages/adt-clients/docs/usage/CLIENT_API_REFERENCE.md`,
 
 1. `packages/adt-clients/package.json` version `45.5.1`; the lockfile regenerated by npm
    (`npm install --ignore-scripts` at the root), then checked as in the rules.
-   `adt-strategies` and `adt-clients-legacy` take no change and no version.
+   `adt-strategies` and `adt-clients-legacy` take no change and no version. Every
+   dependency range in `packages/adt-clients/package.json` is checked against the
+   registry (`npm view <name>@<range> version` answers a published version for each);
+   none is `file:`, `link:` or `workspace:`.
 2. The PR description gets what the working documents still owe: the server follow-up
    (below), the live results of step 3, and the owner's one open question, if any case
    failed. Then the last commit deletes the goal, spec and plan
@@ -159,9 +181,16 @@ Files: `packages/adt-clients/docs/usage/CLIENT_API_REFERENCE.md`,
 3. `npm run check` at the root; CI's step list; push; CI green; the PR leaves draft for
    review. After the review's approval and green CI: merge, tag
    `adt-clients-v45.5.1` at the merge commit, ready the publish checkout (the main
-   checkout at the tag, built, `npm run check`). The publish is the owner's
+   checkout's `main` fast-forwarded to the merge commit, which the tag names — not
+   switched — then built and `npm run check`). The publish is the owner's
    (`npm run release:publish`). The CHANGELOG date is checked against the release day
    before the tag.
+4. After the owner's publish: a clean install from the registry outside the repository
+   (a new directory in the scratchpad: `npm init -y`, then
+   `npm install @mcp-abap-adt/adt-clients@45.5.1 --ignore-scripts`), the lockfile there
+   checked for anything not resolved from the registry, and the package's entry loaded
+   with `node -e` requiring it; the directory deleted afterwards. A registry that lags is
+   "not visible yet", rechecked, never a reason to republish.
 
 ## After the release — the server follow-up (mcp-abap-adt, its own PR)
 
