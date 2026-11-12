@@ -24,6 +24,54 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [45.4.0] - 2026-11-12
+
+### Added
+
+- **An answer says what the connection said about the SAP session**
+  (`@mcp-abap-adt/interfaces-adt` 27.3.0), so a caller reads it by field,
+  never from the message:
+  - `IAdtError.sessionError` on a connection failure: the connection's
+    session error code the request was thrown with, one of `ADT_SESSION_ERROR`
+    (`ADT_NOT_CONNECTED`, `ADT_SESSION_REPLACED`, `ADT_RELEASE_PENDING`),
+    read as the thrown value's own `code`. A debugger stop over a spent
+    connection answers `ADT_NOT_CONNECTED`.
+  - `IAdtError.sessionLost` and `IAdtResult.sessionLost`: the request the
+    answer answers was answered with the SAP session replaced
+    (`@mcp-abap-adt/connection` 23.0.0 marks such a stateless answer). On a
+    refusal from the thrown value's own mark — a refusal the connection
+    layers over a frozen error included — or from the 2xx answer a refusal
+    was read from; on a success from the answer, beside `value`, whatever
+    result strategy made the value, and from a thrown refusal whose verdict
+    `analyse` cleared.
+  - Each answer carries the facts of the one request it answers: a chain's
+    success the mark of its last request and its failure the failing
+    request's facts; `getSystemInformation` the mark of its one request on
+    every verdict and success; activation's read after a silent checklist
+    its own facts when it fails and nothing when it succeeds; each part of a
+    batch the mark of the envelope it travelled in.
+  - A verdict a caller's own `analyse` answers is answered as it came (the
+    same object); such a strategy carries the fields itself.
+- **`EPIPE` is a connection cause** (`ADT_CONNECTION_CAUSES`,
+  interfaces-adt 27.3.0): a write to a socket the server had reset, measured
+  on an established connection, is `connectionCause: 'EPIPE'`.
+
+### Fixed
+
+- **The request trace never replaces what was thrown.** `withRequestTrace`
+  wrote `request` onto a thrown value by plain assignment; on a refusal
+  connection 23.0.0 layers over a frozen error (whose `request` is then an
+  inherited read-only field), and on a frozen error or a thrown primitive,
+  the assignment threw a `TypeError` in place of SAP's refusal. It now sets
+  an existing writable `request`, else defines an own one, and writes nothing
+  where neither is taken; the value is rethrown as it came.
+
+### Changed
+
+- **On `@mcp-abap-adt/interfaces-adt` `^27.3.0`** (was `^27.2.0`) and
+  **`@mcp-abap-adt/interfaces-adt-connection` `^4.2.0`** (was `^4.1.0`); the
+  devDependency on `@mcp-abap-adt/adt-strategies` is `^0.22.3`.
+
 ## [45.3.0] - 2026-11-12
 
 ### Added

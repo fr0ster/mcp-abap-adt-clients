@@ -103,6 +103,11 @@ inactive). SAP spells severity three ways and carries
 a T100 key in exactly one of the forms; the reading flattens that so a caller
 matching on `type === 'E'` does not have to know which carrier they got.
 
+A failure built from a document on a successful answer carries that answer's
+`sessionLost` (since 0.22.3: the connection marked the answer with the SAP
+session replaced); a verdict the library reached first is enriched by
+spreading, so its `sessionError` and `sessionLost` come through as they were.
+
 ### Why a strategy says what it says
 
 Several of these exist because SAP answers something other than what it means —
