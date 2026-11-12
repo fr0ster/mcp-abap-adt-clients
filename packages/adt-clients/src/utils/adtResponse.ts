@@ -38,7 +38,11 @@ import {
   ADT_CONNECTION_CAUSES,
   ADT_NO_FAILURE,
 } from '@mcp-abap-adt/interfaces-adt';
-import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
+import type {
+  IAdtWireResponse,
+  IRfcErrorInfo,
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import { RFC_RCS } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtSAPError } from './adtErrors';
 
 /**
@@ -164,6 +168,46 @@ function connectionCauseOf(error: unknown): AdtConnectionCause | undefined {
 }
 
 /**
+ * What the RFC SDK said about the call `error` was thrown from, when it carries
+ * a well-formed `rfc` (`IRfcErrorInfo`, the connection's field); anything else
+ * is `undefined`.
+ *
+ * The thrown value is outside the type system, so every field is read by
+ * {@link ownValue} — a getter is never run, an inherited field is not one —
+ * and checked: `key` a string, `group` and `code` integers, `codeString` one of
+ * `RFC_RCS`, found by comparison. One field that fails makes the whole `rfc`
+ * absent: a partial one would claim facts the SDK did not report.
+ *
+ * The copy is a fresh plain object of exactly the four fields, so nothing else
+ * the thrown value's `rfc` held, and no later change to it, reaches the
+ * failure. An inspection that throws (a Proxy's trap) is no `rfc`: the
+ * classifier never throws on what was thrown at it.
+ */
+function rfcOf(error: unknown): IRfcErrorInfo | undefined {
+  try {
+    const rfc = ownValue(error, 'rfc');
+    const key = ownValue(rfc, 'key');
+    const group = ownValue(rfc, 'group');
+    const code = ownValue(rfc, 'code');
+    const named = ownValue(rfc, 'codeString');
+    const codeString = RFC_RCS.find((listed) => listed === named);
+    if (
+      typeof key !== 'string' ||
+      typeof group !== 'number' ||
+      !Number.isInteger(group) ||
+      typeof code !== 'number' ||
+      !Number.isInteger(code) ||
+      codeString === undefined
+    ) {
+      return undefined;
+    }
+    return { key, group, code, codeString };
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * The default error strategy: what this library recognises as a failure.
  *
  * Origin is not decoration — the two have different remedies, and a caller
@@ -210,6 +254,10 @@ export function recogniseFailure(error: unknown): IAdtError {
   // The network code, by code alone, so a caller can say "no connection"
   // without reading the message. Absent unless it is a listed one.
   const connectionCause = connectionCauseOf(error);
+  // What the RFC SDK said, by its fields, so a caller can tell "the system
+  // closed the conversation" (`RFC_CLOSED`) without reading the message.
+  // Absent for an HTTP failure and for anything not carrying a well-formed one.
+  const rfc = rfcOf(error);
   return {
     origin: 'connection',
     message:
@@ -221,6 +269,7 @@ export function recogniseFailure(error: unknown): IAdtError {
     // caller could not locate in a chain of six.
     request: carried?.request,
     ...(connectionCause === undefined ? {} : { connectionCause }),
+    ...(rfc === undefined ? {} : { rfc }),
   };
 }
 
