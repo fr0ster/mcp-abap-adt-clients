@@ -132,7 +132,9 @@ spec §3 and §4's generic branch). Tests first, in a new
   `code` → absent;
 - a refusal marked in place (own read-only `sessionLost`) and one layered over a frozen
   error, as connection 23.0.0's `markedLost` builds it → `sessionLost`, with `response`,
-  `message` and `request` as before; another value, inherited only, getter → absent;
+  `message` and `request` as before; another value, inherited only, getter → absent; a
+  Proxy whose descriptor trap throws only for `sessionLost` → classified, `sessionLost`
+  absent, the other fields as for an unmarked refusal;
 - `EPIPE` as own `code` → `connectionCause: 'EPIPE'` (moved from the off-list cases to the
   listed ones, which iterate `ADT_CONNECTION_CAUSES`);
 - `AbapDebugger.terminateDebugger` over a stub rejecting `ADT_NOT_CONNECTED` →
@@ -142,8 +144,8 @@ Code: two readers beside `rfcOf` — the session code read as an own data proper
 in `ADT_SESSION_ERROR`'s values, the mark read as an own data property and compared with
 `SESSION_REPLACED`, each inside `try`; the generic branch of `recogniseFailure` carries
 both when defined. Deliberate breaks, each on its own: each own-property read made an
-ordinary read (the inherited cases go red); each list comparison removed; each `try`
-removed (the Proxy case goes red); each field left out of the branch. Commit.
+ordinary read (the inherited cases go red); each list comparison removed; each reader's `try`
+removed (its own Proxy case — the `code` trap, the `sessionLost` trap — goes red); each field left out of the branch. Commit.
 
 **B4. `AdtSAPError` branch** (spec §4). Tests: an `AdtSAPError` whose `response` is a
 marked 2xx wire → `sessionLost`; unmarked → absent; regression: the credential-refusal
