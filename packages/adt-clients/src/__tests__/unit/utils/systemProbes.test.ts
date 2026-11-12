@@ -9,7 +9,11 @@
  */
 import type { IAnalyse } from '@mcp-abap-adt/interfaces-adt';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import {
+  ADT_SESSION_ERROR,
+  type IAbapConnection,
+  type IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { fetchDiscoveryEndpoints } from '../../../utils/discoveryEndpoints';
 import {
   getSystemInformation,
@@ -299,5 +303,105 @@ describe('fetchDiscoveryEndpoints', () => {
       new Set(),
     );
     await expect(fetchDiscoveryEndpoints(failingWith(500))).rejects.toThrow();
+  });
+});
+
+describe('getSystemInformation: the session mark of its one request', () => {
+  const REPLACED = ADT_SESSION_ERROR.SESSION_REPLACED;
+
+  /** A connection whose one request rejects with `thrown`. */
+  const throwing = (thrown: unknown): IAbapConnection => ({
+    connect: async () => undefined,
+    getBaseUrl: async () => undefined,
+    getSessionId: () => null,
+    setSessionType: () => undefined,
+    makeAdtRequest: async () => {
+      throw thrown;
+    },
+  });
+
+  /** A connection whose one request resolves `wire`. */
+  const resolving = (wire: IAdtWireResponse): IAbapConnection => ({
+    connect: async () => undefined,
+    getBaseUrl: async () => undefined,
+    getSessionId: () => null,
+    setSessionType: () => undefined,
+    makeAdtRequest: async <T, D>() => wire as IAdtWireResponse<T, D>,
+  });
+
+  /** SAP's refusal, marked on the error itself as connection 23.0.0 does. */
+  const markedRefusal = (status: number) =>
+    Object.assign(new Error(`Request failed with status code ${status}`), {
+      response: { status, statusText: 'x', headers: {}, data: '' },
+      sessionLost: REPLACED,
+    });
+
+  const markedWire = (status: number, data: unknown): IAdtWireResponse => ({
+    status,
+    statusText: 'x',
+    headers: {},
+    data,
+    sessionLost: REPLACED,
+  });
+
+  it('a marked thrown 404: the endpoint absent, with the mark', async () => {
+    const answer = await getSystemInformation(throwing(markedRefusal(404)));
+
+    if (!answer.ok) throw new Error('expected a success');
+    expect(answer.getResult()).toEqual({
+      value: { present: false },
+      sessionLost: REPLACED,
+    });
+  });
+
+  it('a marked non-2xx answer: the verdict carries the mark', async () => {
+    const answer = await getSystemInformation(resolving(markedWire(500, '')));
+
+    if (answer.ok) throw new Error('expected a failure');
+    expect(answer.getError().sessionLost).toBe(REPLACED);
+  });
+
+  it('a marked 2xx with an unreadable body: the verdict carries the mark', async () => {
+    const answer = await getSystemInformation(
+      resolving(markedWire(200, 'not json')),
+    );
+
+    if (answer.ok) throw new Error('expected a failure');
+    expect(answer.getError().sessionLost).toBe(REPLACED);
+  });
+
+  it('a marked thrown refusal: the verdict carries the mark', async () => {
+    const answer = await getSystemInformation(throwing(markedRefusal(500)));
+
+    if (answer.ok) throw new Error('expected a failure');
+    expect(answer.getError().sessionLost).toBe(REPLACED);
+  });
+
+  it('a marked thrown refusal cleared by analyse: the success carries the mark', async () => {
+    const clears: IAnalyse = () => ADT_NO_FAILURE;
+    const answer = await getSystemInformation(throwing(markedRefusal(500)), {
+      analyse: clears,
+    });
+
+    if (!answer.ok) throw new Error('expected a success');
+    expect(answer.getResult().sessionLost).toBe(REPLACED);
+  });
+
+  it('a marked readable 2xx: the success carries the mark', async () => {
+    const answer = await getSystemInformation(
+      resolving(markedWire(200, { systemID: 'X' })),
+    );
+
+    if (!answer.ok) throw new Error('expected a success');
+    expect(answer.getResult().value.present).toBe(true);
+    expect(answer.getResult().sessionLost).toBe(REPLACED);
+  });
+
+  it('an unmarked readable 2xx: no key on the result', async () => {
+    const { sessionLost: _, ...unmarked } = markedWire(200, { systemID: 'X' });
+    const answer = await getSystemInformation(resolving(unmarked));
+
+    if (!answer.ok) throw new Error('expected a success');
+    expect('sessionLost' in answer.getResult()).toBe(false);
   });
 });
