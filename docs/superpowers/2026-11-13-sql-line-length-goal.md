@@ -26,8 +26,9 @@ After this change:
    **A string literal is never cut**, whatever its length: a break is placed only outside
    `'…'` and `` `…` `` literals, and a literal longer than 72 characters goes whole on a
    line of its own. Only the placement of whitespace changes; SAP reads the statement the
-   caller wrote, laid out on shorter lines — except what SAP cannot read on any layout (a
-   literal longer than 255, a `"` inside a literal, item 3). The commas of
+   caller wrote, laid out on shorter lines — what SAP then makes of a literal longer than
+   255 characters or of a `"` inside a literal (item 3) is SAP's own reading, the same
+   on any layout. The commas of
    a compact `IN ('…','…')` list are break points, so the issue's statement is wrapped
    and answered.
 3. **The library refuses nothing for its layout.** A string literal longer than 255
@@ -37,7 +38,7 @@ After this change:
 72 characters is the width ABAP source has long been written to — far below the 255 at
 which SAP cuts a line — so a wrapped line stays well inside what SAP reads. The two
 exceptions are kept as they are by decision: a token longer than 255 on its own line
-(SAP's to refuse) and a comment that runs past 255 (harmless).
+(SAP's to answer as it reads it) and a comment that runs past 255 (harmless).
 
 The mcp-abap-adt server's `GetSqlQuery` (and `GetTableContents`, which reads the same
 endpoint through the same member) gets the fix by taking the adt-clients release that
@@ -54,7 +55,9 @@ carries it; the server's code does not change for it.
   begin with `*`.
 - **A literal is never split.** No break is ever placed inside a `'…'` or `` `…` ``
   literal (nor inside a comment); every literal of the statement appears in the sent
-  text byte-identical and on one line, whatever its length.
+  text byte-identical, whatever its length — a literal the caller wrote on one line
+  stays on one line, and line breaks the caller wrote inside a literal stay as they are
+  (none is inserted, none removed).
 - **Untouched when it fits.** A statement with no line whose code is longer than 72 characters goes on
   the wire as the caller's string, unchanged.
 - **No regular expression.** The statement is read by one linear scanner, character by
@@ -174,7 +177,9 @@ charset=utf-8`, read-only statements on `TDEVC`), **Code** (read in the source n
   character counting are not measured further; a 72-character line leaves a margin of
   more than three to one.
 - **Inference.** A token on a line of its own fits SAP's line whenever it is at most 255
-  characters (the field-list literal rows); one that is longer is SAP's to refuse.
+  characters (the field-list literal rows); one that is longer is SAP's to answer — SAP
+  refused the blank-free ones measured, and one with runs of blanks might be read once
+  SAP collapses them.
 - **Measured.** A comment that runs past 255 does no harm (the long-comment rows).
 
 ## Open for the spec
