@@ -137,7 +137,7 @@ section 1), else the resolved wire's, read as typed.
   The chain's failure is the failing step's failure as answered (`ChainAbandoned`,
   lines 95–98, 162–163) or `recogniseFailure`'s — the facts of that failing request: a step
   rejected `ADT_NOT_CONNECTED` after a marked one carries `sessionError`, not the earlier
-  step's `sessionLost`. Cleanups and rollbacks (`unwind`, lines 113–131) answer nothing to the
+  step's `sessionLost`. Cleanups and rollbacks (`unwind`, lines 107–123) answer nothing to the
   consumer — their failures are logged — so they carry nothing. `AdtMessageClassMessage`,
   built on `chain`, gets this with no change of its own.
 - **`getSystemInformation`** (`src/utils/systemInfo.ts`, one request, its own composition):
