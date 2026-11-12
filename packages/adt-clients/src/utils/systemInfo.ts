@@ -11,6 +11,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
 import type {
+  AdtSessionLoss,
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -22,6 +23,7 @@ import {
   failed,
   isUnansweredCredentialRefusal,
   recogniseFailure,
+  sessionLostOf,
   succeeded,
 } from './adtResponse';
 
@@ -126,6 +128,10 @@ export async function getSystemInformation<E extends IAdtError = IAdtError>(
   const request = { method: 'GET', url: SYSTEM_INFORMATION_URL };
   let wire: IAdtWireResponse | undefined;
   let verdict: IAdtError | AdtNoFailure = ADT_NO_FAILURE;
+  // The connection's mark of the one request this sends — on the refusal it
+  // threw, else on the answer it resolved — carried by every verdict built
+  // here and every success.
+  let lost: AdtSessionLoss | undefined;
 
   try {
     wire = await connection.makeAdtRequest({
@@ -138,9 +144,11 @@ export async function getSystemInformation<E extends IAdtError = IAdtError>(
       // Cache busting, as Eclipse sends it.
       params: { _: Date.now() },
     });
+    lost = wire.sessionLost;
   } catch (error: unknown) {
     if (isUnansweredCredentialRefusal(error)) throw error;
     wire = (error as { response?: IAdtWireResponse })?.response;
+    lost = sessionLostOf(error) ?? wire?.sessionLost;
     if (wire?.status !== 404) {
       const recognised = recogniseFailure(error);
       verdict = { ...recognised, request: recognised.request ?? request };
@@ -155,6 +163,7 @@ export async function getSystemInformation<E extends IAdtError = IAdtError>(
         message: `systeminformation answered ${wire.status}`,
         response: wire,
         request,
+        ...(lost === undefined ? {} : { sessionLost: lost }),
       };
     } else {
       body = objectOf(wire.data);
@@ -164,6 +173,7 @@ export async function getSystemInformation<E extends IAdtError = IAdtError>(
           message: `systeminformation answered ${wire.status} with a body that is not a JSON object`,
           response: wire,
           request,
+          ...(lost === undefined ? {} : { sessionLost: lost }),
         };
       }
     }
@@ -190,8 +200,8 @@ export async function getSystemInformation<E extends IAdtError = IAdtError>(
         : verdict) as E,
     );
   }
-  if (!isSuccessStatus(wire.status)) return succeeded({ present: false });
-  return succeeded({ present: true, info: recordOf(body) });
+  if (!isSuccessStatus(wire.status)) return succeeded({ present: false }, lost);
+  return succeeded({ present: true, info: recordOf(body) }, lost);
 }
 
 /**

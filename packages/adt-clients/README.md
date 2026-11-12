@@ -165,8 +165,8 @@ This package interacts with external packages **ONLY through interfaces**:
 
   | package | what this package takes from it |
   |---|---|
-  | [`@mcp-abap-adt/interfaces-adt`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt) `^26.0.0` | the ADT type tables (`ADT_TYPES_ONPREM`, `ADT_TYPES_CLOUD`, `ADT_TYPES_BASIS_740`) and their code types (`AdtTypeCode`, …), the ABAP Unit run registry (`ABAP_UNIT_RUN_TYPES`, `AbapUnitRunObjectType`, `AbapUnitRunTarget`), the capability atoms, every object's config, the result-set contracts, `IAdtAnsweredObject`, `IAdtResponse`, `IAnalyse`, `IAdtAnalyseOptions`, `IAdtHeaders`, `IResultStrategy`, `ADT_NO_FAILURE`, `ADT_TASK_TYPE` |
-  | [`@mcp-abap-adt/interfaces-adt-connection`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt-connection) `^4.0.0` | `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions`, the connection capability atoms, `ADT_SESSION_ERROR` |
+  | [`@mcp-abap-adt/interfaces-adt`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt) `^27.3.0` | the ADT type tables (`ADT_TYPES_ONPREM`, `ADT_TYPES_CLOUD`, `ADT_TYPES_BASIS_740`) and their code types (`AdtTypeCode`, …), the ABAP Unit run registry (`ABAP_UNIT_RUN_TYPES`, `AbapUnitRunObjectType`, `AbapUnitRunTarget`), the capability atoms, every object's config, the result-set contracts, `IAdtAnsweredObject`, `IAdtResponse`, `IAnalyse`, `IAdtAnalyseOptions`, `IAdtHeaders`, `IResultStrategy`, `ADT_NO_FAILURE`, `ADT_TASK_TYPE` |
+  | [`@mcp-abap-adt/interfaces-adt-connection`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt-connection) `^4.2.0` | `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions`, the connection capability atoms, `ADT_SESSION_ERROR`, `AdtSessionLoss` |
   | [`@mcp-abap-adt/interfaces-network`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-network) `^2.0.1` | `IWebSocketTransport` and its four companions, `HttpError` |
   | [`@mcp-abap-adt/interfaces-utils`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-utils) `^1.1.1` | `ILogger`, `LogLevel`, `XmlNode` |
   | [`@mcp-abap-adt/interfaces-auth`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-auth) `^7.5.0` — **dev only** | `IAuthProvider`, for the test helpers that open a session |
@@ -1056,9 +1056,13 @@ code, never from `message`:
 
 ```typescript
 if (!answer.ok && answer.getError().connectionCause !== undefined) {
-  // no answer came back: ECONNREFUSED, ENOTFOUND, ETIMEDOUT, …
+  // no answer came back: ECONNREFUSED, ENOTFOUND, ETIMEDOUT, EPIPE, …
 }
 ```
+
+`EPIPE` (since 45.4.0, interfaces-adt 27.3.0) is a write to a socket the
+server had already reset — measured on an established connection, where the
+request's write met the reset before any answer.
 
 **A connection failure carries what the RFC SDK said.** When the request
 failed in an RFC call and the thrown value carries the connection's `rfc`
@@ -1079,6 +1083,70 @@ if (!answer.ok && answer.getError().rfc?.codeString === 'RFC_CLOSED') {
   // the system closed the RFC conversation
 }
 ```
+
+**An answer says what the connection said about the SAP session** (since
+45.4.0, interfaces-adt 27.3.0). Two fields, read by field, never from
+`message`:
+
+- `sessionError` on a connection failure — the connection's session error
+  code the request was thrown with, one of `ADT_SESSION_ERROR`
+  (`@mcp-abap-adt/interfaces-adt-connection`): `ADT_NOT_CONNECTED` (the
+  connection has no usable session — never connected, torn down, or spent),
+  `ADT_SESSION_REPLACED`, `ADT_RELEASE_PENDING`. Any other code leaves it
+  absent; it is separate from `code`, which is a strategy's failure code.
+- `sessionLost` on a failure **and** on `getResult()` — the request the answer
+  answers was answered with the SAP session replaced
+  (`@mcp-abap-adt/connection` 23.0.0 marks such a stateless answer). The answer
+  is SAP's, a refusal or a value; the connection's session is gone with it, so
+  the next request on it answers `ADT_NOT_CONNECTED`. On a result it sits
+  beside `value`, so it reaches you whatever reading made the value.
+
+```typescript
+const answer = await debuggerApi.terminateDebugger();
+if (!answer.ok) {
+  const error = answer.getError();
+  if (
+    error.sessionError === ADT_SESSION_ERROR.NOT_CONNECTED ||
+    error.sessionError === ADT_SESSION_ERROR.SESSION_REPLACED ||
+    error.sessionLost !== undefined
+  ) {
+    // this connection is spent: drop what depended on it
+  }
+} else if (answer.getResult().sessionLost !== undefined) {
+  // the value stands; open a new connection for what comes next
+}
+```
+
+Each answer carries the facts of the **one request it answers**: a failure,
+those of the request its verdict was built from; a success, the mark of the
+answer it was read from. The thrown value is read as data — own properties
+only (a getter is never run), each compared with its list — and a refusal
+the connection layers over a frozen error keeps its mark. Where a member sends
+more than one request: a chain's success carries the mark of its last request,
+and its failure the failing request's facts; activation's read after a silent
+checklist is not the request the member answers, so its success's mark is not
+carried (its failure carries its own facts); each part of a batch carries the
+mark of the envelope it travelled in.
+
+**Your own `analyse` owns the failure it answers.** It receives the library's
+verdict, which carries these fields, and the answer, whose `sessionLost` is
+typed; the library never rewrites what it answers — a copy would drop a class
+instance's prototype. A strategy that answers a verdict of its own carries the
+fields itself, from the verdict it was given or from the answer:
+
+```typescript
+const analyse: IAnalyse = (verdict, answer) =>
+  verdict === ADT_NO_FAILURE
+    ? verdict
+    : { ...verdict, message: `ZCL_X: ${verdict.message}` }; // keeps sessionError, sessionLost
+```
+
+The verdict and the answer may come from different requests — activation's
+read after a silent checklist fails with that read's facts beside the
+activation's answer — so carry the mark of the request whose facts the
+failure states. The shipped strategies of `@mcp-abap-adt/adt-strategies`
+(0.22.3) do: `enrich` keeps the verdict's, a refusal read from a document
+takes the answer's.
 
 **What throws, and what does not.** The boundary is the cause. A failure caused
 by SAP's answer comes back through the strategies, with the response attached —
@@ -1528,7 +1596,7 @@ everything else is not.
 
 ### Single Definition Site: the contract packages
 
-Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^26.0.0`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^4.0.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the result-set contracts a factory accepts (`IClassResults`, …, since 38.0.0), the option and response types and the cross-cutting shared types all live there.
+Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^27.3.0`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^4.2.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the result-set contracts a factory accepts (`IClassResults`, …, since 38.0.0), the option and response types and the cross-cutting shared types all live there.
 
 **Import them from the package that owns them:**
 

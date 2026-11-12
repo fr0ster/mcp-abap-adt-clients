@@ -39,10 +39,15 @@ import {
   ADT_NO_FAILURE,
 } from '@mcp-abap-adt/interfaces-adt';
 import type {
+  AdtSessionErrorCode,
+  AdtSessionLoss,
   IAdtWireResponse,
   IRfcErrorInfo,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { RFC_RCS } from '@mcp-abap-adt/interfaces-adt-connection';
+import {
+  ADT_SESSION_ERROR,
+  RFC_RCS,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtSAPError } from './adtErrors';
 
 /**
@@ -55,10 +60,15 @@ import { AdtSAPError } from './adtErrors';
  */
 export function succeeded<T, E extends IAdtError = IAdtError>(
   value: T,
+  sessionLost?: AdtSessionLoss,
 ): IAdtResponse<T, E> {
+  // The connection's mark of the answer the value was read from, beside the
+  // value: it reaches the caller whatever reading made `value`. No key when
+  // there is no mark, so a result reads as it did before the mark existed.
+  const result = sessionLost === undefined ? { value } : { value, sessionLost };
   return {
     ok: true,
-    getResult: () => ({ value }),
+    getResult: () => result,
   };
 }
 
@@ -207,6 +217,58 @@ function rfcOf(error: unknown): IRfcErrorInfo | undefined {
   }
 }
 
+/** The connection's session error codes, as a list to compare with. */
+const SESSION_ERROR_CODES: ReadonlyArray<AdtSessionErrorCode> =
+  Object.values(ADT_SESSION_ERROR);
+
+/**
+ * The connection's session error code `error` was thrown with, when it is one
+ * of `ADT_SESSION_ERROR`; any other code, none, or a code that is not an own
+ * data property is `undefined`.
+ *
+ * Read like {@link connectionCauseOf}: by {@link ownValue} — a getter never
+ * runs — and found by comparison, so the answer is typed by the list itself.
+ * An inspection that throws (a Proxy's trap) is no code.
+ */
+function sessionErrorOf(error: unknown): AdtSessionErrorCode | undefined {
+  let code: unknown;
+  try {
+    code = ownValue(error, 'code');
+  } catch {
+    return undefined;
+  }
+  return SESSION_ERROR_CODES.find((listed) => listed === code);
+}
+
+/**
+ * The connection's `sessionLost` mark on what was thrown: SAP's refusal of a
+ * request whose answer showed the session replaced. Connection 23.0.0 sets it
+ * as an own data property — on the refusal itself, or on an object layered
+ * over a frozen refusal — so it is read by {@link ownValue} and kept only when
+ * it is `ADT_SESSION_REPLACED`. An inspection that throws is no mark.
+ */
+export function sessionLostOf(error: unknown): AdtSessionLoss | undefined {
+  let mark: unknown;
+  try {
+    mark = ownValue(error, 'sessionLost');
+  } catch {
+    return undefined;
+  }
+  return mark === ADT_SESSION_ERROR.SESSION_REPLACED ? mark : undefined;
+}
+
+/**
+ * The connection's `sessionLost` on an answer, as a field to spread — none when
+ * the answer carries no mark. The answer is the connection's
+ * `IAdtWireResponse`, typed by its contract, so the field is read as typed.
+ */
+export function markOf(
+  answer: IAdtWireResponse | undefined,
+): Pick<IAdtError, 'sessionLost'> {
+  const sessionLost = answer?.sessionLost;
+  return sessionLost === undefined ? {} : { sessionLost };
+}
+
 /**
  * The default error strategy: what this library recognises as a failure.
  *
@@ -225,6 +287,8 @@ function rfcOf(error: unknown): IRfcErrorInfo | undefined {
  */
 export function recogniseFailure(error: unknown): IAdtError {
   if (error instanceof AdtSAPError) {
+    // A refusal read from a 2xx document: the answer it was read from is the
+    // connection's `IAdtWireResponse`, typed, so its mark is read as typed.
     return {
       origin: 'refusal',
       message: error.message,
@@ -232,6 +296,7 @@ export function recogniseFailure(error: unknown): IAdtError {
       namespace: error.namespace,
       response: error.response,
       request: error.request,
+      ...markOf(error.response),
     };
   }
 
@@ -259,6 +324,13 @@ export function recogniseFailure(error: unknown): IAdtError {
   // Present whenever the thrown value carries a well-formed one, whatever else
   // it carries; absent otherwise (an HTTP wire's errors carry none).
   const rfc = rfcOf(error);
+  // What the connection said about the SAP session, by its fields, so a
+  // caller tells a spent connection without reading the message: the session
+  // code it was thrown with, and the mark of a refusal whose answer showed
+  // the session replaced. On a layered refusal only the mark is the object's
+  // own; its code is SAP's HTTP code, never a session code.
+  const sessionError = sessionErrorOf(error);
+  const sessionLost = sessionLostOf(error);
   return {
     origin: 'connection',
     message:
@@ -271,6 +343,8 @@ export function recogniseFailure(error: unknown): IAdtError {
     request: carried?.request,
     ...(connectionCause === undefined ? {} : { connectionCause }),
     ...(rfc === undefined ? {} : { rfc }),
+    ...(sessionError === undefined ? {} : { sessionError }),
+    ...(sessionLost === undefined ? {} : { sessionLost }),
   };
 }
 
@@ -376,10 +450,15 @@ export async function answeringExchange<T, E extends IAdtError = IAdtError>(
   let wire: IAdtWireResponse | undefined;
   let verdict: IAdtError | AdtNoFailure = ADT_NO_FAILURE;
   let context: IAdtAnalyseContext | undefined;
+  // The connection's mark of the member's own request: on the refusal it
+  // threw (connection 23.0.0 marks the error, not its response), else on the
+  // answer it resolved. A success read from that answer carries it.
+  let lost: AdtSessionLoss | undefined;
 
   try {
     const exchange = await run();
     wire = exchange.answer;
+    lost = wire.sessionLost;
     context = exchange.context;
     if (exchange.failure) verdict = exchange.failure;
   } catch (error: unknown) {
@@ -389,6 +468,7 @@ export async function answeringExchange<T, E extends IAdtError = IAdtError>(
     if (isUnansweredCredentialRefusal(error)) throw error;
     verdict = recogniseFailure(error);
     wire = (error as IWithResponse)?.response;
+    lost = sessionLostOf(error) ?? wire?.sessionLost;
   }
 
   // Two casts below, and one reason for both: `E` is only ever given a value by
@@ -426,7 +506,7 @@ export async function answeringExchange<T, E extends IAdtError = IAdtError>(
   }
 
   // Outside any catch, on purpose. The reading's own exception is the reading's.
-  return succeeded<T, E>(read(wire));
+  return succeeded<T, E>(read(wire), lost);
 }
 
 /**

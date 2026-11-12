@@ -38,7 +38,6 @@ describe('a connection failure names its cause by code', () => {
   });
 
   it.each([
-    'EPIPE',
     'ECONNABORTED',
     'ERR_BAD_RESPONSE',
     'CERT_HAS_EXPIRED',

@@ -17,8 +17,14 @@ import {
   type IAdtError,
   type IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
-import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
+import {
+  ADT_SESSION_ERROR,
+  type IAbapConnection,
+  type IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClient } from '../../../clients/AdtClient';
+import { answeringActivation } from '../../../utils/activationUtils';
+import { rawDocument } from '../../../utils/resultStrategy';
 import { headersOf } from '../../helpers/adtHeaders';
 import { readExchange } from '../../helpers/recordedConformance';
 import { CriticalSectionConnection } from '../../helpers/recordingConnection';
@@ -237,4 +243,87 @@ describe('every activation member reads after a silent checklist', () => {
       expect(seen[0]?.context?.activation?.named.length).toBeGreaterThan(0);
     },
   );
+});
+
+describe('the session mark: each answer names the request it is built from', () => {
+  /**
+   * Regression checks (interfaces-adt 27.3.0): the activation's answer and
+   * the read after it are two requests. A failure carries the facts of the
+   * request it was built from; a success the mark of the answer it was read
+   * from. After a marked answer connection 23.0.0 rejects every later request
+   * of the instance `ADT_NOT_CONNECTED`.
+   */
+  const REPLACED = ADT_SESSION_ERROR.SESSION_REPLACED;
+
+  function connectionAnswering(
+    activation: IAdtWireResponse,
+    inactive: IAdtWireResponse | Error,
+  ): IAbapConnection {
+    return {
+      connect: async () => undefined,
+      getBaseUrl: async () => undefined,
+      getSessionId: () => null,
+      setSessionType: () => undefined,
+      makeAdtRequest: async <T, D>(options: { url: string }) => {
+        const answer = options.url === INACTIVE ? inactive : activation;
+        if (answer instanceof Error) throw answer;
+        return answer as IAdtWireResponse<T, D>;
+      },
+    };
+  }
+
+  const activate = (connection: IAbapConnection) =>
+    connection.makeAdtRequest({
+      method: 'POST',
+      url: '/sap/bc/adt/activation',
+      timeout: 0,
+      data: `<adtcore:objectReference adtcore:uri="${GROUP}"/>`,
+    });
+
+  const spent = () =>
+    Object.assign(new Error('the session is gone'), {
+      code: ADT_SESSION_ERROR.NOT_CONNECTED,
+    });
+
+  it("a marked activation whose read is refused: the read's code, no mark", async () => {
+    const answer = await answeringActivation(
+      connectionAnswering({ ...SILENT, sessionLost: REPLACED }, spent()),
+      activate,
+      rawDocument,
+    );
+
+    expect(answer.ok).toBe(false);
+    if (answer.ok) return;
+    expect(answer.getError().sessionError).toBe(
+      ADT_SESSION_ERROR.NOT_CONNECTED,
+    );
+    expect('sessionLost' in answer.getError()).toBe(false);
+  });
+
+  it("cleared, the success carries the activation answer's mark", async () => {
+    const clears: IAnalyse = () => ADT_NO_FAILURE;
+    const answer = await answeringActivation(
+      connectionAnswering({ ...SILENT, sessionLost: REPLACED }, spent()),
+      activate,
+      rawDocument,
+      clears,
+    );
+
+    expect(answer.ok).toBe(true);
+    if (!answer.ok) return;
+    expect(answer.getResult().sessionLost).toBe(REPLACED);
+  });
+
+  it('a marked read after an unmarked activation: no mark on the answer', async () => {
+    const answer = await answeringActivation(
+      connectionAnswering(SILENT, { ...LISTED, sessionLost: REPLACED }),
+      activate,
+      rawDocument,
+      () => ADT_NO_FAILURE,
+    );
+
+    expect(answer.ok).toBe(true);
+    if (!answer.ok) return;
+    expect('sessionLost' in answer.getResult()).toBe(false);
+  });
 });

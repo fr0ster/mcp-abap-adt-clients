@@ -1510,9 +1510,21 @@ The other types send the handler's own request.
 `IAdtError` always carries `origin` and `message`; `code`, `adtType`,
 `namespace`, `response` and `request` are filled in as far as the error strategy
 could; a connection failure also carries `connectionCause` (a listed network
-code) and `rfc` (the RFC SDK's fields) when the thrown value named them
-(README, "A connection failure names its cause by code" and "A connection
-failure carries what the RFC SDK said"). `origin` is the part to act on, and there are two — both describing the
+code, `EPIPE` among them since 45.4.0) and `rfc` (the RFC SDK's fields) when
+the thrown value named them (README, "A connection failure names its cause by
+code" and "A connection failure carries what the RFC SDK said"). Since 45.4.0
+an answer also says what the connection said about the SAP session:
+`sessionError` on a connection failure (one of `ADT_SESSION_ERROR`, from the
+thrown value's own `code`), and `sessionLost` on a failure and on
+`getResult()` beside `value` (the request the answer answers was answered with
+the session replaced; connection 23.0.0). Each answer carries the facts of the
+one request it answers — a chain's success the mark of its last request, a
+batch part the envelope's, activation's read after a silent checklist only
+when it fails. An `analyse` of your own that answers its own verdict carries
+the fields itself (`{ ...verdict, … }`); the library never rewrites it, and
+when the verdict and the answer come from different requests it carries the
+mark of the request whose facts it states (README, "An answer says what the
+connection said about the SAP session"). `origin` is the part to act on, and there are two — both describing the
 server, because that is the only thing this contract is a verdict about:
 
 | origin | what happened | remedy |

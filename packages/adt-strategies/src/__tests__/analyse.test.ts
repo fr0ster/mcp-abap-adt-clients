@@ -3,7 +3,10 @@ import {
   type IAdtAnalyseContext,
   type IAdtError,
 } from '@mcp-abap-adt/interfaces-adt';
-import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
+import {
+  ADT_SESSION_ERROR,
+  type IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   analyseActivation,
   analyseAny,
@@ -14,6 +17,8 @@ import {
   analyseException,
   analysePublicationLock,
   analyseUnitTest,
+  analyseUnitTestStart,
+  analyseUnsupportedStatus,
   analyseValidation,
   type IAdtActivationFailure,
   type IAdtMessageFailure,
@@ -798,5 +803,87 @@ describe('analyseAny hands an activation its facts', () => {
     expect(verdict !== ADT_NO_FAILURE && verdict.message).toContain(
       'the inactive list still names',
     );
+  });
+});
+
+describe('the SAP session mark', () => {
+  /**
+   * A refusal read from a 2xx answer is built here, from the answer: the
+   * connection's `sessionLost` on that answer (interfaces-adt-connection 4.2.0)
+   * is copied onto it, so a consumer reads it by field. A verdict the library
+   * reached is enriched by spreading, so its session fields survive as they
+   * came.
+   */
+  const marked = (answer: IAdtWireResponse): IAdtWireResponse => ({
+    ...answer,
+    sessionLost: ADT_SESSION_ERROR.SESSION_REPLACED,
+  });
+
+  it('a refusal read from a marked answer carries sessionLost', () => {
+    const verdict = failed(
+      analyseException(
+        ADT_NO_FAILURE,
+        marked(answerFor('refusal-lock-held-by-other')),
+      ),
+    );
+    expect(verdict.sessionLost).toBe(ADT_SESSION_ERROR.SESSION_REPLACED);
+  });
+
+  it('a refusal read from an unmarked answer has no sessionLost key', () => {
+    const verdict = failed(
+      analyseException(ADT_NO_FAILURE, answerFor('refusal-lock-held-by-other')),
+    );
+    expect('sessionLost' in verdict).toBe(false);
+  });
+
+  it('a unit-test start without a run id, marked, carries sessionLost', () => {
+    const answer = {
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      data: '',
+      sessionLost: ADT_SESSION_ERROR.SESSION_REPLACED,
+    } as IAdtWireResponse;
+    const verdict = failed(analyseUnitTestStart(ADT_NO_FAILURE, answer));
+    expect(verdict.sessionLost).toBe(ADT_SESSION_ERROR.SESSION_REPLACED);
+  });
+
+  it('a unit-test start without a run id, unmarked, has no sessionLost key', () => {
+    const answer = {
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      data: '',
+    } as IAdtWireResponse;
+    const verdict = failed(analyseUnitTestStart(ADT_NO_FAILURE, answer));
+    expect('sessionLost' in verdict).toBe(false);
+  });
+
+  const libraryVerdict: IAdtError = {
+    origin: 'connection',
+    message: 'Request failed with status code 403',
+    sessionError: ADT_SESSION_ERROR.SESSION_REPLACED,
+    sessionLost: ADT_SESSION_ERROR.SESSION_REPLACED,
+  };
+
+  it('enriching the library verdict keeps its session fields', () => {
+    const verdict = failed(
+      analyseException(libraryVerdict, answerFor('refusal-lock-held-by-other')),
+    );
+    expect(verdict.sessionError).toBe(ADT_SESSION_ERROR.SESSION_REPLACED);
+    expect(verdict.sessionLost).toBe(ADT_SESSION_ERROR.SESSION_REPLACED);
+  });
+
+  it('renaming an unsupported status keeps the session fields', () => {
+    const verdict = failed(
+      analyseUnsupportedStatus([403], 'this resource')(libraryVerdict, {
+        status: 403,
+        statusText: 'Forbidden',
+        headers: {},
+        data: '',
+      } as IAdtWireResponse),
+    );
+    expect(verdict.sessionError).toBe(ADT_SESSION_ERROR.SESSION_REPLACED);
+    expect(verdict.sessionLost).toBe(ADT_SESSION_ERROR.SESSION_REPLACED);
   });
 });

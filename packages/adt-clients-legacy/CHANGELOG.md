@@ -4,6 +4,19 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [0.9.3] - 2026-11-12
+
+Released with `@mcp-abap-adt/adt-clients` 45.4.0.
+
+### Changed
+
+- **The `@mcp-abap-adt/adt-clients` range is `^45.4.0`** (was `^45.1.0`),
+  peer and dev, so the legacy classes — which answer through adt-clients'
+  `answering` — are promised the verdicts that carry `sessionError` and
+  `sessionLost`. `@mcp-abap-adt/interfaces-adt` `^27.3.0` (was `^27.2.0`),
+  `@mcp-abap-adt/interfaces-adt-connection` `^4.2.0` (was `^4.1.0`), and the
+  `@mcp-abap-adt/adt-strategies` devDependency `^0.22.3`. No member changes.
+
 ## [0.9.2] - 2026-11-11
 
 Released with `@mcp-abap-adt/adt-clients` 45.2.0.

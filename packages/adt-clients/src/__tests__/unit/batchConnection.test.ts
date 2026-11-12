@@ -716,3 +716,73 @@ describe('an envelope that fails as a whole', () => {
     expect(a.cause).toBe(failure);
   });
 });
+
+describe("the envelope answer's session mark", () => {
+  // Each part's request travelled in the envelope, so the envelope's answer
+  // is its answer: a mark on it (connection 23.0.0) marks every part.
+  const REPLACED = 'ADT_SESSION_REPLACED' as const;
+
+  async function partsOf(marked: boolean) {
+    const { batch, send } = fixture([200, 500]);
+    const single = await send({});
+    send.mockClear();
+    // The fixture's mock is typed by its first answer; a marked one is that
+    // answer with the connection's own field beside it.
+    send.mockResolvedValue(
+      (marked ? { ...single, sessionLost: REPLACED } : single) as typeof single,
+    );
+    const settled = [
+      batch.makeAdtRequest(req),
+      batch.makeAdtRequest({ ...req, url: '/test2' }),
+    ].map((p) =>
+      p.then(
+        (answer) => answer,
+        (error: unknown) => error,
+      ),
+    );
+    await batch.execute();
+    return Promise.all(settled);
+  }
+
+  it('a marked envelope marks the resolved part and the refused part', async () => {
+    const [answer, refusal] = await partsOf(true);
+
+    expect((answer as IAdtWireResponse).status).toBe(200);
+    expect((answer as IAdtWireResponse).sessionLost).toBe(REPLACED);
+    expect(refusal).toBeInstanceOf(Error);
+    expect((refusal as { sessionLost?: unknown }).sessionLost).toBe(REPLACED);
+    expect((refusal as { response?: IAdtWireResponse }).response?.status).toBe(
+      500,
+    );
+  });
+
+  it('an unmarked envelope marks no part', async () => {
+    const [answer, refusal] = await partsOf(false);
+
+    expect('sessionLost' in (answer as object)).toBe(false);
+    expect('sessionLost' in (refusal as object)).toBe(false);
+  });
+
+  it('an envelope rejected with a marked refusal rejects every part with that object', async () => {
+    const { batch, send } = fixture();
+    const failure = Object.assign(
+      new Error('Request failed with status code 400'),
+      {
+        response: { status: 400, statusText: 'x', headers: {}, data: '' },
+        sessionLost: REPLACED,
+      },
+    );
+    send.mockRejectedValueOnce(failure);
+    const settled = [batch.makeAdtRequest(req), batch.makeAdtRequest(req)].map(
+      (p) => p.catch((error: unknown) => error),
+    );
+
+    await expect(batch.execute()).rejects.toBe(failure);
+    const errors = await Promise.all(settled);
+
+    for (const error of errors) {
+      expect(error).toBe(failure);
+      expect((error as { sessionLost?: unknown }).sessionLost).toBe(REPLACED);
+    }
+  });
+});

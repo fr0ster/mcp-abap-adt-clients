@@ -14,6 +14,25 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.22.3] - 2026-11-12
+
+Released with `@mcp-abap-adt/adt-clients` 45.4.0.
+
+### Added
+
+- **A refusal read from a marked answer carries `sessionLost`.** The
+  failures this package builds from a document on a successful answer — every
+  `analyser` reading (`asFailure`) and `analyseUnitTestStart`'s missing run
+  id — copy the answer's `sessionLost` (the connection marked it with the SAP
+  session replaced; `@mcp-abap-adt/interfaces-adt-connection` 4.2.0), and
+  only when it is there. A verdict the library reached first is enriched by
+  spreading, as before, so its `sessionError` and `sessionLost` come through.
+
+### Changed
+
+- **On `@mcp-abap-adt/interfaces-adt` `^27.3.0`** (was `^27.2.0`) and
+  **`@mcp-abap-adt/interfaces-adt-connection` `^4.2.0`** (was `^4.1.0`).
+
 ## [0.22.2] - 2026-11-11
 
 Released with `@mcp-abap-adt/adt-clients` 45.2.0.

@@ -7,6 +7,7 @@
  * on the server and the session stateful, and nothing would say so.
  */
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { chain } from '../../../core/shared/chain';
 import { failed, succeeded } from '../../../utils/adtResponse';
@@ -117,5 +118,82 @@ describe('chain', () => {
     expect(answer.ok).toBe(true);
     if (!answer.ok) throw new Error('expected a result');
     expect(answer.getResult().value).toBe('one+two');
+  });
+});
+
+describe('chain: the session mark', () => {
+  /**
+   * After a marked answer connection 23.0.0 rejects every later request of
+   * the instance `ADT_NOT_CONNECTED`, so a chain that succeeds after a marked
+   * step has it as the last request it judged; a chain that fails answers the
+   * facts of the failing request.
+   */
+  const REPLACED = ADT_SESSION_ERROR.SESSION_REPLACED;
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it("a marked last step: the chain's success carries the mark", async () => {
+    const answer = await chain(logger, async ({ step }) => {
+      await step(Promise.resolve(succeeded('locked')));
+      return step(Promise.resolve(succeeded('written', REPLACED)));
+    });
+
+    expect(answer.ok).toBe(true);
+    if (!answer.ok) throw new Error('expected a success');
+    expect(answer.getResult()).toEqual({
+      value: 'written',
+      sessionLost: REPLACED,
+    });
+  });
+
+  it("no marked step: no key on the chain's result", async () => {
+    const answer = await chain(logger, async ({ step }) =>
+      step(Promise.resolve(succeeded('written'))),
+    );
+
+    if (!answer.ok) throw new Error('expected a success');
+    expect('sessionLost' in answer.getResult()).toBe(false);
+  });
+
+  it("a marked step, then a step refused ADT_NOT_CONNECTED: the failing request's facts", async () => {
+    const answer = await chain(logger, async ({ step }) => {
+      await step(Promise.resolve(succeeded('locked', REPLACED)));
+      return step(
+        Promise.resolve(
+          failed<string>({
+            origin: 'connection',
+            message: 'the session is gone',
+            sessionError: ADT_SESSION_ERROR.NOT_CONNECTED,
+          }),
+        ),
+      );
+    });
+
+    expect(answer.ok).toBe(false);
+    if (answer.ok) throw new Error('expected a failure');
+    expect(answer.getError().sessionError).toBe(
+      ADT_SESSION_ERROR.NOT_CONNECTED,
+    );
+    expect('sessionLost' in answer.getError()).toBe(false);
+  });
+
+  it('a cleanup refused ADT_NOT_CONNECTED after a successful chain: the success as it was, the cleanup logged', async () => {
+    const answer = await chain(logger, async ({ step, onScopeEnd }) => {
+      onScopeEnd(async () => {
+        throw Object.assign(new Error('the session is gone'), {
+          code: ADT_SESSION_ERROR.NOT_CONNECTED,
+        });
+      });
+      return step(Promise.resolve(succeeded('written', REPLACED)));
+    });
+
+    if (!answer.ok) throw new Error('expected a success');
+    expect(answer.getResult()).toEqual({
+      value: 'written',
+      sessionLost: REPLACED,
+    });
+    expect(logger.warn).toHaveBeenCalledWith('cleanup failed', {
+      error: 'the session is gone',
+    });
   });
 });
