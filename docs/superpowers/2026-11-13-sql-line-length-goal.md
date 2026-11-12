@@ -3,25 +3,34 @@
 ## Goal
 
 `AdtUtils.getSqlQuery` (`@mcp-abap-adt/adt-clients`) posts the caller's statement to
-`POST /sap/bc/adt/datapreview/freestyle?rowNumber=…` as it was given. SAP cuts every line
-of that statement at 255 characters and drops the rest of the line without a word. A
-statement with a line longer than 255 characters therefore either fails — a string literal
+`POST /sap/bc/adt/datapreview/freestyle?rowNumber=…` as it was given. SAP keeps at most 255 characters of each line —
+counted after it has collapsed the line's whitespace — and drops the rest of the line
+without a word (the measurements below; the model is an inference from them). A
+statement with a line whose code runs past that mark therefore either fails — a string literal
 cut in two (`ExceptionDataPreviewGeneral`, "The text literal … is longer than 255
 characters", mcp-abap-adt#350), a keyword cut in two, a closing parenthesis lost — or,
 worse, runs **with part of its text gone** and answers rows the caller did not ask for.
 
 After this change:
 
-1. **A statement whose every line fits is sent exactly as given**, byte for byte.
-2. **A statement with a line longer than 255 characters is sent with line breaks placed
-   so that no line is longer than 255 characters**, every break placed between tokens —
-   never inside a string literal, never inside a comment, never where it would turn code
-   into a comment. Only the placement of whitespace changes; what SAP executes is the
-   statement the caller wrote.
+1. **A statement whose every line fits is sent exactly as given**, byte for byte. A line
+   fits when its code — everything before a comment that ends the line — is at most 255
+   characters, counted as given; the comment itself may run past 255 (SAP drops only
+   comment text there: measured harmless).
+2. **A statement with a line that does not fit is sent with line breaks placed so that
+   every line fits**, each break placed at whitespace or right after a comma — never
+   inside a string literal, never inside a comment, never where it would turn code into a
+   comment. Only the placement of whitespace changes; what SAP executes is the statement
+   the caller wrote. A statement whose tokens each fit is never refused for want of a
+   break point: the commas of a compact `IN ('…','…')` list are break points.
 3. **A statement that cannot be laid out so** — a token (a string literal with its
-   delimiters, above all) longer than 255 characters — **is refused before any request**,
+   delimiters, above all) longer than 255 characters, or a line whose code before the
+   first possible break is longer — **is refused before any request**,
    as a failure of the member's answer carrying fixed words of the library's, not SAP's
    message and not the statement's text.
+4. **A statement with a `"` inside a string literal is sent as given**, never laid out:
+   SAP refuses it today (measured) for a reason the layout cannot repair, and the library
+   neither guesses which reading SAP takes nor answers for SAP.
 
 The mcp-abap-adt server's `GetSqlQuery` (and `GetTableContents`, which reads the same
 endpoint through the same member) gets the fix by taking the adt-clients release that
@@ -36,12 +45,14 @@ carries it; the server's code does not change for it.
   string literal or a comment is touched, added or removed; no token is added, removed,
   reordered, re-cased or rewritten; no comment is moved off its line. A break is never
   placed so that a line begins (after its leading whitespace) with `*`.
-- **Untouched when it fits.** A statement with no line longer than 255 characters goes on
-  the wire as the caller's string, unchanged.
+- **Untouched when it fits.** A statement whose every line fits (goal item 1), and one
+  with a `"` inside a literal (goal item 4), goes on the wire as the caller's string,
+  unchanged.
 - **No regular expression.** The statement is read by one linear scanner, character by
   character, that knows the string literals (`'…'` with `''` inside, `` `…` `` with
-  ` `` ` inside) and the comments (`"` to the end of the line, a line whose first
-  non-blank character is `*`) as SAP reads them.
+  ` `` ` inside) and the comments (`"` outside a literal to the end of the line, a line
+  whose first non-blank character is `*`). A `"` it meets inside a literal makes the
+  statement one that is sent as given (goal item 4).
 - **Static types first.** The statement is typed by the contract (`IGetSqlQueryParams`
   from `@mcp-abap-adt/interfaces-adt`, `sql_query: string`); the layout is a typed
   function from string to its result. No cast, `any`, non-null `!`, `@ts-ignore` or
@@ -133,37 +144,41 @@ charset=utf-8`, read-only statements on `TDEVC`), **Code** (read in the source n
 - **Inference.** A line break between tokens does not change what SAP executes: the lines
   are joined with a space. A line break inserted where there was no whitespace — after the
   comma of an `IN` list — works (the LF/CRLF/CR rows).
-- **Measured.** A line holds at most 255 characters; a string literal of more than 253
-  characters between its quotes (255 with them) cannot be sent on any line.
-- **Measured.** SAP reads a `"` as the start of a comment wherever it stands on the line,
-  inside a string literal too; and a line whose first non-blank character is `*` is a
-  comment, so a break before a `*` (`SELECT *`, `COUNT(*)`) changes the statement.
+- **Measured.** A line of 255 characters is read whole and one of 256 is not, when the
+  256th character is code (the 255/256 rows); a field-list literal of 253 characters
+  between its quotes (255 with them) alone on its line is answered, one of 254 (256) is
+  refused, `'…'` and `` `…` `` alike.
+- **Inference.** No string literal longer than 255 characters with its delimiters can be
+  sent on any line, since a line keeps at most 255 characters after collapsing and a
+  literal's own characters are no fewer than its non-blank ones.
+- **Measured.** A `"` inside a `'…'` or `` `…` `` literal makes SAP refuse the statement
+  (the three `"`-inside rows). **Inference:** SAP reads that `"` as a comment start (the
+  message of the two-line row shows line 1 cut at the `"`).
+- **Measured.** A line whose first non-blank character is `*` is a comment, and a break
+  before a `*` (`SELECT *`, `COUNT(*)`) breaks the statement (the 500 rows).
 
 ### The rule the fix follows
 
-Count each line of the statement (separated by LF, CRLF or CR) in characters, as given —
-without relying on SAP's collapsing of whitespace, so the count is never below SAP's. When
-a line is longer than 255 characters, break it between tokens — at whitespace, or after a
-comma — outside string literals and outside comments, never before a `*`, so that every
-line holds at most 255 characters; a comment stays on the line it began on. A token that
+Count the code of each line of the statement (lines separated by LF, CRLF or CR; the code
+is what comes before a comment that ends the line) in characters, as given — the library
+deliberately does not rely on SAP's collapsing of whitespace, so its count is never below
+SAP's and it may break a line SAP would have read whole, which changes nothing. When a
+line's code is longer than 255 characters, break it at whitespace or right after a comma,
+outside string literals and outside comments, never before a `*`, so that every line's
+code holds at most 255 characters; a comment stays on the line it began on. A token that
 alone is longer than 255 characters (a string literal with its delimiters, above all)
-cannot be laid out, and the statement is refused before any request.
+cannot be laid out, and the statement is refused before any request. A statement with a
+`"` inside a literal is sent as given.
 
 ## Open for the spec
 
-- **The break points.** Whitespace only, or also after `,` and around `(` / `)` where the
-  caller wrote no whitespace (the issue's `IN ('…','…')` list has none); which other token
-  boundaries without whitespace are safe in ABAP SQL (`a=b`, `@var`, `~`, `->`), each
-  measured.
+- **Further break points.** Beyond whitespace and after a comma (required by the goal):
+  whether `(` / `)` and other token boundaries without whitespace are break points
+  (`a=b`, `@var`, `~`, `->`), each measured before it is used.
 - **Where on a line to break.** The last break point at or before 255 (fewest lines), or
   every break point once a line is too long; what a broken line's continuation starts with
   (an LF and nothing, or the original whitespace kept); which separator the library writes
   (LF, or the separator the statement already uses).
-- **The `"` inside a literal.** SAP reads it as a comment start even inside a literal and
-  refuses the statement today. Whether the scanner reads `"` as SAP does (the rest of the
-  line is a comment, never broken) or as a literal character (then the statement is
-  refused by SAP as today, and the layout must not make it different), and whether such a
-  statement is laid out at all.
 - **How characters are counted.** UTF-16 code units (JavaScript's `length`) or code
   points; whether SAP counts a character outside the Basic Multilingual Plane as one or
   two — measured.
@@ -175,9 +190,6 @@ cannot be laid out, and the statement is refused before any request.
 - **`getTableContents` (`/datapreview/ddic`).** It posts a caller's statement the same
   way; whether the same limit applies there (to be measured) and whether the same layout
   goes in, in this change.
-- **A comment line longer than 255 characters**, and a code line ending with a long
-  comment: measured harmless when the cut falls inside the comment; whether the layout
-  leaves such a line alone.
 - **The evidence.** Unit tests of the scanner and the layout (every measured row above,
   each break point and each refusal), the request's body pinned at the connection stub,
   and a live run of the issue's statement and of the silently truncated one through the
