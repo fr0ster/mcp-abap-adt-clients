@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    // The legacy classes are checked under the option their consumers
+    // compile with. The typechecks import both packages by their names, so
+    // they read the built declarations (no `paths` to the root's source, as
+    // tsconfig.test.json has): what a consumer of the published packages sees.
+    "exactOptionalPropertyTypes": true
+  },
+  "include": ["src/__tests__/typechecks/exact/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

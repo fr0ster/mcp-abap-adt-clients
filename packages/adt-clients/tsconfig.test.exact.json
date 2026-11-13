@@ -6,11 +6,17 @@
     "rootDir": "..",
     // The fields this package declares `?: T | undefined` are checked under
     // the option their consumers compile with. The typechecks import the
-    // package by its name, so they read the built declarations (skipLibCheck)
-    // and the package's own sources, written without the option, are not
-    // part of this program.
-    "exactOptionalPropertyTypes": true
+    // package by its name, so they read the built declarations and the
+    // package's own sources, written without the option, are not part of
+    // this program.
+    "exactOptionalPropertyTypes": true,
+    // The built declarations are checked themselves, not only read: a class
+    // declaration keeps its `implements` clause, so every class is checked
+    // here against the interfaces-adt contracts it claims, as a consumer
+    // compiling with the option sees it. The declarations this program
+    // reads from node_modules are checked under the option too.
+    "skipLibCheck": false
   },
-  "include": ["src/__tests__/typechecks/exact/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["dist/**/*.d.ts", "src/__tests__/typechecks/exact/**/*"],
+  "exclude": ["node_modules"]
 }

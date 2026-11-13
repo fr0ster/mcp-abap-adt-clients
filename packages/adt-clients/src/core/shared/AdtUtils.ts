@@ -601,7 +601,7 @@ export class AdtUtils<
    */
   async getActivationRun<E extends IAdtError = IAdtError>(
     runId: string,
-    options?: { withLongPolling?: boolean } & IAdtAnalyseOptions<E>,
+    options?: { withLongPolling?: boolean | undefined } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['run'], E>> {
     return answering(
       () =>
