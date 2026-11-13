@@ -38,6 +38,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   `skipLibCheck: false`), so every class's `implements` clause is checked
   against the contracts it claims as such a consumer compiles them; this was
   the one mismatch it found.
+- **`getSqlQuery` keeps a long one-line statement whole**
+  (mcp-abap-adt#350). The freestyle preview keeps 255 characters of each line
+  and drops the rest without a word (measured on premise): a literal crossing
+  the mark answered `400` ("The text literal … is longer than 255
+  characters"), and a condition past it was silently lost — one row answered
+  where none was right. The member now sends the statement with every line
+  whose code is longer than 72 characters wrapped: at a run of blanks or right
+  after a comma, never inside a `'…'` or `` `…` `` literal or a `"` comment,
+  never before a `*` or a comment. A statement that fits is sent as given;
+  nothing is refused. Measured live after the change: the long line, the
+  condition past 255 and a 100-character literal inside `concat( )` all
+  answer correctly. `getTableContents` (`/datapreview/ddic` reads a long line
+  whole, measured) is unchanged.
 
 ## [45.5.0] - 2026-11-12
 
