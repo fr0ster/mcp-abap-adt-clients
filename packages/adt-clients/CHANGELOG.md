@@ -24,6 +24,21 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [45.5.1] - 2026-11-13
+
+### Fixed
+
+- **`AdtUtils.getActivationRun` meets interfaces-adt's `IAdtGroupLifecycle`
+  under `exactOptionalPropertyTypes`.** Its `withLongPolling` option is
+  declared `?: boolean | undefined`, as the contract declares it since
+  interfaces-adt 27.4.0; it was `?: boolean`, so a consumer compiling with
+  the option saw `AdtUtils` not meet the `Pick<IAdtGroupLifecycle, …>` it
+  implements. Types only; nothing sent changes. `npm run test:check` now
+  checks the built declarations under the option (`tsconfig.test.exact.json`,
+  `skipLibCheck: false`), so every class's `implements` clause is checked
+  against the contracts it claims as such a consumer compiles them; this was
+  the one mismatch it found.
+
 ## [45.5.0] - 2026-11-12
 
 ### Changed

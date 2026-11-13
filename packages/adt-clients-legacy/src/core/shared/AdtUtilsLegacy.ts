@@ -403,7 +403,9 @@ export class AdtUtilsLegacy<
    */
   override async getActivationRun<E extends IAdtError = IAdtError>(
     _runId: string,
-    _options?: { withLongPolling?: boolean } & IAdtAnalyseOptions<E>,
+    _options?: {
+      withLongPolling?: boolean | undefined;
+    } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['run'], E>> {
     return legacyRefusal<T['run'], E>(
       'getActivationRun',
