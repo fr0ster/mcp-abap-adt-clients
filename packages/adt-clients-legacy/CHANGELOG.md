@@ -4,6 +4,23 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [Unreleased] - 2026-11-13
+
+### Fixed
+
+- **`AdtUtilsLegacy.getActivationRun` takes the option its root member
+  takes**: `withLongPolling?: boolean | undefined`, as `AdtUtils` declares it
+  from `@mcp-abap-adt/adt-clients` 45.5.1 and interfaces-adt's
+  `IAdtGroupLifecycle` declares it. It was `?: boolean`, so under
+  `exactOptionalPropertyTypes` the class `getUtils()` hands out did not meet
+  the contract its root class implements (the `extends` check compares
+  methods bivariantly and let it through). Types only; the member is still
+  refused without a request. `npm run test:check` now compiles
+  `src/__tests__/typechecks/exact/` under the option against the built
+  declarations (`tsconfig.test.exact.json`): every member of every class
+  `AdtClientLegacy` and `AdtExecutorLegacy` hand out must accept what its
+  root member accepts.
+
 ## [0.9.4] - 2026-11-12
 
 Released with `@mcp-abap-adt/adt-clients` 45.5.0.
