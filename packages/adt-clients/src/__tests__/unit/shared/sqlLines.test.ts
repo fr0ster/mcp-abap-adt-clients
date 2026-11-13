@@ -274,6 +274,20 @@ const CASES: WrapCase[] = [
     expected: null,
   },
   {
+    // 73 UTF-16 code units, 72 code points: counted by `length`, so wrapped.
+    name: 'a character outside the BMP in a line of 73 code units',
+    input: `SELECT devclass FROM tdevc WHERE devclass = '\u{1F600}${'X'.repeat(25)}'`,
+    expected: [
+      'SELECT devclass FROM tdevc WHERE devclass =',
+      `'\u{1F600}${'X'.repeat(25)}'`,
+    ],
+  },
+  {
+    name: 'an empty statement',
+    input: '',
+    expected: null,
+  },
+  {
     name: 'Ä in a line of 73',
     input:
       "SELECT devclass FROM tdevc WHERE devclass = 'ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ'",
