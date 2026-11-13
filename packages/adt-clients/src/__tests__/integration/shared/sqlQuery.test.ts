@@ -25,6 +25,7 @@ import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { integrationHeadersOf } from '../../helpers/adtHeaders';
 import { gate, missingCaseMessage } from '../../helpers/caseGate';
 import { expectResult } from '../../helpers/contract';
+import { recordRequests } from '../../helpers/requestRecorder';
 import {
   createTestAdtClient,
   createTestConnection,
@@ -33,7 +34,6 @@ import {
 } from '../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import { createTestsLogger } from '../../helpers/testLogger';
-import { recordRequests } from '../../helpers/requestRecorder';
 import { logTestStep } from '../../helpers/testProgressLogger';
 
 const { withAcceptHandling } = require('../../helpers/test-helper');
