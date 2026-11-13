@@ -2887,6 +2887,27 @@ sql_query:
       params:
         # sql_query: Uses standard_objects.tables (T000 for onprem) if not specified - will be "SELECT * FROM T000"
 
+    # mcp-abap-adt#350: the freestyle preview keeps 255 characters of a line and
+    # drops the rest; getSqlQuery wraps a long line at 72. The statements are
+    # built in the test, over TDEVC (package names, read-only).
+    - name: "execute_sql_query_long_line"
+      enabled: true
+      available_in: ["onprem"]
+      description: "A one-line IN list whose '$TMP' item spans column 255: answered with the $TMP row once wrapped."
+      params: {}
+
+    - name: "execute_sql_query_tail_past_255"
+      enabled: true
+      available_in: ["onprem"]
+      description: "IN (...) closed at 255, then AND devclass = 'NOPE' past it: no row, the condition kept."
+      params: {}
+
+    - name: "execute_sql_query_concat_long_literal"
+      enabled: true
+      available_in: ["onprem"]
+      description: "concat('<100-character literal>','B') on one line under 255: the same row before and after the wrap."
+      params: {}
+
 # Runtime dumps read operations (AdtRuntimeClient)
 runtime_debugger:
   test_cases:
