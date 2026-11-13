@@ -157,7 +157,7 @@ Files: `packages/adt-clients/src/__tests__/helpers/test-config.yaml.template`
    credentials, which is not project tooling: `401` with the realm naming the on-premise
    system — and
    run only this file from the worktree, in `packages/adt-clients`:
-   `DEBUG_ADT_TESTS=true MCP_ENV_PATH=~/.config/mcp-abap-adt/sessions/e19-tunnel.env MCP_TEST_OVERLAY=<the main checkout's packages/adt-clients/src/__tests__/helpers/test-config.overlay.e19.yaml, absolute> npm test -- src/__tests__/integration/shared/sqlQuery.test.ts`.
+   `DEBUG_ADT_TESTS=true MCP_ENV_PATH=<the on-premise system's session file under ~/.config/mcp-abap-adt/sessions/> MCP_TEST_OVERLAY=<the main checkout's per-system overlay for the on-premise system, packages/adt-clients/src/__tests__/helpers/test-config.overlay.<system>.yaml, absolute> npm test -- src/__tests__/integration/shared/sqlQuery.test.ts`.
    `DEBUG_ADT_TESTS=true` switches on the test logger (`createTestsLogger()` is silent
    without it), so the evidence of item 1 reaches the run's log. The cases come from the
    tracked template (item 1); the overlay is the existing

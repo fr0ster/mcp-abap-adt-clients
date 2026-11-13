@@ -144,7 +144,7 @@ broken.
 Unit tests (Jest, as every adt-clients unit test today), no SAP.
 
 - **`src/__tests__/unit/shared/sqlLines.test.ts`** — `wrapSqlLines` alone:
-  - the issue's statement (334 characters, `IN ('AAA…',…,'GGG…','Z_FLIGHT_ADDITIONAL')`):
+  - the issue's statement (299 characters, `IN ('AAA…',…,'GGG…','Z_FLIGHT_ADDITIONAL')`):
     the exact expected output string (each break right after the comma that is the last
     one at or before 72); properties 2 and 3;
   - the greedy choice, each with its exact expected output: a blank run and a comma both

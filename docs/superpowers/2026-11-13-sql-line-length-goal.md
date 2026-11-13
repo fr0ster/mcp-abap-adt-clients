@@ -107,7 +107,7 @@ charset=utf-8`, read-only statements on `TDEVC`), **Code** (read in the source n
 
 | Case | Status | SAP's answer |
 |---|---|---|
-| The issue's statement, one line of 334 characters (literal `'GGG…'` at 245–276) | 400 | `The text literal "'GGGGGGGGGG   INTO     TABL..." is longer than 255 characters.` |
+| The issue's statement, one line of 299 characters (literal `'GGG…'` at 245–276) | 400 | `The text literal "'GGGGGGGGGG   INTO     TABL..." is longer than 255 characters.` |
 | The same, LF before `'GGG…'` (after the comma) | 200 | the expected row |
 | The same, CRLF / CR alone before `'GGG…'` | 200 / 200 | the expected row |
 | One line of 255 characters, its `)` at 255 | 200 | the expected row |
