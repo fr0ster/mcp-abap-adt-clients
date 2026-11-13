@@ -12,6 +12,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { requestHeaders } from '../../utils/requestHeaders';
+import { wrapSqlLines } from './sqlLines';
 import type { IGetSqlQueryParams } from './types';
 
 /**
@@ -22,6 +23,11 @@ import type { IGetSqlQueryParams } from './types';
  * the caller's, set on the connection it hands in. Until 31.0.0 this set the
  * library's own long deadline (120 s by default), which a caller applying its
  * own deadline only where the request had none never got to.
+ *
+ * **The statement is sent wrapped at 72** ({@link wrapSqlLines}): the preview
+ * keeps 255 characters of each line and drops the rest without a word, so a
+ * long one-line statement lost its literal or its condition (mcp-abap-adt#350).
+ * Only where whitespace is changes; a statement that fits is sent as given.
  *
  * @param connection - ABAP connection
  * @param params - SQL query parameters
@@ -41,7 +47,7 @@ export async function getSqlQuery(
     // No deadline: the contract requires a number, and 0 is what the wires
     // read as "do not abort". How long to wait is the caller's.
     timeout: 0,
-    data: params.sql_query,
+    data: wrapSqlLines(params.sql_query),
     headers: requestHeaders(headers),
   });
 }

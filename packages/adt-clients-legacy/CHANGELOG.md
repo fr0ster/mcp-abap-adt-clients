@@ -4,7 +4,15 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
-## [Unreleased] - 2026-11-13
+## [0.9.5] - 2026-11-13
+
+Released with `@mcp-abap-adt/adt-clients` 45.5.1.
+
+### Changed
+
+- **The `@mcp-abap-adt/adt-clients` range is `^45.5.1`** (was `^45.5.0`),
+  peer and dev: the root member's `withLongPolling` type this release meets
+  comes from 45.5.1. No member changes beyond the fix below.
 
 ### Fixed
 
