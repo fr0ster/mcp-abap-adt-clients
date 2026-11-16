@@ -192,11 +192,31 @@ function parsedXml(body: unknown): Record<string, unknown> | undefined {
 
 /**
  * The message types of a checklist without `activationExecuted` after which
- * the list is read: a warning, an information, a success. A message of any
- * other type, or no message at all, leaves the answer as it was: nothing
- * more is read.
+ * the list is read: a warning, an information, a success, as
+ * {@link severityLetter} reads them. A message of any other type, or no
+ * message at all, leaves the answer as it was: nothing more is read.
  */
 const LIST_READ_BESIDE: ReadonlySet<string> = new Set(['W', 'I', 'S']);
+
+/**
+ * A message type as one letter: a copy of adt-strategies' `severity()`
+ * (`src/refusals/read.ts`), so the client reads the list after exactly the
+ * checklists that strategy decides by it. adt-clients does not depend on
+ * adt-strategies at run time; `activationRead.test.ts` pins the two equal by
+ * behaviour. No type at all reads as `E`.
+ */
+function severityLetter(raw: unknown): string {
+  const s = (typeof raw === 'string' ? raw : '').trim().toUpperCase();
+  if (!s) return 'E';
+  if (s.startsWith('ERROR') || s === 'E') return 'E';
+  if (s.startsWith('WARN') || s === 'W') return 'W';
+  if (s.startsWith('INFO') || s === 'I') return 'I';
+  if (s.startsWith('SUCCESS') || s === 'S') return 'S';
+  if (s === 'OK') return 'S';
+  if (s === 'CRITICAL' || s === 'FATAL') return 'E';
+  if (s === 'TOLERABLE') return 'W';
+  return s;
+}
 
 /**
  * The checklists that do not state the activation's outcome themselves, for
@@ -232,13 +252,9 @@ function unstatedOutcome(
   if (
     executed === undefined &&
     messages.length > 0 &&
-    messages.every((message) => {
-      const type = field(message, '@type');
-      return (
-        typeof type === 'string' &&
-        LIST_READ_BESIDE.has(type.trim().toUpperCase())
-      );
-    })
+    messages.every((message) =>
+      LIST_READ_BESIDE.has(severityLetter(field(message, '@type'))),
+    )
   ) {
     return 'unstated';
   }
