@@ -1,9 +1,11 @@
 /**
- * The one read after a silent checklist (fr0ster/mcp-abap-adt#351): when an
- * activation answers `chkl:messages` with `activationExecuted="false"` and no
- * message, the member reads `GET /sap/bc/adt/activation/inactiveobjects` once
- * and hands `analyse` the list and the uris its request named; after every
- * other answer it sends nothing more.
+ * The one read after a checklist that does not state its outcome
+ * (fr0ster/mcp-abap-adt#351, #360): when an activation answers
+ * `chkl:messages` with `activationExecuted="false"` and no message, or with
+ * no `activationExecuted` and only `W`/`I`/`S` messages, the member reads
+ * `GET /sap/bc/adt/activation/inactiveobjects` once and hands `analyse` the
+ * list and the uris its request named; after every other answer it sends
+ * nothing more.
  *
  * The answers are the recorded ones (`corpus/adt/answers/`), replayed by a
  * stub connection that answers by request.
@@ -43,6 +45,46 @@ function recorded(caseName: string, step: string): IAdtWireResponse<string> {
 
 const SILENT = recorded('activation-group-alone-s4-2025', '04-activation');
 const LISTED = recorded('activation-group-alone-s4-2025', '05-inactiveobjects');
+const EMPTY = recorded(
+  'activation-reactivate-active-s4-2025',
+  '04-inactiveobjects',
+);
+
+const CHECKLIST_NS = 'http://www.sap.com/abapxml/checklist';
+
+/** A `200` answer carrying `data`. */
+function answered(data: string): IAdtWireResponse<string> {
+  return { status: 200, statusText: 'OK', headers: {}, data };
+}
+
+/**
+ * Built from the report of fr0ster/mcp-abap-adt#360 (SAP_BASIS 7.52),
+ * **not recorded**: no `activationExecuted`, one `W` message whose text is
+ * its `objDescr`. SAP activated the program.
+ */
+const UNSTATED_WARNING = answered(
+  `<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="${CHECKLIST_NS}"><msg objDescr="Program ZUNITTEST_MOCKUP_LOADER_EXMPL" type="W" line="1"/></chkl:messages>`,
+);
+
+/** A checklist with no `activationExecuted` and one message of `type`. */
+function unstatedWith(type: string): IAdtWireResponse<string> {
+  return answered(
+    `<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="${CHECKLIST_NS}"><chkl:properties checkExecuted="true"/><msg objDescr="Program ZP" type="${type}" line="1"><shortText><txt>message of type ${type}</txt></shortText></msg></chkl:messages>`,
+  );
+}
+
+/**
+ * Recorded on onprem (SAP_BASIS 816), 2026-11-16, bodies verbatim: a
+ * warning-only activation (`activationExecuted="true"`, one `W`) and a
+ * cancelled one (`activationExecuted="false"`, a `W` "Activation was
+ * cancelled." first).
+ */
+const RECORDED_816_WARNING = answered(
+  `<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="${CHECKLIST_NS}"><chkl:properties checkExecuted="true" activationExecuted="true" generationExecuted="true"/><msg objDescr="Program ZMCP_I360_8614B7_P" type="W" line="1" href="/sap/bc/adt/programs/programs/zmcp_i360_8614b7_p/source/main#start=9,4;end=9,50" code="MESSAGE(G-Q)" forceSupported="true"><shortText><txt>The exception CX_UUID_ERROR is not caught or declared in the RAISING clause of "M".</txt></shortText><atom:link href="art.syntax:G-Q" rel="http://www.sap.com/adt/categories/quickfixes" xmlns:atom="http://www.w3.org/2005/Atom"/></msg></chkl:messages>`,
+);
+const RECORDED_816_CANCELLED = answered(
+  `<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="${CHECKLIST_NS}"><chkl:properties checkExecuted="true" activationExecuted="false" generationExecuted="false"/><msg objDescr="" type="W" line="0" href=""><shortText><txt>Activation was cancelled.</txt></shortText></msg><msg objDescr="Program ZMCP_I360_4666B4_P" type="E" line="1" href="/sap/bc/adt/programs/programs/zmcp_i360_4666b4_p/source/main#start=13,10" code="WRITE(100)" forceSupported="true"><shortText><txt>The specified formats "/" and "1" must be specified as one word: "/1".</txt></shortText></msg></chkl:messages>`,
+);
 const GROUP = '/sap/bc/adt/functions/groups/zact751p9325';
 const INACTIVE = '/sap/bc/adt/activation/inactiveobjects';
 
@@ -175,6 +217,26 @@ describe('the read after a silent checklist', () => {
       'a refusal with an E',
       recorded('refusal-activation-fails', '01-activation'),
     ],
+    ['activationExecuted="true" and a W (recorded, 816)', RECORDED_816_WARNING],
+    [
+      'activationExecuted="false" and a W first (recorded cancelled, 816)',
+      RECORDED_816_CANCELLED,
+    ],
+    [
+      'activationExecuted="false" and the cancel note alone (derived from the recorded cancelled answer)',
+      answered(
+        `<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="${CHECKLIST_NS}"><chkl:properties checkExecuted="true" activationExecuted="false" generationExecuted="false"/><msg objDescr="" type="W" line="0" href=""><shortText><txt>Activation was cancelled.</txt></shortText></msg></chkl:messages>`,
+      ),
+    ],
+    ['no activationExecuted and an E', unstatedWith('E')],
+    ['no activationExecuted and an A', unstatedWith('A')],
+    ['no activationExecuted and an X', unstatedWith('X')],
+    [
+      'no activationExecuted and no message',
+      answered(
+        `<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="${CHECKLIST_NS}"><chkl:properties checkExecuted="true"/></chkl:messages>`,
+      ),
+    ],
   ])('after %s nothing more is sent', async (_what, activation) => {
     const { analyse, seen } = spying();
     const { sent } = await activateGroup({ activation }, analyse);
@@ -214,6 +276,107 @@ describe('the read after a silent checklist', () => {
   });
 });
 
+describe('the read after a checklist with no verdict and warnings alone', () => {
+  it.each([
+    ['the 7.52 shape', UNSTATED_WARNING],
+    ['an I', unstatedWith('I')],
+    ['an S', unstatedWith('S')],
+  ])('after %s it reads the inactive list once', async (_what, activation) => {
+    const { analyse, seen } = spying();
+    const { sent } = await activateGroup(
+      { activation, inactive: EMPTY },
+      analyse,
+    );
+    expect(sent.map((r) => [r.method, r.url])).toEqual([
+      ['POST', '/sap/bc/adt/activation?method=activate&preauditRequested=true'],
+      ['GET', INACTIVE],
+    ]);
+    expect(seen[0]?.context?.activation?.named).toEqual([
+      GROUP,
+      `${GROUP}/source/main`,
+    ]);
+  });
+
+  it('analyseActivation: none listed is activated, the warning kept in the document', async () => {
+    const { answer } = await activateGroup(
+      { activation: UNSTATED_WARNING, inactive: EMPTY },
+      analyseActivation,
+    );
+    expect(answer.ok).toBe(true);
+    if (!answer.ok) return;
+    expect(answer.getResult().value).toContain(
+      'Program ZUNITTEST_MOCKUP_LOADER_EXMPL',
+    );
+  });
+
+  it('analyseActivation: the group still listed is not activated', async () => {
+    const { answer } = await activateGroup(
+      { activation: UNSTATED_WARNING, inactive: LISTED },
+      analyseActivation,
+    );
+    expect(answer.ok).toBe(false);
+    if (answer.ok) return;
+    expect(answer.getError().stillInactive.map((o) => o.uri)).toEqual([
+      GROUP,
+      `${GROUP}/source/main`,
+    ]);
+  });
+
+  it('a refused read leaves the verdict as it was, its response the list', async () => {
+    const { analyse, seen } = spying();
+    const { answer } = await activateGroup(
+      { activation: UNSTATED_WARNING, inactive: refused(500) },
+      analyse,
+    );
+    expect(answer.ok).toBe(true);
+    expect(seen[0]?.verdict).toBe(ADT_NO_FAILURE);
+    expect(seen[0]?.context?.activation?.inactiveObjects.status).toBe(500);
+  });
+
+  it('a read with no response hands no list', async () => {
+    const { analyse, seen } = spying();
+    const { answer } = await activateGroup(
+      { activation: UNSTATED_WARNING, inactive: new Error('socket hang up') },
+      analyse,
+    );
+    expect(answer.ok).toBe(true);
+    expect(seen[0]?.verdict).toBe(ADT_NO_FAILURE);
+    expect(seen[0]?.context).toBeUndefined();
+  });
+
+  it('without an analyse the answer is what it was before the read existed', async () => {
+    const { client, sent } = replaying({
+      activation: UNSTATED_WARNING,
+      inactive: refused(500),
+    });
+    const group = client.getFunctionGroup();
+    const answer = await group.activate(
+      { functionGroupName: 'ZACT751P9325' },
+      { headers: headersOf(group, 'activate') },
+    );
+    expect(sent.map((r) => r.method)).toEqual(['POST', 'GET']);
+    expect(answer.ok).toBe(true);
+  });
+
+  it.each([
+    ['refused', refused(500)],
+    ['with no response', new Error('socket hang up')],
+  ])('analyseActivation: a read %s is undecided', async (_what, inactive) => {
+    const { answer } = await activateGroup(
+      { activation: UNSTATED_WARNING, inactive },
+      analyseActivation,
+    );
+    expect(answer.ok).toBe(false);
+    if (answer.ok) return;
+    expect(answer.getError().message).toContain(
+      'SAP answered no activationExecuted verdict and only warnings',
+    );
+    expect(answer.getError().message).toContain(
+      "the activation's outcome could not be decided",
+    );
+  });
+});
+
 /** The `adtcore:uri` of every reference a request body names, in order. */
 function urisIn(body: unknown): string[] {
   if (typeof body !== 'string') return [];
@@ -223,12 +386,18 @@ function urisIn(body: unknown): string[] {
     .map((rest) => rest.slice(0, rest.indexOf('"')));
 }
 
-describe('every activation member reads after a silent checklist', () => {
+describe.each([
+  ['a silent checklist', SILENT],
+  ['a checklist with no verdict and warnings alone', UNSTATED_WARNING],
+])('every activation member reads after %s', (_what, activation) => {
   it.each(ACTIVATING_APIS)(
     '%s reads once and names what its request named',
     async (api) => {
       const { analyse, seen } = spying();
-      const { handler, config, calls } = activatingHandler(api, SILENT.data);
+      const { handler, config, calls } = activatingHandler(
+        api,
+        activation.data,
+      );
       await handler.activate(config, {
         headers: headersOf(handler, 'activate', config),
         analyse,
