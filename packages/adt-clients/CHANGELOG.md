@@ -24,6 +24,22 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [45.5.2] - 2026-11-16
+
+### Fixed
+
+- **An activation reads the inactive list after a checklist with no
+  `activationExecuted` and only `W`/`I`/`S` messages** (fr0ster/mcp-abap-adt#360,
+  #314), as it does after the silent checklist, and hands it to `analyse` as
+  `context.activation`. SAP_BASIS 7.52 answered such a checklist for a program
+  it activated; with adt-strategies 0.23.1 `analyseActivation` judges it by
+  the list. The client judges nothing: a read that fails after this answer
+  leaves the call's verdict as it was (no failure, as before the read
+  existed) and hands the refusal's response, if any, as the list; without an
+  `analyse` the answer is what it was, one `GET` later. After every other
+  answer nothing more is sent, as before. adt-strategies' range is `^0.23.1`
+  (dev).
+
 ## [45.5.1] - 2026-11-13
 
 ### Fixed
