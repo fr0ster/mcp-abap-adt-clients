@@ -154,7 +154,8 @@ export async function activateObjectInSession(
 }
 
 // ---------------------------------------------------------------------------
-// The one read after a silent checklist (fr0ster/mcp-abap-adt#351)
+// The one read after a checklist that does not state its outcome
+// (fr0ster/mcp-abap-adt#351, #360)
 // ---------------------------------------------------------------------------
 
 const parser = new XMLParser({
@@ -190,19 +191,58 @@ function parsedXml(body: unknown): Record<string, unknown> | undefined {
 }
 
 /**
- * Whether an activation answered the silent checklist: a `2xx`
- * `chkl:messages` with `activationExecuted="false"` and no `msg`. The one
- * answer the document alone cannot judge — it answered both a re-activation
- * that had nothing to do and an activation that left a function group
- * inactive (S/4HANA 2025).
+ * The message types of a checklist without `activationExecuted` after which
+ * the list is read: a warning, an information, a success. A message of any
+ * other type, or no message at all, leaves the answer as it was: nothing
+ * more is read.
  */
-function isSilentChecklist(answer: IAdtWireResponse): boolean {
-  if (answer.status < 200 || answer.status >= 300) return false;
+const LIST_READ_BESIDE: ReadonlySet<string> = new Set(['W', 'I', 'S']);
+
+/**
+ * The checklists that do not state the activation's outcome themselves, for
+ * which the inactive list is the one fact that does. This decides nothing:
+ * it only says when the client reads the list, and the consumer's `analyse`
+ * judges the answer and the list.
+ *
+ * - `silent`: `activationExecuted="false"` and no `msg`. It answered both a
+ *   re-activation that had nothing to do and an activation that left a
+ *   function group inactive (S/4HANA 2025, fr0ster/mcp-abap-adt#351).
+ * - `unstated`: no `activationExecuted`, and only `W`/`I`/`S` messages.
+ *   SAP sets the attribute only once its activation run starts, and
+ *   SAP_BASIS 7.52 answered this, with one warning, for a program it
+ *   activated (fr0ster/mcp-abap-adt#360).
+ */
+type UnstatedOutcome = 'silent' | 'unstated';
+
+/**
+ * Whether a `2xx` `chkl:messages` leaves the activation's outcome unstated,
+ * and how ({@link UnstatedOutcome}). `undefined` for every other answer:
+ * nothing more is read.
+ */
+function unstatedOutcome(
+  answer: IAdtWireResponse,
+): UnstatedOutcome | undefined {
+  if (answer.status < 200 || answer.status >= 300) return undefined;
   const root = parsedXml(answer.data);
-  if (root === undefined || !Object.hasOwn(root, 'messages')) return false;
+  if (root === undefined || !Object.hasOwn(root, 'messages')) return undefined;
   const checklist = field(root, 'messages');
   const executed = field(field(checklist, 'properties'), '@activationExecuted');
-  return executed === 'false' && listOf(field(checklist, 'msg')).length === 0;
+  const messages = listOf(field(checklist, 'msg'));
+  if (executed === 'false' && messages.length === 0) return 'silent';
+  if (
+    executed === undefined &&
+    messages.length > 0 &&
+    messages.every((message) => {
+      const type = field(message, '@type');
+      return (
+        typeof type === 'string' &&
+        LIST_READ_BESIDE.has(type.trim().toUpperCase())
+      );
+    })
+  ) {
+    return 'unstated';
+  }
+  return undefined;
 }
 
 /** The `adtcore:uri` of every reference an activation request sent. */
@@ -242,16 +282,25 @@ function keepingRequests(
  * An activation, and the one read its answer may need.
  *
  * **The one exception to "a member issues one request"** (fr0ster/mcp-abap-adt#351). `send` issues the activation — `POST /sap/bc/adt/activation` — and
- * after a silent checklist alone (`activationExecuted="false"`, no message)
- * this reads `GET /sap/bc/adt/activation/inactiveobjects` once, with the
+ * after a checklist that does not state the outcome itself
+ * ({@link UnstatedOutcome}: `activationExecuted="false"` with no message, or
+ * no `activationExecuted` and only `W`/`I`/`S` messages) this reads
+ * `GET /sap/bc/adt/activation/inactiveobjects` once, with the
  * `Accept` `getInactiveObjects` sends, and hands the list and the uris the
  * request named to `analyse` as `context.activation`. After every other
- * answer, and when the activation itself failed, nothing more is sent.
+ * answer, and when the activation itself failed, nothing more is sent. The
+ * client judges neither: the verdict is the consumer's `analyse` (the
+ * shipped one is adt-strategies' `analyseActivation`).
  *
- * A read that fails is the call's failure: the verdict `analyse` starts from
- * names that the activation's outcome could not be decided and carries the
- * read's response; the activation's answer stays the one a cleared verdict is
- * read from. A credential refusal SAP never saw is thrown as it came.
+ * After a `silent` checklist, a read that fails is the call's failure: the
+ * verdict `analyse` starts from names that the activation's outcome could not
+ * be decided and carries the read's response; the activation's answer stays
+ * the one a cleared verdict is read from. After an `unstated` one, a read that
+ * fails leaves the starting verdict as it was before the read existed — no
+ * failure — and hands the refusal's response as `inactiveObjects`, or no
+ * context when none came back; adt-strategies' `analyseActivation` reads
+ * either as an outcome it could not decide. A credential refusal SAP never
+ * saw is thrown as it came.
  */
 async function activationExchange(
   connection: IAbapConnection,
@@ -259,7 +308,8 @@ async function activationExchange(
 ): Promise<IAdtExchange> {
   const sent: IAbapRequestOptions[] = [];
   const answer = await send(keepingRequests(connection, sent));
-  if (!isSilentChecklist(answer)) return { answer };
+  const unstated = unstatedOutcome(answer);
+  if (unstated === undefined) return { answer };
 
   const named = namedIn(sent.find((request) => request.method === 'POST'));
   try {
@@ -268,6 +318,18 @@ async function activationExchange(
   } catch (error: unknown) {
     if (isUnansweredCredentialRefusal(error)) throw error;
     const cause = recogniseFailure(error);
+    if (unstated === 'unstated') {
+      // The starting verdict stays the activation's own, as it was before
+      // this read existed: the read is a fact for `analyse`, not a verdict.
+      // What came back, a refusal's response included, is handed as the
+      // list; with no response there is no list to hand.
+      return cause.response === undefined
+        ? { answer }
+        : {
+            answer,
+            context: { activation: { named, inactiveObjects: cause.response } },
+          };
+    }
     return {
       answer,
       failure: {
