@@ -1,0 +1,41 @@
+{
+  "note": "Bodies of POST /sap/bc/adt/activation recorded verbatim on 2026-11-16 for fr0ster/mcp-abap-adt#360 (the server issue): warning-only and cancelled activations of programs and classes. Bodies only; no request or response headers were kept.",
+  "answers": [
+    {
+      "name": "i360-01",
+      "recordedOn": "onprem (SAP_BASIS 816)",
+      "recordedAt": "2026-11-16",
+      "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><chkl:messages xmlns:chkl=\"http://www.sap.com/abapxml/checklist\"><chkl:properties checkExecuted=\"true\" activationExecuted=\"false\" generationExecuted=\"false\"/><msg objDescr=\"\" type=\"W\" line=\"0\" href=\"\"><shortText><txt>Activation was cancelled.</txt></shortText></msg><msg objDescr=\"Program ZMCP_I360_4666B4_P\" type=\"E\" line=\"1\" href=\"/sap/bc/adt/programs/programs/zmcp_i360_4666b4_p/source/main#start=13,10\" code=\"WRITE(100)\" forceSupported=\"true\"><shortText><txt>The specified formats \"/\" and \"1\" must be specified as one word: \"/1\".</txt></shortText><correctionHint number=\"-1\" kind=\"E\" line=\"0\" column=\"0\" word=\"\"/><correctionHint number=\"1\" kind=\"\" line=\"0\" column=\"0\" word=\"\"/><correctionHint number=\"1\" kind=\"D\" line=\"13\" column=\"8\" word=\"/\"/><correctionHint number=\"1\" kind=\"D\" line=\"13\" column=\"10\" word=\"1\"/><correctionHint number=\"1\" kind=\"I\" line=\"13\" column=\"8\" word=\"/1\"/></msg><msg objDescr=\"Program ZMCP_I360_4666B4_P\" type=\"W\" line=\"2\" href=\"/sap/bc/adt/programs/programs/zmcp_i360_4666b4_p/source/main#start=9,4;end=9,50\" code=\"MESSAGE(G-Q)\" forceSupported=\"true\"><shortText><txt>The exception CX_UUID_ERROR is not caught or declared in the RAISING clause of \"M\".</txt></shortText><atom:link href=\"art.syntax:G-Q\" rel=\"http://www.sap.com/adt/categories/quickfixes\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/></msg></chkl:messages>"
+    },
+    {
+      "name": "i360-02",
+      "recordedOn": "onprem (SAP_BASIS 816)",
+      "recordedAt": "2026-11-16",
+      "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><chkl:messages xmlns:chkl=\"http://www.sap.com/abapxml/checklist\"><chkl:properties checkExecuted=\"true\" activationExecuted=\"true\" generationExecuted=\"true\"/><msg objDescr=\"Class ZCL_MCP_I360_4666B4, Method M\" type=\"W\" line=\"1\" href=\"/sap/bc/adt/oo/classes/zcl_mcp_i360_4666b4/source/main#start=8,4;end=8,50\" code=\"MESSAGE(G-Q)\" forceSupported=\"true\"><shortText><txt>The exception CX_UUID_ERROR is not caught or declared in the RAISING clause of \"M\".</txt></shortText><atom:link href=\"art.syntax:G-Q\" rel=\"http://www.sap.com/adt/categories/quickfixes\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/></msg></chkl:messages>"
+    },
+    {
+      "name": "i360-03",
+      "recordedOn": "onprem (SAP_BASIS 816)",
+      "recordedAt": "2026-11-16",
+      "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><chkl:messages xmlns:chkl=\"http://www.sap.com/abapxml/checklist\"><chkl:properties checkExecuted=\"true\" activationExecuted=\"true\" generationExecuted=\"true\"/><msg objDescr=\"Class ZCL_MCP_I360_8614B7, Method M\" type=\"W\" line=\"1\" href=\"/sap/bc/adt/oo/classes/zcl_mcp_i360_8614b7/source/main#start=8,4;end=8,50\" code=\"MESSAGE(G-Q)\" forceSupported=\"true\"><shortText><txt>The exception CX_UUID_ERROR is not caught or declared in the RAISING clause of \"M\".</txt></shortText><atom:link href=\"art.syntax:G-Q\" rel=\"http://www.sap.com/adt/categories/quickfixes\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/></msg></chkl:messages>"
+    },
+    {
+      "name": "i360-04",
+      "recordedOn": "cloud",
+      "recordedAt": "2026-11-16",
+      "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><chkl:messages xmlns:chkl=\"http://www.sap.com/abapxml/checklist\"><chkl:properties checkExecuted=\"true\" activationExecuted=\"true\" generationExecuted=\"true\"/><msg objDescr=\"Class ZCL_MCP_I360_DBBB53, Method M\" type=\"W\" line=\"1\" href=\"/sap/bc/adt/oo/classes/zcl_mcp_i360_dbbb53/source/main#start=8,4;end=8,50\" code=\"MESSAGE(G-Q)\" forceSupported=\"true\"><shortText><txt>The exception CX_UUID_ERROR is not caught or declared in the RAISING clause of \"M\".</txt></shortText><atom:link href=\"art.syntax:G-Q\" rel=\"http://www.sap.com/adt/categories/quickfixes\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/></msg></chkl:messages>"
+    },
+    {
+      "name": "i360-05",
+      "recordedOn": "onprem (SAP_BASIS 816)",
+      "recordedAt": "2026-11-16",
+      "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><chkl:messages xmlns:chkl=\"http://www.sap.com/abapxml/checklist\"><chkl:properties checkExecuted=\"true\" activationExecuted=\"true\" generationExecuted=\"true\"/><msg objDescr=\"Program ZMCP_I360_2D3B81_P\" type=\"W\" line=\"1\" href=\"/sap/bc/adt/programs/programs/zmcp_i360_2d3b81_p/source/main#start=9,4;end=9,39\" code=\"MESSAGE(G-Q)\" forceSupported=\"true\"><shortText><txt>The exception CX_UUID_ERROR is not caught or declared in the RAISING clause of \"RUN_TEST\".</txt></shortText><atom:link href=\"art.syntax:G-Q\" rel=\"http://www.sap.com/adt/categories/quickfixes\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/></msg></chkl:messages>"
+    },
+    {
+      "name": "i360-06",
+      "recordedOn": "onprem (SAP_BASIS 816)",
+      "recordedAt": "2026-11-16",
+      "body": "<?xml version=\"1.0\" encoding=\"utf-8\"?><chkl:messages xmlns:chkl=\"http://www.sap.com/abapxml/checklist\"><chkl:properties checkExecuted=\"true\" activationExecuted=\"true\" generationExecuted=\"true\"/><msg objDescr=\"Program ZMCP_I360_8614B7_P\" type=\"W\" line=\"1\" href=\"/sap/bc/adt/programs/programs/zmcp_i360_8614b7_p/source/main#start=9,4;end=9,50\" code=\"MESSAGE(G-Q)\" forceSupported=\"true\"><shortText><txt>The exception CX_UUID_ERROR is not caught or declared in the RAISING clause of \"M\".</txt></shortText><atom:link href=\"art.syntax:G-Q\" rel=\"http://www.sap.com/adt/categories/quickfixes\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/></msg></chkl:messages>"
+    }
+  ]
+}

@@ -178,10 +178,15 @@ export interface IAdtActivationFailure extends IAdtMessageFailure {
  * activated object are **not activated**; an empty answer is activated; a
  * message of type `E` is a refusal with its messages.
  *
- * A silent checklist (`activationExecuted="false"`, no message) is judged by
- * the inactive list the member read after it, handed as
- * `context.activation`; without it the outcome is not decided, and that is a
- * failure too.
+ * A silent checklist (`activationExecuted="false"`, no message), and a
+ * checklist with no `activationExecuted` and only `W`/`I`/`S` messages
+ * (fr0ster/mcp-abap-adt#360), are judged by the inactive list the member read
+ * after it, handed as `context.activation`; without it the outcome is not
+ * decided, and that is a failure too.
+ *
+ * The verdict is this strategy's — the consumer's choice of strategy, not
+ * the client's: adt-clients hands the answer and the list and judges
+ * neither.
  */
 export const analyseActivation: IAnalyse<IAdtActivationFailure> = (
   verdict,

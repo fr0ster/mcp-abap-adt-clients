@@ -72,7 +72,7 @@ ADT does not have a single way of saying no. From the recordings in
 | the "no" | arrives as | shape |
 |---|---|---|
 | activation did not happen | 200 | `<chkl:messages>` with `<msg type="E">` |
-| activation activated nothing | 200 | `<ioc:inactiveObjects>`, or `activationExecuted="false"` with no message and the object still inactive |
+| activation activated nothing | 200 | `<ioc:inactiveObjects>`, or `activationExecuted="false"` with no message, or no `activationExecuted` and only `W`/`I`/`S` messages, and the object still inactive |
 | the object was never checked | 200 | `chkrun:status="notProcessed"` |
 | the check found an error | 200 | `<chkrun:checkMessage type="E">` |
 | the deletion was declined | 200 | `del:isDeleted="false"` |
@@ -121,7 +121,7 @@ a `403` on a service binding's LOCK that is to be ignored
 
 | export | what it is |
 |---|---|
-| `analyseActivation` | what `POST /activation` answered, answering `IAdtActivationFailure` (the messages and `stillInactive`): a `<msg type="E">` is a refusal; `ioc:inactiveObjects` is not activated, its objects in `stillInactive`; an empty body is activated; any other document is not activated ("the answer does not state the activation"); `activationExecuted="false"` with no message is judged by the inactive list the member hands as `context.activation` — a named object still listed is not activated, none is nothing to activate, no list is not decided. The table and its measurements are in [ERRATA.md](ERRATA.md) |
+| `analyseActivation` | what `POST /activation` answered, answering `IAdtActivationFailure` (the messages and `stillInactive`): a `<msg type="E">` is a refusal; `ioc:inactiveObjects` is not activated, its objects in `stillInactive`; an empty body is activated; any other document is not activated ("the answer does not state the activation"); `activationExecuted="false"` with no message, and (0.23.1, fr0ster/mcp-abap-adt#360) a checklist with no `activationExecuted` and only `W`/`I`/`S` messages, are judged by the inactive list the member hands as `context.activation` — a named object still listed is not activated, none is nothing to activate (activated, for the second), no list is not decided. The verdict is this strategy's: the consumer chooses it by passing it as `analyse`. The table and its measurements are in [ERRATA.md](ERRATA.md) |
 | `stillInactiveAmong(named, inactiveObjects)` | the judgement after a silent checklist, on either activation path: the entries of an inactive-objects answer (`ioc:inactiveObjects`, or the flat `adtcore:objectReferences` of 7.40) whose `uri` or `parentUri` is one of `named`; the transport-only entry never counts; `null` for an answer that is no `2xx` list |
 | `analyseCheck` | `<chkrun:checkRunReports>` — the status first, then the messages |
 | `analyseDeletion` | `del:isDeleted` and `del:isDeletable` on a `200`, and **every** `del:message`, each with its severity and the T100 key read from its long-text link |
@@ -138,7 +138,7 @@ a `403` on a service binding's LOCK that is to be ignored
 | `analyseUnitTestStart` | a started run whose answer names no run id |
 | `analyseUnsupportedStatus(statuses, what)` | renames a `404`/`405`/`501`… as `UNSUPPORTED_OPERATION` — a system without the resource, told apart from a refusal |
 | `analyseAny` | dispatches on the root element when the form is not known in advance |
-| `readActivationRefusal(document, activation?)` | the activation reading underneath `analyseActivation`, answering `AdtActivationRefusal` or `null`; `activation` is the facts of a silent checklist (`AdtActivationFacts`) |
+| `readActivationRefusal(document, activation?)` | the activation reading underneath `analyseActivation`, answering `AdtActivationRefusal` or `null`; `activation` is the facts of a checklist the inactive list decides (`AdtActivationFacts`) |
 | `readCheckRunRefusal`, `readDeletionRefusal`, `readValidationRefusal`, `readUnitTestRefusal`, `readExceptionRefusal`, `readPublicationRefusal`, `readCdsTestDoublesRefusal`, `readMessageClassMessageAbsence`, `readObjectPropertiesAbsence`, `readAdtRefusal` | the readings underneath — pure functions over a document, answering `AdtRefusal` or `null`; of an activation's answers `readAdtRefusal(document, activation?)` dispatches the checklist only, with the facts `analyseAny` passes on from `context.activation` |
 | `readExceptionSubType` | the subtype an `exc:exception` names (`com.sap.adt.communicationFramework.subType`), or `undefined` |
 | `isIndeterminateWalkAnswer` | says an empty node structure cannot be read: an empty package and one that does not exist answer identically |

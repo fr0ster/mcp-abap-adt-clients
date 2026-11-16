@@ -1406,6 +1406,16 @@ failure ("the activation's outcome could not be decided"), carrying the read's
 response. This is the one exception to "a member issues one request"; every
 other answer is handed on with no second request.
 
+**And after a checklist with no verdict and warnings alone** (45.5.2,
+fr0ster/mcp-abap-adt#360). `chkl:messages` with no `activationExecuted` and
+only `W`/`I`/`S` messages answered, on SAP_BASIS 7.52, a program SAP
+activated: SAP sets the attribute only once its activation run starts. The
+member reads the inactive list after it too, the same way. The client judges
+nothing: a read that fails here leaves the answer as it was and hands the
+refusal's response, if any, as `inactiveObjects`. `analyseActivation`
+(adt-strategies 0.23.1) judges it like the silent checklist, SAP's warnings
+kept beside its sentence; with no readable list the outcome is not decided.
+
 A lock held by another session is an HTTP 403 (`User … is currently editing …`)
 and surfaces as a failure with its response, never as a body to inspect.
 
@@ -2060,7 +2070,8 @@ if (discovery.getResult().value.has(ACTIVATION_RUNS_COLLECTION)) {
 
 **After a run's results.** The run sequence is yours, so the read after a
 silent checklist is too: when `getActivationResults` answers `chkl:messages`
-with `activationExecuted="false"` and no message, read `getInactiveObjects()`
+with `activationExecuted="false"` and no message, or with no
+`activationExecuted` and only `W`/`I`/`S` messages, read `getInactiveObjects()`
 once and judge with `stillInactiveAmong(<the uris of the run's references>,
 <that answer>)` from `@mcp-abap-adt/adt-strategies` — the judgement
 `analyseActivation` makes on the synchronous paths. The run's uris are

@@ -88,6 +88,11 @@ Worth knowing before writing any rule of your own.
 
 Only the inactive list read after the answer separates them
 (`activation-reactivate-active-s4-2025`, `activation-group-alone-s4-2025`).
+A checklist with no `activationExecuted` and warnings alone is the same kind
+of answer: SAP_BASIS 7.52 gave it for a program it activated
+(fr0ster/mcp-abap-adt#360, from the report; no recording here), and SAP sets
+the attribute only once its activation run starts. Onprem 816 and cloud
+answer that activation `activationExecuted="true"` with the warning.
 Beside them, an activation may answer `ioc:inactiveObjects` and activate
 nothing (`activation-preaudit-still-inactive-751`,
 `activation-group-alone-s4-2025` 01), or an empty body and activate

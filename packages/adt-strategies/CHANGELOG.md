@@ -14,6 +14,35 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.23.1] - 2026-11-16
+
+Released with `@mcp-abap-adt/adt-clients` 45.5.2 (fr0ster/mcp-abap-adt#360,
+fr0ster/mcp-abap-adt-clients#314).
+
+### Fixed
+
+- **`analyseActivation` / `readActivationRefusal`: a checklist with no
+  `activationExecuted` and only `W`/`I`/`S` messages is judged by the
+  inactive list**, as the silent checklist is. SAP_BASIS 7.52 answered such a
+  checklist (one `W`) for a program it activated, and the reading refused it
+  ("Activation did not run and SAP attached no error"). SAP sets the verdict
+  attributes only once its activation run starts, so their absence says
+  nothing either way. Now: a named object still listed is not activated, with
+  `stillInactive` and SAP's messages after the sentence; none listed is
+  activated, the messages in the answer's document; no list, or one that
+  cannot be read, is not decided — a failure. A checklist with no
+  `activationExecuted` and no message, or with any other message (`E`, `A`,
+  `X`, a letter not known), is refused as before. Every other row is
+  unchanged: every recorded activation answer (the corpus and the onprem 816
+  and cloud bodies recorded for the issue) is judged exactly as by 0.23.0.
+- **`stillInactiveAmong` compares percent escapes without regard to case.**
+  adt-clients names a namespaced object `%2Fabc%2Fzp` (encodeURIComponent);
+  ADT writes `%2fabc%2fzp` (recorded in the 7.40 quick search); RFC 3986
+  makes them one address. The exact match read such an object, still on the
+  inactive list, as activated — after the silent checklist and in the new row
+  alike. Only a `%` with two hex digits is compared this way; nothing else in
+  an address changes.
+
 ## [0.23.0] - 2026-11-12
 
 Released with `@mcp-abap-adt/adt-clients` 45.5.0.

@@ -1,0 +1,377 @@
+{
+  "activation-class-basis-740--01-activation / list empty": {
+    "ok": true,
+    "listRead": false
+  },
+  "activation-class-basis-740--01-activation / list naming": {
+    "ok": true,
+    "listRead": false
+  },
+  "activation-class-basis-740--01-activation / list refused": {
+    "ok": true,
+    "listRead": false
+  },
+  "activation-class-transportable-s4-2025--01-activation / list empty": {
+    "ok": true,
+    "listRead": false
+  },
+  "activation-class-transportable-s4-2025--01-activation / list naming": {
+    "ok": true,
+    "listRead": false
+  },
+  "activation-class-transportable-s4-2025--01-activation / list refused": {
+    "ok": true,
+    "listRead": false
+  },
+  "activation-group-alone-s4-2025--01-activation / list empty": {
+    "ok": false,
+    "listRead": false,
+    "message": "Not activated: SAP answered the objects still inactive; nothing was activated",
+    "stillInactive": [
+      "/sap/bc/adt/functions/groups/zact751p9325",
+      "/sap/bc/adt/functions/groups/zact751p9325/source/main"
+    ],
+    "messageTypes": ["E"]
+  },
+  "activation-group-alone-s4-2025--01-activation / list naming": {
+    "ok": false,
+    "listRead": false,
+    "message": "Not activated: SAP answered the objects still inactive; nothing was activated",
+    "stillInactive": [
+      "/sap/bc/adt/functions/groups/zact751p9325",
+      "/sap/bc/adt/functions/groups/zact751p9325/source/main"
+    ],
+    "messageTypes": ["E"]
+  },
+  "activation-group-alone-s4-2025--01-activation / list refused": {
+    "ok": false,
+    "listRead": false,
+    "message": "Not activated: SAP answered the objects still inactive; nothing was activated",
+    "stillInactive": [
+      "/sap/bc/adt/functions/groups/zact751p9325",
+      "/sap/bc/adt/functions/groups/zact751p9325/source/main"
+    ],
+    "messageTypes": ["E"]
+  },
+  "activation-group-alone-s4-2025--04-activation / list empty": {
+    "ok": true,
+    "listRead": true
+  },
+  "activation-group-alone-s4-2025--04-activation / list naming": {
+    "ok": false,
+    "listRead": true,
+    "message": "Not activated: SAP answered that no activation ran, and the inactive list still names 2 object(s) of the activation; nothing was activated",
+    "stillInactive": [
+      "/sap/bc/adt/functions/groups/zact751p9325",
+      "/sap/bc/adt/functions/groups/zact751p9325/source/main"
+    ],
+    "messageTypes": ["E"]
+  },
+  "activation-group-alone-s4-2025--04-activation / list refused": {
+    "ok": false,
+    "listRead": true,
+    "message": "The activation's outcome could not be decided: SAP answered that no activation ran and gave no message, and reading the inactive objects failed: Request failed with status code 500",
+    "stillInactive": [],
+    "messageTypes": ["E"]
+  },
+  "activation-group-second-step-s4-2025--01-activation / list empty": {
+    "ok": false,
+    "listRead": false,
+    "message": "Not activated: SAP answered the objects still inactive; nothing was activated",
+    "stillInactive": [
+      "/sap/bc/adt/functions/groups/zact751p8178",
+      "/sap/bc/adt/functions/groups/zact751p8178/source/main"
+    ],
+    "messageTypes": ["E"]
+  },
+  "activation-group-second-step-s4-2025--01-activation / list naming": {
+    "ok": false,
+    "listRead": false,
+    "message": "Not activated: SAP answered the objects still inactive; nothing was activated",
+    "stillInactive": [
+      "/sap/bc/adt/functions/groups/zact751p8178",
+      "/sap/bc/adt/functions/groups/zact751p8178/source/main"
+    ],
+    "messageTypes": ["E"]
+  },
+  "activation-group-second-step-s4-2025--01-activation / list refused": {
+    "ok": false,
+    "listRead": false,
+    "message": "Not activated: SAP answered the objects still inactive; nothing was activated",
+    "stillInactive": [
+      "/sap/bc/adt/functions/groups/zact751p8178",
+      "/sap/bc/adt/functions/groups/zact751p8178/source/main"
+    ],
+    "messageTypes": ["E"]
+  },
+  "activation-group-second-step-s4-2025--02-activation / list empty": {
+    "ok": true,
+    "listRead": false
+  },
+  "activation-group-second-step-s4-2025--02-activation / list naming": {
+    "ok": true,
+    "listRead": false
+  },
+  "activation-group-second-step-s4-2025--02-activation / list refused": {
+    "ok": true,
+    "listRead": false
+  },
+  "activation-nothing-to-activate--01-activation / list empty": {
+    "ok": true,
+    "listRead": true
+  },
+  "activation-nothing-to-activate--01-activation / list naming": {
+    "ok": false,
+    "listRead": true,
+    "message": "Not activated: SAP answered that no activation ran, and the inactive list still names 2 object(s) of the activation; nothing was activated",
+    "stillInactive": [
+      "/sap/bc/adt/functions/groups/zact751p9325",
+      "/sap/bc/adt/functions/groups/zact751p9325/source/main"
+    ],
+    "messageTypes": ["E"]
+  },
+  "activation-nothing-to-activate--01-activation / list refused": {
+    "ok": false,
+    "listRead": true,
+    "message": "The activation's outcome could not be decided: SAP answered that no activation ran and gave no message, and reading the inactive objects failed: Request failed with status code 500",
+    "stillInactive": [],
+    "messageTypes": ["E"]
+  },
+  "activation-preaudit-still-inactive-751--01-activation / list empty": {
+    "ok": false,
+    "listRead": false,
+    "message": "Not activated: SAP answered the objects still inactive; nothing was activated",
+    "stillInactive": [
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe",
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe/includes/definitions",
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe/includes/implementations",
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe/includes/macros",
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe/includes/testclasses",
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe/source/main#type=CLAS%2FOSI",
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe/source/main#type=CLAS%2FOSO",
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe/source/main#type=CLAS%2FOSU"
+    ],
+    "messageTypes": ["E"]
+  },
+  "activation-preaudit-still-inactive-751--01-activation / list naming": {
+    "ok": false,
+    "listRead": false,
+    "message": "Not activated: SAP answered the objects still inactive; nothing was activated",
+    "stillInactive": [
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe",
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe/includes/definitions",
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe/includes/implementations",
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe/includes/macros",
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe/includes/testclasses",
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe/source/main#type=CLAS%2FOSI",
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe/source/main#type=CLAS%2FOSO",
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe/source/main#type=CLAS%2FOSU"
+    ],
+    "messageTypes": ["E"]
+  },
+  "activation-preaudit-still-inactive-751--01-activation / list refused": {
+    "ok": false,
+    "listRead": false,
+    "message": "Not activated: SAP answered the objects still inactive; nothing was activated",
+    "stillInactive": [
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe",
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe/includes/definitions",
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe/includes/implementations",
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe/includes/macros",
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe/includes/testclasses",
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe/source/main#type=CLAS%2FOSI",
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe/source/main#type=CLAS%2FOSO",
+      "/sap/bc/adt/oo/classes/zcl_ai_act_probe/source/main#type=CLAS%2FOSU"
+    ],
+    "messageTypes": ["E"]
+  },
+  "activation-reactivate-active-s4-2025--01-activation / list empty": {
+    "ok": true,
+    "listRead": false
+  },
+  "activation-reactivate-active-s4-2025--01-activation / list naming": {
+    "ok": true,
+    "listRead": false
+  },
+  "activation-reactivate-active-s4-2025--01-activation / list refused": {
+    "ok": true,
+    "listRead": false
+  },
+  "activation-reactivate-active-s4-2025--03-activation / list empty": {
+    "ok": true,
+    "listRead": true
+  },
+  "activation-reactivate-active-s4-2025--03-activation / list naming": {
+    "ok": false,
+    "listRead": true,
+    "message": "Not activated: SAP answered that no activation ran, and the inactive list still names 2 object(s) of the activation; nothing was activated",
+    "stillInactive": [
+      "/sap/bc/adt/functions/groups/zact751p9325",
+      "/sap/bc/adt/functions/groups/zact751p9325/source/main"
+    ],
+    "messageTypes": ["E"]
+  },
+  "activation-reactivate-active-s4-2025--03-activation / list refused": {
+    "ok": false,
+    "listRead": true,
+    "message": "The activation's outcome could not be decided: SAP answered that no activation ran and gave no message, and reading the inactive objects failed: Request failed with status code 500",
+    "stillInactive": [],
+    "messageTypes": ["E"]
+  },
+  "activation-still-inactive--01-activation / list empty": {
+    "ok": false,
+    "listRead": false,
+    "message": "Not activated: SAP answered the objects still inactive; nothing was activated",
+    "stillInactive": [
+      "/sap/bc/adt/functions/groups/zmcp_bld_fgr_l1",
+      "/sap/bc/adt/functions/groups/zmcp_bld_fgr_l1/source/main"
+    ],
+    "messageTypes": ["E"]
+  },
+  "activation-still-inactive--01-activation / list naming": {
+    "ok": false,
+    "listRead": false,
+    "message": "Not activated: SAP answered the objects still inactive; nothing was activated",
+    "stillInactive": [
+      "/sap/bc/adt/functions/groups/zmcp_bld_fgr_l1",
+      "/sap/bc/adt/functions/groups/zmcp_bld_fgr_l1/source/main"
+    ],
+    "messageTypes": ["E"]
+  },
+  "activation-still-inactive--01-activation / list refused": {
+    "ok": false,
+    "listRead": false,
+    "message": "Not activated: SAP answered the objects still inactive; nothing was activated",
+    "stillInactive": [
+      "/sap/bc/adt/functions/groups/zmcp_bld_fgr_l1",
+      "/sap/bc/adt/functions/groups/zmcp_bld_fgr_l1/source/main"
+    ],
+    "messageTypes": ["E"]
+  },
+  "activation-success-verdict--01-activation / list empty": {
+    "ok": true,
+    "listRead": false
+  },
+  "activation-success-verdict--01-activation / list naming": {
+    "ok": true,
+    "listRead": false
+  },
+  "activation-success-verdict--01-activation / list refused": {
+    "ok": true,
+    "listRead": false
+  },
+  "activation-sync-activated-751--01-activation / list empty": {
+    "ok": true,
+    "listRead": false
+  },
+  "activation-sync-activated-751--01-activation / list naming": {
+    "ok": true,
+    "listRead": false
+  },
+  "activation-sync-activated-751--01-activation / list refused": {
+    "ok": true,
+    "listRead": false
+  },
+  "refusal-activation-fails--01-activation / list empty": {
+    "ok": false,
+    "listRead": false,
+    "message": "Activation failed: Type \"STRONG_BUT_NOT_A_REAL_TYPE\" is unknown.",
+    "stillInactive": [],
+    "messageTypes": ["E"]
+  },
+  "refusal-activation-fails--01-activation / list naming": {
+    "ok": false,
+    "listRead": false,
+    "message": "Activation failed: Type \"STRONG_BUT_NOT_A_REAL_TYPE\" is unknown.",
+    "stillInactive": [],
+    "messageTypes": ["E"]
+  },
+  "refusal-activation-fails--01-activation / list refused": {
+    "ok": false,
+    "listRead": false,
+    "message": "Activation failed: Type \"STRONG_BUT_NOT_A_REAL_TYPE\" is unknown.",
+    "stillInactive": [],
+    "messageTypes": ["E"]
+  },
+  "i360-01 / list empty": {
+    "ok": false,
+    "listRead": false,
+    "message": "Activation failed: The specified formats \"/\" and \"1\" must be specified as one word: \"/1\".",
+    "stillInactive": [],
+    "messageTypes": ["W", "E", "W"]
+  },
+  "i360-01 / list naming": {
+    "ok": false,
+    "listRead": false,
+    "message": "Activation failed: The specified formats \"/\" and \"1\" must be specified as one word: \"/1\".",
+    "stillInactive": [],
+    "messageTypes": ["W", "E", "W"]
+  },
+  "i360-01 / list refused": {
+    "ok": false,
+    "listRead": false,
+    "message": "Activation failed: The specified formats \"/\" and \"1\" must be specified as one word: \"/1\".",
+    "stillInactive": [],
+    "messageTypes": ["W", "E", "W"]
+  },
+  "i360-02 / list empty": {
+    "ok": true,
+    "listRead": false
+  },
+  "i360-02 / list naming": {
+    "ok": true,
+    "listRead": false
+  },
+  "i360-02 / list refused": {
+    "ok": true,
+    "listRead": false
+  },
+  "i360-03 / list empty": {
+    "ok": true,
+    "listRead": false
+  },
+  "i360-03 / list naming": {
+    "ok": true,
+    "listRead": false
+  },
+  "i360-03 / list refused": {
+    "ok": true,
+    "listRead": false
+  },
+  "i360-04 / list empty": {
+    "ok": true,
+    "listRead": false
+  },
+  "i360-04 / list naming": {
+    "ok": true,
+    "listRead": false
+  },
+  "i360-04 / list refused": {
+    "ok": true,
+    "listRead": false
+  },
+  "i360-05 / list empty": {
+    "ok": true,
+    "listRead": false
+  },
+  "i360-05 / list naming": {
+    "ok": true,
+    "listRead": false
+  },
+  "i360-05 / list refused": {
+    "ok": true,
+    "listRead": false
+  },
+  "i360-06 / list empty": {
+    "ok": true,
+    "listRead": false
+  },
+  "i360-06 / list naming": {
+    "ok": true,
+    "listRead": false
+  },
+  "i360-06 / list refused": {
+    "ok": true,
+    "listRead": false
+  }
+}
