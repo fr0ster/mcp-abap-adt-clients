@@ -1294,8 +1294,9 @@ reads `ioc:inactiveObjects` and an answer that does not state the activation
 as **not activated**, with the objects SAP still lists in `stillInactive`.
 Every single-object activation takes `options.preauditRequested` (absent,
 `true`); after a `chkl:messages` with `activationExecuted="false"` and no
-message, and only then, the member reads the inactive list once and hands it
-to `analyse`. Group activation is two members, one endpoint each:
+message, or with no `activationExecuted` and only `W`/`I`/`S` messages
+(45.5.2, fr0ster/mcp-abap-adt#360), and only then, the member reads the
+inactive list once and hands it to `analyse`. Group activation is two members, one endpoint each:
 `activateObjectsGroup` (`/activation/runs`) and `activateObjects`
 (`/activation`); which one a system offers is in its discovery, and the
 choice is yours. Details and examples:

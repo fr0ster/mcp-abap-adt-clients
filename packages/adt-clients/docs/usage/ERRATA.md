@@ -94,6 +94,15 @@ answers `200` without activating, in two documents that carry no message:
   (2026-11-09). The identical document answers the re-activation of an object
   that is already active — on S/4HANA 2025 and on ABAP cloud (2026-09-16) —
   where nothing was inactive. The document alone cannot tell the two apart.
+- **`chkl:messages` with no `activationExecuted` and warnings alone**: on
+  SAP_BASIS 7.52 (fr0ster/mcp-abap-adt#360, from the report; not recorded
+  here) a program's activation answered one `W` message with no verdict
+  attribute, and the program was activated — its active source held the
+  change and the inactive list did not name it. SAP's handler
+  (`CL_SEU_ADT_RES_ACTIVATION`, read on onprem SAP_BASIS 816 and cloud) sets
+  the verdict attributes only once its activation run starts, so their absence
+  says nothing either way. Onprem 816 and cloud answer the same activation
+  `activationExecuted="true"` with the `W` (measured 2026-11-16).
 
 **What activates.** On SAP_BASIS 751 the same reference with
 `preauditRequested=false` (`200`, empty body). On S/4HANA 2025 every reference
@@ -113,13 +122,18 @@ and the active source both said so), SAP_BASIS 751 to `false`.
 | `chkl:messages`, `activationExecuted="true"`, no `E` | activated |
 | `chkl:messages`, a `msg type="E"` | refused, with the messages |
 | `chkl:messages`, `activationExecuted="false"`, no message | judged by the inactive list read after it: a named object still listed → not activated, with `stillInactive`; none → nothing to activate; no list → not decided, a failure |
+| `chkl:messages`, no `activationExecuted`, only `W`/`I`/`S` messages (0.23.1) | judged by the inactive list read after it: a named object still listed → not activated, with `stillInactive` and SAP's messages; none → activated, the messages in the document; no list → not decided, a failure |
+| `chkl:messages`, no `activationExecuted`, no message or any other message | refused |
 | `ioc:inactiveObjects` | not activated, every listed object in `stillInactive` |
 | empty | activated |
 | any other document | not activated: the answer does not state the activation |
 
-For the silent checklist, every adt-clients member that sends
-`POST /activation` reads `GET /sap/bc/adt/activation/inactiveobjects` once,
-after that answer only, and hands the list to `analyse` (`IAdtAnalyseContext`);
+For the two checklists the inactive list decides, every adt-clients member
+that sends `POST /activation` reads `GET /sap/bc/adt/activation/inactiveobjects`
+once, after those answers only, and hands the list to `analyse`
+(`IAdtAnalyseContext`); the client judges neither, the verdict is the
+strategy's. After the checklist with no verdict, a read that fails leaves the
+answer as it was and hands the refusal's response, if any, as the list;
 an entry counts when its `uri` or `parentUri` is one the request named
 (`stillInactiveAmong`). A caller who wants another verdict passes its own
 `analyse`.
