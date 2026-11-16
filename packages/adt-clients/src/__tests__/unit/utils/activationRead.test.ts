@@ -11,7 +11,10 @@
  * stub connection that answers by request.
  */
 import { join } from 'node:path';
-import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseActivation,
+  readActivationRefusal,
+} from '@mcp-abap-adt/adt-strategies';
 import {
   ADT_NO_FAILURE,
   type AdtNoFailure,
@@ -495,4 +498,65 @@ describe('the session mark: each answer names the request it is built from', () 
     if (!answer.ok) return;
     expect('sessionLost' in answer.getResult()).toBe(false);
   });
+});
+
+/**
+ * A message's type as SAP may spell it: the client reads the list after
+ * exactly the types adt-strategies reads as `W`, `I` or `S` (its
+ * `severity()`), so the reading never meets a checklist it would decide by a
+ * list the client did not read. Pinned by behaviour: for each spelling, the
+ * client reads the list exactly when `readActivationRefusal`, given no list,
+ * answers that the outcome could not be decided without it.
+ */
+describe('the client reads the list after the types the strategy reads as warnings', () => {
+  const SPELLINGS = [
+    'W',
+    'w',
+    ' W ',
+    'warning',
+    'Warning',
+    'WARN',
+    'I',
+    'info',
+    'Information',
+    'S',
+    'success',
+    'OK',
+    'tolerable',
+    'E',
+    'error',
+    'critical',
+    'fatal',
+    'A',
+    'X',
+    '',
+    'unknown',
+  ];
+
+  it.each(SPELLINGS)('type="%s"', async (type) => {
+    const document = unstatedWith(type);
+    const { analyse } = spying();
+    const { sent } = await activateGroup(
+      { activation: document, inactive: EMPTY },
+      analyse,
+    );
+    const read = sent.some((r) => r.url === INACTIVE);
+    const decidedByList =
+      readActivationRefusal(document.data)?.message.includes(
+        'without the list of inactive objects',
+      ) === true;
+    expect(read).toBe(decidedByList);
+  });
+
+  it.each(['warning', 'Information', 'success', 'OK', 'tolerable'])(
+    'type="%s" is read after',
+    async (type) => {
+      const { analyse } = spying();
+      const { sent } = await activateGroup(
+        { activation: unstatedWith(type), inactive: EMPTY },
+        analyse,
+      );
+      expect(sent.map((r) => r.method)).toEqual(['POST', 'GET']);
+    },
+  );
 });
