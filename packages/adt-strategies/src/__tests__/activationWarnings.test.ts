@@ -221,3 +221,43 @@ describe('activationExecuted="false" with messages stays refused', () => {
     );
   });
 });
+
+/**
+ * A namespaced object's address in two spellings: the client builds
+ * `%2Fabc%2Fzp` (encodeURIComponent's uppercase hex), and ADT writes
+ * `%2fabc%2fzp` (recorded in the 7.40 quick search's `adtcore:uri`s). RFC 3986
+ * makes them the same address, so the inactive list naming one counts for an
+ * activation that named the other. The list is constructed: no recorded
+ * inactive list names a namespaced object.
+ */
+describe('a namespaced object counts however its escapes are cased', () => {
+  const NAMED = '/sap/bc/adt/programs/programs/%2Fabc%2Fzp';
+  const LISTED = '/sap/bc/adt/programs/programs/%2fabc%2fzp';
+  const LIST = wire(
+    `<?xml version="1.0" encoding="utf-8"?><ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects"><ioc:entry><ioc:object ioc:user="" ioc:deleted="false"><ioc:ref adtcore:uri="${LISTED}" adtcore:type="PROG/P" adtcore:name="/ABC/ZP" xmlns:adtcore="http://www.sap.com/adt/core"/></ioc:object><ioc:transport/></ioc:entry></ioc:inactiveObjects>`,
+  );
+  const SILENT = `<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="${CHECKLIST_NS}"><chkl:properties checkExecuted="true" activationExecuted="false" generationExecuted="false"/></chkl:messages>`;
+
+  it.each([
+    ['no verdict, warnings alone', ISSUE_752_PROPERTIES],
+    ['the silent checklist', SILENT],
+  ])('%s: still listed in lowercase escapes is not activated', (_row, document) => {
+    const verdict = failure(
+      analyseActivation(ADT_NO_FAILURE, wire(document), {
+        activation: { named: [NAMED], inactiveObjects: LIST },
+      }),
+    );
+    expect(verdict.stillInactive.map((o) => o.uri)).toEqual([LISTED]);
+  });
+
+  it('an escape is not a letter: %2F does not match a literal "2f"', () => {
+    const other = wire(
+      `<?xml version="1.0" encoding="utf-8"?><ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects"><ioc:entry><ioc:object ioc:user="" ioc:deleted="false"><ioc:ref adtcore:uri="/sap/bc/adt/programs/programs/%2fabc%2fzq" adtcore:type="PROG/P" adtcore:name="/ABC/ZQ" xmlns:adtcore="http://www.sap.com/adt/core"/></ioc:object><ioc:transport/></ioc:entry></ioc:inactiveObjects>`,
+    );
+    expect(
+      analyseActivation(ADT_NO_FAILURE, wire(SILENT), {
+        activation: { named: [NAMED], inactiveObjects: other },
+      }),
+    ).toBe(ADT_NO_FAILURE);
+  });
+});
