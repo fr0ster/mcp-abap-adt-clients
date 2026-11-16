@@ -233,9 +233,8 @@ describe('activationExecuted="false" with messages stays refused', () => {
 describe('a namespaced object counts however its escapes are cased', () => {
   const NAMED = '/sap/bc/adt/programs/programs/%2Fabc%2Fzp';
   const LISTED = '/sap/bc/adt/programs/programs/%2fabc%2fzp';
-  const LIST = wire(
-    `<?xml version="1.0" encoding="utf-8"?><ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects"><ioc:entry><ioc:object ioc:user="" ioc:deleted="false"><ioc:ref adtcore:uri="${LISTED}" adtcore:type="PROG/P" adtcore:name="/ABC/ZP" xmlns:adtcore="http://www.sap.com/adt/core"/></ioc:object><ioc:transport/></ioc:entry></ioc:inactiveObjects>`,
-  );
+  const LIST_XML = `<?xml version="1.0" encoding="utf-8"?><ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects"><ioc:entry><ioc:object ioc:user="" ioc:deleted="false"><ioc:ref adtcore:uri="${LISTED}" adtcore:type="PROG/P" adtcore:name="/ABC/ZP" xmlns:adtcore="http://www.sap.com/adt/core"/></ioc:object><ioc:transport/></ioc:entry></ioc:inactiveObjects>`;
+  const LIST = wire(LIST_XML);
   const SILENT = `<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="${CHECKLIST_NS}"><chkl:properties checkExecuted="true" activationExecuted="false" generationExecuted="false"/></chkl:messages>`;
 
   it.each([
@@ -250,9 +249,40 @@ describe('a namespaced object counts however its escapes are cased', () => {
     expect(verdict.stillInactive.map((o) => o.uri)).toEqual([LISTED]);
   });
 
-  it('an escape is not a letter: %2F does not match a literal "2f"', () => {
+  it('an include counts by its parentUri in lowercase escapes', () => {
+    const include = wire(
+      `<?xml version="1.0" encoding="utf-8"?><ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects"><ioc:entry><ioc:object ioc:user="" ioc:deleted="false"><ioc:ref adtcore:uri="/sap/bc/adt/oo/classes/%2fabc%2fcl_x/includes/definitions" adtcore:type="CLAS/OCN/definitions" adtcore:name="/ABC/CL_X" adtcore:parentUri="/sap/bc/adt/oo/classes/%2fabc%2fcl_x" xmlns:adtcore="http://www.sap.com/adt/core"/></ioc:object><ioc:transport/></ioc:entry></ioc:inactiveObjects>`,
+    );
+    const verdict = failure(
+      analyseActivation(ADT_NO_FAILURE, wire(SILENT), {
+        activation: {
+          named: ['/sap/bc/adt/oo/classes/%2Fabc%2Fcl_x'],
+          inactiveObjects: include,
+        },
+      }),
+    );
+    expect(verdict.stillInactive.map((o) => o.uri)).toEqual([
+      '/sap/bc/adt/oo/classes/%2fabc%2fcl_x/includes/definitions',
+    ]);
+  });
+
+  it('and the other way round: named in lowercase, listed in uppercase', () => {
+    const upper = wire(LIST_XML.split(LISTED).join(NAMED));
+    const verdict = failure(
+      analyseActivation(ADT_NO_FAILURE, wire(SILENT), {
+        activation: { named: [LISTED], inactiveObjects: upper },
+      }),
+    );
+    expect(verdict.stillInactive.map((o) => o.uri)).toEqual([NAMED]);
+  });
+
+  it.each([
+    ['another namespaced object', '/sap/bc/adt/programs/programs/%2fabc%2fzq'],
+    ['the name without its escapes', '/sap/bc/adt/programs/programs/abczp'],
+    ['the escapes written as letters', '/sap/bc/adt/programs/programs/2Fabc2Fzp'],
+  ])('%s does not count', (_what, uri) => {
     const other = wire(
-      `<?xml version="1.0" encoding="utf-8"?><ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects"><ioc:entry><ioc:object ioc:user="" ioc:deleted="false"><ioc:ref adtcore:uri="/sap/bc/adt/programs/programs/%2fabc%2fzq" adtcore:type="PROG/P" adtcore:name="/ABC/ZQ" xmlns:adtcore="http://www.sap.com/adt/core"/></ioc:object><ioc:transport/></ioc:entry></ioc:inactiveObjects>`,
+      `<?xml version="1.0" encoding="utf-8"?><ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects"><ioc:entry><ioc:object ioc:user="" ioc:deleted="false"><ioc:ref adtcore:uri="${uri}" adtcore:type="PROG/P" adtcore:name="X" xmlns:adtcore="http://www.sap.com/adt/core"/></ioc:object><ioc:transport/></ioc:entry></ioc:inactiveObjects>`,
     );
     expect(
       analyseActivation(ADT_NO_FAILURE, wire(SILENT), {
