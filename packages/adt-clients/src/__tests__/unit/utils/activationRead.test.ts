@@ -11,6 +11,7 @@
  * stub connection that answers by request.
  */
 import { join } from 'node:path';
+import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import {
   analyseActivation,
   readActivationRefusal,
@@ -559,4 +560,25 @@ describe('the client reads the list after the types the strategy reads as warnin
       expect(sent.map((r) => r.method)).toEqual(['POST', 'GET']);
     },
   );
+});
+
+describe('a credential refusal SAP never saw, on the read, is thrown as it came', () => {
+  /** A refusal the provider raised before SAP was asked (as the sweep builds one). */
+  function providerRefused(): AuthRefusedError {
+    return new AuthRefusedError(
+      {} as never,
+      'request',
+      new Error('the provider gave up'),
+    );
+  }
+
+  it.each([
+    ['a silent checklist', SILENT],
+    ['a checklist with no verdict and warnings alone', UNSTATED_WARNING],
+  ])('after %s', async (_what, activation) => {
+    const refusal = providerRefused();
+    const { analyse } = spying();
+    const answered = activateGroup({ activation, inactive: refusal }, analyse);
+    await expect(answered).rejects.toBe(refusal);
+  });
 });
