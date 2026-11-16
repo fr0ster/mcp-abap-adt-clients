@@ -341,8 +341,8 @@ function listedObjects(
 /**
  * The objects of an inactive-objects list that an activation named: an entry
  * counts when its `uri`, or its `parentUri`, is one of `named` (the uris of
- * the references the activation request sent). The transport-only entry never
- * counts.
+ * the references the activation request sent), percent escapes compared
+ * without regard to case. The transport-only entry never counts.
  *
  * The one judgement both activation paths make after a silent checklist
  * (`activationExecuted="false"`, no message):
@@ -361,12 +361,45 @@ export function stillInactiveAmong(
   }
   const listed = listedObjects(wellFormed(inactiveObjects.data));
   if (listed === null) return null;
-  const names = new Set(named);
+  const names = new Set(named.map(sameEscapes));
   return listed.filter(
     (entry) =>
-      names.has(entry.uri) ||
-      (entry.parentUri !== undefined && names.has(entry.parentUri)),
+      names.has(sameEscapes(entry.uri)) ||
+      (entry.parentUri !== undefined &&
+        names.has(sameEscapes(entry.parentUri))),
   );
+}
+
+const HEX_DIGITS = '0123456789abcdefABCDEF';
+
+/**
+ * An address with every percent escape's hex digits in upper case, so that
+ * two spellings of one address compare equal: the client builds `%2F`
+ * (encodeURIComponent), ADT writes `%2f`, and RFC 3986 §6.2.2.1 makes them
+ * the same. Only a `%` followed by two hex digits is an escape; nothing else
+ * changes.
+ */
+function sameEscapes(uri: string): string {
+  let out = '';
+  let i = 0;
+  while (i < uri.length) {
+    const high = uri.charAt(i + 1);
+    const low = uri.charAt(i + 2);
+    if (
+      uri.charAt(i) === '%' &&
+      high !== '' &&
+      low !== '' &&
+      HEX_DIGITS.includes(high) &&
+      HEX_DIGITS.includes(low)
+    ) {
+      out += `%${high.toUpperCase()}${low.toUpperCase()}`;
+      i += 3;
+    } else {
+      out += uri.charAt(i);
+      i += 1;
+    }
+  }
+  return out;
 }
 
 /**
