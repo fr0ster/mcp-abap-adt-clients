@@ -369,17 +369,71 @@ export function stillInactiveAmong(
   );
 }
 
-/** A refusal about the activation's answer, in a sentence of this reading. */
+/**
+ * A refusal about the activation's answer, in a sentence of this reading,
+ * followed by whatever SAP said beside it (the warnings of a checklist that
+ * carried no verdict).
+ */
 function notActivated(
   sentence: string,
   stillInactive: ReadonlyArray<IAdtStillInactive> = [],
+  said: ReadonlyArray<AdtMessage> = [],
 ): AdtActivationRefusal {
   return {
     form: 'activation',
     message: `Not activated: ${sentence}`,
-    messages: [{ type: 'E', text: sentence }],
+    messages: [{ type: 'E', text: sentence }, ...said],
     stillInactive,
   };
+}
+
+/**
+ * The severities of a checklist without `activationExecuted` that the
+ * inactive list may decide (fr0ster/mcp-abap-adt#360): a warning, an
+ * information, a success. A message of any other type — `E`, `A`, `X`, a
+ * letter this reading does not know — keeps that checklist refused, as it
+ * was. An allow-list, so an unknown letter is never taken for a warning.
+ */
+const LIST_DECIDES_BESIDE: ReadonlySet<string> = new Set(['W', 'I', 'S']);
+
+/**
+ * The judgement of a checklist the document alone cannot decide, by the
+ * inactive list the member read after it: an object the activation named
+ * still listed is not activated; none is activated. Without the list, or
+ * with one that cannot be read, the outcome is not decided. `answered` is
+ * what SAP answered, in the words the undecided sentences begin with;
+ * `answeredListed` the same, in the words of the sentence naming the objects.
+ */
+function byInactiveList(
+  answered: string,
+  answeredListed: string,
+  activation: AdtActivationFacts | undefined,
+  said: ReadonlyArray<AdtMessage>,
+): AdtActivationRefusal | null {
+  if (activation === undefined) {
+    return notActivated(
+      `${answered}; without the list of inactive objects the activation's outcome could not be decided`,
+      [],
+      said,
+    );
+  }
+  const still = stillInactiveAmong(
+    activation.named,
+    activation.inactiveObjects,
+  );
+  if (still === null) {
+    return notActivated(
+      `${answered}, and the inactive list could not be read; the activation's outcome could not be decided`,
+      [],
+      said,
+    );
+  }
+  if (still.length === 0) return null;
+  return notActivated(
+    `${answeredListed}, and the inactive list still names ${still.length} object(s) of the activation; nothing was activated`,
+    still,
+    said,
+  );
 }
 
 /**
@@ -400,7 +454,9 @@ function notActivated(
  * | `chkl:messages`, a `msg` of type `E` | refused, the messages explain it |
  * | `chkl:messages`, `activationExecuted="false"`, a message | refused, the messages explain it |
  * | `chkl:messages`, `activationExecuted="false"`, **no message** | judged by the inactive list read after it (below) |
- * | `chkl:messages`, no `activationExecuted` | refused, the messages explain it, or a sentence that the document says nothing |
+ * | `chkl:messages`, no `activationExecuted`, **only `W`/`I`/`S` messages** | judged by the inactive list read after it (below; fr0ster/mcp-abap-adt#360) |
+ * | `chkl:messages`, no `activationExecuted`, any other message (`E`, `A`, `X`, …) | refused, the messages explain it |
+ * | `chkl:messages`, no `activationExecuted`, no message | refused: a sentence that the document says nothing |
  * | `ioc:inactiveObjects` | **not activated**, every object it lists |
  * | an empty body | **activated**, whatever `preauditRequested` was (an empty answer activated on every release measured) |
  * | anything else, or a document that is not well-formed | **not activated**: the answer does not state the activation |
@@ -415,6 +471,15 @@ function notActivated(
  * nothing to activate. Without the list, or with a list that cannot be read,
  * the outcome is not decided and is answered as not activated.
  *
+ * **The checklist without a verdict, warnings alone** answered, on SAP_BASIS
+ * 7.52, the activation of a program that SAP activated
+ * (fr0ster/mcp-abap-adt#360, from the report; onprem 816 and cloud answer the
+ * same activation `activationExecuted="true"`). SAP's handler sets the
+ * attribute only once its activation run starts, so its absence says nothing
+ * either way. It is judged by the inactive list exactly as the silent
+ * checklist is, and SAP's warnings follow the sentence in `messages`; none
+ * listed is activated, and the warnings stay in the answer's document.
+ *
  * **`ioc:inactiveObjects` is not "still running".** Measured on S/4HANA 2025:
  * the objects stayed inactive in two reads of the list ten seconds apart; on
  * 751 (fr0ster/mcp-abap-adt#351) the class stayed inactive until it was
@@ -425,7 +490,15 @@ function notActivated(
  * **The attribute is read as three states, not as a boolean.** Absent is not
  * `false`: a checklist that carries no `activationExecuted` — or no
  * `chkl:properties` — has told us nothing, and the silent row is measured for
- * SAP writing `false`, never for SAP writing nothing.
+ * SAP writing `false`, never for SAP writing nothing. Absent with warnings
+ * alone goes to the inactive list; absent with nothing, or with any other
+ * message, is refused.
+ *
+ * **The verdict is this strategy's, and the strategy is the consumer's
+ * choice.** adt-clients judges nothing: it hands the answer, and the
+ * inactive list where it read one, to whichever `analyse` the consumer
+ * passed. This table is what `analyseActivation` answers; a consumer who
+ * reads an activation otherwise passes its own.
  */
 export function readActivationRefusal(
   document: unknown,
@@ -469,28 +542,34 @@ export function readActivationRefusal(
   const executed = at(root, 'properties', '@activationExecuted');
   const activated = executed === 'true' || executed === true;
   const declaredNotActivated = executed === 'false' || executed === false;
+  const unstated = executed === undefined;
 
   if (activated && errors.length === 0) return null;
 
   if (declaredNotActivated && messages.length === 0) {
-    if (activation === undefined) {
-      return notActivated(
-        "SAP answered that no activation ran and gave no message; without the list of inactive objects the activation's outcome could not be decided",
-      );
-    }
-    const still = stillInactiveAmong(
-      activation.named,
-      activation.inactiveObjects,
+    return byInactiveList(
+      'SAP answered that no activation ran and gave no message',
+      'SAP answered that no activation ran',
+      activation,
+      [],
     );
-    if (still === null) {
-      return notActivated(
-        "SAP answered that no activation ran and gave no message, and the inactive list could not be read; the activation's outcome could not be decided",
-      );
-    }
-    if (still.length === 0) return null;
-    return notActivated(
-      `SAP answered that no activation ran, and the inactive list still names ${still.length} object(s) of the activation; nothing was activated`,
-      still,
+  }
+
+  // SAP sets the verdict attributes only when its activation run starts
+  // (CL_SEU_ADT_RES_ACTIVATION, `lif_phased_activation~run`), so a checklist
+  // without one and with warnings alone says nothing about the object:
+  // SAP_BASIS 7.52 answered it for a program it activated
+  // (fr0ster/mcp-abap-adt#360). The inactive list decides.
+  if (
+    unstated &&
+    messages.length > 0 &&
+    messages.every((m) => LIST_DECIDES_BESIDE.has(m.type))
+  ) {
+    return byInactiveList(
+      'SAP answered no activationExecuted verdict and only warnings',
+      'SAP answered no activationExecuted verdict and only warnings',
+      activation,
+      messages,
     );
   }
 
