@@ -37,7 +37,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   leaves the call's verdict as it was (no failure, as before the read
   existed) and hands the refusal's response, if any, as the list; without an
   `analyse` the answer is what it was, one `GET` later. After every other
-  answer nothing more is sent, as before. adt-strategies' range is `^0.23.1`
+  answer nothing more is sent, as before. A message type is read as
+  adt-strategies reads it (`warning`, `info`, `success`, `OK`, `tolerable`
+  and the single letters), so the client reads the list after exactly the
+  checklists that strategy decides by it. adt-strategies' range is `^0.23.1`
   (dev).
 
 ## [45.5.1] - 2026-11-13

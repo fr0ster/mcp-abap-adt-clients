@@ -35,6 +35,13 @@ fr0ster/mcp-abap-adt-clients#314).
   `X`, a letter not known), is refused as before. Every other row is
   unchanged: every recorded activation answer (the corpus and the onprem 816
   and cloud bodies recorded for the issue) is judged exactly as by 0.23.0.
+- **`stillInactiveAmong` compares percent escapes without regard to case.**
+  adt-clients names a namespaced object `%2Fabc%2Fzp` (encodeURIComponent);
+  ADT writes `%2fabc%2fzp` (recorded in the 7.40 quick search); RFC 3986
+  makes them one address. The exact match read such an object, still on the
+  inactive list, as activated — after the silent checklist and in the new row
+  alike. Only a `%` with two hex digits is compared this way; nothing else in
+  an address changes.
 
 ## [0.23.0] - 2026-11-12
 
