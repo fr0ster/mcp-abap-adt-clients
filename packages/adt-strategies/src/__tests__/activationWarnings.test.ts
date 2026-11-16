@@ -240,14 +240,17 @@ describe('a namespaced object counts however its escapes are cased', () => {
   it.each([
     ['no verdict, warnings alone', ISSUE_752_PROPERTIES],
     ['the silent checklist', SILENT],
-  ])('%s: still listed in lowercase escapes is not activated', (_row, document) => {
-    const verdict = failure(
-      analyseActivation(ADT_NO_FAILURE, wire(document), {
-        activation: { named: [NAMED], inactiveObjects: LIST },
-      }),
-    );
-    expect(verdict.stillInactive.map((o) => o.uri)).toEqual([LISTED]);
-  });
+  ])(
+    '%s: still listed in lowercase escapes is not activated',
+    (_row, document) => {
+      const verdict = failure(
+        analyseActivation(ADT_NO_FAILURE, wire(document), {
+          activation: { named: [NAMED], inactiveObjects: LIST },
+        }),
+      );
+      expect(verdict.stillInactive.map((o) => o.uri)).toEqual([LISTED]);
+    },
+  );
 
   it('an include counts by its parentUri in lowercase escapes', () => {
     const include = wire(
@@ -279,7 +282,10 @@ describe('a namespaced object counts however its escapes are cased', () => {
   it.each([
     ['another namespaced object', '/sap/bc/adt/programs/programs/%2fabc%2fzq'],
     ['the name without its escapes', '/sap/bc/adt/programs/programs/abczp'],
-    ['the escapes written as letters', '/sap/bc/adt/programs/programs/2Fabc2Fzp'],
+    [
+      'the escapes written as letters',
+      '/sap/bc/adt/programs/programs/2Fabc2Fzp',
+    ],
   ])('%s does not count', (_what, uri) => {
     const other = wire(
       `<?xml version="1.0" encoding="utf-8"?><ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects"><ioc:entry><ioc:object ioc:user="" ioc:deleted="false"><ioc:ref adtcore:uri="${uri}" adtcore:type="PROG/P" adtcore:name="X" xmlns:adtcore="http://www.sap.com/adt/core"/></ioc:object><ioc:transport/></ioc:entry></ioc:inactiveObjects>`,

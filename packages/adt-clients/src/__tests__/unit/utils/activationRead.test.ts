@@ -11,11 +11,11 @@
  * stub connection that answers by request.
  */
 import { join } from 'node:path';
-import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import {
   analyseActivation,
   readActivationRefusal,
 } from '@mcp-abap-adt/adt-strategies';
+import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import {
   ADT_NO_FAILURE,
   type AdtNoFailure,
