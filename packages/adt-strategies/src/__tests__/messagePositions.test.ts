@@ -70,16 +70,29 @@ describe('an activation message states where it stands', () => {
       'a start with a sign',
       '/sap/bc/adt/programs/programs/zp/source/main#start=-1,2',
     ],
-    [
-      'an end that does not read',
-      '/sap/bc/adt/programs/programs/zp/source/main#start=1,2;end=x,4',
-    ],
   ])('gives the uri only for an href with %s', (_label, href) => {
     expect(firstActivationMessage(withHref(href))).toStrictEqual({
       type: 'E',
       text: 'a syntax error',
       object: 'Program ZP',
       uri: '/sap/bc/adt/programs/programs/zp/source/main',
+    });
+  });
+
+  it('keeps a valid start when the optional end does not read', () => {
+    expect(
+      firstActivationMessage(
+        withHref(
+          '/sap/bc/adt/programs/programs/zp/source/main#start=16,15;end=x,4',
+        ),
+      ),
+    ).toStrictEqual({
+      type: 'E',
+      text: 'a syntax error',
+      object: 'Program ZP',
+      uri: '/sap/bc/adt/programs/programs/zp/source/main',
+      position: { line: 16, column: 15 },
+      line: 16,
     });
   });
 

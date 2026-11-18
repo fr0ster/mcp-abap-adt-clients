@@ -109,7 +109,8 @@ fr0ster/mcp-abap-adt#351): `object` (a checklist `msg`'s `objDescr`, such as
 and `position: { line, column, end?: { line, column } }`, read from the
 reference's fragment `#start=<line>,<col>[;end=<line>,<col>]` — a checklist
 `msg`'s `href`, a check run's `uri`. A reference with no fragment, or with one
-that is not a position, gives the `uri` alone; an empty one gives neither. A
+whose `start` does not read, gives the `uri` alone; an `end` that does not
+read is dropped and the start kept; an empty reference gives neither. A
 checklist `msg`'s `line` attribute is the message's ordinal (1, 2, 3…), not a
 source line, and is not read. `AdtMessage.line` is deprecated: it repeats
 `position.line` — the real source line — and is absent without a position.

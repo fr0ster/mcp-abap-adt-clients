@@ -31,8 +31,9 @@ Released with `@mcp-abap-adt/adt-clients` 45.5.3 (fr0ster/mcp-abap-adt#351).
   `href` without its fragment), `position: { line, column, end?: { line,
   column } }` (from the fragment; lines from 1, columns from 0, `end`
   exclusive), `code`, and `line` (deprecated: `position.line`). An `href`
-  with no fragment, or with one that is not a
-  position, gives the `uri` alone; an empty `href` gives neither. The fragment
+  with no fragment, or with one whose `start` does not read, gives the `uri`
+  alone; an `end` that does not read is dropped and the start kept; an empty
+  `href` gives neither. The fragment
   is read by plain string code, shared with `readObjectOutline`.
 - **`readCheckRunRefusal` (`analyseCheck`) reads the same reference** from a
   `chkrun:checkMessage`'s `uri`, which it dropped: `uri` and `position`, as

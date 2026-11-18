@@ -62,8 +62,9 @@ export interface AdtSourceReference {
 
 /**
  * A reference as SAP wrote it, split. A fragment that is not a position — none,
- * a `#type=…;name=…` target, a `start` or an `end` that does not read — gives
- * the uri alone; an empty reference gives nothing.
+ * a `#type=…;name=…` target, a `start` that does not read — gives the uri
+ * alone; an `end` that does not read is dropped and the start kept; an empty
+ * reference gives nothing.
  */
 export function readSourceReference(
   reference: string | undefined,
@@ -76,9 +77,9 @@ export function readSourceReference(
   const pairs = fragmentPairs(reference.slice(hash + 1));
   const start = sourcePoint(pairs.get('start'));
   if (start === undefined) return located;
-  const endText = pairs.get('end');
-  if (endText === undefined) return { ...located, position: start };
-  const end = sourcePoint(endText);
-  if (end === undefined) return located;
-  return { ...located, position: { ...start, end } };
+  // `end` is optional: one that does not read is dropped, the start kept.
+  const end = sourcePoint(pairs.get('end'));
+  return end === undefined
+    ? { ...located, position: start }
+    : { ...located, position: { ...start, end } };
 }
