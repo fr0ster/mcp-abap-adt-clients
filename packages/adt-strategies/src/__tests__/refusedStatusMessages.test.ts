@@ -258,6 +258,14 @@ describe('a body that only looks like one keeps the 0.23.2 answer', () => {
       'a page followed by a report',
       `<html><body>gateway</body></html><chkrun:checkReport xmlns:chkrun="${CHECKRUN_NS}" chkrun:status="notProcessed" chkrun:statusText="trailing"/>`,
     ],
+    [
+      'a report followed by text',
+      `<chkrun:checkReport xmlns:chkrun="${CHECKRUN_NS}" chkrun:status="notProcessed" chkrun:statusText="trailing"/>trailing`,
+    ],
+    [
+      'text followed by a report',
+      `leading<chkrun:checkReport xmlns:chkrun="${CHECKRUN_NS}" chkrun:status="notProcessed" chkrun:statusText="leading"/>`,
+    ],
   ])('%s', (_label, body) => {
     for (const [, analyse] of [...CHECK_ANALYSERS, ...ACTIVATION_ANALYSERS]) {
       expect(on400(analyse, body).messages).toStrictEqual(FALLBACK);
@@ -306,6 +314,44 @@ describe('an exception document refused with a non-2xx status', () => {
     );
     expect(analyseActivation(verdict, answer)).toStrictEqual({
       ...expectedFor(answer),
+      stillInactive: [],
+    });
+  });
+});
+
+/**
+ * The activation answered 200 with a silent checklist, and the inactive-list
+ * read after it failed 500: the client hands the activation's answer with
+ * the read's failure as the verdict (adt-clients `activationExchange`). The
+ * failure is not the checklist's, so the checklist is not read as a refused
+ * body: the answer stays 0.23.2's, the read's failure in the message.
+ */
+describe('a failure from the read after a 200 checklist', () => {
+  it('keeps the 0.23.2 answer', () => {
+    const activation = answerFor('activation-nothing-to-activate');
+    expect(activation.status).toBe(200);
+    const read: IAdtWireResponse = {
+      data: '',
+      status: 500,
+      statusText: 'Internal Server Error',
+      headers: {},
+    };
+    const message =
+      "The activation's outcome could not be decided: SAP answered that no activation ran and gave no message, and reading the inactive objects failed: Request failed with status code 500";
+    const verdict: IAdtError = { origin: 'refusal', message, response: read };
+    for (const [, analyse] of ACTIVATION_ANALYSERS) {
+      expect(analyse(verdict, activation)).toMatchObject({
+        origin: 'refusal',
+        message,
+        response: read,
+        messages: [{ type: 'E', text: message }],
+      });
+    }
+    expect(analyseActivation(verdict, activation)).toStrictEqual({
+      origin: 'refusal',
+      message,
+      response: read,
+      messages: [{ type: 'E', text: message }],
       stillInactive: [],
     });
   });
