@@ -126,9 +126,9 @@ function enrich(
   answer: IAdtWireResponse | undefined,
   activation?: AdtActivationFacts,
 ): IAdtMessageFailure {
-  const document = answer?.data;
-  const refusal = readExceptionRefusal(document);
+  const refusal = readExceptionRefusal(answer?.data);
   if (!refusal) {
+    const document = refusedDocument(answer);
     return withBody(
       verdict,
       checkRunBody(document) ?? checklistBody(document, activation),
@@ -140,6 +140,18 @@ function enrich(
     namespace: verdict.namespace ?? refusal.namespace,
     messages: refusal.messages,
   };
+}
+
+/**
+ * The answer's body when the answer itself was refused — its own status is
+ * not 2xx — and `undefined` otherwise. A verdict may come from another
+ * request than the answer: after an activation's `200` checklist the client
+ * hands the failure of the inactive-list read beside it, and that checklist
+ * was not refused.
+ */
+function refusedDocument(answer: IAdtWireResponse | undefined): unknown {
+  if (answer === undefined) return undefined;
+  return answer.status >= 200 && answer.status < 300 ? undefined : answer.data;
 }
 
 /** The namespace of a check run's report, `chkrun:`. */
@@ -250,7 +262,7 @@ export const analyseActivation: IAnalyse<IAdtActivationFailure> = (
     // lists as still inactive, as on a 200.
     const checklist =
       readExceptionRefusal(answer?.data) === null
-        ? checklistBody(answer?.data, context?.activation)
+        ? checklistBody(refusedDocument(answer), context?.activation)
         : null;
     if (checklist) {
       return {
