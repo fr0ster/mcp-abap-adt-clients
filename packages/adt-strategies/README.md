@@ -118,16 +118,20 @@ position.
 
 A check or an activation refused with a non-2xx status carries the same
 messages as the `200` reading of the same body (0.23.3): when the library's
-verdict is already a failure and the body is not an `exc:exception`, its one
-top-level element — by namespace URI and local name, never by prefix —
+verdict is already a failure, the answer's own status is not 2xx and its body
+is not an `exc:exception`, the body's one top-level element (nothing but
+whitespace after it) — by namespace URI and local name, never by prefix —
 decides. `checkRunReports` or `checkReport` in `http://www.sap.com/adt/checkrun`
 goes through `readCheckRunRefusal`, `messages` in
 `http://www.sap.com/abapxml/checklist` through `readActivationRefusal` (with
 the inactive-list facts; `analyseActivation` carries its `stillInactive`).
 Where that reading refuses nothing (an empty `checkRunReports`, a processed
 report without an error), and for any other body — another namespace, no
-namespace, more than one top-level element — the failure carries one `E`
-with the verdict's message. An `exc:exception` body is read as before.
+namespace, more than one top-level element, text after it — the failure
+carries one `E` with the verdict's message. A failure verdict beside a 2xx
+answer (an inactive-list read that failed after an activation's `200`
+checklist) reads no body: one `E` with the verdict's message, as in 0.23.2.
+An `exc:exception` body is read as before.
 
 A failure built from a document on a successful answer carries that answer's
 `sessionLost` (since 0.22.3: the connection marked the answer with the SAP
