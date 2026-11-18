@@ -1,4 +1,8 @@
-import { ADT_NO_FAILURE, type IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import {
+  ADT_NO_FAILURE,
+  type IAdtError,
+  type IAnalyse,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   analyseActivation,
@@ -7,27 +11,35 @@ import {
   analyseException,
   type IAdtMessageFailure,
 } from '../refusals/analyse';
-import {
-  readActivationRefusal,
-  readCheckRunRefusal,
-  readExceptionRefusal,
-} from '../refusals/read';
 import { answerFor } from './corpus';
 
 /**
- * A check or an activation refused with a non-2xx status keeps its messages
- * as the 200 reading gives them — position, uri, object, code and the
- * deprecated line. Until 0.23.3 every analyser read such an answer with the
- * exception reading alone, and a check-run report or an activation checklist
- * came back as one `E` carrying the library's sentence.
+ * A check or an activation refused with a non-2xx status gives exactly the
+ * messages the 200 reading gives for the same body — position, uri, object,
+ * code and the deprecated line included. Until 0.23.3 every analyser read
+ * such an answer with the exception reading alone, and a check-run report or
+ * an activation checklist came back as one `E` carrying the library's
+ * sentence.
+ *
+ * Every case is a parity: the same body through the form's own analyser on a
+ * 200, and through each analyser on a 400.
  */
 
-/** A recorded answer, served with another status. */
-const servedAs = (
-  caseName: string,
+const CHECKRUN_NS = 'http://www.sap.com/adt/checkrun';
+const CHECKLIST_NS = 'http://www.sap.com/abapxml/checklist';
+const XML = '<?xml version="1.0" encoding="utf-8"?>';
+
+/** A body served with a status; the library's verdict for a non-2xx one. */
+const served = (
+  data: string,
   status: number,
 ): { answer: IAdtWireResponse; verdict: IAdtError } => {
-  const answer = { ...answerFor(caseName), status };
+  const answer: IAdtWireResponse = {
+    data,
+    status,
+    statusText: '',
+    headers: {},
+  };
   return {
     answer,
     verdict: {
@@ -45,6 +57,25 @@ const failure = (
   return judged;
 };
 
+/** What the form's own analyser answers for the body on a 200. */
+const on200 = (
+  form: IAnalyse<IAdtMessageFailure>,
+  data: string,
+): IAdtMessageFailure =>
+  failure(form(ADT_NO_FAILURE, served(data, 200).answer));
+
+/** What an analyser answers for the body on a 400. */
+const on400 = (
+  analyse: IAnalyse<IAdtMessageFailure>,
+  data: string,
+): IAdtMessageFailure => {
+  const { answer, verdict } = served(data, 400);
+  return failure(analyse(verdict, answer));
+};
+
+/** The sentence a non-2xx answer gets when its body says nothing readable. */
+const FALLBACK = [{ type: 'E', text: 'Request failed with status code 400' }];
+
 const SYNTAX_FINDING = {
   type: 'E',
   text: 'Type "STRONG_BUT_NOT_A_REAL_TYPE" is unknown.',
@@ -54,83 +85,207 @@ const SYNTAX_FINDING = {
   code: 'MESSAGE(GTH)',
 };
 
-describe('a check run refused with a non-2xx status', () => {
-  const analysers = [
-    ['analyseCheck', analyseCheck],
-    ['analyseException', analyseException],
-    ['analyseAny', analyseAny],
-  ] as const;
+const recorded = (caseName: string): string => String(answerFor(caseName).data);
 
-  it.each(analysers)('keeps the findings as on a 200: %s', (_name, analyse) => {
-    const { answer, verdict } = servedAs('refusal-syntax-check', 400);
-    const judged = failure(analyse(verdict, answer));
-    expect(judged.messages).toStrictEqual(
-      readCheckRunRefusal(answer.data)?.messages,
-    );
-    expect(judged.messages[0]).toStrictEqual(SYNTAX_FINDING);
+/** A warning-only processed report, then a report with an error. */
+const MULTI_REPORT = `${XML}<chkrun:checkRunReports xmlns:chkrun="${CHECKRUN_NS}"><chkrun:checkReport chkrun:status="processed" chkrun:statusText="A checked"><chkrun:checkMessageList><chkrun:checkMessage chkrun:uri="/a/source/main#start=3,4" chkrun:type="W" chkrun:shortText="a warning"/></chkrun:checkMessageList></chkrun:checkReport><chkrun:checkReport chkrun:status="processed" chkrun:statusText="B checked"><chkrun:checkMessageList><chkrun:checkMessage chkrun:uri="/b/source/main#start=7,1" chkrun:type="E" chkrun:shortText="an error" chkrun:code="MESSAGE(X)"/></chkrun:checkMessageList></chkrun:checkReport></chkrun:checkRunReports>`;
+
+/** The recorded syntax check, under another prefix and the default namespace. */
+const RENAMED_CHECKRUN = recorded('refusal-syntax-check').replaceAll(
+  'chkrun:',
+  'cr:',
+);
+const DEFAULT_NS_CHECKRUN = recorded('refusal-syntax-check')
+  .replaceAll('chkrun:', '')
+  .replace(`xmlns:chkrun="${CHECKRUN_NS}"`, `xmlns="${CHECKRUN_NS}"`);
+const RENAMED_CHECKLIST = recorded('refusal-activation-fails').replaceAll(
+  'chkl:',
+  'cl:',
+);
+
+const BARE_EMPTY_REPORT = `${XML}<chkrun:checkReport xmlns:chkrun="${CHECKRUN_NS}"/>`;
+const EMPTY_REPORTS = `${XML}<chkrun:checkRunReports xmlns:chkrun="${CHECKRUN_NS}"/>`;
+
+/** A checklist with one warning, no activationExecuted. */
+const WARNING_ONLY = `${XML}<chkl:messages xmlns:chkl="${CHECKLIST_NS}"><msg objDescr="Program ZP" type="W" line="1" href="/p/source/main#start=2,0"><shortText><txt>a warning</txt></shortText></msg></chkl:messages>`;
+
+const CHECK_ANALYSERS = [
+  ['analyseCheck', analyseCheck],
+  ['analyseException', analyseException],
+  ['analyseAny', analyseAny],
+] as const;
+
+const ACTIVATION_ANALYSERS = [
+  ['analyseActivation', analyseActivation],
+  ['analyseException', analyseException],
+  ['analyseAny', analyseAny],
+] as const;
+
+describe('a check run refused with a non-2xx status gives what a 200 gives', () => {
+  it.each(CHECK_ANALYSERS)('the recorded syntax check: %s', (_n, analyse) => {
+    const body = recorded('refusal-syntax-check');
+    const judged = on400(analyse, body);
+    expect(judged.messages).toStrictEqual(on200(analyseCheck, body).messages);
+    expect(judged.messages).toStrictEqual([SYNTAX_FINDING]);
     // The library's verdict is enriched, not replaced.
-    expect(judged.message).toBe(verdict.message);
+    expect(judged.message).toBe('Request failed with status code 400');
     expect(judged.origin).toBe('refusal');
   });
 
-  it.each(analysers)(
-    'keeps a report that did not run as on a 200: %s',
-    (_name, analyse) => {
-      const { answer, verdict } = servedAs(
-        'refusal-check-nonexistent-object',
-        400,
-      );
-      expect(failure(analyse(verdict, answer)).messages).toStrictEqual([
-        {
-          type: 'E',
-          text: 'Resource CLASS ZMCP_BLD_NOPE_CLS99 does not exist.',
-          code: 'notProcessed',
-        },
-      ]);
+  it.each(CHECK_ANALYSERS)('a report that did not run: %s', (_n, analyse) => {
+    const body = recorded('refusal-check-nonexistent-object');
+    expect(on400(analyse, body).messages).toStrictEqual(
+      on200(analyseCheck, body).messages,
+    );
+  });
+
+  it.each(CHECK_ANALYSERS)(
+    'a warning-only report, then an error report: %s',
+    (_n, analyse) => {
+      const expected = on200(analyseCheck, MULTI_REPORT).messages;
+      expect(expected.map((m) => m.type)).toStrictEqual(['E']);
+      expect(on400(analyse, MULTI_REPORT).messages).toStrictEqual(expected);
     },
   );
+
+  it.each([
+    ['another prefix', RENAMED_CHECKRUN],
+    ['the default namespace', DEFAULT_NS_CHECKRUN],
+  ])('the namespace decides, not the prefix: %s', (_label, body) => {
+    expect(on200(analyseCheck, body).messages).toStrictEqual([SYNTAX_FINDING]);
+    for (const [, analyse] of CHECK_ANALYSERS) {
+      expect(on400(analyse, body).messages).toStrictEqual([SYNTAX_FINDING]);
+    }
+  });
+
+  it('a bare checkReport with nothing in it: what the 200 reading gives', () => {
+    const expected = on200(analyseCheck, BARE_EMPTY_REPORT).messages;
+    expect(expected).toStrictEqual([
+      { type: 'E', text: 'Check did not run (status: unstated)', code: '' },
+    ]);
+    for (const [, analyse] of CHECK_ANALYSERS) {
+      expect(on400(analyse, BARE_EMPTY_REPORT).messages).toStrictEqual(
+        expected,
+      );
+    }
+  });
+
+  it('an empty checkRunReports: no refusal on a 200, the verdict on a 400', () => {
+    expect(
+      analyseCheck(ADT_NO_FAILURE, served(EMPTY_REPORTS, 200).answer),
+    ).toBe(ADT_NO_FAILURE);
+    for (const [, analyse] of CHECK_ANALYSERS) {
+      expect(on400(analyse, EMPTY_REPORTS).messages).toStrictEqual(FALLBACK);
+    }
+  });
 });
 
-describe('an activation checklist refused with a non-2xx status', () => {
-  it.each([
-    ['analyseActivation', analyseActivation],
-    ['analyseException', analyseException],
-    ['analyseAny', analyseAny],
-  ] as const)('keeps the messages as on a 200: %s', (_name, analyse) => {
-    const { answer, verdict } = servedAs('refusal-activation-fails', 400);
-    const judged = failure(analyse(verdict, answer));
-    expect(judged.messages).toStrictEqual(
-      readActivationRefusal(answer.data)?.messages,
-    );
-    expect(judged.messages[0]).toStrictEqual({
+describe('an activation checklist refused with a non-2xx status gives what a 200 gives', () => {
+  it.each(ACTIVATION_ANALYSERS)('the recorded refusal: %s', (_n, analyse) => {
+    const body = recorded('refusal-activation-fails');
+    const expected = on200(analyseActivation, body).messages;
+    expect(expected[0]).toStrictEqual({
       ...SYNTAX_FINDING,
       object: 'Class ZMCP_BLD_ANSCH01, Method SAY_HELLO',
     });
+    expect(on400(analyse, body).messages).toStrictEqual(expected);
   });
 
-  it('carries no inactive objects', () => {
-    const { answer, verdict } = servedAs('refusal-activation-fails', 400);
+  it.each(ACTIVATION_ANALYSERS)('another prefix: %s', (_n, analyse) => {
+    const expected = on200(
+      analyseActivation,
+      recorded('refusal-activation-fails'),
+    ).messages;
+    expect(on400(analyse, RENAMED_CHECKLIST).messages).toStrictEqual(expected);
+  });
+
+  it.each(ACTIVATION_ANALYSERS)(
+    'one warning, no activationExecuted, no inactive list: %s',
+    (_n, analyse) => {
+      const expected = on200(analyseActivation, WARNING_ONLY).messages;
+      expect(expected.map((m) => m.type)).toStrictEqual(['E', 'W']);
+      expect(on400(analyse, WARNING_ONLY).messages).toStrictEqual(expected);
+    },
+  );
+
+  it('carries no inactive objects for a checklist', () => {
+    const { answer, verdict } = served(
+      recorded('refusal-activation-fails'),
+      400,
+    );
     const judged = analyseActivation(verdict, answer);
     if (judged === ADT_NO_FAILURE) throw new Error('expected a failure');
     expect(judged.stillInactive).toStrictEqual([]);
   });
 });
 
+describe('a body that only looks like one keeps the 0.23.2 answer', () => {
+  it.each([
+    [
+      'a foreign namespace with the checklist local name',
+      `${XML}<api:messages xmlns:api="urn:gateway"><msg type="E" href="/p#start=1,0"><shortText><txt>foreign</txt></shortText></msg></api:messages>`,
+    ],
+    [
+      'a foreign namespace with the check-run local name',
+      `${XML}<x:checkRunReports xmlns:x="urn:gateway"><x:checkReport x:status="notProcessed" x:statusText="foreign"/></x:checkRunReports>`,
+    ],
+    [
+      'no namespace at all',
+      `${XML}<messages><msg type="E"><shortText><txt>foreign</txt></shortText></msg></messages>`,
+    ],
+    [
+      'a page followed by a report',
+      `<html><body>gateway</body></html><chkrun:checkReport xmlns:chkrun="${CHECKRUN_NS}" chkrun:status="notProcessed" chkrun:statusText="trailing"/>`,
+    ],
+  ])('%s', (_label, body) => {
+    for (const [, analyse] of [...CHECK_ANALYSERS, ...ACTIVATION_ANALYSERS]) {
+      expect(on400(analyse, body).messages).toStrictEqual(FALLBACK);
+    }
+  });
+});
+
 describe('an exception document refused with a non-2xx status', () => {
+  /** The 0.23.2 answer, written out: the exception reading's, T100 key included. */
+  const expectedFor = (answer: IAdtWireResponse) => ({
+    origin: 'refusal',
+    message: 'Request failed with status code 404',
+    response: answer,
+    adtType: 'ExceptionResourceNotFound',
+    namespace: 'com.sap.adt',
+    messages: [
+      {
+        type: 'E',
+        text: 'Resource CLASS ZMCP_BLD_NOPE_CLS99 does not exist.',
+        code: 'ExceptionResourceNotFound',
+        t100: {
+          id: 'SADT_RESOURCE',
+          no: '002',
+          values: ['CLASS', 'ZMCP_BLD_NOPE_CLS99'],
+        },
+      },
+    ],
+  });
+
   it.each([
     ['analyseCheck', analyseCheck],
-    ['analyseActivation', analyseActivation],
     ['analyseException', analyseException],
     ['analyseAny', analyseAny],
-  ] as const)(
-    'is read by the exception reading alone: %s',
-    (_name, analyse) => {
-      const { answer, verdict } = servedAs('refusal-object-not-found', 404);
-      const refusal = readExceptionRefusal(answer.data);
-      const judged = failure(analyse(verdict, answer));
-      expect(judged.messages).toStrictEqual(refusal?.messages);
-      expect(judged.adtType).toBe(refusal?.adtType);
-      expect(judged.namespace).toBe(refusal?.namespace);
-    },
-  );
+  ] as const)('answers as 0.23.2 did: %s', (_n, analyse) => {
+    const { answer, verdict } = served(
+      recorded('refusal-object-not-found'),
+      404,
+    );
+    expect(analyse(verdict, answer)).toStrictEqual(expectedFor(answer));
+  });
+
+  it('answers as 0.23.2 did: analyseActivation', () => {
+    const { answer, verdict } = served(
+      recorded('refusal-object-not-found'),
+      404,
+    );
+    expect(analyseActivation(verdict, answer)).toStrictEqual({
+      ...expectedFor(answer),
+      stillInactive: [],
+    });
+  });
 });
