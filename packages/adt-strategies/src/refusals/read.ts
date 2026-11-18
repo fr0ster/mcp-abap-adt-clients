@@ -229,6 +229,54 @@ function parseXml(document: unknown): ParsedElement | null {
   }
 }
 
+/**
+ * The parser for a document's root element: namespace prefixes kept, so the
+ * root's name and its `xmlns` declarations can be read as written.
+ */
+const namespacedParser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '@',
+  parseAttributeValue: false,
+  parseTagValue: false,
+});
+
+/** A document's one top-level element: its namespace URI and local name. */
+export interface IAdtRootElement {
+  /** The namespace URI the element is in; absent when it is in none. */
+  readonly namespace?: string;
+  readonly local: string;
+}
+
+/**
+ * The root element of a well-formed document with exactly one top-level
+ * element, by namespace URI and local name — never by prefix, which the
+ * sender chooses. `null` for anything else: not a string, not well-formed,
+ * no element or more than one at the top.
+ */
+export function readRootElement(document: unknown): IAdtRootElement | null {
+  if (typeof document !== 'string') return null;
+  if (XMLValidator.validate(document) !== true) return null;
+  let parsed: unknown;
+  try {
+    parsed = namespacedParser.parse(document);
+  } catch {
+    return null;
+  }
+  if (!isElement(parsed)) return null;
+  const names = Object.keys(parsed).filter(
+    (key) => !key.startsWith('?') && !key.startsWith('#'),
+  );
+  const [name] = names;
+  if (names.length !== 1 || name === undefined) return null;
+  const element = parsed[name];
+  if (Array.isArray(element)) return null;
+  const colon = name.indexOf(':');
+  const local = colon < 0 ? name : name.slice(colon + 1);
+  const declaration = colon < 0 ? '@xmlns' : `@xmlns:${name.slice(0, colon)}`;
+  const namespace = leafText(field(element, declaration));
+  return namespace === undefined ? { local } : { namespace, local };
+}
+
 // ---------------------------------------------------------------------------
 // Form 1 — the HTTP status carries it, the document explains it
 // ---------------------------------------------------------------------------
@@ -531,18 +579,6 @@ function checklistMessagesOf(root: unknown): AdtMessage[] {
       ...(code !== undefined ? { code } : {}),
     };
   });
-}
-
-/**
- * Every message of an activation checklist (`chkl:messages`), each as
- * {@link readActivationRefusal} reads it; `null` for a document whose root
- * is not a checklist. No verdict: for an answer the status already refused,
- * where the checklist explains the refusal.
- */
-export function readChecklistMessages(document: unknown): AdtMessage[] | null {
-  const parsed = wellFormed(document);
-  if (!rootIs(parsed, 'messages')) return null;
-  return checklistMessagesOf(field(parsed, 'messages'));
 }
 
 /**
@@ -866,30 +902,6 @@ function notRunMessage(report: unknown): AdtMessage {
   const text =
     statusText || `Check did not run (status: ${status || 'unstated'})`;
   return { type: 'E', text, code: status };
-}
-
-/**
- * Every message of a check-run report (`chkrun:checkRunReports`, or a bare
- * `chkrun:checkReport`), each as {@link readCheckRunRefusal} reads it — a
- * report that did not run and listed nothing gives its status sentence;
- * `null` for a document whose root is neither. No verdict: for an answer the
- * status already refused, where the report explains the refusal.
- */
-export function readCheckRunMessages(document: unknown): AdtMessage[] | null {
-  const parsed = parseXml(document);
-  const reports = rootIs(parsed, 'checkRunReports')
-    ? asArray(at(parsed, 'checkRunReports', 'checkReport'))
-    : rootIs(parsed, 'checkReport')
-      ? asArray(field(parsed, 'checkReport'))
-      : null;
-  if (reports === null) return null;
-  return reports.flatMap((report) => {
-    const reported = checkMessagesOf(report);
-    if (reported.length > 0) return reported;
-    return String(field(report, '@status') ?? '') === 'processed'
-      ? []
-      : [notRunMessage(report)];
-  });
 }
 
 /**

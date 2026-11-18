@@ -6,14 +6,13 @@ import {
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   type AdtActivationFacts,
+  type AdtActivationRefusal,
   type AdtMessage,
   type AdtRefusal,
   type IAdtStillInactive,
   readActivationRefusal,
   readAdtRefusal,
   readCdsTestDoublesRefusal,
-  readChecklistMessages,
-  readCheckRunMessages,
   readCheckRunRefusal,
   readDeletionRefusal,
   readExceptionRefusal,
@@ -21,6 +20,7 @@ import {
   readMessageClassMessageAbsence,
   readObjectPropertiesAbsence,
   readPublicationRefusal,
+  readRootElement,
   readUnitTestRefusal,
   readValidationRefusal,
 } from './read';
@@ -124,28 +124,67 @@ function requestOf(
 function enrich(
   verdict: IAdtError,
   answer: IAdtWireResponse | undefined,
+  activation?: AdtActivationFacts,
 ): IAdtMessageFailure {
   const document = answer?.data;
   const refusal = readExceptionRefusal(document);
   if (!refusal) {
-    // A check or an activation refused with a non-2xx status still explains
-    // itself in its own document, and its messages are read as the 200
-    // reading reads them — position, uri, object, code. The document's root
-    // decides which reading; any other body gives the library's sentence.
-    const listed =
-      readCheckRunMessages(document) ?? readChecklistMessages(document);
-    return {
-      ...verdict,
-      messages: listed?.length
-        ? listed
-        : [{ type: 'E', text: verdict.message }],
-    };
+    return withBody(
+      verdict,
+      checkRunBody(document) ?? checklistBody(document, activation),
+    );
   }
   return {
     ...verdict,
     adtType: verdict.adtType ?? refusal.adtType,
     namespace: verdict.namespace ?? refusal.namespace,
     messages: refusal.messages,
+  };
+}
+
+/** The namespace of a check run's report, `chkrun:`. */
+const CHECKRUN_NS = 'http://www.sap.com/adt/checkrun';
+/** The namespace of an activation's checklist, `chkl:`. */
+const CHECKLIST_NS = 'http://www.sap.com/abapxml/checklist';
+
+/**
+ * A check run refused with a non-2xx status explains itself in its report,
+ * and the report is read by the very reading of a 200 — the same messages,
+ * position, uri and code included. The root decides, by namespace URI and
+ * local name: a document that only looks like a report is not read.
+ */
+function checkRunBody(document: unknown): AdtRefusal | null {
+  const root = readRootElement(document);
+  const isReport =
+    root?.namespace === CHECKRUN_NS &&
+    (root.local === 'checkRunReports' || root.local === 'checkReport');
+  return isReport ? readCheckRunRefusal(document) : null;
+}
+
+/** An activation's checklist on a non-2xx status, read as on a 200. */
+function checklistBody(
+  document: unknown,
+  activation: AdtActivationFacts | undefined,
+): AdtActivationRefusal | null {
+  const root = readRootElement(document);
+  const isChecklist =
+    root?.namespace === CHECKLIST_NS && root.local === 'messages';
+  return isChecklist ? readActivationRefusal(document, activation) : null;
+}
+
+/**
+ * The verdict, with the messages of the body's own refusal; with one `E`
+ * carrying the verdict's sentence when the body gave none.
+ */
+function withBody(
+  verdict: IAdtError,
+  body: AdtRefusal | null,
+): IAdtMessageFailure {
+  return {
+    ...verdict,
+    messages: body?.messages.length
+      ? body.messages
+      : [{ type: 'E', text: verdict.message }],
   };
 }
 
@@ -168,7 +207,8 @@ function analyser(
   // The facts a member read beside the answer travel to the reading: a
   // dispatcher that dropped them would judge an activation without its list.
   return (verdict, answer, context) => {
-    if (verdict !== ADT_NO_FAILURE) return enrich(verdict, answer);
+    if (verdict !== ADT_NO_FAILURE)
+      return enrich(verdict, answer, context?.activation);
     const refusal = read(
       (answer as { data?: unknown } | undefined)?.data,
       context?.activation,
@@ -206,7 +246,22 @@ export const analyseActivation: IAnalyse<IAdtActivationFailure> = (
   context,
 ) => {
   if (verdict !== ADT_NO_FAILURE) {
-    return { ...enrich(verdict, answer), stillInactive: [] };
+    // A checklist refused with a non-2xx status: its messages and what it
+    // lists as still inactive, as on a 200.
+    const checklist =
+      readExceptionRefusal(answer?.data) === null
+        ? checklistBody(answer?.data, context?.activation)
+        : null;
+    if (checklist) {
+      return {
+        ...withBody(verdict, checklist),
+        stillInactive: checklist.stillInactive,
+      };
+    }
+    return {
+      ...enrich(verdict, answer, context?.activation),
+      stillInactive: [],
+    };
   }
   const refusal = readActivationRefusal(answer?.data, context?.activation);
   return refusal
