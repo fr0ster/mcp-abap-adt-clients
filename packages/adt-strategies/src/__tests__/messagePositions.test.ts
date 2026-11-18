@@ -35,8 +35,10 @@ describe('an activation message states where it stands', () => {
       object: 'Class ZCL_AI_ACT_PROBE, Method GET_VALUE',
       uri: '/sap/bc/adt/oo/classes/zcl_ai_act_probe/source/main',
       position: { line: 16, column: 15 },
+      // The real source line, deprecated in favour of `position.line`;
+      // never SAP's ordinal (`line="1"`).
+      line: 16,
     });
-    expect(message && 'line' in message).toBe(false);
   });
 
   it('reads a start and an end, and the code, from the recorded refusal', () => {
@@ -48,6 +50,7 @@ describe('an activation message states where it stands', () => {
       object: 'Class ZMCP_BLD_ANSCH01, Method SAY_HELLO',
       uri: '/sap/bc/adt/oo/classes/zmcp_bld_ansch01/source/main',
       position: { line: 15, column: 24, end: { line: 15, column: 50 } },
+      line: 15,
       code: 'MESSAGE(GTH)',
     });
   });
@@ -101,6 +104,7 @@ describe('an activation message states where it stands', () => {
         object: 'Program ZP',
         uri: '/p',
         position: { line: 13, column: 10 },
+        line: 13,
       },
     ]);
   });
@@ -115,6 +119,7 @@ describe('a check-run message states where it stands', () => {
       text: 'Type "STRONG_BUT_NOT_A_REAL_TYPE" is unknown.',
       uri: '/sap/bc/adt/oo/classes/zmcp_bld_ansch01/source/main',
       position: { line: 15, column: 24, end: { line: 15, column: 50 } },
+      line: 15,
       code: 'MESSAGE(GTH)',
     });
   });

@@ -111,7 +111,8 @@ reference's fragment `#start=<line>,<col>[;end=<line>,<col>]` — a checklist
 `msg`'s `href`, a check run's `uri`. A reference with no fragment, or with one
 that is not a position, gives the `uri` alone; an empty one gives neither. A
 checklist `msg`'s `line` attribute is the message's ordinal (1, 2, 3…), not a
-source line, and is not read: `AdtMessage` has no `line`.
+source line, and is not read. `AdtMessage.line` is deprecated: it repeats
+`position.line` — the real source line — and is absent without a position.
 
 A failure built from a document on a successful answer carries that answer's
 `sessionLost` (since 0.22.3: the connection marked the answer with the SAP

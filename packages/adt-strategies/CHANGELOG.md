@@ -30,7 +30,8 @@ Released with `@mcp-abap-adt/adt-clients` 45.5.3 (fr0ster/mcp-abap-adt#351).
   carries, where SAP states them, `object` (from `objDescr`), `uri` (the
   `href` without its fragment), `position: { line, column, end?: { line,
   column } }` (from the fragment; lines from 1, columns from 0, `end`
-  exclusive) and `code`. An `href` with no fragment, or with one that is not a
+  exclusive), `code`, and `line` (deprecated: `position.line`). An `href`
+  with no fragment, or with one that is not a
   position, gives the `uri` alone; an empty `href` gives neither. The fragment
   is read by plain string code, shared with `readObjectOutline`.
 - **`readCheckRunRefusal` (`analyseCheck`) reads the same reference** from a
@@ -39,9 +40,11 @@ Released with `@mcp-abap-adt/adt-clients` 45.5.3 (fr0ster/mcp-abap-adt#351).
 
 ### Changed
 
-- **`AdtMessage.line` is removed** — it never held a source line. A consumer
-  that read it reads `position.line`. New exported types: `AdtSourcePosition`,
-  `AdtSourcePoint`.
+- **`AdtMessage.line` carries the real source line, and is deprecated.** It
+  held a checklist `msg`'s ordinal; it is now `position.line` — a number, no
+  longer a string — and absent when the message has no position. Use
+  `position.line`. Added: `AdtMessage.position`, `object`, and the exported
+  types `AdtSourcePosition`, `AdtSourcePoint`.
 
 ## [0.23.1] - 2026-11-16
 

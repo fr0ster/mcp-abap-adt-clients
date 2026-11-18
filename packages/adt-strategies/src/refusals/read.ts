@@ -103,6 +103,29 @@ export interface AdtMessage {
    * (fr0ster/mcp-abap-adt#351), and is not read.
    */
   readonly position?: AdtSourcePosition;
+  /**
+   * The source line the message stands on: `position.line`, present exactly
+   * when `position` is. Until 0.23.2 this held a checklist `msg`'s `line`
+   * attribute, the message's ordinal.
+   *
+   * @deprecated Use `position.line`.
+   */
+  readonly line?: number;
+}
+
+/**
+ * A message's reference read into `uri`, `position` and the deprecated
+ * `line`, which repeats `position.line`.
+ */
+function located(reference: string | undefined): {
+  uri?: string;
+  position?: AdtSourcePosition;
+  line?: number;
+} {
+  const read = readSourceReference(reference);
+  return read.position === undefined
+    ? read
+    : { ...read, line: read.position.line };
 }
 
 /** SAP spells severity three ways. One letter out. */
@@ -589,7 +612,7 @@ export function readActivationRefusal(
       ...(object ? { object } : {}),
       // `@line` is the message's ordinal, not a source line: the position is
       // only in `href`'s fragment (fr0ster/mcp-abap-adt#351).
-      ...readSourceReference(leafText(field(msg, '@href'))),
+      ...located(leafText(field(msg, '@href'))),
       ...(code !== undefined ? { code } : {}),
     };
   });
@@ -852,7 +875,7 @@ export function readCheckRunRefusal(document: unknown): AdtRefusal | null {
           textOf(field(msg, '@shortText')) ||
           textOf(field(msg, 'shortText')) ||
           'check message',
-        ...readSourceReference(leafText(field(msg, '@uri'))),
+        ...located(leafText(field(msg, '@uri'))),
         ...(code !== undefined ? { code } : {}),
       };
     });
