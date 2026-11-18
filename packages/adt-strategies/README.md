@@ -103,6 +103,16 @@ inactive). SAP spells severity three ways and carries
 a T100 key in exactly one of the forms; the reading flattens that so a caller
 matching on `type === 'E'` does not have to know which carrier they got.
 
+A message says where it stands where SAP states it (0.23.2,
+fr0ster/mcp-abap-adt#351): `object` (a checklist `msg`'s `objDescr`, such as
+`Class ZCL_X, Method GET_VALUE`), `uri` (the reference without its fragment)
+and `position: { line, column, end?: { line, column } }`, read from the
+reference's fragment `#start=<line>,<col>[;end=<line>,<col>]` — a checklist
+`msg`'s `href`, a check run's `uri`. A reference with no fragment, or with one
+that is not a position, gives the `uri` alone; an empty one gives neither. A
+checklist `msg`'s `line` attribute is the message's ordinal (1, 2, 3…), not a
+source line, and is not read: `AdtMessage` has no `line`.
+
 A failure built from a document on a successful answer carries that answer's
 `sessionLost` (since 0.22.3: the connection marked the answer with the SAP
 session replaced); a verdict the library reached first is enriched by
@@ -142,7 +152,7 @@ a `403` on a service binding's LOCK that is to be ignored
 | `readCheckRunRefusal`, `readDeletionRefusal`, `readValidationRefusal`, `readUnitTestRefusal`, `readExceptionRefusal`, `readPublicationRefusal`, `readCdsTestDoublesRefusal`, `readMessageClassMessageAbsence`, `readObjectPropertiesAbsence`, `readAdtRefusal` | the readings underneath — pure functions over a document, answering `AdtRefusal` or `null`; of an activation's answers `readAdtRefusal(document, activation?)` dispatches the checklist only, with the facts `analyseAny` passes on from `context.activation` |
 | `readExceptionSubType` | the subtype an `exc:exception` names (`com.sap.adt.communicationFramework.subType`), or `undefined` |
 | `isIndeterminateWalkAnswer` | says an empty node structure cannot be read: an empty package and one that does not exist answer identically |
-| `AdtMessage`, `AdtRefusal`, `IAdtMessageFailure`, `AdtActivationRefusal`, `IAdtActivationFailure`, `IAdtStillInactive`, `AdtActivationFacts` | the shapes those produce |
+| `AdtMessage`, `AdtRefusal`, `IAdtMessageFailure`, `AdtActivationRefusal`, `IAdtActivationFailure`, `IAdtStillInactive`, `AdtActivationFacts`, `AdtSourcePosition`, `AdtSourcePoint` | the shapes those produce |
 
 **The result axis** — each a `IResultStrategy` for one slot of an `adt-clients`
 result set, except the readings of members that have no slot yet (the table
