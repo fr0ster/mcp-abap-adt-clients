@@ -97,6 +97,26 @@ describe('legacy transport list', () => {
     );
     expect(calls).toHaveLength(0);
   });
+
+  it('takes no query field beside a configUri, in the type', () => {
+    const { connection } = recordingConnection();
+    const request = new AdtRequestLegacy(connection, {
+      results: transportDocuments,
+    });
+    // Not fresh literals, so no excess-property check reaches them.
+    const targets = { configUri: '/c', targets: true as const };
+    const released = { configUri: '/c', releasedFromDate: '20261101' };
+    const queryAlone = { releasedToDate: '20261118' };
+    const refused = [
+      // @ts-expect-error -- targets beside configUri
+      () => request.list(targets),
+      // @ts-expect-error -- releasedFromDate beside configUri
+      () => request.list(released),
+      // @ts-expect-error -- a query field without the query's user
+      () => request.list(queryAlone),
+    ];
+    expect(refused).toHaveLength(3);
+  });
 });
 
 describe('legacy transport update/delete', () => {

@@ -30,6 +30,7 @@ import {
   AdtRequest,
   answering,
   failed,
+  type IListTransportsBySearch,
   type ListTransportsParams,
   type ResultValuesOf,
   TRANSPORT_REQUEST,
@@ -44,7 +45,6 @@ import type {
   IAdtHeaders,
   IAdtOperationOptions,
   IAdtResponse,
-  IListTransportsOptions,
   ITransportConfig,
 } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
@@ -122,10 +122,8 @@ export class AdtRequestLegacy<
     // is refused below rather than ignored. The root's query by user is
     // accepted for the same reason it is refused: the override takes every
     // argument the root takes.
-    options?: (
-      | (Partial<IListTransportsOptions> & { user?: undefined })
-      | ListTransportsParams
-    ) &
+    // `configUri` optional here, every query field still excluded beside it.
+    options?: (Partial<IListTransportsBySearch> | ListTransportsParams) &
       IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['list'], E>> {
     const refused = options?.configUri

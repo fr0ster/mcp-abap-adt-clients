@@ -171,6 +171,30 @@ describe('listTransports by user, with no saved configuration', () => {
       // @ts-expect-error -- one form or the other, not both
       { configUri: '/c', user: 'U', requestStatus: ['D'] },
     ];
+    // Every query field is refused beside a configUri, also in an object
+    // that is not a fresh literal (no excess-property check reaches it): the
+    // saved search would drop it without a word.
+    const user = { configUri: '/c', user: 'U' };
+    const requestStatus = { configUri: '/c', requestStatus: ['D'] as const };
+    const requestType = { configUri: '/c', requestType: ['K'] as const };
+    const targets = { configUri: '/c', targets: true as const };
+    const releasedFromDate = { configUri: '/c', releasedFromDate: '20261101' };
+    const releasedToDate = { configUri: '/c', releasedToDate: '20261118' };
+    const besideSearch: ListTransportsParams[] = [
+      // @ts-expect-error -- user beside configUri
+      user,
+      // @ts-expect-error -- requestStatus beside configUri
+      requestStatus,
+      // @ts-expect-error -- requestType beside configUri
+      requestType,
+      // @ts-expect-error -- targets beside configUri
+      targets,
+      // @ts-expect-error -- releasedFromDate beside configUri
+      releasedFromDate,
+      // @ts-expect-error -- releasedToDate beside configUri
+      releasedToDate,
+    ];
+    expect(besideSearch).toHaveLength(6);
     const accepted: ListTransportsParams[] = [
       { configUri: '/c' },
       { user: 'U', requestStatus: ['D'] },

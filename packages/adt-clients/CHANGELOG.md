@@ -49,7 +49,10 @@ Released with `@mcp-abap-adt/adt-strategies` 0.23.2 and
   query answers byte-identically to the saved configuration (measured).
   Exactly the parameters given are sent, each value encoded and the letters
   joined in the order given; the library adds no default. Same `Accept`. New
-  exported types: `IListTransportsQuery`, `ListTransportsParams` (the union),
+  exported types: `IListTransportsQuery`, `IListTransportsBySearch` (the
+  saved-search form, every query field excluded beside `configUri`, so one
+  does not compile rather than being dropped), `ListTransportsParams` (the
+  union),
   `TransportLetters`, `TransportRequestStatus`, `TransportRequestType`.
   `AdtRequest.list()` is wider than interfaces-adt's `IListTransportsOptions`,
   which names the saved search alone: a caller that types what it holds as

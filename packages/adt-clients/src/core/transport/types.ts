@@ -116,10 +116,23 @@ export type IListTransportsQuery = {
 );
 
 /**
+ * The saved-search form: the contract's `IListTransportsParams` with every
+ * query field excluded, so a query field beside a `configUri` does not
+ * compile rather than being dropped.
+ */
+export type IListTransportsBySearch = IListTransportsParams & {
+  user?: undefined;
+  requestStatus?: undefined;
+  requestType?: undefined;
+  targets?: undefined;
+  releasedFromDate?: undefined;
+  releasedToDate?: undefined;
+};
+
+/**
  * What `AdtRequest.list()` and `listTransports` take: a saved search's
- * `configUri` (the contract's `IListTransportsParams`, nothing of the query
- * beside it), or the query by user.
+ * `configUri`, or the query by user — one or the other.
  */
 export type ListTransportsParams =
-  | (IListTransportsParams & { user?: undefined })
+  | IListTransportsBySearch
   | IListTransportsQuery;

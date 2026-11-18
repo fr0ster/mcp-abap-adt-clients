@@ -192,6 +192,7 @@ export {
 } from './core/transformation';
 export {
   AdtRequest,
+  type IListTransportsBySearch,
   type IListTransportsQuery,
   type ListTransportsParams,
   type TransportLetters,
