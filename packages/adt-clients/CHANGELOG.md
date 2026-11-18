@@ -24,6 +24,25 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [45.5.4] - 2026-11-18
+
+### Fixed
+
+- **`getSqlQuery` sends a line of up to 255 characters as it is**
+  (mcp-abap-adt#363; a length in UTF-16 code units, as ABAP counts characters). 45.5.1 wrapped every line whose code was longer than 72
+  characters (#350), and SAP_BASIS 751 refuses a line break anywhere inside the
+  freestyle statement: `400`, the LF glued into a token (`Unknown column name
+  "AS4LOCAL\n="`, measured by the reporter), so every statement longer than 72
+  characters failed there. Now only a line whose code is longer than 255 — the
+  length SAP's handler keeps (`SEO_SECTION_SOURCE`, CHAR 255) — as written is
+  wrapped, at the last break point within 255 characters; the other rules stay:
+  never inside a `'…'` or `` `…` `` literal or a `"` comment, never before a
+  `*` or a comment. A token with no break point within 255 goes on a line of its
+  own, as it is, longer than 255, and SAP's answer is the caller's. A statement
+  whose lines all fit goes out as given, as before 45.5.1. On 751 a line longer
+  than 255 still cannot be sent whole: unwrapped, SAP cuts it; wrapped, 751
+  refuses the line break.
+
 ## [45.5.3] - 2026-11-18
 
 Released with `@mcp-abap-adt/adt-strategies` 0.23.2 and

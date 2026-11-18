@@ -24,10 +24,12 @@ import type { IGetSqlQueryParams } from './types';
  * library's own long deadline (120 s by default), which a caller applying its
  * own deadline only where the request had none never got to.
  *
- * **The statement is sent wrapped at 72** ({@link wrapSqlLines}): the preview
- * keeps 255 characters of each line and drops the rest without a word, so a
- * long one-line statement lost its literal or its condition (mcp-abap-adt#350).
- * Only where whitespace is changes; a statement that fits is sent as given.
+ * **A line longer than 255 is sent wrapped** ({@link wrapSqlLines}): the
+ * preview keeps 255 characters of each line and drops the rest without a word,
+ * so a long one-line statement lost its literal or its condition
+ * (mcp-abap-adt#350). Only where whitespace is changes; a statement whose
+ * lines fit is sent as given, since SAP_BASIS 751 refuses any line break inside
+ * the statement (mcp-abap-adt#363).
  *
  * @param connection - ABAP connection
  * @param params - SQL query parameters

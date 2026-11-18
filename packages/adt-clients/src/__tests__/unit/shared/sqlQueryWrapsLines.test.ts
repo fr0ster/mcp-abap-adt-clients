@@ -1,9 +1,11 @@
 /**
- * `getSqlQuery` sends its statement wrapped at 72 (mcp-abap-adt#350).
+ * `getSqlQuery` sends a line longer than 255 wrapped (mcp-abap-adt#350, #363).
  *
  * The freestyle preview keeps 255 characters of each line and drops the rest
  * (measured), so the member sends `wrapSqlLines` of the caller's statement: a
- * long line broken at blanks and after commas, never inside a literal. What is
+ * line longer than 255 broken at blanks and after commas, never inside a
+ * literal. A line of up to 255 is sent as it is: SAP_BASIS 751 refuses a line
+ * break anywhere inside the statement (#363). What is
  * asserted is the `data` the connection received, as a string — the request
  * boundary. A statement that fits goes out as given; nothing is refused, so a
  * statement SAP refuses is answered with SAP's refusal after one request.
@@ -82,17 +84,24 @@ function tailPast255(): string {
   return `${statement} AND devclass = 'NOPE'`;
 }
 
-describe('getSqlQuery sends its statement wrapped at 72', () => {
-  it("sends the issue's statement wrapped, each item whole", async () => {
+describe('getSqlQuery sends a line longer than 255 wrapped', () => {
+  it("sends #363's statement of 77 as given", async () => {
+    const statement =
+      "SELECT TABNAME, TABCLASS FROM DD02L WHERE TABNAME = 'MARA' AND AS4LOCAL = 'A'";
+    expect(statement).toHaveLength(77);
+    const request = await sentFor(statement);
+    expect(request.data).toBe(statement);
+  });
+
+  it("sends #350's statement wrapped, each item whole", async () => {
     expect(ISSUE).toHaveLength(299);
     expect(ISSUE.indexOf(`'${ITEMS[6]}'`)).toBe(244);
     const request = await sentFor(ISSUE);
     expect(request.data).toBe(
       [
-        'SELECT devclass FROM tdevc WHERE devclass IN',
-        `('${ITEMS[0]}','${ITEMS[1]}',`,
-        `'${ITEMS[2]}','${ITEMS[3]}',`,
-        `'${ITEMS[4]}','${ITEMS[5]}',`,
+        `SELECT devclass FROM tdevc WHERE devclass IN (${ITEMS.slice(0, 6)
+          .map((item) => `'${item}'`)
+          .join(',')},`,
         `'${ITEMS[6]}','Z_FLIGHT_ADDITIONAL')`,
       ].join('\n'),
     );
@@ -102,22 +111,13 @@ describe('getSqlQuery sends its statement wrapped at 72', () => {
     const statement = tailPast255();
     expect(statement.indexOf(' AND ')).toBe(255);
     const request = await sentFor(statement);
-    const a = `'${'A'.repeat(30)}'`;
     expect(request.data).toBe(
-      [
-        "SELECT devclass FROM tdevc WHERE devclass IN ('$TMP',",
-        `${a},${a},`,
-        `${a},${a},`,
-        `${a},${a},'Z')`,
-        "AND devclass = 'NOPE'",
-      ].join('\n'),
+      [statement.slice(0, 255), "AND devclass = 'NOPE'"].join('\n'),
     );
   });
 
   it.each([
-    ["'", 10],
     ["'", 30],
-    ['`', 10],
     ['`', 30],
   ])(
     'sends a %s literal of %i0 characters byte-identical, alone on its line',
@@ -137,7 +137,7 @@ describe('getSqlQuery sends its statement wrapped at 72', () => {
   );
 
   it('sends a statement with a " inside a literal, and answers SAP\'s refusal after one request', async () => {
-    const statement = `SELECT devclass FROM tdevc WHERE devclass = 'A"B, ${'word, '.repeat(12)}' OR devclass = '$TMP'`;
+    const statement = `SELECT devclass FROM tdevc WHERE devclass = 'A"B, ${'word, '.repeat(45)}' OR devclass = '$TMP'`;
     const { utils, sent } = recordingConnection(true);
     const answer = await utils.getSqlQuery(
       { sql_query: statement, row_number: 5 },
@@ -147,7 +147,7 @@ describe('getSqlQuery sends its statement wrapped at 72', () => {
     expect(sent[0]?.data).toBe(
       [
         'SELECT devclass FROM tdevc WHERE devclass =',
-        `'A"B, ${'word, '.repeat(12)}'`,
+        `'A"B, ${'word, '.repeat(45)}'`,
         "OR devclass = '$TMP'",
       ].join('\n'),
     );

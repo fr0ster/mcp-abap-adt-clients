@@ -1,12 +1,18 @@
 /**
- * A freestyle SQL statement laid out on lines of at most 72 characters.
+ * A freestyle SQL statement with each line longer than 255 wrapped.
  *
  * **Why.** The freestyle data preview (`/datapreview/freestyle`) keeps the first
  * 255 characters of each line of the statement and drops the rest of the line
- * without a word (measured on premise, mcp-abap-adt#350): a string literal that
- * crosses the mark is refused as "longer than 255 characters", and a condition
- * past it is silently lost — the query answers rows the caller did not ask for.
- * A statement whose lines are short is read whole.
+ * without a word (measured on premise, mcp-abap-adt#350; SAP's handler casts
+ * the lines to `SEO_SECTION_SOURCE`, whose line is CHAR 255): a string literal
+ * that crosses the mark is refused as "longer than 255 characters", and a
+ * condition past it is silently lost — the query answers rows the caller did
+ * not ask for. A statement whose lines fit is read whole.
+ *
+ * **Why 255 and not less.** SAP_BASIS 751 refuses a line break anywhere inside
+ * the statement (`400`, measured in mcp-abap-adt#363), so a line that fits is
+ * sent as it is — as before #350 — and only a line SAP would cut is broken.
+ * On 751 such a line could not be sent whole either way.
  *
  * **What is changed.** Only where whitespace is: a line whose code is longer
  * than {@link SQL_LINE_WIDTH} is broken at a run of blanks (the run replaced by
@@ -16,7 +22,8 @@
  * a `"` comment, never before a `*` (the line would become a comment line) or a
  * comment (it would leave its line), never among a line's leading blanks. A
  * token with no break point within the width goes on a line of its own, as it
- * is. A comment that ends a line is not counted and is left where it is.
+ * is — longer than 255, and SAP's answer is the caller's. A comment that ends a
+ * line is not counted and is left where it is. Lengths are as written.
  *
  * **What is not.** A statement whose every line fits is returned as the same
  * string. Nothing is refused: a literal longer than 255 characters, a `"` inside
@@ -25,8 +32,8 @@
  * One pass over the statement in plain code; no regular expression.
  */
 
-/** The width a line's code is wrapped to. */
-export const SQL_LINE_WIDTH = 72;
+/** The width a line's code is wrapped to: SAP's line, CHAR 255. */
+export const SQL_LINE_WIDTH = 255;
 
 /** Where the scanner is: in code, or inside a literal (which a line break does not end). */
 type ScanState = 'code' | 'quote' | 'backtick';

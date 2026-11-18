@@ -1,14 +1,18 @@
 /**
- * `wrapSqlLines` — a statement's long lines wrapped at 72, outside literals and
- * comments (mcp-abap-adt#350).
+ * `wrapSqlLines` — a statement's lines longer than 255 wrapped, outside literals
+ * and comments (mcp-abap-adt#350, #363).
  *
  * The freestyle data preview keeps 255 characters of each line and drops the
- * rest without a word (measured): a literal crossing the mark fails, and a
- * condition past it is silently lost. The wrap breaks a line longer than 72 at a
- * run of blanks (replaced by one LF) or right after a comma — never inside a
- * `'…'` or `` `…` `` literal, never inside a comment, never before a `*` or a
- * comment — taking the last such point at or before 72, else the first after.
- * A statement that fits is returned as the same string.
+ * rest without a word (measured; `SEO_SECTION_SOURCE_LINE` is CHAR 255): a
+ * literal crossing the mark fails, and a condition past it is silently lost.
+ * SAP_BASIS 751 refuses a line break anywhere inside the statement (#363), so a
+ * line of up to 255 is sent as it is, and only a longer one is broken: at a run
+ * of blanks (replaced by one LF) or right after a comma — never inside a `'…'`
+ * or `` `…` `` literal, never inside a comment, never before a `*` or a
+ * comment — taking the last such point at or before 255, else the first after.
+ * A statement that fits is returned as the same string; a token with no break
+ * point within 255 goes as it is, on a line longer than 255. Lengths are as
+ * written.
  *
  * Every case pins the exact output; the property checks below hold for all of
  * them.
@@ -23,264 +27,215 @@ interface WrapCase {
   expected: string[] | null;
 }
 
+const X = (count: number): string => 'X'.repeat(count);
+const D = (count: number): string => 'd'.repeat(count);
+const L = (count: number): string => 'LLLLLLLL, '.repeat(count);
+
+/** 44 characters: a line `${EQUALS}'${X(n)}'` is 46 + n long. */
+const EQUALS = 'SELECT devclass FROM tdevc WHERE devclass = ';
+
+const ITEMS = ['A', 'B', 'C', 'D', 'E', 'F', 'G'].map((c) => c.repeat(30));
+
 const CASES: WrapCase[] = [
   {
-    name: 'the issue statement',
+    name: "the #363 reporter's statement of 77",
     input:
-      "SELECT devclass FROM tdevc WHERE devclass IN ('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA','BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB','CCCCCCCCCCCCCCCCCCCCCCCCCCCCCC','DDDDDDDDDDDDDDDDDDDDDDDDDDDDDD','EEEEEEEEEEEEEEEEEEEEEEEEEEEEEE','FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF','GGGGGGGGGGGGGGGGGGGGGGGGGGGGGG','Z_FLIGHT_ADDITIONAL')",
-    expected: [
-      'SELECT devclass FROM tdevc WHERE devclass IN',
-      "('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA','BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB',",
-      "'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCC','DDDDDDDDDDDDDDDDDDDDDDDDDDDDDD',",
-      "'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEE','FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF',",
-      "'GGGGGGGGGGGGGGGGGGGGGGGGGGGGGG','Z_FLIGHT_ADDITIONAL')",
-    ],
-  },
-  {
-    name: 'the condition past 255',
-    input:
-      "SELECT devclass FROM tdevc WHERE devclass IN ('$TMP','AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA','AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA','AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA','AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA','AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA','AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA','Z') AND devclass = 'NOPE'",
-    expected: [
-      "SELECT devclass FROM tdevc WHERE devclass IN ('$TMP',",
-      "'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA','AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',",
-      "'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA','AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',",
-      "'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA','AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA','Z')",
-      "AND devclass = 'NOPE'",
-    ],
-  },
-  {
-    name: 'a line of 72',
-    input:
-      "SELECT devclass FROM tdevc WHERE devclass = 'XXXXXXXXXXXXXXXXXXXXXXXXXX'",
+      "SELECT TABNAME, TABCLASS FROM DD02L WHERE TABNAME = 'MARA' AND AS4LOCAL = 'A'",
     expected: null,
   },
   {
+    name: 'the #350 statement of 299',
+    input: `SELECT devclass FROM tdevc WHERE devclass IN (${ITEMS.map((i) => `'${i}'`).join(',')},'Z_FLIGHT_ADDITIONAL')`,
+    expected: [
+      `SELECT devclass FROM tdevc WHERE devclass IN (${ITEMS.slice(0, 6)
+        .map((i) => `'${i}'`)
+        .join(',')},`,
+      `'${ITEMS[6]}','Z_FLIGHT_ADDITIONAL')`,
+    ],
+  },
+  {
+    name: 'a statement of 300 with a literal across 255',
+    input: `${EQUALS}'${X(190)}' OR devclass = '${'B'.repeat(47)}'`,
+    expected: [`${EQUALS}'${X(190)}' OR devclass =`, `'${'B'.repeat(47)}'`],
+  },
+  {
     name: 'a line of 73',
-    input:
-      "SELECT devclass FROM tdevc WHERE devclass = 'XXXXXXXXXXXXXXXXXXXXXXXXXXX'",
+    input: `${EQUALS}'${X(27)}'`,
+    expected: null,
+  },
+  {
+    name: 'a line of 255',
+    input: `${EQUALS}'${X(209)}'`,
+    expected: null,
+  },
+  {
+    name: 'a line of 256',
+    input: `${EQUALS}'${X(210)}'`,
+    expected: [EQUALS.trimEnd(), `'${X(210)}'`],
+  },
+  {
+    name: 'a blank run and a comma before 255: the later taken',
+    input: `SELECT devclass FROM tdevc WHERE devclass IN ('${X(180)}','${X(30)}') OR devclass = '$TMP'`,
     expected: [
-      'SELECT devclass FROM tdevc WHERE devclass =',
-      "'XXXXXXXXXXXXXXXXXXXXXXXXXXX'",
+      `SELECT devclass FROM tdevc WHERE devclass IN ('${X(180)}',`,
+      `'${X(30)}') OR devclass = '$TMP'`,
     ],
   },
   {
-    name: 'a blank run and a comma before 72: the later taken',
-    input:
-      "SELECT devclass FROM tdevc WHERE devclass IN ('AAAAAAAAAAAA','BBBBBBBBBB') OR devclass = '$TMP'",
-    expected: [
-      "SELECT devclass FROM tdevc WHERE devclass IN ('AAAAAAAAAAAA',",
-      "'BBBBBBBBBB') OR devclass = '$TMP'",
-    ],
+    name: 'a break point at 255 taken',
+    input: `SELECT ${D(248)} FROM tdevc`,
+    expected: [`SELECT ${D(248)}`, 'FROM tdevc'],
   },
   {
-    name: 'a break point at 72 taken',
-    input:
-      'SELECT ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd FROM tdevc',
-    expected: [
-      'SELECT ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
-      'FROM tdevc',
-    ],
+    name: 'a break point at 256 not taken',
+    input: `SELECT ${D(249)} FROM tdevc`,
+    expected: ['SELECT', `${D(249)} FROM`, 'tdevc'],
   },
   {
-    name: 'a break point at 73 not taken',
-    input:
-      'SELECT dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd FROM tdevc',
-    expected: [
-      'SELECT',
-      'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd FROM',
-      'tdevc',
-    ],
-  },
-  {
-    name: 'no break point at or before 72',
-    input:
-      'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd FROM tdevc',
-    expected: [
-      'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
-      'FROM tdevc',
-    ],
+    name: 'no break point at or before 255',
+    input: `${D(260)} FROM tdevc`,
+    expected: [D(260), 'FROM tdevc'],
   },
   {
     name: 'a comma followed by blanks',
-    input:
-      "SELECT devclass FROM tdevc WHERE devclass IN ('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',   'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB')",
+    input: `SELECT devclass FROM tdevc WHERE devclass IN ('${X(215)}',   '${X(30)}')`,
     expected: [
       'SELECT devclass FROM tdevc WHERE devclass IN',
-      "('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',   'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB')",
-    ],
-  },
-  {
-    name: "a '…' literal of 100",
-    input:
-      "SELECT devclass FROM tdevc WHERE devclass IN ('$TMP', 'LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, ', 'X')",
-    expected: [
-      "SELECT devclass FROM tdevc WHERE devclass IN ('$TMP',",
-      "'LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, ',",
-      "'X')",
-    ],
-  },
-  {
-    name: 'a backtick literal of 100',
-    input:
-      "SELECT devclass FROM tdevc WHERE devclass IN ('$TMP', `LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, `, 'X')",
-    expected: [
-      "SELECT devclass FROM tdevc WHERE devclass IN ('$TMP',",
-      '`LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, `,',
-      "'X')",
+      `('${X(215)}',   '${X(30)}')`,
     ],
   },
   {
     name: "a '…' literal of 300",
-    input:
-      "SELECT devclass FROM tdevc WHERE devclass IN ('$TMP', 'LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, ', 'X')",
+    input: `SELECT devclass FROM tdevc WHERE devclass IN ('$TMP', '${L(30)}', 'X')`,
     expected: [
       "SELECT devclass FROM tdevc WHERE devclass IN ('$TMP',",
-      "'LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, ',",
+      `'${L(30)}',`,
       "'X')",
     ],
   },
   {
     name: 'a backtick literal of 300',
-    input:
-      "SELECT devclass FROM tdevc WHERE devclass IN ('$TMP', `LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, `, 'X')",
+    input: `SELECT devclass FROM tdevc WHERE devclass IN ('$TMP', \`${L(30)}\`, 'X')`,
     expected: [
       "SELECT devclass FROM tdevc WHERE devclass IN ('$TMP',",
-      '`LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, LLLLLLLL, `,',
+      `\`${L(30)}\`,`,
       "'X')",
     ],
   },
   {
-    name: 'a doubled quote inside a literal',
-    input:
-      "SELECT devclass FROM tdevc WHERE devclass = 'O'' word, word, word, word, word, word, word, word, word, word, word, word, '",
-    expected: [
-      'SELECT devclass FROM tdevc WHERE devclass =',
-      "'O'' word, word, word, word, word, word, word, word, word, word, word, word, '",
-    ],
+    name: 'a doubled quote inside a literal across 255',
+    input: `${EQUALS}'O'' ${'word, '.repeat(40)}'`,
+    expected: [EQUALS.trimEnd(), `'O'' ${'word, '.repeat(40)}'`],
   },
   {
-    name: 'a doubled backtick inside a literal',
-    input:
-      'SELECT devclass FROM tdevc WHERE devclass = `O`` word, word, word, word, word, word, word, word, word, word, word, word, `',
-    expected: [
-      'SELECT devclass FROM tdevc WHERE devclass =',
-      '`O`` word, word, word, word, word, word, word, word, word, word, word, word, `',
-    ],
+    name: 'a doubled backtick inside a literal across 255',
+    input: `${EQUALS}\`O\`\` ${'word, '.repeat(40)}\``,
+    expected: [EQUALS.trimEnd(), `\`O\`\` ${'word, '.repeat(40)}\``],
   },
   {
-    name: 'a " inside a literal',
-    input:
-      "SELECT devclass FROM tdevc WHERE devclass = 'A\"B, word, word, word, word, word, word, word, word, word, word, word, word, ' OR devclass = '$TMP'",
+    name: 'a " inside a literal across 255',
+    input: `${EQUALS}'A"B, ${'word, '.repeat(45)}' OR devclass = '$TMP'`,
     expected: [
-      'SELECT devclass FROM tdevc WHERE devclass =',
-      "'A\"B, word, word, word, word, word, word, word, word, word, word, word, word, '",
+      EQUALS.trimEnd(),
+      `'A"B, ${'word, '.repeat(45)}'`,
       "OR devclass = '$TMP'",
     ],
   },
   {
     name: "a caller's LF inside a literal, then a line starting with *",
-    input:
-      "SELECT devclass FROM tdevc WHERE devclass = 'X\n* Y' OR devclass = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' OR devclass = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'",
+    input: `${EQUALS}'X\n* Y' OR devclass = '${X(200)}' OR devclass = '${'B'.repeat(30)}'`,
     expected: [
-      "SELECT devclass FROM tdevc WHERE devclass = 'X",
-      "* Y' OR devclass = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' OR devclass =",
-      "'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'",
+      `${EQUALS}'X`,
+      `* Y' OR devclass = '${X(200)}' OR devclass =`,
+      `'${'B'.repeat(30)}'`,
     ],
   },
   {
     name: "a caller's CRLF inside a short literal",
-    input: "SELECT devclass FROM tdevc WHERE devclass = 'X\r\nY'",
+    input: `${EQUALS}'X\r\nY'`,
     expected: null,
   },
   {
     name: "a caller's CR inside a short literal",
-    input: "SELECT devclass FROM tdevc WHERE devclass = 'X\rY'",
+    input: `${EQUALS}'X\rY'`,
     expected: null,
   },
   {
-    name: 'SELECT * with the blank before * at column 70',
-    input:
-      'SELECT devclass FROM tdevc WHERE devclass IN (SELECT qqqqqqqqqqqqqqqq *xxxxxxxxxx FROM tdevc)',
+    name: 'SELECT * with the blank before * at column 253',
+    input: `SELECT devclass FROM tdevc WHERE devclass IN (SELECT ${D(199)} *xxxxxxxxxx FROM tdevc)`,
     expected: [
       'SELECT devclass FROM tdevc WHERE devclass IN (SELECT',
-      'qqqqqqqqqqqqqqqq *xxxxxxxxxx FROM tdevc)',
+      `${D(199)} *xxxxxxxxxx FROM tdevc)`,
     ],
   },
   {
-    name: 'COUNT( *) with the blank before * at column 70',
-    input:
-      'SELECT devclass FROM tdevc WHERE devclass IN (SELECT qqqqqqqqqqCOUNT( *)xxxxxxxxxx FROM tdevc)',
+    name: 'COUNT( *) with the blank before * at column 253',
+    input: `SELECT devclass FROM tdevc WHERE devclass IN (SELECT ${D(193)}COUNT( *)xxxxxxxxxx FROM tdevc)`,
     expected: [
       'SELECT devclass FROM tdevc WHERE devclass IN (SELECT',
-      'qqqqqqqqqqCOUNT( *)xxxxxxxxxx FROM tdevc)',
+      `${D(193)}COUNT( *)xxxxxxxxxx FROM tdevc)`,
     ],
   },
   {
-    name: 'a token longer than 72, blanks, then a comment',
-    input:
-      "'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL'   \" note",
+    name: 'a token longer than 255, blanks, then a comment',
+    input: `'${'L'.repeat(260)}'   " note`,
     expected: null,
   },
   {
     name: 'a long line ending with a comment',
-    input:
-      "SELECT devclass FROM tdevc WHERE devclass IN ('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA','BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB') \" note",
+    input: `SELECT devclass FROM tdevc WHERE devclass IN ('${X(215)}','${X(30)}') " note`,
     expected: [
       'SELECT devclass FROM tdevc WHERE devclass IN',
-      "('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA','BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB') \" note",
+      `('${X(215)}','${X(30)}') " note`,
     ],
   },
   {
     name: 'code of 60 and a comment of 300',
-    input:
-      "SELECT devclass FROM tdevc WHERE devclass = 'XXXXXXXXXXXXX' \" cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    input: `${EQUALS}'XXXXXXXXXXXXX' " ${'c'.repeat(300)}`,
     expected: null,
   },
   {
     name: 'a * comment line of 300',
-    input:
-      '* cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\nSELECT devclass FROM tdevc',
+    input: `* ${'c'.repeat(300)}\nSELECT devclass FROM tdevc`,
     expected: null,
   },
   {
     name: 'short lines separated by CR alone',
-    input:
-      "SELECT devclass\rFROM tdevc\rWHERE devclass = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'\rOR devclass = 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'",
+    input: `SELECT devclass\rFROM tdevc\rWHERE devclass = '${X(200)}'\rOR devclass = '${X(200)}'`,
     expected: null,
   },
   {
     name: 'a long line, then CRLF and a short one',
-    input:
-      "SELECT devclass FROM tdevc WHERE devclass IN ('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA','BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB')\r\nORDER BY devclass",
+    input: `SELECT devclass FROM tdevc WHERE devclass IN ('${X(215)}','${X(30)}')\r\nORDER BY devclass`,
     expected: [
       'SELECT devclass FROM tdevc WHERE devclass IN',
-      "('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA','BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB')\r",
+      `('${X(215)}','${X(30)}')\r`,
       'ORDER BY devclass',
     ],
   },
   {
     name: 'tabs at a break point, leading blanks kept',
-    input:
-      "    SELECT devclass\tFROM tdevc WHERE devclass IN ('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',\t\t'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB')",
+    input: `    SELECT devclass\tFROM tdevc WHERE devclass IN ('${X(215)}',\t\t'${X(30)}')`,
     expected: [
       '    SELECT devclass\tFROM tdevc WHERE devclass IN',
-      "('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',\t\t'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB')",
+      `('${X(215)}',\t\t'${X(30)}')`,
     ],
   },
   {
-    name: 'Ä in a line of 72',
-    input:
-      "SELECT devclass FROM tdevc WHERE devclass = 'ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ'",
+    name: 'Ä in a line of 255',
+    input: `${EQUALS}'${'Ä'.repeat(209)}'`,
     expected: null,
   },
   {
-    // 73 UTF-16 code units, 72 code points: counted by `length`, so wrapped.
-    name: 'a character outside the BMP in a line of 73 code units',
-    input: `SELECT devclass FROM tdevc WHERE devclass = '\u{1F600}${'X'.repeat(25)}'`,
-    expected: [
-      'SELECT devclass FROM tdevc WHERE devclass =',
-      `'\u{1F600}${'X'.repeat(25)}'`,
-    ],
+    name: 'Ä in a line of 256',
+    input: `${EQUALS}'${'Ä'.repeat(210)}'`,
+    expected: [EQUALS.trimEnd(), `'${'Ä'.repeat(210)}'`],
+  },
+  {
+    // 256 UTF-16 code units, 255 code points: counted by `length`, so wrapped.
+    name: 'a character outside the BMP in a line of 256 code units',
+    input: `${EQUALS}'\u{1F600}${X(208)}'`,
+    expected: [EQUALS.trimEnd(), `'\u{1F600}${X(208)}'`],
   },
   {
     name: 'an empty statement',
@@ -288,31 +243,20 @@ const CASES: WrapCase[] = [
     expected: null,
   },
   {
-    name: 'Ä in a line of 73',
-    input:
-      "SELECT devclass FROM tdevc WHERE devclass = 'ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ'",
-    expected: [
-      'SELECT devclass FROM tdevc WHERE devclass =',
-      "'ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ'",
-    ],
-  },
-  {
-    name: "concat( '<100>','B')",
-    input:
-      "SELECT devclass, concat('LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL','B') AS x FROM tdevc WHERE devclass = '$TMP'",
+    name: "concat( '<250>','B')",
+    input: `SELECT devclass, concat('${'L'.repeat(250)}','B') AS x FROM tdevc WHERE devclass = '$TMP'`,
     expected: [
       'SELECT devclass,',
-      "concat('LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL',",
+      `concat('${'L'.repeat(250)}',`,
       "'B') AS x FROM tdevc WHERE devclass = '$TMP'",
     ],
   },
   {
-    name: "'<100>' * 2",
-    input:
-      "SELECT devclass FROM tdevc WHERE devclass = '$TMP' AND 'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL' * 2 = 2",
+    name: "'<250>' * 2",
+    input: `SELECT devclass FROM tdevc WHERE devclass = '$TMP' AND '${'L'.repeat(250)}' * 2 = 2`,
     expected: [
       "SELECT devclass FROM tdevc WHERE devclass = '$TMP' AND",
-      "'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL' *",
+      `'${'L'.repeat(250)}' *`,
       '2 = 2',
     ],
   },
@@ -320,6 +264,16 @@ const CASES: WrapCase[] = [
     name: 'a short statement',
     input: 'SELECT * FROM T000',
     expected: null,
+  },
+  {
+    // A token with no break point within 255 goes as it is, longer than 255.
+    name: 'a literal of 255 and its comma: a line of 257',
+    input: `SELECT devclass FROM tdevc WHERE devclass IN ('${X(253)}', 'B')`,
+    expected: [
+      'SELECT devclass FROM tdevc WHERE devclass IN',
+      `('${X(253)}',`,
+      "'B')",
+    ],
   },
 ];
 
@@ -394,8 +348,25 @@ function firstNonBlank(line: string): string {
 }
 
 describe('wrapSqlLines', () => {
-  it('wraps at 72', () => {
-    expect(SQL_LINE_WIDTH).toBe(72);
+  it('wraps at 255', () => {
+    expect(SQL_LINE_WIDTH).toBe(255);
+  });
+
+  it('sends a token with no break point within 255 as it is, longer than 255', () => {
+    const lines = wrapSqlLines(
+      `SELECT devclass FROM tdevc WHERE devclass IN ('${X(253)}', 'B')`,
+    ).split('\n');
+    expect(lines[1]).toBe(`('${X(253)}',`);
+    expect(lines[1]?.length).toBe(257);
+  });
+
+  it('sends a statement of 300 on lines of at most 255, its literals whole', () => {
+    const input = `${EQUALS}'${X(190)}' OR devclass = '${'B'.repeat(47)}'`;
+    expect(input).toHaveLength(300);
+    const lines = wrapSqlLines(input).split('\n');
+    expect(lines.length).toBeGreaterThan(1);
+    for (const line of lines) expect(line.length).toBeLessThanOrEqual(255);
+    expect(literalsOf(lines.join('\n'))).toEqual(literalsOf(input));
   });
 
   it.each(CASES)('$name', ({ input, expected }) => {
@@ -425,9 +396,9 @@ describe('wrapSqlLines', () => {
     expect(after).toBe(before);
   });
 
-  it('keeps the 100- and 300-character literals alone on their lines', () => {
+  it('keeps the 300-character literals alone on their lines', () => {
     const unit = 'LLLLLLLL, ';
-    for (const count of [10, 30]) {
+    for (const count of [30]) {
       for (const delimiter of ["'", '`']) {
         const literal = `${delimiter}${unit.repeat(count)}${delimiter}`;
         const output = wrapSqlLines(
