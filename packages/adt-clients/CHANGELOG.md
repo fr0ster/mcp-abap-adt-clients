@@ -34,10 +34,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   freestyle statement: `400`, the LF glued into a token (`Unknown column name
   "AS4LOCAL\n="`, measured by the reporter), so every statement longer than 72
   characters failed there. Now only a line whose code is longer than 255 — the
-  length SAP's handler keeps (`SEO_SECTION_SOURCE`, CHAR 255) — once condensed
-  as SAP condenses it (leading and trailing blanks dropped, a run of blanks
-  counted as one; blanks inside a literal counted as written) is wrapped. It is
-  broken at the last break point within 255 characters; the other rules stay:
+  length SAP's handler keeps (`SEO_SECTION_SOURCE`, CHAR 255) — as written is
+  wrapped, at the last break point within 255 characters; the other rules stay:
   never inside a `'…'` or `` `…` `` literal or a `"` comment, never before a
   `*` or a comment. A token with no break point within 255 goes on a line of its
   own, as it is, longer than 255, and SAP's answer is the caller's. A statement

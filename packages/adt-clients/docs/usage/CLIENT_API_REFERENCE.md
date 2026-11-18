@@ -1612,12 +1612,10 @@ freestyle preview (`/datapreview/freestyle`) keeps the first 255 characters of
 each line of the statement and drops the rest without a word (measured on
 premise): a string literal crossing the mark is refused as "longer than 255
 characters", and a condition past it is silently lost — the query answers rows
-you did not ask for. So a line whose code is longer than 255 characters once
-condensed as SAP condenses it (leading and trailing blanks dropped, a run of
-blanks counted as one; blanks inside a literal counted as written) is broken at
-the last run of blanks (replaced by one line feed) or comma within 255
-characters, never inside a `'…'` or `` `…` `` literal, never inside a `"`
-comment, never before a `*` or a comment. A token with no such point within 255
+you did not ask for. So a line whose code is longer than 255 characters as
+written is broken at the last run of blanks (replaced by one line feed) or
+comma within 255 characters, never inside a `'…'` or `` `…` `` literal, never
+inside a `"` comment, never before a `*` or a comment. A token with no such point within 255
 characters goes whole on a line of its own, as it is: that line is longer than
 255, and SAP's answer is yours. Only where whitespace stands changes. A line of
 up to 255 characters is sent as it is: SAP_BASIS 751 refuses a line break
