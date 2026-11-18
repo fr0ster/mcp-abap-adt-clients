@@ -4,6 +4,26 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [0.9.6] - 2026-11-18
+
+Released with `@mcp-abap-adt/adt-clients` 45.5.3.
+
+### Changed
+
+- **The `@mcp-abap-adt/adt-clients` range is `^45.5.3`** (was `^45.5.1`),
+  peer and dev: the root `list()` option type this release accepts
+  (`ListTransportsParams`) comes from 45.5.3.
+
+### Fixed
+
+- **`AdtRequestLegacy.list()` takes every argument the root `list()` takes,
+  and refuses the query by user.** adt-clients 45.5.3 lists transports by
+  user (`{ user, requestStatus, … }`); `/sap/bc/cts/transportrequests`
+  reads no query, so the query is refused `UNSUPPORTED_OPERATION` without a
+  request, as a `configUri` is — never sent and never ignored. The override
+  accepting what its root accepts is what
+  `typechecks/exact/legacyOverrides.ts` holds.
+
 ## [0.9.5] - 2026-11-13
 
 Released with `@mcp-abap-adt/adt-clients` 45.5.1.
