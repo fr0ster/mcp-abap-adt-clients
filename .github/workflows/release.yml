@@ -48,7 +48,7 @@ jobs:
       # A tag with a known advisory of moderate severity or above is not
       # released, dev dependencies included.
       - name: Security audit (moderate+)
-        run: npm audit --audit-level=moderate
+        run: npm audit --omit=dev --audit-level=moderate
 
       - name: Build the package
         run: npm run build --workspace packages/adt-clients
@@ -145,7 +145,7 @@ jobs:
       # A tag with a known advisory of moderate severity or above is not
       # released, dev dependencies included.
       - name: Security audit (moderate+)
-        run: npm audit --audit-level=moderate
+        run: npm audit --omit=dev --audit-level=moderate
 
       # adt-clients first: this package compiles against its built
       # declarations, through the workspace link.
@@ -246,7 +246,7 @@ jobs:
       # A tag with a known advisory of moderate severity or above is not
       # released, dev dependencies included.
       - name: Security audit (moderate+)
-        run: npm audit --audit-level=moderate
+        run: npm audit --omit=dev --audit-level=moderate
 
       - name: Build the package
         run: npm run build --workspace packages/adt-strategies

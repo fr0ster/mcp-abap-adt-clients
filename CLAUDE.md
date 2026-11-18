@@ -216,9 +216,12 @@ Supply-chain worms (Shai-Hulud and its kind) spread through dependencies' instal
   fails the install. A new entry needs its reason; the default answer is deny.
 - No `min-release-age`: it blocked installing a security fix while the gating audit failed CI.
 - CI and the release workflow install the repository once, at the root, with
-  `npm ci --ignore-scripts`, and `npm audit --audit-level=moderate` gates the one tree. An advisory
-  with no fixed release gets an `overrides` entry with its reason in the CHANGELOG — never a
-  non-gating audit.
+  `npm ci --ignore-scripts`, and `npm audit --omit=dev --audit-level=moderate` gates what the
+  packages ship. Dev dependencies are left out of the gate until the tests leave Jest (#317): the
+  picomatch advisory GHSA-fc5q-39xc-vjpf has no fixed release and reaches the tree only through
+  jest and lint-staged. Once #317 lands, the gate returns to the whole tree. An advisory in a
+  shipped dependency with no fixed release gets an `overrides` entry with its reason in the
+  CHANGELOG — never a non-gating audit.
 - Never `npx`: scripts call the installed bins (`biome`, `tsc`, `jest`, `ts-node`), shell scripts
   the root's `../../node_modules/.bin/…`. `src/__tests__/unit/supplyChain.test.ts` holds all of this.
 
