@@ -24,6 +24,7 @@ import type {
 import { XMLParser } from 'fast-xml-parser';
 import { field, isElement, leafText, listOf } from '../parsed';
 import { rawOf } from '../result';
+import { fragmentPairs, sourcePoint } from '../sourcePosition';
 import { answeredObject } from './answeredObject';
 
 /** A position in a source: line from 1, column from 0. */
@@ -94,37 +95,6 @@ const ELEMENT = 'abapsource:objectStructureElement';
 const attr = (node: unknown, name: string): string | undefined =>
   leafText(field(node, `@_${name}`));
 
-/** A non-negative integer written in decimal digits, else `undefined`. */
-function digits(text: string): number | undefined {
-  if (text.length === 0) return undefined;
-  for (const character of text) {
-    if (character < '0' || character > '9') return undefined;
-  }
-  return Number(text);
-}
-
-/** `l,c`, or `undefined` when the text is not one. */
-function point(text: string | undefined): IOutlinePoint | undefined {
-  if (text === undefined) return undefined;
-  const comma = text.indexOf(',');
-  if (comma === -1) return undefined;
-  const line = digits(text.slice(0, comma));
-  const column = digits(text.slice(comma + 1));
-  return line === undefined || column === undefined
-    ? undefined
-    : { line, column };
-}
-
-/** The `key=value` pairs of a fragment, split on `;`. */
-function fragmentPairs(fragment: string): Map<string, string> {
-  const pairs = new Map<string, string>();
-  for (const part of fragment.split(';')) {
-    const equals = part.indexOf('=');
-    if (equals > 0) pairs.set(part.slice(0, equals), part.slice(equals + 1));
-  }
-  return pairs;
-}
-
 function readLink(node: unknown): IOutlineLink | undefined {
   const rel = attr(node, 'rel');
   const href = attr(node, 'href');
@@ -140,8 +110,8 @@ function readLink(node: unknown): IOutlineLink | undefined {
     href,
     source: hash === -1 ? href : href.slice(0, hash),
     fragment,
-    start: point(pairs.get('start')),
-    end: point(pairs.get('end')),
+    start: sourcePoint(pairs.get('start')),
+    end: sourcePoint(pairs.get('end')),
     type: attr(node, 'type'),
   };
 }
