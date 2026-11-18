@@ -24,7 +24,14 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [45.5.4] - 2026-11-18
+## [45.5.5] - 2026-11-18
+
+The same code as 45.5.4, released together with adt-strategies 0.23.5 from one
+commit. 45.5.4 was tagged (`adt-clients-v45.5.4`) but never published: a release
+publishes every package from main's HEAD, and adt-strategies 0.23.4 landed after
+it. Everything 45.5.4 lists below is in 45.5.5.
+
+## [45.5.4] - 2026-11-18 (tagged, not published)
 
 ### Fixed
 
