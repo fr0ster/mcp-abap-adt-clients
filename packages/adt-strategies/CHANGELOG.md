@@ -30,7 +30,7 @@ For `mcp-abap-adt` 24.0.1.
   replaying the recorded syntax check as a `400` lost `{ line: 15, column: 24 }`).
   When the answer's own status is not 2xx, its body is not an
   `exc:exception`, and it is a well-formed document with exactly one
-  top-level element and nothing but whitespace after it, that element — by namespace URI and local
+  top-level element as the parser reports it, that element — by namespace URI and local
   name, never by prefix — picks the reading, and it is the very reading of a
   `200`: `checkRunReports` or `checkReport` in `http://www.sap.com/adt/checkrun`
   goes through `readCheckRunRefusal`, `messages` in
@@ -45,7 +45,7 @@ For `mcp-abap-adt` 24.0.1.
   `checkRunReports`, a processed report without an error, an activated
   checklist — gives one `E` with the verdict's message, as in 0.23.2. So does a
   body that only looks like one: another namespace, no namespace, or more
-  than one top-level element, text after it. A failure verdict handed beside
+  than one top-level element. A failure verdict handed beside
   a 2xx answer — the inactive-list read that failed after an activation's
   `200` checklist — reads no body and answers as in 0.23.2, the read's
   failure in the message. An `exc:exception` body answers as before,
@@ -53,6 +53,14 @@ For `mcp-abap-adt` 24.0.1.
   (`analyseCheck`, `analyseActivation`, `analyseException`, `analyseAny` and
   the rest built the same way); the verdict itself (`origin`, `code`,
   `message`, `response`) is kept.
+- **Not changed.** On the client's normal path a `400` activation carries no
+  inactive-list facts, so `stillInactive` is `[]`: adt-clients reads
+  `GET /activation/inactiveobjects` only after a 2xx activation. The analyser
+  fills `stillInactive` only when the caller passes `context.activation`.
+  Text after the root element, which the parser drops, is not looked for: the
+  document is read as its one element (SAP does not send such text). A
+  namespace URI written with character references (`checkru&#110;`) is not
+  resolved and does not match (SAP does not send it either).
 
 ## [0.23.2] - 2026-11-18
 

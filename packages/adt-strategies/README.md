@@ -119,15 +119,18 @@ position.
 A check or an activation refused with a non-2xx status carries the same
 messages as the `200` reading of the same body (0.23.3): when the library's
 verdict is already a failure, the answer's own status is not 2xx and its body
-is not an `exc:exception`, the body's one top-level element (nothing but
-whitespace after it) — by namespace URI and local name, never by prefix —
+is not an `exc:exception`, the body's one top-level element — by namespace
+URI and local name, never by prefix —
 decides. `checkRunReports` or `checkReport` in `http://www.sap.com/adt/checkrun`
 goes through `readCheckRunRefusal`, `messages` in
 `http://www.sap.com/abapxml/checklist` through `readActivationRefusal` (with
-the inactive-list facts; `analyseActivation` carries its `stillInactive`).
+the inactive-list facts in `context.activation`; `analyseActivation` carries
+its `stillInactive`). On the client's normal path a `400` activation carries
+no such facts — adt-clients reads the inactive list only after a 2xx
+activation — so its `stillInactive` is `[]`.
 Where that reading refuses nothing (an empty `checkRunReports`, a processed
 report without an error), and for any other body — another namespace, no
-namespace, more than one top-level element, text after it — the failure
+namespace, more than one top-level element — the failure
 carries one `E` with the verdict's message. A failure verdict beside a 2xx
 answer (an inactive-list read that failed after an activation's `200`
 checklist) reads no body: one `E` with the verdict's message, as in 0.23.2.
