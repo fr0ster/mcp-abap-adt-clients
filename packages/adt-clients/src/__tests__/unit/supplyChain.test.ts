@@ -83,13 +83,16 @@ describe.each(WORKFLOWS)('%s installs and runs nothing unreviewed', (file) => {
     expect([...new Set(installs)]).toEqual(['npm ci --ignore-scripts']);
   });
 
-  it('gates on every known advisory of moderate severity or above, in the one tree', () => {
+  it('gates on every known advisory of moderate severity or above in the production dependencies, until #317 removes Jest', () => {
     const audits = text
       .map((line) => line.trim())
       .filter((line) => line.startsWith('run: npm audit'));
     expect(audits.length).toBeGreaterThan(0);
+    // Production dependencies until the tests leave Jest (#317), then dev
+    // again. Every audit step, whole: dropping `--omit=dev` or the level
+    // turns this red.
     expect([...new Set(audits)]).toEqual([
-      'run: npm audit --audit-level=moderate',
+      'run: npm audit --omit=dev --audit-level=moderate',
     ]);
     expect(
       text.filter((line) => line.trim().startsWith('continue-on-error')),
