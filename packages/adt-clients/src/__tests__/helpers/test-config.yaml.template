@@ -2888,7 +2888,8 @@ sql_query:
         # sql_query: Uses standard_objects.tables (T000 for onprem) if not specified - will be "SELECT * FROM T000"
 
     # mcp-abap-adt#350: the freestyle preview keeps 255 characters of a line and
-    # drops the rest; getSqlQuery wraps a long line at 72. The statements are
+    # drops the rest; getSqlQuery wraps a line longer than 255 (mcp-abap-adt#363:
+    # a shorter one goes as it is, since SAP_BASIS 751 refuses any line break). The statements are
     # built in the test, over TDEVC (package names, read-only).
     - name: "execute_sql_query_long_line"
       enabled: true
