@@ -326,10 +326,10 @@ describe('Shared - getSqlQuery', () => {
     async () => {
       const statement = concatStatement();
       expect(statement.length).toBeLessThan(255);
-      expect(statement.length).toBeGreaterThan(72);
       const { cells, sent } = await runStatement(statement);
       expect(cells).toContain(`${LONG_LITERAL}B`);
-      expect(sent).toEqual([wrapSqlLines(statement)]);
+      // A line of up to 255 goes as given (mcp-abap-adt#363).
+      expect(sent).toEqual([statement]);
     },
     30000,
   );
