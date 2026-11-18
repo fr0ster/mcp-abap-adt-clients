@@ -12,6 +12,8 @@ import {
   readActivationRefusal,
   readAdtRefusal,
   readCdsTestDoublesRefusal,
+  readChecklistMessages,
+  readCheckRunMessages,
   readCheckRunRefusal,
   readDeletionRefusal,
   readExceptionRefusal,
@@ -123,11 +125,21 @@ function enrich(
   verdict: IAdtError,
   answer: IAdtWireResponse | undefined,
 ): IAdtMessageFailure {
-  const refusal = readExceptionRefusal(
-    (answer as { data?: unknown } | undefined)?.data,
-  );
+  const document = answer?.data;
+  const refusal = readExceptionRefusal(document);
   if (!refusal) {
-    return { ...verdict, messages: [{ type: 'E', text: verdict.message }] };
+    // A check or an activation refused with a non-2xx status still explains
+    // itself in its own document, and its messages are read as the 200
+    // reading reads them — position, uri, object, code. The document's root
+    // decides which reading; any other body gives the library's sentence.
+    const listed =
+      readCheckRunMessages(document) ?? readChecklistMessages(document);
+    return {
+      ...verdict,
+      messages: listed?.length
+        ? listed
+        : [{ type: 'E', text: verdict.message }],
+    };
   }
   return {
     ...verdict,
