@@ -240,32 +240,6 @@ const namespacedParser = new XMLParser({
   parseTagValue: false,
 });
 
-/**
- * Whether nothing but whitespace follows the root element. Text after it
- * (`<x/>trailing`) passes the validator and the parser drops it, so it is
- * looked for here, in plain code: the document ends with the root's closing
- * tag, or — for an empty root — with the start tag that the last `<` opens
- * (no `<` stands in an attribute value), its end found outside quotes.
- */
-function endsWithRoot(document: string, name: string): boolean {
-  const end = document.trimEnd();
-  if (end.endsWith(`</${name}>`)) return true;
-  const start = end.lastIndexOf('<');
-  if (start < 0 || !end.startsWith(`<${name}`, start)) return false;
-  let quote: string | undefined;
-  for (let i = start + 1; i < end.length; i++) {
-    const c = end[i];
-    if (quote !== undefined) {
-      if (c === quote) quote = undefined;
-    } else if (c === '"' || c === "'") {
-      quote = c;
-    } else if (c === '>') {
-      return i === end.length - 1 && end[i - 1] === '/';
-    }
-  }
-  return false;
-}
-
 /** A document's one top-level element: its namespace URI and local name. */
 export interface IAdtRootElement {
   /** The namespace URI the element is in; absent when it is in none. */
@@ -277,7 +251,7 @@ export interface IAdtRootElement {
  * The root element of a well-formed document with exactly one top-level
  * element, by namespace URI and local name — never by prefix, which the
  * sender chooses. `null` for anything else: not a string, not well-formed,
- * no element or more than one at the top, or text after it.
+ * no element or more than one at the top.
  */
 export function readRootElement(document: unknown): IAdtRootElement | null {
   if (typeof document !== 'string') return null;
@@ -294,7 +268,6 @@ export function readRootElement(document: unknown): IAdtRootElement | null {
   );
   const [name] = names;
   if (names.length !== 1 || name === undefined) return null;
-  if (!endsWithRoot(document, name)) return null;
   const element = parsed[name];
   if (Array.isArray(element)) return null;
   const colon = name.indexOf(':');
