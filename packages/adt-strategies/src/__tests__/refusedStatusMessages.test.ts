@@ -73,21 +73,22 @@ describe('a check run refused with a non-2xx status', () => {
     expect(judged.origin).toBe('refusal');
   });
 
-  it.each(
-    analysers,
-  )('keeps a report that did not run as on a 200: %s', (_name, analyse) => {
-    const { answer, verdict } = servedAs(
-      'refusal-check-nonexistent-object',
-      400,
-    );
-    expect(failure(analyse(verdict, answer)).messages).toStrictEqual([
-      {
-        type: 'E',
-        text: 'Resource CLASS ZMCP_BLD_NOPE_CLS99 does not exist.',
-        code: 'notProcessed',
-      },
-    ]);
-  });
+  it.each(analysers)(
+    'keeps a report that did not run as on a 200: %s',
+    (_name, analyse) => {
+      const { answer, verdict } = servedAs(
+        'refusal-check-nonexistent-object',
+        400,
+      );
+      expect(failure(analyse(verdict, answer)).messages).toStrictEqual([
+        {
+          type: 'E',
+          text: 'Resource CLASS ZMCP_BLD_NOPE_CLS99 does not exist.',
+          code: 'notProcessed',
+        },
+      ]);
+    },
+  );
 });
 
 describe('an activation checklist refused with a non-2xx status', () => {
@@ -121,12 +122,15 @@ describe('an exception document refused with a non-2xx status', () => {
     ['analyseActivation', analyseActivation],
     ['analyseException', analyseException],
     ['analyseAny', analyseAny],
-  ] as const)('is read by the exception reading alone: %s', (_name, analyse) => {
-    const { answer, verdict } = servedAs('refusal-object-not-found', 404);
-    const refusal = readExceptionRefusal(answer.data);
-    const judged = failure(analyse(verdict, answer));
-    expect(judged.messages).toStrictEqual(refusal?.messages);
-    expect(judged.adtType).toBe(refusal?.adtType);
-    expect(judged.namespace).toBe(refusal?.namespace);
-  });
+  ] as const)(
+    'is read by the exception reading alone: %s',
+    (_name, analyse) => {
+      const { answer, verdict } = servedAs('refusal-object-not-found', 404);
+      const refusal = readExceptionRefusal(answer.data);
+      const judged = failure(analyse(verdict, answer));
+      expect(judged.messages).toStrictEqual(refusal?.messages);
+      expect(judged.adtType).toBe(refusal?.adtType);
+      expect(judged.namespace).toBe(refusal?.namespace);
+    },
+  );
 });
