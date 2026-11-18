@@ -11,7 +11,7 @@ import {
   analyseException,
   type IAdtMessageFailure,
 } from '../refusals/analyse';
-import { answerFor } from './corpus';
+import { answerFor, stepsOf } from './corpus';
 
 /**
  * A check or an activation refused with a non-2xx status gives exactly the
@@ -206,7 +206,30 @@ describe('an activation checklist refused with a non-2xx status gives what a 200
     },
   );
 
-  it('carries no inactive objects for a checklist', () => {
+  it('with the inactive list: the same messages and stillInactive', () => {
+    // The recorded list naming the function group; the activation named it.
+    const context = {
+      activation: {
+        named: ['/sap/bc/adt/functions/groups/zact751p9325'],
+        inactiveObjects: stepsOf('activation-group-alone-s4-2025')[4],
+      },
+    };
+    const ok = analyseActivation(
+      ADT_NO_FAILURE,
+      served(WARNING_ONLY, 200).answer,
+      context,
+    );
+    const { answer, verdict } = served(WARNING_ONLY, 400);
+    const refused = analyseActivation(verdict, answer, context);
+    if (ok === ADT_NO_FAILURE || refused === ADT_NO_FAILURE) {
+      throw new Error('expected a failure');
+    }
+    expect(ok.stillInactive.length).toBeGreaterThan(0);
+    expect(refused.messages).toStrictEqual(ok.messages);
+    expect(refused.stillInactive).toStrictEqual(ok.stillInactive);
+  });
+
+  it('carries no inactive objects for a checklist that names none', () => {
     const { answer, verdict } = served(
       recorded('refusal-activation-fails'),
       400,
