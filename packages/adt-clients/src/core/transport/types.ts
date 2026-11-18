@@ -8,7 +8,10 @@
 
 export type { IAbapObjectEntry } from '@mcp-abap-adt/interfaces-adt';
 
-import type { ITransportResults } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IListTransportsParams,
+  ITransportResults,
+} from '@mcp-abap-adt/interfaces-adt';
 import { rawDocument } from '../../utils/resultStrategy';
 
 // Types defined in @mcp-abap-adt/interfaces
@@ -63,3 +66,60 @@ export interface ICreateTransportParams {
   target_system?: string;
   owner?: string;
 }
+
+/** A request status `GET /cts/transportrequests` reads: `D` modifiable, `R` released. */
+export type TransportRequestStatus = 'D' | 'R';
+
+/**
+ * A request type `GET /cts/transportrequests` reads: `K` workbench, `W`
+ * customizing, `T` transport of copies.
+ */
+export type TransportRequestType = 'K' | 'W' | 'T';
+
+/** One letter or more, sent joined in the order given. */
+export type TransportLetters<
+  L extends TransportRequestStatus | TransportRequestType,
+> = readonly [L, ...L[]];
+
+/**
+ * The transport list by user, with no saved configuration: the query
+ * parameters SAP's handler reads (`CL_CTS_ADT_TM_RES_COLL_CONT`,
+ * `GET_QUERY_PARAMETER`), measured on premise 2026-11-18. Each is sent only
+ * when given; the library adds nothing.
+ *
+ * - `user` — any user; it matches the request owner or a task owner.
+ * - `requestStatus` — required: without a letter nothing is selected (the
+ *   deprecated `status=D` does nothing).
+ * - `requestType` — required beside `targets`: SAP answers `targets=true`
+ *   without one with an empty `<tm:root/>`. With `KW` the list is
+ *   byte-identical to the saved configuration's.
+ * - `releasedFromDate` / `releasedToDate` — `YYYYMMDD`, applied to released
+ *   requests only; SAP's default is the last 14 days.
+ */
+export type IListTransportsQuery = {
+  /** Not with a saved configuration: the two forms are exclusive. */
+  configUri?: undefined;
+  user: string;
+  requestStatus: TransportLetters<TransportRequestStatus>;
+  releasedFromDate?: string | undefined;
+  releasedToDate?: string | undefined;
+} & (
+  | {
+      targets?: undefined;
+      requestType?: TransportLetters<TransportRequestType> | undefined;
+    }
+  | {
+      /** `targets=true`: each request's target systems. */
+      targets: true;
+      requestType: TransportLetters<TransportRequestType>;
+    }
+);
+
+/**
+ * What `AdtRequest.list()` and `listTransports` take: a saved search's
+ * `configUri` (the contract's `IListTransportsParams`, nothing of the query
+ * beside it), or the query by user.
+ */
+export type ListTransportsParams =
+  | (IListTransportsParams & { user?: undefined })
+  | IListTransportsQuery;
