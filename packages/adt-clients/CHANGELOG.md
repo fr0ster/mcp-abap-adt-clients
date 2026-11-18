@@ -29,7 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ### Fixed
 
 - **`getSqlQuery` sends a line of up to 255 characters as it is**
-  (mcp-abap-adt#363). 45.5.1 wrapped every line whose code was longer than 72
+  (mcp-abap-adt#363; a length in UTF-16 code units, as ABAP counts characters). 45.5.1 wrapped every line whose code was longer than 72
   characters (#350), and SAP_BASIS 751 refuses a line break anywhere inside the
   freestyle statement: `400`, the LF glued into a token (`Unknown column name
   "AS4LOCAL\n="`, measured by the reporter), so every statement longer than 72

@@ -1618,7 +1618,9 @@ comma within 255 characters, never inside a `'…'` or `` `…` `` literal, neve
 inside a `"` comment, never before a `*` or a comment. A token with no such point within 255
 characters goes whole on a line of its own, as it is: that line is longer than
 255, and SAP's answer is yours. Only where whitespace stands changes. A line of
-up to 255 characters is sent as it is: SAP_BASIS 751 refuses a line break
+up to 255 characters is sent as it is (a length is counted in UTF-16 code units,
+as ABAP counts characters: a character outside the BMP, such as an emoji, counts
+two): SAP_BASIS 751 refuses a line break
 anywhere inside the statement (`400`, mcp-abap-adt#363). A statement whose
 lines all fit is sent as given, and nothing is refused by the library: a
 literal longer than 255 characters, or a `"` inside a literal, is sent as it is
