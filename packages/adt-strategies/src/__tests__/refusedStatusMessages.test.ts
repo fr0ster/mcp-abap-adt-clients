@@ -168,6 +168,32 @@ describe('a check run refused with a non-2xx status gives what a 200 gives', () 
     }
   });
 
+  it.each([
+    ['a space', '</r:checkRunReports >'],
+    ['a line break', '</r:checkRunReports\n>'],
+  ])('a root closing tag with %s: read as on a 200', (_label, closing) => {
+    const body = recorded('refusal-syntax-check')
+      .replaceAll('chkrun:', 'r:')
+      .replace('xmlns:chkrun=', 'xmlns:r=')
+      .replace('</r:checkRunReports>', closing);
+    expect(body).toContain(closing);
+    expect(on200(analyseCheck, body).messages).toStrictEqual([SYNTAX_FINDING]);
+    for (const [, analyse] of CHECK_ANALYSERS) {
+      expect(on400(analyse, body).messages).toStrictEqual([SYNTAX_FINDING]);
+    }
+  });
+
+  it('a bare report whose closing tag has a space: read as on a 200', () => {
+    const body = `${XML}<r:checkReport xmlns:r="${CHECKRUN_NS}" r:status="notProcessed" r:statusText="gone"></r:checkReport >`;
+    const expected = on200(analyseCheck, body).messages;
+    expect(expected).toStrictEqual([
+      { type: 'E', text: 'gone', code: 'notProcessed' },
+    ]);
+    for (const [, analyse] of CHECK_ANALYSERS) {
+      expect(on400(analyse, body).messages).toStrictEqual(expected);
+    }
+  });
+
   it('an empty checkRunReports: no refusal on a 200, the verdict on a 400', () => {
     expect(
       analyseCheck(ADT_NO_FAILURE, served(EMPTY_REPORTS, 200).answer),
@@ -188,6 +214,20 @@ describe('an activation checklist refused with a non-2xx status gives what a 200
     });
     expect(on400(analyse, body).messages).toStrictEqual(expected);
   });
+
+  it.each(ACTIVATION_ANALYSERS)(
+    'a root closing tag with a line break: %s',
+    (_n, analyse) => {
+      const body = recorded('refusal-activation-fails')
+        .replaceAll('chkl:', 'c:')
+        .replace('xmlns:chkl=', 'xmlns:c=')
+        .replace('</c:messages>', '</c:messages\n>');
+      expect(body).toContain('</c:messages\n>');
+      expect(on400(analyse, body).messages).toStrictEqual(
+        on200(analyseActivation, recorded('refusal-activation-fails')).messages,
+      );
+    },
+  );
 
   it.each(ACTIVATION_ANALYSERS)('another prefix: %s', (_n, analyse) => {
     const expected = on200(
@@ -257,10 +297,6 @@ describe('a body that only looks like one keeps the 0.23.2 answer', () => {
     [
       'a page followed by a report',
       `<html><body>gateway</body></html><chkrun:checkReport xmlns:chkrun="${CHECKRUN_NS}" chkrun:status="notProcessed" chkrun:statusText="trailing"/>`,
-    ],
-    [
-      'a report followed by text',
-      `<chkrun:checkReport xmlns:chkrun="${CHECKRUN_NS}" chkrun:status="notProcessed" chkrun:statusText="trailing"/>trailing`,
     ],
     [
       'text followed by a report',
