@@ -1,5 +1,5 @@
 /**
- * A freestyle SQL statement with each line SAP would cut at 255 wrapped.
+ * A freestyle SQL statement laid out on lines of at most 255 characters.
  *
  * **Why.** The freestyle data preview (`/datapreview/freestyle`) keeps the first
  * 255 characters of each line of the statement and drops the rest of the line
@@ -15,18 +15,14 @@
  * On 751 such a line could not be sent whole either way.
  *
  * **What is changed.** Only where whitespace is: a line whose code is longer
- * than {@link SQL_LINE_WIDTH} once condensed (SAP CONDENSEs each line before
- * the cut: leading and trailing blanks dropped, a run of blanks counted as
- * one; blanks inside a literal counted as written) is broken at a run of blanks (the run replaced by
+ * than {@link SQL_LINE_WIDTH} is broken at a run of blanks (the run replaced by
  * one LF) or right after a comma (an LF inserted), taking the last such point at
  * or before the width, else the first after it. Never inside a `'…'` or
  * `` `…` `` literal (a literal is never cut, whatever its length), never inside
  * a `"` comment, never before a `*` (the line would become a comment line) or a
- * comment (it would leave its line), never among a line's leading blanks. The
- * break point is chosen by the width as written, which is never under the
- * condensed one. A token with no break point within the width goes on a line
- * of its own, as it is — that line is longer than 255, and SAP's answer is the
- * caller's. A comment that ends a line is not counted and is left where it is.
+ * comment (it would leave its line), never among a line's leading blanks. A
+ * token with no break point within the width goes on a line of its own, as it
+ * is. A comment that ends a line is not counted and is left where it is.
  *
  * **What is not.** A statement whose every line fits is returned as the same
  * string. Nothing is refused: a literal longer than 255 characters, a `"` inside
@@ -153,51 +149,6 @@ function scanLine(
 }
 
 /**
- * How long the code from `from` to `end` is once SAP CONDENSEs it: leading and
- * trailing blanks dropped, a run of blanks counted as one. Blanks inside a
- * literal are counted as written (SAP condenses them too), so the length is
- * never under SAP's: it only decides whether a line is wrapped.
- */
-function condensedLength(
-  text: string,
-  from: number,
-  end: number,
-  startState: ScanState,
-): number {
-  let state = startState;
-  let length = 0;
-  let pendingBlank = false;
-  let at = from;
-  while (at < end) {
-    const ch = text.charAt(at);
-    if (state === 'code' && isBlank(ch)) {
-      pendingBlank = length > 0;
-      at += 1;
-      continue;
-    }
-    if (pendingBlank) {
-      length += 1;
-      pendingBlank = false;
-    }
-    if (state !== 'code') {
-      const delimiter = state === 'quote' ? "'" : '`';
-      if (ch === delimiter) {
-        if (text.charAt(at + 1) === delimiter && at + 1 < end) {
-          length += 2;
-          at += 2;
-          continue;
-        }
-        state = 'code';
-      }
-    } else if (ch === "'") state = 'quote';
-    else if (ch === '`') state = 'backtick';
-    length += 1;
-    at += 1;
-  }
-  return length;
-}
-
-/**
  * The statement with every line whose code is longer than
  * {@link SQL_LINE_WIDTH} wrapped; the same string when every line fits.
  */
@@ -209,11 +160,8 @@ export function wrapSqlLines(statement: string): string {
   while (start < statement.length) {
     const line = scanLine(statement, start, state);
     let from = start;
-    let fromState = state;
     let next = 0;
-    while (
-      condensedLength(statement, from, line.codeEnd, fromState) > SQL_LINE_WIDTH
-    ) {
+    while (line.codeEnd - from > SQL_LINE_WIDTH) {
       // The last break point within the width; else the first beyond it.
       let chosen: BreakPoint | undefined;
       let index = next;
@@ -234,8 +182,6 @@ export function wrapSqlLines(statement: string): string {
       parts.push(statement.slice(from, chosen.end), '\n');
       wrapped = true;
       from = chosen.resume;
-      // A break point is in code, so what follows it starts in code.
-      fromState = 'code';
       next = index;
     }
     parts.push(statement.slice(from, line.next));

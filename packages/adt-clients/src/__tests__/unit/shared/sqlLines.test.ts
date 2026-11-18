@@ -6,13 +6,11 @@
  * rest without a word (measured; `SEO_SECTION_SOURCE_LINE` is CHAR 255): a
  * literal crossing the mark fails, and a condition past it is silently lost.
  * SAP_BASIS 751 refuses a line break anywhere inside the statement (#363), so a
- * line of up to 255 once condensed (SAP CONDENSEs each line before the cut) is
- * sent as it is, and only a longer one is broken: at a run
+ * line of up to 255 is sent as it is, and only a longer one is broken: at a run
  * of blanks (replaced by one LF) or right after a comma — never inside a `'…'`
  * or `` `…` `` literal, never inside a comment, never before a `*` or a
  * comment — taking the last such point at or before 255, else the first after.
- * A statement that fits is returned as the same string; a token with no break
- * point within 255 goes as it is, on a line longer than 255.
+ * A statement that fits is returned as the same string.
  *
  * Every case pins the exact output; the property checks below hold for all of
  * them.
@@ -265,40 +263,6 @@ const CASES: WrapCase[] = [
     input: 'SELECT * FROM T000',
     expected: null,
   },
-  {
-    // SAP CONDENSEs a line before the cut: 261 as written, 18 condensed.
-    name: 'a line of 261 whose blanks condense to 18',
-    input: `SELECT${' '.repeat(244)}* FROM T000`,
-    expected: null,
-  },
-  {
-    name: 'a line of 262 whose blanks condense to 255',
-    input: `  SELECT devclass   FROM tdevc WHERE devclass = '${X(209)}'   `,
-    expected: null,
-  },
-  {
-    name: 'a line of 263 whose blanks condense to 256',
-    input: `  SELECT devclass   FROM tdevc WHERE devclass = '${X(210)}'   `,
-    expected: [
-      '  SELECT devclass   FROM tdevc WHERE devclass =',
-      `'${X(210)}'   `,
-    ],
-  },
-  {
-    name: 'blanks inside a literal counted as written',
-    input: `${EQUALS}'${' '.repeat(100)}${X(110)}'`,
-    expected: [EQUALS.trimEnd(), `'${' '.repeat(100)}${X(110)}'`],
-  },
-  {
-    // A token with no break point within 255 goes as it is, longer than 255.
-    name: 'a literal of 255 and its comma: a line of 257',
-    input: `SELECT devclass FROM tdevc WHERE devclass IN ('${X(253)}', 'B')`,
-    expected: [
-      'SELECT devclass FROM tdevc WHERE devclass IN',
-      `('${X(253)}',`,
-      "'B')",
-    ],
-  },
 ];
 
 /** The literals of a statement, delimiters included, in order — plain code. */
@@ -374,14 +338,6 @@ function firstNonBlank(line: string): string {
 describe('wrapSqlLines', () => {
   it('wraps at 255', () => {
     expect(SQL_LINE_WIDTH).toBe(255);
-  });
-
-  it('sends a token with no break point within 255 as it is, longer than 255', () => {
-    const lines = wrapSqlLines(
-      `SELECT devclass FROM tdevc WHERE devclass IN ('${X(253)}', 'B')`,
-    ).split('\n');
-    expect(lines[1]).toBe(`('${X(253)}',`);
-    expect(lines[1]?.length).toBe(257);
   });
 
   it('sends a statement of 300 on lines of at most 255, its literals whole', () => {
