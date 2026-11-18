@@ -168,6 +168,17 @@ describe('a check run refused with a non-2xx status gives what a 200 gives', () 
     }
   });
 
+  it('an empty report whose attribute holds a quoted >: read as on a 200', () => {
+    const body = `${XML}<chkrun:checkReport xmlns:chkrun="${CHECKRUN_NS}" chkrun:status="notProcessed" chkrun:statusText="a > b"/>\n`;
+    const expected = on200(analyseCheck, body).messages;
+    expect(expected).toStrictEqual([
+      { type: 'E', text: 'a > b', code: 'notProcessed' },
+    ]);
+    for (const [, analyse] of CHECK_ANALYSERS) {
+      expect(on400(analyse, body).messages).toStrictEqual(expected);
+    }
+  });
+
   it('an empty checkRunReports: no refusal on a 200, the verdict on a 400', () => {
     expect(
       analyseCheck(ADT_NO_FAILURE, served(EMPTY_REPORTS, 200).answer),
@@ -261,6 +272,10 @@ describe('a body that only looks like one keeps the 0.23.2 answer', () => {
     [
       'a report followed by text',
       `<chkrun:checkReport xmlns:chkrun="${CHECKRUN_NS}" chkrun:status="notProcessed" chkrun:statusText="trailing"/>trailing`,
+    ],
+    [
+      'a report followed by text ending like a tag',
+      `<chkrun:checkReport xmlns:chkrun="${CHECKRUN_NS}" chkrun:status="notProcessed" chkrun:statusText="trailing"/>trailing/>`,
     ],
     [
       'text followed by a report',
