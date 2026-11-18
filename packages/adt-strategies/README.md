@@ -112,8 +112,9 @@ reference's fragment `#start=<line>,<col>[;end=<line>,<col>]` — a checklist
 whose `start` does not read, gives the `uri` alone; an `end` that does not
 read is dropped and the start kept; an empty reference gives neither. A
 checklist `msg`'s `line` attribute is the message's ordinal (1, 2, 3…), not a
-source line, and is not read. `AdtMessage.line` is deprecated: it repeats
-`position.line` — the real source line — and is absent without a position.
+source line, and is not read. `AdtMessage.line` is deprecated: it stays a string,
+`String(position.line)` — the real source line — and is absent without a
+position.
 
 A failure built from a document on a successful answer carries that answer's
 `sessionLost` (since 0.22.3: the connection marked the answer with the SAP

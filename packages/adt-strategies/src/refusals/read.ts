@@ -104,13 +104,13 @@ export interface AdtMessage {
    */
   readonly position?: AdtSourcePosition;
   /**
-   * The source line the message stands on: `position.line`, present exactly
-   * when `position` is. Until 0.23.2 this held a checklist `msg`'s `line`
-   * attribute, the message's ordinal.
+   * The source line the message stands on, as text: `String(position.line)`,
+   * present exactly when `position` is. Until 0.23.2 this held a checklist
+   * `msg`'s `line` attribute, the message's ordinal.
    *
    * @deprecated Use `position.line`.
    */
-  readonly line?: number;
+  readonly line?: string;
 }
 
 /**
@@ -120,12 +120,12 @@ export interface AdtMessage {
 function located(reference: string | undefined): {
   uri?: string;
   position?: AdtSourcePosition;
-  line?: number;
+  line?: string;
 } {
   const read = readSourceReference(reference);
   return read.position === undefined
     ? read
-    : { ...read, line: read.position.line };
+    : { ...read, line: String(read.position.line) };
 }
 
 /** SAP spells severity three ways. One letter out. */
