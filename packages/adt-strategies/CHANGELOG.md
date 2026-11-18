@@ -14,7 +14,14 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
-## [0.23.4] - 2026-11-18
+## [0.23.5] - 2026-11-18
+
+The same code as 0.23.3, released together with adt-clients 45.5.5 from one
+commit. 0.23.4 was tagged (`adt-strategies-v0.23.4`) but never published: a
+release publishes every package from main's HEAD, and adt-clients 45.5.4's tag
+was no longer there. Everything 0.23.3 lists below is in 0.23.5.
+
+## [0.23.4] - 2026-11-18 (tagged, not published)
 
 The same code as 0.23.3, released from the repository's current HEAD.
 0.23.3 was tagged (`adt-strategies-v0.23.3`) but never published: adt-clients
