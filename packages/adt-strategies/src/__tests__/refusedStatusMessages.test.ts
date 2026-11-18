@@ -91,17 +91,15 @@ const recorded = (caseName: string): string => String(answerFor(caseName).data);
 const MULTI_REPORT = `${XML}<chkrun:checkRunReports xmlns:chkrun="${CHECKRUN_NS}"><chkrun:checkReport chkrun:status="processed" chkrun:statusText="A checked"><chkrun:checkMessageList><chkrun:checkMessage chkrun:uri="/a/source/main#start=3,4" chkrun:type="W" chkrun:shortText="a warning"/></chkrun:checkMessageList></chkrun:checkReport><chkrun:checkReport chkrun:status="processed" chkrun:statusText="B checked"><chkrun:checkMessageList><chkrun:checkMessage chkrun:uri="/b/source/main#start=7,1" chkrun:type="E" chkrun:shortText="an error" chkrun:code="MESSAGE(X)"/></chkrun:checkMessageList></chkrun:checkReport></chkrun:checkRunReports>`;
 
 /** The recorded syntax check, under another prefix and the default namespace. */
-const RENAMED_CHECKRUN = recorded('refusal-syntax-check').replaceAll(
-  'chkrun:',
-  'cr:',
-);
+const RENAMED_CHECKRUN = recorded('refusal-syntax-check')
+  .replaceAll('chkrun:', 'cr:')
+  .replace('xmlns:chkrun=', 'xmlns:cr=');
 const DEFAULT_NS_CHECKRUN = recorded('refusal-syntax-check')
   .replaceAll('chkrun:', '')
   .replace(`xmlns:chkrun="${CHECKRUN_NS}"`, `xmlns="${CHECKRUN_NS}"`);
-const RENAMED_CHECKLIST = recorded('refusal-activation-fails').replaceAll(
-  'chkl:',
-  'cl:',
-);
+const RENAMED_CHECKLIST = recorded('refusal-activation-fails')
+  .replaceAll('chkl:', 'cl:')
+  .replace('xmlns:chkl=', 'xmlns:cl=');
 
 const BARE_EMPTY_REPORT = `${XML}<chkrun:checkReport xmlns:chkrun="${CHECKRUN_NS}"/>`;
 const EMPTY_REPORTS = `${XML}<chkrun:checkRunReports xmlns:chkrun="${CHECKRUN_NS}"/>`;
