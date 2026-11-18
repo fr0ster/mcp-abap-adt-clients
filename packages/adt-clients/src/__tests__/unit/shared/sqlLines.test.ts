@@ -10,7 +10,9 @@
  * of blanks (replaced by one LF) or right after a comma — never inside a `'…'`
  * or `` `…` `` literal, never inside a comment, never before a `*` or a
  * comment — taking the last such point at or before 255, else the first after.
- * A statement that fits is returned as the same string.
+ * A statement that fits is returned as the same string; a token with no break
+ * point within 255 goes as it is, on a line longer than 255. Lengths are as
+ * written.
  *
  * Every case pins the exact output; the property checks below hold for all of
  * them.
@@ -263,6 +265,16 @@ const CASES: WrapCase[] = [
     input: 'SELECT * FROM T000',
     expected: null,
   },
+  {
+    // A token with no break point within 255 goes as it is, longer than 255.
+    name: 'a literal of 255 and its comma: a line of 257',
+    input: `SELECT devclass FROM tdevc WHERE devclass IN ('${X(253)}', 'B')`,
+    expected: [
+      'SELECT devclass FROM tdevc WHERE devclass IN',
+      `('${X(253)}',`,
+      "'B')",
+    ],
+  },
 ];
 
 /** The literals of a statement, delimiters included, in order — plain code. */
@@ -338,6 +350,14 @@ function firstNonBlank(line: string): string {
 describe('wrapSqlLines', () => {
   it('wraps at 255', () => {
     expect(SQL_LINE_WIDTH).toBe(255);
+  });
+
+  it('sends a token with no break point within 255 as it is, longer than 255', () => {
+    const lines = wrapSqlLines(
+      `SELECT devclass FROM tdevc WHERE devclass IN ('${X(253)}', 'B')`,
+    ).split('\n');
+    expect(lines[1]).toBe(`('${X(253)}',`);
+    expect(lines[1]?.length).toBe(257);
   });
 
   it('sends a statement of 300 on lines of at most 255, its literals whole', () => {

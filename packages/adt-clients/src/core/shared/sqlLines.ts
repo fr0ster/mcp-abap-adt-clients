@@ -1,5 +1,5 @@
 /**
- * A freestyle SQL statement laid out on lines of at most 255 characters.
+ * A freestyle SQL statement with each line longer than 255 wrapped.
  *
  * **Why.** The freestyle data preview (`/datapreview/freestyle`) keeps the first
  * 255 characters of each line of the statement and drops the rest of the line
@@ -22,7 +22,8 @@
  * a `"` comment, never before a `*` (the line would become a comment line) or a
  * comment (it would leave its line), never among a line's leading blanks. A
  * token with no break point within the width goes on a line of its own, as it
- * is. A comment that ends a line is not counted and is left where it is.
+ * is — longer than 255, and SAP's answer is the caller's. A comment that ends a
+ * line is not counted and is left where it is. Lengths are as written.
  *
  * **What is not.** A statement whose every line fits is returned as the same
  * string. Nothing is refused: a literal longer than 255 characters, a `"` inside
