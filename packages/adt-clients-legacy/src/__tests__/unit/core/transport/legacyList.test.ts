@@ -75,6 +75,28 @@ describe('legacy transport list', () => {
     );
     expect(calls).toHaveLength(0);
   });
+
+  /**
+   * The root `list` takes the query by user since adt-clients 45.5.3, and
+   * the legacy override accepts every argument the root accepts
+   * (`typechecks/exact/legacyOverrides.ts`). The legacy endpoint reads no
+   * query: the query is refused, not sent and not ignored.
+   */
+  it('refuses the query by user instead of silently ignoring it', async () => {
+    const { connection, calls } = recordingConnection();
+
+    const failure = expectFailure(
+      await new AdtRequestLegacy(connection, {
+        results: transportDocuments,
+      }).list({ user: 'DEVELOPER', requestStatus: ['D'] }),
+      'legacy list with a user query',
+    );
+
+    expect(failure.message).toMatch(
+      /^user is not supported on a legacy system \(7\.40 SP04\)/,
+    );
+    expect(calls).toHaveLength(0);
+  });
 });
 
 describe('legacy transport update/delete', () => {

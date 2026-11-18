@@ -7,8 +7,8 @@
  * Served:
  * - `list`: GET /sap/bc/cts/transportrequests, the user's full list as it came
  *   (measured on 7.40 SP04; the measured user had no requests, so a populated
- *   list was not seen). Not a saved-configuration search, so `configUri` is
- *   refused.
+ *   list was not seen). Not a saved-configuration search and reads no query,
+ *   so `configUri` and the root's query by user are refused.
  * - `readMetadata`: the same GET.
  *
  * Refused without a request, answered through `failed()`:
@@ -30,6 +30,7 @@ import {
   AdtRequest,
   answering,
   failed,
+  type ListTransportsParams,
   type ResultValuesOf,
   TRANSPORT_REQUEST,
   type TransportValues,
@@ -118,14 +119,25 @@ export class AdtRequestLegacy<
   override async list<E extends IAdtError = IAdtError>(
     // Wider than the contract on purpose: the legacy endpoint is not a saved
     // search, so there is no `configUri` to require — and one that is passed
-    // is refused below rather than ignored.
-    options?: Partial<IListTransportsOptions> & IAdtAnalyseOptions<E>,
+    // is refused below rather than ignored. The root's query by user is
+    // accepted for the same reason it is refused: the override takes every
+    // argument the root takes.
+    options?: (
+      | (Partial<IListTransportsOptions> & { user?: undefined })
+      | ListTransportsParams
+    ) &
+      IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['list'], E>> {
-    if (options?.configUri) {
+    const refused = options?.configUri
+      ? 'configUri'
+      : options?.user !== undefined
+        ? 'user'
+        : undefined;
+    if (refused !== undefined) {
       return failed<T['list'], E>(
         unsupported(
-          'configUri',
-          `${TRANSPORT_REQUEST_LEGACY.collection} is not a saved-configuration search and always returns the full list for the current user.`,
+          refused,
+          `${TRANSPORT_REQUEST_LEGACY.collection} is not a saved-configuration search, reads no query, and always returns the full list for the current user.`,
         ) as E,
       );
     }
