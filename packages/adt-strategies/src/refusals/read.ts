@@ -229,6 +229,54 @@ function parseXml(document: unknown): ParsedElement | null {
   }
 }
 
+/**
+ * The parser for a document's root element: namespace prefixes kept, so the
+ * root's name and its `xmlns` declarations can be read as written.
+ */
+const namespacedParser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '@',
+  parseAttributeValue: false,
+  parseTagValue: false,
+});
+
+/** A document's one top-level element: its namespace URI and local name. */
+export interface IAdtRootElement {
+  /** The namespace URI the element is in; absent when it is in none. */
+  readonly namespace?: string;
+  readonly local: string;
+}
+
+/**
+ * The root element of a well-formed document with exactly one top-level
+ * element, by namespace URI and local name — never by prefix, which the
+ * sender chooses. `null` for anything else: not a string, not well-formed,
+ * no element or more than one at the top.
+ */
+export function readRootElement(document: unknown): IAdtRootElement | null {
+  if (typeof document !== 'string') return null;
+  if (XMLValidator.validate(document) !== true) return null;
+  let parsed: unknown;
+  try {
+    parsed = namespacedParser.parse(document);
+  } catch {
+    return null;
+  }
+  if (!isElement(parsed)) return null;
+  const names = Object.keys(parsed).filter(
+    (key) => !key.startsWith('?') && !key.startsWith('#'),
+  );
+  const [name] = names;
+  if (names.length !== 1 || name === undefined) return null;
+  const element = parsed[name];
+  if (Array.isArray(element)) return null;
+  const colon = name.indexOf(':');
+  const local = colon < 0 ? name : name.slice(colon + 1);
+  const declaration = colon < 0 ? '@xmlns' : `@xmlns:${name.slice(0, colon)}`;
+  const namespace = leafText(field(element, declaration));
+  return namespace === undefined ? { local } : { namespace, local };
+}
+
 // ---------------------------------------------------------------------------
 // Form 1 — the HTTP status carries it, the document explains it
 // ---------------------------------------------------------------------------
@@ -512,6 +560,27 @@ function byInactiveList(
   );
 }
 
+/** A checklist's `msg` elements, each read into one message. */
+function checklistMessagesOf(root: unknown): AdtMessage[] {
+  return asArray(field(root, 'msg')).map((msg) => {
+    const object = textOf(field(msg, '@objDescr'));
+    const code = leafText(field(msg, '@code'));
+    return {
+      type: severity(field(msg, '@type')),
+      text:
+        textOf(at(msg, 'shortText', 'txt')) ||
+        textOf(field(msg, 'shortText')) ||
+        object ||
+        'activation message',
+      ...(object ? { object } : {}),
+      // `@line` is the message's ordinal, not a source line: the position is
+      // only in `href`'s fragment (fr0ster/mcp-abap-adt#351).
+      ...located(leafText(field(msg, '@href'))),
+      ...(code !== undefined ? { code } : {}),
+    };
+  });
+}
+
 /**
  * What `POST /activation` answered, judged (fr0ster/mcp-abap-adt#351; the measurements by release: ERRATA.md).
  *
@@ -598,24 +667,7 @@ export function readActivationRefusal(
     return notActivated('the answer does not state the activation');
   }
   const root = field(parsed, 'messages');
-
-  const messages: AdtMessage[] = asArray(field(root, 'msg')).map((msg) => {
-    const object = textOf(field(msg, '@objDescr'));
-    const code = leafText(field(msg, '@code'));
-    return {
-      type: severity(field(msg, '@type')),
-      text:
-        textOf(at(msg, 'shortText', 'txt')) ||
-        textOf(field(msg, 'shortText')) ||
-        object ||
-        'activation message',
-      ...(object ? { object } : {}),
-      // `@line` is the message's ordinal, not a source line: the position is
-      // only in `href`'s fragment (fr0ster/mcp-abap-adt#351).
-      ...located(leafText(field(msg, '@href'))),
-      ...(code !== undefined ? { code } : {}),
-    };
-  });
+  const messages = checklistMessagesOf(root);
 
   const errors = messages.filter((m) => m.type.toUpperCase() === 'E');
   const executed = at(root, 'properties', '@activationExecuted');
@@ -822,6 +874,36 @@ function t100FromLongtext(link: unknown): AdtMessage['t100'] {
 // Form 3 — check runs: the status attribute, then the messages
 // ---------------------------------------------------------------------------
 
+/** A check report's `checkMessage` elements, each read into one message. */
+function checkMessagesOf(report: unknown): AdtMessage[] {
+  return asArray(at(report, 'checkMessageList', 'checkMessage')).map((msg) => {
+    const code = leafText(field(msg, '@code'));
+    return {
+      type: String(field(msg, '@type') ?? 'I'),
+      text:
+        textOf(field(msg, '@shortText')) ||
+        textOf(field(msg, 'shortText')) ||
+        'check message',
+      ...located(leafText(field(msg, '@uri'))),
+      ...(code !== undefined ? { code } : {}),
+    };
+  });
+}
+
+/**
+ * The one message of a report that never ran: such a report carries no
+ * message list at all, the reason sits in an attribute and no severity is
+ * stated anywhere. One is supplied, so this form reduces to {severity, text}
+ * like every other.
+ */
+function notRunMessage(report: unknown): AdtMessage {
+  const status = String(field(report, '@status') ?? '');
+  const statusText = String(field(report, '@statusText') ?? '');
+  const text =
+    statusText || `Check did not run (status: ${status || 'unstated'})`;
+  return { type: 'E', text, code: status };
+}
+
 /**
  * `chkrun:checkRunReports`, what `POST /checkruns` answers.
  *
@@ -864,32 +946,12 @@ export function readCheckRunRefusal(document: unknown): AdtRefusal | null {
   for (const report of reports) {
     const status = String(field(report, '@status') ?? '');
     const statusText = String(field(report, '@statusText') ?? '');
-
-    const reported: AdtMessage[] = asArray(
-      at(report, 'checkMessageList', 'checkMessage'),
-    ).map((msg) => {
-      const code = leafText(field(msg, '@code'));
-      return {
-        type: String(field(msg, '@type') ?? 'I'),
-        text:
-          textOf(field(msg, '@shortText')) ||
-          textOf(field(msg, 'shortText')) ||
-          'check message',
-        ...located(leafText(field(msg, '@uri'))),
-        ...(code !== undefined ? { code } : {}),
-      };
-    });
+    const reported = checkMessagesOf(report);
 
     if (status !== 'processed') {
-      // A check that never ran carries no message list at all: the reason sits
-      // in an attribute and no severity is stated anywhere. One is supplied, so
-      // this form reduces to {severity, text} like every other.
-      const text =
-        statusText || `Check did not run (status: ${status || 'unstated'})`;
-      explanations.push(text);
-      messages.push(
-        ...(reported.length ? reported : [{ type: 'E', text, code: status }]),
-      );
+      const notRun = notRunMessage(report);
+      explanations.push(notRun.text);
+      messages.push(...(reported.length ? reported : [notRun]));
       continue;
     }
 

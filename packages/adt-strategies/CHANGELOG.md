@@ -14,6 +14,54 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.23.3] - 2026-11-18
+
+For `mcp-abap-adt` 24.0.1.
+
+### Fixed
+
+- **A check or an activation refused with a non-2xx status keeps its
+  messages' positions.** Every analyser read an answer whose status the
+  library had already refused with the exception reading alone
+  (`readExceptionRefusal`), so a check-run report or an activation checklist
+  on a `400` became one `E` carrying the library's sentence: `position`,
+  `uri`, `object`, `code` and the deprecated `line`, which the `200` readings
+  give, survived only in the raw body (mcp-abap-adt's `CheckClassLow`
+  replaying the recorded syntax check as a `400` lost `{ line: 15, column: 24 }`).
+  When the answer's own status is not 2xx, its body is not an
+  `exc:exception`, and it is a well-formed document with exactly one
+  top-level element as the parser reports it, that element — by namespace URI and local
+  name, never by prefix — picks the reading, and it is the very reading of a
+  `200`: `checkRunReports` or `checkReport` in `http://www.sap.com/adt/checkrun`
+  goes through `readCheckRunRefusal`, `messages` in
+  `http://www.sap.com/abapxml/checklist` through `readActivationRefusal` with
+  the member's inactive-list facts. The `400` therefore carries exactly the
+  messages the `200` reading gives for the same body (a warning-only report
+  beside an error report contributes nothing, as on a `200`; a warning-only
+  checklist without `activationExecuted` gives the undecided `E` and the
+  warning), and `analyseActivation` carries that reading's `stillInactive`.
+  A bare empty `checkReport` gives the `200` reading's "Check did not run
+  (status: unstated)". A body the `200` reading does not refuse — an empty
+  `checkRunReports`, a processed report without an error, an activated
+  checklist — gives one `E` with the verdict's message, as in 0.23.2. So does a
+  body that only looks like one: another namespace, no namespace, or more
+  than one top-level element. A failure verdict handed beside
+  a 2xx answer — the inactive-list read that failed after an activation's
+  `200` checklist — reads no body and answers as in 0.23.2, the read's
+  failure in the message. An `exc:exception` body answers as before,
+  byte for byte. This holds for every analyser that enriches a verdict
+  (`analyseCheck`, `analyseActivation`, `analyseException`, `analyseAny` and
+  the rest built the same way); the verdict itself (`origin`, `code`,
+  `message`, `response`) is kept.
+- **Not changed.** On the client's normal path a `400` activation carries no
+  inactive-list facts, so `stillInactive` is `[]`: adt-clients reads
+  `GET /activation/inactiveobjects` only after a 2xx activation. The analyser
+  fills `stillInactive` only when the caller passes `context.activation`.
+  Text after the root element, which the parser drops, is not looked for: the
+  document is read as its one element (SAP does not send such text). A
+  namespace URI written with character references (`checkru&#110;`) is not
+  resolved and does not match (SAP does not send it either).
+
 ## [0.23.2] - 2026-11-18
 
 Released with `@mcp-abap-adt/adt-clients` 45.5.3 (fr0ster/mcp-abap-adt#351).
