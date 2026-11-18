@@ -94,6 +94,10 @@ describe.each(WORKFLOWS)('%s installs and runs nothing unreviewed', (file) => {
     expect([...new Set(audits)]).toEqual([
       'run: npm audit --omit=dev --audit-level=moderate',
     ]);
+    // The comments say what the step gates, never the dev tree.
+    expect(
+      text.filter((line) => line.includes('dev dependencies included')),
+    ).toEqual([]);
     expect(
       text.filter((line) => line.trim().startsWith('continue-on-error')),
     ).toEqual([]);

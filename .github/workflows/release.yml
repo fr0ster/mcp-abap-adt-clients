@@ -45,8 +45,10 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      # A tag with a known advisory of moderate severity or above is not
-      # released, dev dependencies included.
+      # A tag with a known advisory of moderate severity or above in what the
+      # packages ship (production dependencies) is not released. Dev
+      # dependencies are audited again once the test runner leaves Jest
+      # (fr0ster/mcp-abap-adt-clients#317).
       - name: Security audit (moderate+)
         run: npm audit --omit=dev --audit-level=moderate
 
@@ -142,8 +144,10 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      # A tag with a known advisory of moderate severity or above is not
-      # released, dev dependencies included.
+      # A tag with a known advisory of moderate severity or above in what the
+      # packages ship (production dependencies) is not released. Dev
+      # dependencies are audited again once the test runner leaves Jest
+      # (fr0ster/mcp-abap-adt-clients#317).
       - name: Security audit (moderate+)
         run: npm audit --omit=dev --audit-level=moderate
 
@@ -243,8 +247,10 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      # A tag with a known advisory of moderate severity or above is not
-      # released, dev dependencies included.
+      # A tag with a known advisory of moderate severity or above in what the
+      # packages ship (production dependencies) is not released. Dev
+      # dependencies are audited again once the test runner leaves Jest
+      # (fr0ster/mcp-abap-adt-clients#317).
       - name: Security audit (moderate+)
         run: npm audit --omit=dev --audit-level=moderate
 
