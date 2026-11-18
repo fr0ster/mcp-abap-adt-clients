@@ -28,16 +28,27 @@ For `mcp-abap-adt` 24.0.1.
   `uri`, `object`, `code` and the deprecated `line`, which the `200` readings
   give, survived only in the raw body (mcp-abap-adt's `CheckClassLow`
   replaying the recorded syntax check as a `400` lost `{ line: 15, column: 24 }`).
-  When the body is not an `exc:exception`, its root element now picks the
-  reading: `chkrun:checkRunReports` (or a bare `chkrun:checkReport`) is read as
-  `readCheckRunRefusal` reads its messages — a report that did not run and
-  listed nothing gives its status sentence —, `chkl:messages` as
-  `readActivationRefusal` does. This holds for every analyser that enriches a
-  verdict (`analyseCheck`, `analyseActivation`, `analyseException`,
-  `analyseAny` and the rest built the same way). An `exc:exception` body answers
-  as before, byte for byte; any other body, or a report or checklist that lists
-  nothing, still gives one `E` with the verdict's message. The verdict itself
-  (`origin`, `code`, `message`, `response`) is kept.
+  When the body is not an `exc:exception` and is a well-formed document with
+  exactly one top-level element, that element — by namespace URI and local
+  name, never by prefix — picks the reading, and it is the very reading of a
+  `200`: `checkRunReports` or `checkReport` in `http://www.sap.com/adt/checkrun`
+  goes through `readCheckRunRefusal`, `messages` in
+  `http://www.sap.com/abapxml/checklist` through `readActivationRefusal` with
+  the member's inactive-list facts. The `400` therefore carries exactly the
+  messages the `200` reading gives for the same body (a warning-only report
+  beside an error report contributes nothing, as on a `200`; a warning-only
+  checklist without `activationExecuted` gives the undecided `E` and the
+  warning), and `analyseActivation` carries that reading's `stillInactive`.
+  A bare empty `checkReport` gives the `200` reading's "Check did not run
+  (status: unstated)". A body the `200` reading does not refuse — an empty
+  `checkRunReports`, a processed report without an error, an activated
+  checklist — gives one `E` with the verdict's message, as in 0.23.2. So does a
+  body that only looks like one: another namespace, no namespace, or more
+  than one top-level element. An `exc:exception` body answers as before,
+  byte for byte. This holds for every analyser that enriches a verdict
+  (`analyseCheck`, `analyseActivation`, `analyseException`, `analyseAny` and
+  the rest built the same way); the verdict itself (`origin`, `code`,
+  `message`, `response`) is kept.
 
 ## [0.23.2] - 2026-11-18
 
