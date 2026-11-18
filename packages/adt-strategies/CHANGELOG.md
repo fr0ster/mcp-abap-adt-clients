@@ -14,6 +14,31 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.23.3] - 2026-11-18
+
+For `mcp-abap-adt` 24.0.1.
+
+### Fixed
+
+- **A check or an activation refused with a non-2xx status keeps its
+  messages' positions.** Every analyser read an answer whose status the
+  library had already refused with the exception reading alone
+  (`readExceptionRefusal`), so a check-run report or an activation checklist
+  on a `400` became one `E` carrying the library's sentence: `position`,
+  `uri`, `object`, `code` and the deprecated `line`, which the `200` readings
+  give, survived only in the raw body (mcp-abap-adt's `CheckClassLow`
+  replaying the recorded syntax check as a `400` lost `{ line: 15, column: 24 }`).
+  When the body is not an `exc:exception`, its root element now picks the
+  reading: `chkrun:checkRunReports` (or a bare `chkrun:checkReport`) is read as
+  `readCheckRunRefusal` reads its messages — a report that did not run and
+  listed nothing gives its status sentence —, `chkl:messages` as
+  `readActivationRefusal` does. This holds for every analyser that enriches a
+  verdict (`analyseCheck`, `analyseActivation`, `analyseException`,
+  `analyseAny` and the rest built the same way). An `exc:exception` body answers
+  as before, byte for byte; any other body, or a report or checklist that lists
+  nothing, still gives one `E` with the verdict's message. The verdict itself
+  (`origin`, `code`, `message`, `response`) is kept.
+
 ## [0.23.2] - 2026-11-18
 
 Released with `@mcp-abap-adt/adt-clients` 45.5.3 (fr0ster/mcp-abap-adt#351).
