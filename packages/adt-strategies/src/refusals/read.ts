@@ -512,6 +512,39 @@ function byInactiveList(
   );
 }
 
+/** A checklist's `msg` elements, each read into one message. */
+function checklistMessagesOf(root: unknown): AdtMessage[] {
+  return asArray(field(root, 'msg')).map((msg) => {
+    const object = textOf(field(msg, '@objDescr'));
+    const code = leafText(field(msg, '@code'));
+    return {
+      type: severity(field(msg, '@type')),
+      text:
+        textOf(at(msg, 'shortText', 'txt')) ||
+        textOf(field(msg, 'shortText')) ||
+        object ||
+        'activation message',
+      ...(object ? { object } : {}),
+      // `@line` is the message's ordinal, not a source line: the position is
+      // only in `href`'s fragment (fr0ster/mcp-abap-adt#351).
+      ...located(leafText(field(msg, '@href'))),
+      ...(code !== undefined ? { code } : {}),
+    };
+  });
+}
+
+/**
+ * Every message of an activation checklist (`chkl:messages`), each as
+ * {@link readActivationRefusal} reads it; `null` for a document whose root
+ * is not a checklist. No verdict: for an answer the status already refused,
+ * where the checklist explains the refusal.
+ */
+export function readChecklistMessages(document: unknown): AdtMessage[] | null {
+  const parsed = wellFormed(document);
+  if (!rootIs(parsed, 'messages')) return null;
+  return checklistMessagesOf(field(parsed, 'messages'));
+}
+
 /**
  * What `POST /activation` answered, judged (fr0ster/mcp-abap-adt#351; the measurements by release: ERRATA.md).
  *
@@ -598,24 +631,7 @@ export function readActivationRefusal(
     return notActivated('the answer does not state the activation');
   }
   const root = field(parsed, 'messages');
-
-  const messages: AdtMessage[] = asArray(field(root, 'msg')).map((msg) => {
-    const object = textOf(field(msg, '@objDescr'));
-    const code = leafText(field(msg, '@code'));
-    return {
-      type: severity(field(msg, '@type')),
-      text:
-        textOf(at(msg, 'shortText', 'txt')) ||
-        textOf(field(msg, 'shortText')) ||
-        object ||
-        'activation message',
-      ...(object ? { object } : {}),
-      // `@line` is the message's ordinal, not a source line: the position is
-      // only in `href`'s fragment (fr0ster/mcp-abap-adt#351).
-      ...located(leafText(field(msg, '@href'))),
-      ...(code !== undefined ? { code } : {}),
-    };
-  });
+  const messages = checklistMessagesOf(root);
 
   const errors = messages.filter((m) => m.type.toUpperCase() === 'E');
   const executed = at(root, 'properties', '@activationExecuted');
@@ -822,6 +838,60 @@ function t100FromLongtext(link: unknown): AdtMessage['t100'] {
 // Form 3 — check runs: the status attribute, then the messages
 // ---------------------------------------------------------------------------
 
+/** A check report's `checkMessage` elements, each read into one message. */
+function checkMessagesOf(report: unknown): AdtMessage[] {
+  return asArray(at(report, 'checkMessageList', 'checkMessage')).map((msg) => {
+    const code = leafText(field(msg, '@code'));
+    return {
+      type: String(field(msg, '@type') ?? 'I'),
+      text:
+        textOf(field(msg, '@shortText')) ||
+        textOf(field(msg, 'shortText')) ||
+        'check message',
+      ...located(leafText(field(msg, '@uri'))),
+      ...(code !== undefined ? { code } : {}),
+    };
+  });
+}
+
+/**
+ * The one message of a report that never ran: such a report carries no
+ * message list at all, the reason sits in an attribute and no severity is
+ * stated anywhere. One is supplied, so this form reduces to {severity, text}
+ * like every other.
+ */
+function notRunMessage(report: unknown): AdtMessage {
+  const status = String(field(report, '@status') ?? '');
+  const statusText = String(field(report, '@statusText') ?? '');
+  const text =
+    statusText || `Check did not run (status: ${status || 'unstated'})`;
+  return { type: 'E', text, code: status };
+}
+
+/**
+ * Every message of a check-run report (`chkrun:checkRunReports`, or a bare
+ * `chkrun:checkReport`), each as {@link readCheckRunRefusal} reads it — a
+ * report that did not run and listed nothing gives its status sentence;
+ * `null` for a document whose root is neither. No verdict: for an answer the
+ * status already refused, where the report explains the refusal.
+ */
+export function readCheckRunMessages(document: unknown): AdtMessage[] | null {
+  const parsed = parseXml(document);
+  const reports = rootIs(parsed, 'checkRunReports')
+    ? asArray(at(parsed, 'checkRunReports', 'checkReport'))
+    : rootIs(parsed, 'checkReport')
+      ? asArray(field(parsed, 'checkReport'))
+      : null;
+  if (reports === null) return null;
+  return reports.flatMap((report) => {
+    const reported = checkMessagesOf(report);
+    if (reported.length > 0) return reported;
+    return String(field(report, '@status') ?? '') === 'processed'
+      ? []
+      : [notRunMessage(report)];
+  });
+}
+
 /**
  * `chkrun:checkRunReports`, what `POST /checkruns` answers.
  *
@@ -864,32 +934,12 @@ export function readCheckRunRefusal(document: unknown): AdtRefusal | null {
   for (const report of reports) {
     const status = String(field(report, '@status') ?? '');
     const statusText = String(field(report, '@statusText') ?? '');
-
-    const reported: AdtMessage[] = asArray(
-      at(report, 'checkMessageList', 'checkMessage'),
-    ).map((msg) => {
-      const code = leafText(field(msg, '@code'));
-      return {
-        type: String(field(msg, '@type') ?? 'I'),
-        text:
-          textOf(field(msg, '@shortText')) ||
-          textOf(field(msg, 'shortText')) ||
-          'check message',
-        ...located(leafText(field(msg, '@uri'))),
-        ...(code !== undefined ? { code } : {}),
-      };
-    });
+    const reported = checkMessagesOf(report);
 
     if (status !== 'processed') {
-      // A check that never ran carries no message list at all: the reason sits
-      // in an attribute and no severity is stated anywhere. One is supplied, so
-      // this form reduces to {severity, text} like every other.
-      const text =
-        statusText || `Check did not run (status: ${status || 'unstated'})`;
-      explanations.push(text);
-      messages.push(
-        ...(reported.length ? reported : [{ type: 'E', text, code: status }]),
-      );
+      const notRun = notRunMessage(report);
+      explanations.push(notRun.text);
+      messages.push(...(reported.length ? reported : [notRun]));
       continue;
     }
 
