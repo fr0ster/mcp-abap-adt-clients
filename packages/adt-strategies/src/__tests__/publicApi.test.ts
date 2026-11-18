@@ -3,6 +3,8 @@ import type {
   AdtActivationRefusal,
   AdtMessage,
   AdtRefusal,
+  AdtSourcePoint,
+  AdtSourcePosition,
   IAdtActivationFailure,
   IAdtMessageFailure,
   IAdtStillInactive,
@@ -123,9 +125,13 @@ describe('the published surface', () => {
       text: 'a sentence',
       code: 'MESSAGE(GTH)',
       t100: { id: 'SADT_RESOURCE', no: '026', values: ['x'] },
-      line: '15',
-      uri: '/sap/bc/adt/oo/classes/zcl_x',
+      object: 'Class ZCL_X, Method GET_VALUE',
+      uri: '/sap/bc/adt/oo/classes/zcl_x/source/main',
+      position: { line: 15, column: 24, end: { line: 15, column: 50 } },
     };
+    const point: AdtSourcePoint = { line: 1, column: 0 };
+    const position: AdtSourcePosition = { ...point };
+    expect(position).toEqual(point);
     const refusal: AdtRefusal = {
       message: 'a sentence',
       adtType: 'InvalidClifName',

@@ -202,3 +202,5 @@ export {
   utilWhereUsedReferences,
 } from './results/utils';
 export { type IObjectVersion, objectVersions } from './results/versions';
+// Where a message stands in its source (`AdtMessage.position`).
+export type { AdtSourcePoint, AdtSourcePosition } from './sourcePosition';
