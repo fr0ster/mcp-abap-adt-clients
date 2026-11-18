@@ -255,7 +255,7 @@ await client.getFunctionInclude().create(config, {
 
 | `AdtRequestLegacy` member | decision |
 |---|---|
-| `list` | measured: `GET /sap/bc/cts/transportrequests`; `configUri` is not a saved search there and is refused when given |
+| `list` | measured: `GET /sap/bc/cts/transportrequests`; `configUri` is not a saved search there and is refused when given, and so is the root's query by user (`user`, `requestStatus`, …), which that endpoint does not read |
 | `readMetadata` | measured: the same GET as `list` — the user's list |
 | `create` | refused — measured |
 | `updateMetadata`, `delete` | refused (not measured; changes are refused) |
