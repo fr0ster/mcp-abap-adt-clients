@@ -24,6 +24,45 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [45.5.3] - 2026-11-18
+
+Released with `@mcp-abap-adt/adt-strategies` 0.23.2 and
+`@mcp-abap-adt/adt-clients-legacy` 0.9.6.
+
+### Added
+
+- **`getRequest().list()` lists transports by user, with no saved
+  configuration** (owner decision 2026-11-18). `GET
+  /sap/bc/adt/cts/transportrequests` takes two forms, and `list()` /
+  `listTransports()` now take either: `{ configUri }`, as before, or the query
+  SAP's handler reads (`CL_CTS_ADT_TM_RES_COLL_CONT`, `GET_QUERY_PARAMETER`;
+  measured on premise) — `{ user, requestStatus, requestType?, targets?,
+  releasedFromDate?, releasedToDate? }` (`IListTransportsQuery`).
+  `user` matches the request owner or a task owner; `requestStatus` takes the
+  letters `D` (modifiable) and/or `R` (released) and is required (nothing is
+  selected without one; the deprecated `status=D` does nothing);
+  `requestType` the letters `K`, `W`, `T`; `targets: true`;
+  `releasedFromDate` / `releasedToDate` are `YYYYMMDD`, applied to released
+  requests only (SAP's default is the last 14 days). SAP answers
+  `targets=true` without a `requestType` with an empty `<tm:root/>`, so the
+  type requires `requestType` beside `targets`. With `requestType` `KW` the
+  query answers byte-identically to the saved configuration (measured).
+  Exactly the parameters given are sent, each value encoded and the letters
+  joined in the order given; the library adds no default. Same `Accept`. New
+  exported types: `IListTransportsQuery`, `IListTransportsBySearch` (the
+  saved-search form, every query field excluded beside `configUri`, so one
+  does not compile rather than being dropped), `ListTransportsParams` (the
+  union),
+  `TransportLetters`, `TransportRequestStatus`, `TransportRequestType`.
+  `AdtRequest.list()` is wider than interfaces-adt's `IListTransportsOptions`,
+  which names the saved search alone: a caller that types what it holds as
+  `IAdtRequest` keeps that form.
+
+### Changed
+
+- **`listTransports` no longer throws for an empty `configUri`**: the union
+  states the two forms, and what is given is sent.
+
 ## [45.5.2] - 2026-11-16
 
 ### Fixed

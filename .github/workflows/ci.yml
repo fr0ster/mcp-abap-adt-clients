@@ -35,11 +35,13 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      # Any known advisory of moderate severity or above fails the run, dev
-      # dependencies included: they run here and on every developer's
-      # machine. The root lockfile is the one tree of every package.
+      # Any known advisory of moderate severity or above in what the packages
+      # ship (production dependencies) fails the run. Dev dependencies are
+      # audited again once the test runner leaves Jest (fr0ster/mcp-abap-adt-clients#317):
+      # the picomatch advisory GHSA-fc5q-39xc-vjpf has no fixed release and
+      # reaches the tree only through jest and lint-staged (owner, 2026-11-18).
       - name: Security audit (moderate+)
-        run: npm audit --audit-level=moderate
+        run: npm audit --omit=dev --audit-level=moderate
 
       # Every package, each with its own build: adt-clients lints its `src`
       # (errors only) and compiles it, the strategies package writes its

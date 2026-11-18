@@ -190,7 +190,16 @@ export {
   AdtTransformation,
   type TransformationValues,
 } from './core/transformation';
-export { AdtRequest, type TransportValues } from './core/transport';
+export {
+  AdtRequest,
+  type IListTransportsBySearch,
+  type IListTransportsQuery,
+  type ListTransportsParams,
+  type TransportLetters,
+  type TransportRequestStatus,
+  type TransportRequestType,
+  type TransportValues,
+} from './core/transport';
 export { changeTransportTaskType } from './core/transport/objects';
 export type {
   AdtAddressableCode,

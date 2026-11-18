@@ -305,7 +305,7 @@ Package contents come through `getUtils().fetchNodeStructure('DEVC/K', name)`, o
 
 | Member | On 7.40 SP04 |
 |---|---|
-| `list`, `readMetadata` | sends `GET /sap/bc/cts/transportrequests` (the user's list; a `configUri` is refused when given) |
+| `list`, `readMetadata` | sends `GET /sap/bc/cts/transportrequests` (the user's list; a `configUri` or the root's query by user is refused when given) |
 | `create` | **refused** (`400`) |
 | every other member | **refused** — `/sap/bc/adt/cts/*` is not advertised, and changes to a request are refused |
 

@@ -41,7 +41,6 @@ import type {
   IAdtTransportObjectActions,
   IAdtTransportSortAndCompress,
   IAdtUpdateOptions,
-  IListTransportsOptions,
   ITransportResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -74,6 +73,7 @@ import { getTransport } from './read';
 import type {
   IAbapObjectEntry,
   ITransportConfig,
+  ListTransportsParams,
   transportDocuments,
 } from './types';
 import { updateTransport } from './update';
@@ -237,21 +237,31 @@ export class AdtRequest<
    * document back as it came; `parseTransportTree` is the reading that builds
    * the tree.
    *
-   * One request, run by the saved search the caller names. Until
+   * One request, in one of two forms of the one endpoint: the saved search
+   * the caller names (`configUri`), or the query by user
+   * (`IListTransportsQuery`: `user`, `requestStatus`, and `requestType`,
+   * `targets`, `releasedFromDate`, `releasedToDate` where given), which SAP's
+   * handler reads as it reads a saved search — measured on premise
+   * 2026-11-18, with `requestType` `KW` the list is byte-identical to the
+   * saved configuration's. Exactly the parameters given are sent. Until
    * interfaces-adt 11 a missing `configUri` made this read the configurations
-   * and choose one, refusing when there were none or several — a second request
-   * and a choice that is the caller's (decision 37). `searchConfigurations`
-   * answers what there is to choose from. The five filter parameters this used
-   * to take were never read by the server; filtering is a property of the
-   * saved configuration.
+   * and choose one — a second request and a choice that is the caller's
+   * (decision 37); `searchConfigurations` answers what there is to choose
+   * from. The five filter parameters this took before that (`status`,
+   * `date_range`, …) were names the server never read.
+   *
+   * Wider than the contract's `IListTransportsOptions`, which names the saved
+   * search alone: a caller typed by the contract keeps that form.
    */
   async list<E extends IAdtError = IAdtError>(
-    options: IListTransportsOptions & IAdtAnalyseOptions<E>,
+    options: ListTransportsParams & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['list'], E>> {
-    const { configUri } = options;
-    this.logger?.info?.('Listing transport requests', { configUri });
+    this.logger?.info?.('Listing transport requests', {
+      configUri: options.configUri,
+      user: options.user,
+    });
     return answering(
-      () => listTransports(this.connection, { configUri }),
+      () => listTransports(this.connection, options),
       this.results.list,
       options.analyse,
     );

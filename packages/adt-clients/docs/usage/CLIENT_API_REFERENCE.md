@@ -687,11 +687,45 @@ import type { IAdtRequest } from '@mcp-abap-adt/interfaces-adt';
 const requests: IAdtRequest<unknown> = client.getRequest();
 ```
  `create()` and `read()` behave as any
-other handler; `list()` is the one method worth reading closely, because the
-endpoint it calls is a **saved-configuration search**, not a filtered query —
-sending `user`/`status`/`dateRange`/`targetSystem` as query parameters has
-never worked, on any system this was probed against, and the endpoint answers
-that shape with the same 309-byte empty root every time.
+other handler; `list()` is the one method worth reading closely. It is one
+`GET /sap/bc/adt/cts/transportrequests` in one of two forms (since 45.5.3):
+
+- **a saved search** — `list({ configUri })`, the href of one of the
+  configurations `searchConfigurations()` answers, sent verbatim;
+- **the query by user** — `list({ user, requestStatus, requestType?,
+  targets?, releasedFromDate?, releasedToDate? })` (`IListTransportsQuery`,
+  exported by this package), the query parameters SAP's handler reads
+  (`CL_CTS_ADT_TM_RES_COLL_CONT`, `GET_QUERY_PARAMETER`; measured on premise
+  2026-11-18). No saved configuration is needed.
+
+| parameter | what SAP does with it |
+|---|---|
+| `user` | any user: matches the request owner or a task owner |
+| `requestStatus` | required, letters `D` (modifiable) and/or `R` (released) — `['D']`, `['D', 'R']`; without a letter nothing is selected |
+| `requestType` | letters `K` (workbench), `W` (customizing), `T` (transport of copies); **required beside `targets`** |
+| `targets` | `true`: each request under its target system |
+| `releasedFromDate`, `releasedToDate` | `YYYYMMDD`, applied to released requests only; SAP's default is the last 14 days |
+
+The rules are in the type, not checked at run time: `targets: true` without a
+`requestType` does not compile, because SAP answers that query with an empty
+`<tm:root/>`; `requestStatus` takes one letter or more; `configUri` and the
+query are exclusive. Exactly the parameters given are sent, each value
+encoded, the letters joined in the order given — the library adds no default.
+With `requestType: ['K', 'W']` the query answers byte-identically to the saved
+configuration Eclipse uses (measured). The names the library sent before
+23.0.0 — `status`, `dateRange`, `targetSystem` — were never read by the
+endpoint, and the deprecated `status=D` selects nothing.
+
+```typescript
+const mine = await request.list({
+  user: 'DEVELOPER',
+  requestStatus: ['D'],
+  requestType: ['K', 'W'],
+  targets: true,
+});
+```
+
+The saved-search form:
 
 ```typescript
 import { AdtClient, transportDocuments } from '@mcp-abap-adt/adt-clients';
@@ -724,7 +758,10 @@ for (const { uri } of configurations.getResult().value) {
 #### `searchConfigurations()` — where a `configUri` comes from
 
 **`list()` requires a `configUri` since 23.0.0** (`IListTransportsOptions` in
-`@mcp-abap-adt/interfaces-adt` 11). Until then `list()` with no argument read
+`@mcp-abap-adt/interfaces-adt` 11), **or, since 45.5.3, the query by user**
+above, which needs no configuration. `AdtRequest.list()` is wider than the
+contract's `IListTransportsOptions`; a caller that types what it holds as
+`IAdtRequest` keeps the `configUri` form. Until then `list()` with no argument read
 the configurations itself and chose: one was used, several were refused with
 `TransportSearchConfigurationMissing`. That was two requests behind one member,
 the first of them out of reach of any `analyse` or reading, and a choice about
@@ -943,12 +980,14 @@ The `readObjects()` and `createTask()` examples above assume that set.
 `batch.execute()`, like any other member: it is one request now, so there is no
 first answer a batch would have to deliver early.
 
-**Migration from filter parameters.** There is no server-side filtering to
-lose — the five parameters (`user`, `status`, `date_range`, `target_system`,
-`request_type`) were never read by the endpoint. Pass the `configUri` of the
-saved search you mean — Eclipse's own is among those `searchConfigurations()`
-answers. See [CHANGELOG.md](../../CHANGELOG.md) (11.0.0 entry) for the
-before/after low-level signature.
+**Migration from filter parameters.** The five parameters the low level took
+until 11.0.0 (`user`, `status`, `date_range`, `target_system`, `request_type`)
+were sent under names the endpoint does not read. Since 45.5.3 the query by
+user sends the names it does read (`user`, `requestStatus`, `requestType`,
+`targets`, `releasedFromDate`, `releasedToDate`); a saved search's
+`configUri` — Eclipse's own is among those `searchConfigurations()` answers —
+is the other form. See [CHANGELOG.md](../../CHANGELOG.md) (11.0.0 and 45.5.3
+entries) for the low-level signatures.
 
 #### `list()` — the transport tree
 
@@ -984,7 +1023,7 @@ neither. It lives beside the reading that builds it, in
 `@mcp-abap-adt/adt-strategies` since 23.0.0.
 
 **Containers are a list because the nesting is not fixed.** `?configUri=`
-alone answers `tm:workbench > tm:modifiable > tm:request`; `?targets=true`
+alone answers `tm:workbench > tm:modifiable > tm:request`; `targets=true`
 inserts a `tm:target` level in between, and that level carries a human name
 (`"Local Change Requests"`) the request itself does not have — `tm:target`
 alone. A parser that assumed one fixed chain would silently return zero
@@ -1028,17 +1067,16 @@ distinction is the root element and the nesting, never a count.
 the legacy package, `LegacyTransportable`): after a write with `corrNr`, the list
 and `readMetadata` name the request. That endpoint is not a saved search, so its
 `list()` keeps `configUri` optional and refuses one that is
-given. `readMetadata` sends the same GET; every other member of the legacy
+given, and refuses the query by user (since 0.9.6) — it reads no query. `readMetadata` sends the same GET; every other member of the legacy
 transport handler, `create` included, refuses without a request.
 
-**Known limitation — `?targets=true` is not sent.** This library requests
-`?configUri=` alone; Eclipse requests `?targets=true&configUri=`. With
-`targets=true` the server inserts an extra `tm:target` container carrying a
-human name (`"Local Change Requests"`) that the request itself does not
-have — its own `tm:target` attribute is `""`. Not sending it costs nothing in
-the type: `containers` is already an ordered list, so `tm:target` can be
-added later without a breaking change. Whether to send it — always, never, or
-behind a flag — is an open decision, not an oversight.
+**`targets=true` is the caller's.** The saved-search form sends `?configUri=`
+alone; Eclipse requests `?targets=true&configUri=`. The query by user sends
+`targets=true` when it is given (with the `requestType` SAP needs beside it).
+With it the server inserts an extra `tm:target` container carrying a human
+name (`"Local Change Requests"`) that the request itself does not have — its
+own `tm:target` attribute is `""`; `containers` is an ordered list, so both
+shapes read.
 
 **A response obtained some other way** (a batch result, a fixture, anything
 already held) is read by the same strategy — it is a function of the wire

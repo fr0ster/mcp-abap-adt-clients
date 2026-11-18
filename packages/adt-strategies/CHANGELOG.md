@@ -14,6 +14,39 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.23.2] - 2026-11-18
+
+Released with `@mcp-abap-adt/adt-clients` 45.5.3 (fr0ster/mcp-abap-adt#351).
+
+### Fixed
+
+- **An activation message states where it stands; its ordinal is no longer
+  read as a line.** `readActivationRefusal` (and with it `analyseActivation`
+  and `analyseAny`) read a checklist `msg`'s `line` attribute as the message's
+  line. Measured on SAP_BASIS 751 (fr0ster/mcp-abap-adt#351, its comment of
+  2026-11-18), that attribute is the message's ordinal — 1, 2, 3… — and the
+  position is only in `href`'s fragment, `#start=<line>,<col>[;end=<line>,<col>]`.
+  The reading also dropped `href` and `objDescr`. Each `AdtMessage` now
+  carries, where SAP states them, `object` (from `objDescr`), `uri` (the
+  `href` without its fragment), `position: { line, column, end?: { line,
+  column } }` (from the fragment; lines from 1, columns from 0, `end`
+  exclusive), `code`, and `line` (deprecated: `String(position.line)`).
+  An `href` with no fragment, or with one whose `start` does not read, gives the `uri`
+  alone; an `end` that does not read is dropped and the start kept; an empty
+  `href` gives neither. The fragment
+  is read by plain string code, shared with `readObjectOutline`.
+- **`readCheckRunRefusal` (`analyseCheck`) reads the same reference** from a
+  `chkrun:checkMessage`'s `uri`, which it dropped: `uri` and `position`, as
+  above.
+
+### Changed
+
+- **`AdtMessage.line` carries the real source line, and is deprecated.** It
+  held a checklist `msg`'s ordinal; it is now `String(position.line)` — still
+  a string, as published — and absent when the message has no position. Use
+  `position.line`. Added: `AdtMessage.position`, `object`, and the exported
+  types `AdtSourcePosition`, `AdtSourcePoint`.
+
 ## [0.23.1] - 2026-11-16
 
 Released with `@mcp-abap-adt/adt-clients` 45.5.2 (fr0ster/mcp-abap-adt#360,

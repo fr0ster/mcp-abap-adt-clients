@@ -12,6 +12,7 @@ import {
   listOf,
   type ParsedElement,
 } from '../parsed';
+import { type AdtSourcePosition, readSourceReference } from '../sourcePosition';
 
 /**
  * Reading a refusal out of the document SAP sent.
@@ -81,8 +82,50 @@ export interface AdtMessage {
     readonly no: string;
     readonly values?: ReadonlyArray<string>;
   };
-  readonly line?: string;
+  /**
+   * What the message is about, as SAP described it — a checklist `msg`'s
+   * `objDescr` (`Class ZCL_X, Method GET_VALUE`), where SAP gave one.
+   */
+  readonly object?: string;
+  /**
+   * The resource the message points into: a checklist `msg`'s `href` or a
+   * check run's `uri`, without its fragment; a unit test alert's method.
+   */
   readonly uri?: string;
+  /**
+   * Where the message stands in that resource, read from the reference's
+   * fragment `#start=<line>,<col>[;end=<line>,<col>]` — lines from 1,
+   * columns from 0, `end` exclusive. Absent when the reference has no
+   * fragment or one that is not a position.
+   *
+   * A checklist `msg`'s `line` attribute is not this: it is the message's
+   * ordinal (1, 2, 3…), measured on SAP_BASIS 751
+   * (fr0ster/mcp-abap-adt#351), and is not read.
+   */
+  readonly position?: AdtSourcePosition;
+  /**
+   * The source line the message stands on, as text: `String(position.line)`,
+   * present exactly when `position` is. Until 0.23.2 this held a checklist
+   * `msg`'s `line` attribute, the message's ordinal.
+   *
+   * @deprecated Use `position.line`.
+   */
+  readonly line?: string;
+}
+
+/**
+ * A message's reference read into `uri`, `position` and the deprecated
+ * `line`, which repeats `position.line`.
+ */
+function located(reference: string | undefined): {
+  uri?: string;
+  position?: AdtSourcePosition;
+  line?: string;
+} {
+  const read = readSourceReference(reference);
+  return read.position === undefined
+    ? read
+    : { ...read, line: String(read.position.line) };
 }
 
 /** SAP spells severity three ways. One letter out. */
@@ -557,17 +600,20 @@ export function readActivationRefusal(
   const root = field(parsed, 'messages');
 
   const messages: AdtMessage[] = asArray(field(root, 'msg')).map((msg) => {
-    const line = field(msg, '@line');
-    const code = field(msg, '@code');
+    const object = textOf(field(msg, '@objDescr'));
+    const code = leafText(field(msg, '@code'));
     return {
       type: severity(field(msg, '@type')),
       text:
         textOf(at(msg, 'shortText', 'txt')) ||
         textOf(field(msg, 'shortText')) ||
-        textOf(field(msg, '@objDescr')) ||
+        object ||
         'activation message',
-      line: line !== undefined ? String(line) : undefined,
-      code: code !== undefined ? String(code) : undefined,
+      ...(object ? { object } : {}),
+      // `@line` is the message's ordinal, not a source line: the position is
+      // only in `href`'s fragment (fr0ster/mcp-abap-adt#351).
+      ...located(leafText(field(msg, '@href'))),
+      ...(code !== undefined ? { code } : {}),
     };
   });
 
@@ -822,14 +868,15 @@ export function readCheckRunRefusal(document: unknown): AdtRefusal | null {
     const reported: AdtMessage[] = asArray(
       at(report, 'checkMessageList', 'checkMessage'),
     ).map((msg) => {
-      const code = field(msg, '@code');
+      const code = leafText(field(msg, '@code'));
       return {
         type: String(field(msg, '@type') ?? 'I'),
         text:
           textOf(field(msg, '@shortText')) ||
           textOf(field(msg, 'shortText')) ||
           'check message',
-        code: code !== undefined ? String(code) : undefined,
+        ...located(leafText(field(msg, '@uri'))),
+        ...(code !== undefined ? { code } : {}),
       };
     });
 

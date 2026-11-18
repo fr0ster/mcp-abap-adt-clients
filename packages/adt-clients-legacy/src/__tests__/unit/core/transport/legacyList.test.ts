@@ -75,6 +75,48 @@ describe('legacy transport list', () => {
     );
     expect(calls).toHaveLength(0);
   });
+
+  /**
+   * The root `list` takes the query by user since adt-clients 45.5.3, and
+   * the legacy override accepts every argument the root accepts
+   * (`typechecks/exact/legacyOverrides.ts`). The legacy endpoint reads no
+   * query: the query is refused, not sent and not ignored.
+   */
+  it('refuses the query by user instead of silently ignoring it', async () => {
+    const { connection, calls } = recordingConnection();
+
+    const failure = expectFailure(
+      await new AdtRequestLegacy(connection, {
+        results: transportDocuments,
+      }).list({ user: 'DEVELOPER', requestStatus: ['D'] }),
+      'legacy list with a user query',
+    );
+
+    expect(failure.message).toMatch(
+      /^user is not supported on a legacy system \(7\.40 SP04\)/,
+    );
+    expect(calls).toHaveLength(0);
+  });
+
+  it('takes no query field beside a configUri, in the type', () => {
+    const { connection } = recordingConnection();
+    const request = new AdtRequestLegacy(connection, {
+      results: transportDocuments,
+    });
+    // Not fresh literals, so no excess-property check reaches them.
+    const targets = { configUri: '/c', targets: true as const };
+    const released = { configUri: '/c', releasedFromDate: '20261101' };
+    const queryAlone = { releasedToDate: '20261118' };
+    const refused = [
+      // @ts-expect-error -- targets beside configUri
+      () => request.list(targets),
+      // @ts-expect-error -- releasedFromDate beside configUri
+      () => request.list(released),
+      // @ts-expect-error -- a query field without the query's user
+      () => request.list(queryAlone),
+    ];
+    expect(refused).toHaveLength(3);
+  });
 });
 
 describe('legacy transport update/delete', () => {

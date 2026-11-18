@@ -6,7 +6,6 @@
  * that is precisely what a batch connection cannot supply mid-recording.
  */
 
-import type { IListTransportsParams } from '@mcp-abap-adt/interfaces-adt';
 import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -17,30 +16,45 @@ import {
   ACCEPT_TRANSPORT_LIST,
 } from '../../constants/contentTypes';
 import { TRANSPORT_REQUEST } from '../../endpoints/objects';
+import type { ListTransportsParams } from './types';
+
+/** The query string: exactly the parameters given, each value encoded. */
+function listQuery(params: ListTransportsParams): string {
+  if (params.configUri !== undefined) {
+    return `configUri=${encodeURIComponent(params.configUri)}`;
+  }
+  const pairs: Array<readonly [string, string]> = [
+    ['user', params.user],
+    ['requestStatus', params.requestStatus.join('')],
+  ];
+  if (params.requestType !== undefined) {
+    pairs.push(['requestType', params.requestType.join('')]);
+  }
+  if (params.targets === true) pairs.push(['targets', 'true']);
+  if (params.releasedFromDate !== undefined) {
+    pairs.push(['releasedFromDate', params.releasedFromDate]);
+  }
+  if (params.releasedToDate !== undefined) {
+    pairs.push(['releasedToDate', params.releasedToDate]);
+  }
+  return pairs
+    .map(([name, value]) => `${name}=${encodeURIComponent(value)}`)
+    .join('&');
+}
 
 /**
- * List ABAP transport requests for a saved search.
+ * List ABAP transport requests: one `GET /sap/bc/adt/cts/transportrequests`.
  *
- * `configUri` is required and is used verbatim. Sending filter parameters
- * instead returns an empty root — the search must be referenced, not restated.
+ * Two forms of the one endpoint: a saved search's `configUri`, used verbatim,
+ * or the query by user (`IListTransportsQuery`). Exactly the parameters given
+ * are sent; the library adds no default.
  */
 export async function listTransports(
   connection: IAbapConnection,
-  params: IListTransportsParams,
+  params: ListTransportsParams,
 ): Promise<IAdtWireResponse> {
-  if (!params.configUri) {
-    throw new Error(
-      'listTransports requires configUri: the transport list is a saved-configuration ' +
-        `search. Obtain an href from ${TRANSPORT_SEARCH_CONFIGURATIONS_URL}`,
-    );
-  }
-
-  const url = `${TRANSPORT_REQUEST.collection}?configUri=${encodeURIComponent(
-    params.configUri,
-  )}`;
-
   return connection.makeAdtRequest({
-    url,
+    url: `${TRANSPORT_REQUEST.collection}?${listQuery(params)}`,
     method: 'GET',
     timeout: 0,
     headers: { Accept: ACCEPT_TRANSPORT_LIST },
