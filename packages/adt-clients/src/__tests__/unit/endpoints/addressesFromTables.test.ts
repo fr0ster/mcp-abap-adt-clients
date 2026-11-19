@@ -37,6 +37,7 @@ import {
   SERVICE_DEFINITION,
   STRUCTURE,
   TABLE,
+  TABLE_SETTINGS,
   TABLE_TYPE,
   TRANSFORMATION,
 } from '../../../endpoints/objects';
@@ -57,6 +58,7 @@ const EXPECTED: Readonly<Record<Exclude<AdtTypeCode, 'MSAG/NN'>, string>> = {
   'DEVC/K': PACKAGE.uri(NAME),
   'DDLS/DF': DDL_SOURCE.uri(NAME),
   'TABL/DT': TABLE.uri(NAME),
+  'TABL/DTT': TABLE_SETTINGS.uri(NAME),
   'TABL/DS': STRUCTURE.uri(NAME),
   'TTYP/DA': TABLE_TYPE.uri(NAME),
   'DOMA/DD': DOMAIN.uri(NAME),

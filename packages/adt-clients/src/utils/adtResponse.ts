@@ -374,7 +374,8 @@ export const nothingIsARefusal: IAnalyse<IAdtError> = () => ADT_NO_FAILURE;
  *
  * | what happened | wire in hand | default verdict | `analyse` may clear it | result |
  * |---|---|---|---|---|
- * | returned | yes | none | — | the value, or a failure if `analyse` names one |
+ * | returned, 2xx | yes | none | — | the value, or a failure if `analyse` names one |
+ * | returned, status outside 2xx | yes | `recogniseFailure` | **yes** | cleared → the value read from that same wire |
  * | threw, response attached | yes | `recogniseFailure` | **yes** | cleared → the value read from that same wire |
  * | threw, no response | **no** | `recogniseFailure` | **no** | always a failure |
  * | credential refused, SAP answered `401` | **no** | `recogniseFailure`, SAP's response | **no** | always a failure |
@@ -460,7 +461,17 @@ export async function answeringExchange<T, E extends IAdtError = IAdtError>(
     wire = exchange.answer;
     lost = wire.sessionLost;
     context = exchange.context;
-    if (exchange.failure) verdict = exchange.failure;
+    if (exchange.failure) {
+      verdict = exchange.failure;
+    } else if (wire.status < 200 || wire.status >= 300) {
+      // A refusal a connection resolved instead of rejecting — outside the
+      // connection contract, which rejects on SAP's refusal — is still SAP's
+      // refusal: the default verdict is the one it would have had thrown.
+      verdict = recogniseFailure({
+        message: `Request failed with status code ${wire.status}`,
+        response: wire,
+      });
+    }
   } catch (error: unknown) {
     // The provider refused before SAP said anything: no answer exists to come
     // back, and every further request would only ask the provider again. It is

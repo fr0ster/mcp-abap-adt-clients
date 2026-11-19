@@ -14,6 +14,30 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.24.0] - 2026-11-19
+
+Released with `@mcp-abap-adt/adt-clients` 45.6.0.
+
+### Added
+
+- **`tableSettings`**: the reading of `getTableSettings().readMetadata`'s
+  answer — `{ name, description, version, settings, etag }`, `settings` an
+  `ITableSettingsRead` with every setting the full-replacement write needs,
+  the translation's four attributes included, and the cloud's
+  `isWritableByAMDP` where the read has it. An element or attribute the read
+  lacks throws, naming it: the write would otherwise store a value SAP never
+  sent. Values are read as SAP wrote them: character references and entities
+  decoded (`Caf&#xE9;` is `Café`), in attributes and text, and nothing
+  trimmed, so a write sends back exactly what was read. The ETag header is
+  read whatever the case of its name. `readTableSettings(xml)` reads the text
+  alone.
+
+### Changed
+
+- **`@mcp-abap-adt/interfaces-adt` is `^29.0.0`** (was `^27.4.0`), so a
+  consumer of adt-clients 45.6.0 holds one copy of the contract. No existing
+  reading or verdict changes.
+
 ## [0.23.5] - 2026-11-18
 
 The same code as 0.23.3, released together with adt-clients 45.5.5 from one

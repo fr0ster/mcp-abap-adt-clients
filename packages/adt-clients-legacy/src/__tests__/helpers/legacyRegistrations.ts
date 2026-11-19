@@ -263,6 +263,7 @@ const ABSENT_ON_LEGACY = [
   'ScalarFunction',
   'ScalarFunctionImplementation',
   'AppendStructure',
+  'TableSettings',
 ];
 
 /** A connection that refuses every request: the reference handlers send none. */

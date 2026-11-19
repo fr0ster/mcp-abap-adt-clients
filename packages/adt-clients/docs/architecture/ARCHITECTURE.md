@@ -146,7 +146,7 @@ is in the [README](../../README.md#the-type-tables-conformance-check)).
 `AdtClient` is a factory of capability-contract implementations and returns a new instance per call. Every factory takes an optional result set — `getClass({ ...classDocuments, versions: objectVersions })` — and without one answers documents as they arrived:
 - `getClass()`, `getProgram()`, `getInterface()`, `getDomain()`, `getDataElement()`, `getStructure()`, `getTable()`, `getTableType()`, `getDdl()` (DDL sources — CDS views, AMDP table functions; formerly `getView()`)
 - `getFunctionGroup()`, `getFunctionModule()`, `getFunctionInclude()`, `getPackage()`, `getServiceDefinition()`
-- `getScalarFunction()` (CDS scalar function, `DSFD/SCF`), `getScalarFunctionImplementation()` (scalar function implementation, `DSFI/SFI`), `getAppendStructure()` (append structure, `TABL/DS`)
+- `getScalarFunction()` (CDS scalar function, `DSFD/SCF`), `getScalarFunctionImplementation()` (scalar function implementation, `DSFI/SFI`), `getAppendStructure()` (append structure, `TABL/DS`), `getTableSettings()` (a table's technical settings, `TABL/DTT`: read, lock, write, unlock)
 - `getAuthorizationField()` for SUSO / AUTH authorization-field CRUD (modern on-prem and cloud only)
 - `getFeatureToggle()` for FTG2/FT feature-toggle CRUD plus domain methods (switchOn, switchOff, getRuntimeState, checkState, readSource); modern on-prem and cloud only
 - `getServiceBinding()` for RAP BO service binding CRUD + lifecycle

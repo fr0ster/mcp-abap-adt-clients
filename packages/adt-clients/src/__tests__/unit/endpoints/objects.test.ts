@@ -173,6 +173,7 @@ describe('records', () => {
         'SERVICE_DEFINITION',
         'STRUCTURE',
         'TABLE',
+        'TABLE_SETTINGS',
         'TABLE_TYPE',
         'TRANSFORMATION',
         'TRANSPORT_REQUEST',

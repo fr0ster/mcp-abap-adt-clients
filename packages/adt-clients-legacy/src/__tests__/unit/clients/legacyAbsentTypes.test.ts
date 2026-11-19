@@ -48,6 +48,7 @@ const absent = [
   'getScalarFunction',
   'getScalarFunctionImplementation',
   'getAppendStructure',
+  'getTableSettings',
 ] as const;
 
 /** The endpoint each type's refusal names (its collection). */
@@ -56,6 +57,7 @@ const endpointOf: Record<string, string> = {
   getScalarFunction: '/sap/bc/adt/ddic/dsfd/sources',
   getScalarFunctionImplementation: '/sap/bc/adt/ddic/dsfi',
   getAppendStructure: '/sap/bc/adt/ddic/structures',
+  getTableSettings: '/sap/bc/adt/ddic/db/settings',
 };
 
 /**

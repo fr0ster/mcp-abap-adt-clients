@@ -24,6 +24,88 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [45.6.0] - 2026-11-19
+
+Released with `@mcp-abap-adt/adt-strategies` 0.24.0 and
+`@mcp-abap-adt/adt-clients-legacy` 0.10.0.
+
+### Added
+
+- **`getTableSettings()`: a table's technical settings** (`TABL/DTT`) —
+  data class, size category, buffering, logging and the rest of DD09L, at
+  their own resource `/sap/bc/adt/ddic/db/settings/{name}`, under their own
+  lock (ESDICT `TABT`, which the table's lock does not cover). `AdtTableSettings`
+  has four members, one request each:
+  - `readMetadata` — `GET` with the v2 Accept
+    (`application/vnd.sap.adt.table.settings.v2+xml`; a v1 Accept is answered
+    `406`), the document answered as it arrived;
+  - `lock` — `POST ?_action=LOCK&accessMode=MODIFY`, stateful. A LOCK answered
+    without a handle is a refusal (`LOCK_FAILED`, the answer kept as its
+    `response`). The registry follows the wire: a handle SAP answered with a
+    2xx status is tracked before any `analyse` runs, whatever it rules, so
+    `unlockAll()` can release it;
+  - `updateMetadata` — `PUT ?lockHandle=…[&corrNr=…]` of the document built
+    from the typed `ITableSettingsUpdateConfig` (every setting and the
+    `description`; `lockHandle` required, `source` refused), `If-Match` when
+    `ifMatch` is given. **It replaces every setting**: SAP writes the whole
+    DD09L row and resets a field left out — read, change, write back. The
+    translation goes out with all four attributes (`ts:value`, `ts:isVisible`,
+    `ts:isEditable`, `ts:granularity`), which SAP requires (`400` `00/001`
+    without `ts:isVisible`, measured); the cloud's `ts:isWritableByAMDP` is
+    never written. An empty `lockHandle` throws before any request, since the
+    query would drop it. With `If-Match` the `Content-Type` goes without its
+    charset, as every guarded document write: the settings' ETag carries the
+    media type without it, and SAP refused the guarded PUT with
+    `; charset=utf-8` (`412` SADT_RESOURCE/043) and accepted it without
+    (measured on premise and on the cloud, 2026-11-19);
+  - `unlock` — `POST ?_action=UNLOCK&lockHandle=…`, stateful. The lock leaves
+    the client's registry only when SAP answered the UNLOCK with a 2xx status,
+    decided before any `analyse` runs and whatever it makes of the answer — a 403 or a 500 a
+    connection resolved keeps it — so `unlockAll()` can retry a failed one.
+
+  SAP creates the settings with the table and activating the table activates
+  them, so there is no create, delete or activation of their own. The result
+  set is `tableSettingsDocuments` (`metadata`, `metadataUpdated`), the address
+  `TABLE_SETTINGS`. Served on premise and on the cloud; not on SAP_BASIS 7.40,
+  whose discovery has no such collection.
+- Recorded answers of the settings read (on premise and cloud), the write, and
+  the write refused without a description (`corpus/adt/answers/*table-settings*`).
+
+### Fixed
+
+- **A refusal a connection resolved instead of rejecting is a failure by
+  default.** Every member's default analysis (no `analyse`) answered `ok: true`
+  for an answer with a status outside 2xx that the connection resolved — the
+  connection contract has it reject on SAP's refusal, so the shipped
+  connection never did, but another one may. Such an answer now starts from
+  the same verdict a rejected one has (`recogniseFailure`), which a caller's
+  `analyse` may still clear.
+- **`unlockAll()` keeps a lock whose UNLOCK a connection resolved with a
+  status outside 2xx** and reports it as a failure, where it dropped it as
+  released; the next `unlockAll()` tries it again. A thrown UNLOCK was kept
+  before and still is. This holds for every handler that tracks its locks in
+  the client's registry: class and its local includes, interface, program,
+  function group, function module, function include, DDL source, table,
+  table settings, structure, append structure, table type, domain, data
+  element, package, message class, access control, behavior definition,
+  metadata extension, service definition, scalar function, scalar function
+  implementation, transformation, enhancement, feature toggle and
+  authorization field.
+
+### Changed
+
+- **`@mcp-abap-adt/interfaces-adt` is `^29.0.0`** (was `^27.4.0`): 28.0.0
+  added the table settings contract and `tableSettings` / `TABL/DTT` to the
+  type tables, 29.0.0 made the settings' `translation` its four attributes. A
+  consumer whose exhaustive map over `AdtApiName`, `AdtTypeCode`,
+  `AdtObjectKind` or a union derived from the tables (`AdtApi`,
+  `AdtTypeCodeOf`, `AdtApiWith`, …) types its keys adds the new member —
+  interfaces-adt 28.0.0's and 29.0.0's migration notes.
+- The type-table conformance check records the missing `TABL/DTT` sample as an
+  open divergence: the live conformance run builds a sample's reads from its
+  recorded files, so a code with none has to be seeded first — a separate
+  tooling task.
+
 ## [45.5.5] - 2026-11-18
 
 The same code as 45.5.4, released together with adt-strategies 0.23.5 from one

@@ -350,6 +350,43 @@ export const HANDLERS = {
     },
     capabilities: [...FULL, 'metadataUpdatable'],
   },
+  tableSettings: {
+    factory: (c: AdtClient) => c.getTableSettings(),
+    subject: '/sap/bc/adt/ddic/db/settings/ZGUARD_TAB',
+    config: {
+      tableName: 'ZGUARD_TAB',
+      description: 'guard',
+      settings: {
+        dataClassCategory: 'APPL0',
+        sizeCategory: '0',
+        buffering: { allowed: 'N', type: '', areaKeyFields: 0 },
+        storageType: 'C',
+        sharingType: '',
+        loadUnit: '',
+        translation: {
+          value: '',
+          isVisible: false,
+          isEditable: false,
+          granularity: '2',
+        },
+        loggingEnabled: false,
+      },
+    },
+    requests: {
+      readMetadata: '/sap/bc/adt/ddic/db/settings/zguard_tab',
+      updateMetadata: '/sap/bc/adt/ddic/db/settings/zguard_tab',
+      lock: '/sap/bc/adt/ddic/db/settings/zguard_tab',
+      unlock: '/sap/bc/adt/ddic/db/settings/zguard_tab',
+    },
+    // The write is `IAdtTableSettingsUpdatable.updateMetadata`, not
+    // `IAdtMetadataUpdatable`: its body is the config and its lock handle is
+    // required. No atom here names it, because the method compares
+    // bivariantly — every metadata writer would "offer" it too — so it is
+    // checked by its own tests (`unit/core/tableSettings`), and `requests`
+    // still names its address.
+    capabilities: ['metadataReadable', 'lockable'],
+    why: "a table's technical settings (TABL/DTT): their own resource and lock, created, activated and deleted with the table; the write takes its body from the config (interfaces-adt 28.0.0, decision 49)",
+  },
   structure: {
     factory: (c: AdtClient) => c.getStructure(),
     subject: '/sap/bc/adt/ddic/structures/ZGUARD_STRU',

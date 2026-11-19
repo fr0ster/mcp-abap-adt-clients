@@ -38,9 +38,19 @@ export interface IDivergence {
 const MESSAGE_OWN_URI =
   'the message\'s own address answers a GET with an empty <msg:message msg:msgno="" msg:msgtext=""/> even for a message number that does not exist; the message\'s content is only in the class document; measured on S/4HANA 2025 and ABAP cloud 2026-10-29 (owner: the library reads it from the class); by code: the route /messageclass/{mc_name}/messages/{msg_no} is CL_ADT_MSG_ATOM_RES_CONT, whose do_get reads only the short text (CL_ADT_MESSAGE_CLASS_API=>READ, no IV_FETCH_ALL) and serialises it with ST_ADT_MESSAGE, whose template writes msg:msgno and msg:msgtext with no tt:value — always empty; message 000 is initial as symsgno, so no body';
 
+const TABLE_SETTINGS_SAMPLE =
+  "open: no TABL/DTT sample is recorded: the live conformance run builds each sample's template, urimapper and metadata reads from that sample's recorded files, so a code with none cannot be recorded until a sample is seeded; seeding it (SFLIGHT on premise, Z0001FLIGHT on cloud) is a separate tooling task";
+
 /** Per release, every conflict the check reports against its recorded answers. */
 export const DIVERGENCES: { readonly [R in RecordedRelease]: IDivergence[] } = {
   's4-2025': [
+    {
+      rule: 'sample',
+      api: 'tableSettings',
+      code: 'TABL/DTT',
+      detail: 'no sample is recorded',
+      reason: TABLE_SETTINGS_SAMPLE,
+    },
     {
       rule: 'address',
       api: 'messageClassMessage',
@@ -51,6 +61,13 @@ export const DIVERGENCES: { readonly [R in RecordedRelease]: IDivergence[] } = {
     },
   ],
   'abap-cloud': [
+    {
+      rule: 'sample',
+      api: 'tableSettings',
+      code: 'TABL/DTT',
+      detail: 'no sample is recorded',
+      reason: TABLE_SETTINGS_SAMPLE,
+    },
     {
       rule: 'address',
       api: 'messageClassMessage',

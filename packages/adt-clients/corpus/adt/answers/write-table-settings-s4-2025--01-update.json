@@ -1,0 +1,29 @@
+{
+  "case": "write-table-settings-s4-2025",
+  "step": 1,
+  "stepTag": "update",
+  "capturedAt": "2026-11-19",
+  "note": "Recorded 2026-11-19 by a hand-run probe through @mcp-abap-adt/connection (the research for the table settings contract, interfaces-adt 28.0.0); the probe logged the status, the content type, the ETag where shown and the body, and nothing else. The user id is replaced by SAPUSER01. S/4HANA 2025 on premise, a fresh table in $TMP under the settings lock: the PUT answers 200 with the settings document at adtcore:version=\"inactive\", as written.",
+  "request": {
+    "method": "PUT",
+    "url": "/sap/bc/adt/ddic/db/settings/zmcp_ts_3182",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/ddic/db/settings/zmcp_ts_3182",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.table.settings.v2+xml",
+      "Content-Type": "application/vnd.sap.adt.table.settings.v2+xml; charset=utf-8"
+    },
+    "headersNote": "Caller-supplied headers only. The lock handle is not recorded; the connection adds the logon and the session below this point, none of which is recorded.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ts:tableSettings xmlns:ts=\"http://www.sap.com/dictionary/table/settings\"\n    xmlns:adtcore=\"http://www.sap.com/adt/core\"\n    adtcore:name=\"ZMCP_TS_3182\" adtcore:type=\"TABL/DTT\"\n    adtcore:description=\"MCP table settings trial\">\n  <ts:dataClassCategory>APPL1</ts:dataClassCategory>\n  <ts:sizeCategory>1</ts:sizeCategory>\n  <ts:buffering><ts:allowed>N</ts:allowed></ts:buffering>\n</ts:tableSettings>",
+    "bodyNote": "The document as the research notes give it for this step (the probe did not log the request body): the minimal document, with or without adtcore:description."
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.table.settings.v2+xml; charset=utf-8",
+      "etag": "20261119095456000Aapplication/vnd.sap.adt.table.settings.v2+xmlVYoH+hGqjI1LkKo7cVmVo7bY/6s="
+    },
+    "bodyFile": "write-table-settings-s4-2025--01-update.body.txt"
+  }
+}

@@ -184,3 +184,26 @@ describe('answering', () => {
     expect('cause' in answer.getError()).toBe(false);
   });
 });
+
+describe('answering: a refusal the connection resolved', () => {
+  it.each([403, 412, 500])(
+    'is a failure by default (%i), carrying the answer',
+    async (status) => {
+      const answer = await answering(
+        async () => wire(REFUSAL, status),
+        rawDocument,
+      );
+      expect(answer.ok).toBe(false);
+      expect(!answer.ok && answer.getError().response?.status).toBe(status);
+    },
+  );
+
+  it('may be cleared by the caller, the value read from that same answer', async () => {
+    const answer = await answering(
+      async () => wire('kept', 409),
+      rawDocument,
+      () => ADT_NO_FAILURE,
+    );
+    expect(answer.ok && answer.getResult().value).toBe('kept');
+  });
+});

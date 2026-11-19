@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/adt-strategies",
-  "version": "0.23.5",
+  "version": "0.24.0",
   "description": "Default result and failure strategies for @mcp-abap-adt/adt-clients, derived from recorded ADT answers",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -40,7 +40,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@mcp-abap-adt/interfaces-adt": "^27.4.0",
+    "@mcp-abap-adt/interfaces-adt": "^29.0.0",
     "@mcp-abap-adt/interfaces-adt-connection": "^5.0.0",
     "fast-xml-parser": "^5.12.0"
   },

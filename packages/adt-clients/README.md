@@ -165,7 +165,7 @@ This package interacts with external packages **ONLY through interfaces**:
 
   | package | what this package takes from it |
   |---|---|
-  | [`@mcp-abap-adt/interfaces-adt`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt) `^27.4.0` | the ADT type tables (`ADT_TYPES_ONPREM`, `ADT_TYPES_CLOUD`, `ADT_TYPES_BASIS_740`) and their code types (`AdtTypeCode`, …), the ABAP Unit run registry (`ABAP_UNIT_RUN_TYPES`, `AbapUnitRunObjectType`, `AbapUnitRunTarget`), the capability atoms, every object's config, the result-set contracts, `IAdtAnsweredObject`, `IAdtResponse`, `IAnalyse`, `IAdtAnalyseOptions`, `IAdtHeaders`, `IResultStrategy`, `ADT_NO_FAILURE`, `ADT_TASK_TYPE` |
+  | [`@mcp-abap-adt/interfaces-adt`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt) `^29.0.0` | the ADT type tables (`ADT_TYPES_ONPREM`, `ADT_TYPES_CLOUD`, `ADT_TYPES_BASIS_740`) and their code types (`AdtTypeCode`, …), the ABAP Unit run registry (`ABAP_UNIT_RUN_TYPES`, `AbapUnitRunObjectType`, `AbapUnitRunTarget`), the capability atoms, every object's config, the result-set contracts, `IAdtAnsweredObject`, `IAdtResponse`, `IAnalyse`, `IAdtAnalyseOptions`, `IAdtHeaders`, `IResultStrategy`, `ADT_NO_FAILURE`, `ADT_TASK_TYPE` |
   | [`@mcp-abap-adt/interfaces-adt-connection`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt-connection) `^5.0.0` | `IAbapConnection` (its `makeAdtRequest(options)` takes no type parameter and answers `IAdtWireResponse`, `data: unknown`), `IAdtWireResponse`, `IAbapRequestOptions`, the connection capability atoms, `ADT_SESSION_ERROR`, `AdtSessionLoss` |
   | [`@mcp-abap-adt/interfaces-network`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-network) `^2.0.1` | `IWebSocketTransport` and its four companions, `HttpError` |
   | [`@mcp-abap-adt/interfaces-utils`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-utils) `^1.1.1` | `ILogger`, `LogLevel`, `XmlNode` |
@@ -273,6 +273,7 @@ where 7.40 is not measured (its [LEGACY.md](https://github.com/fr0ster/mcp-abap-
 | Structures | `getStructure()` | `TABL/DS` | ✅ | ✅ | — |
 | Append structures | `getAppendStructure()` | `TABL/DS` | ✅ | ✅ | — |
 | Tables | `getTable()` | `TABL/DT` | ✅ | ✅ | — |
+| Technical settings of a table | `getTableSettings()` | `TABL/DTT` | ✅ | ✅ | — |
 | Table types | `getTableType()` | `TTYP/DA` | ✅ | ✅ | — |
 | DDL sources (CDS views) | `getDdl()` | `DDLS/DF` | ✅ | ✅ | ✅ |
 | Access controls | `getAccessControl()` | `DCLS/DL` | ✅ | ✅ | — |
@@ -793,6 +794,96 @@ metadata document".
 
 Watch the read. ADT answers a read of a not-yet-ready object with **HTTP 200 and
 an empty body**, never a 404, so what you edit may be nothing at all.
+
+### A table's technical settings
+
+Data class, size category, buffering and logging are not part of the table's
+document: SAP keeps them at `/sap/bc/adt/ddic/db/settings/{name}` (`TABL/DTT`,
+content type `application/vnd.sap.adt.table.settings.v2+xml` — a v1 Accept is
+answered `406`), under a lock of their own that the table's lock does not
+cover. `getTableSettings()` answers them: `readMetadata`, `lock`,
+`updateMetadata` and `unlock`, one request each. SAP creates default settings
+when it creates the table, and activating the table activates them — there is
+no create, delete or activation of the settings.
+
+`updateMetadata` takes the settings typed (`ITableSettingsUpdateConfig` of
+`@mcp-abap-adt/interfaces-adt` 29.0.0) and builds the document itself; its
+options refuse a `source` and require the `lockHandle`. **The write replaces
+every setting**: SAP writes the whole DD09L row from the document and resets a
+field left out, so every setting is required — read, change, write back.
+`description` is required too (SAP refuses a write without
+`adtcore:description`, `400` SWB_TOOL 019, measured on premise); it is the
+table's short text, which the read answers. `ts:isWritableByAMDP`, which the
+cloud returns, is never written.
+
+```typescript
+import { tableSettingsDocuments } from '@mcp-abap-adt/adt-clients';
+import { tableSettings } from '@mcp-abap-adt/adt-strategies';
+
+// The request's own pair: the address is the library's, the headers yours.
+const SETTINGS_HEADERS = {
+  accept: 'application/vnd.sap.adt.table.settings.v2+xml',
+  contentType: 'application/vnd.sap.adt.table.settings.v2+xml; charset=utf-8',
+};
+
+// `tableSettings` reads the document: every setting, the description, the ETag.
+const settings = client.getTableSettings({
+  ...tableSettingsDocuments,
+  metadata: tableSettings,
+});
+const target = { tableName: 'ZTABLE' };
+
+const locked = await settings.lock(target);
+if (!locked.ok) throw new Error(locked.getError().message);
+const lockHandle = locked.getResult().value;
+
+let written = false;
+let released = false;
+try {
+  // Read under the lock, so no edit made before it is lost.
+  const read = await settings.readMetadata(target, { version: 'inactive' });
+  if (!read.ok) throw new Error(read.getError().message);
+  const current = read.getResult().value;
+  if (!current.etag) throw new Error('the settings read answered no ETag');
+  // What only a read returns is not written back.
+  const { isWritableByAMDP: _readOnly, ...asRead } = current.settings;
+  const put = await settings.updateMetadata(
+    {
+      ...target,
+      description: current.description,
+      settings: { ...asRead, dataClassCategory: 'APPL1', sizeCategory: '1' },
+    },
+    { headers: SETTINGS_HEADERS, lockHandle, ifMatch: current.etag },
+  );
+  if (!put.ok) throw new Error(put.getError().message);
+  written = true;
+} finally {
+  const unlocked = await settings.unlock(target, lockHandle);
+  released = unlocked.ok;
+}
+// Activate the table — which activates its settings — only after both.
+if (written && released) {
+  await client.getTable().activate(target, { headers: ACTIVATION_HEADERS });
+}
+```
+
+The example relies on the default analysis (no `analyse` passed): a refused
+PUT (`412`) or UNLOCK (`403`) is `ok: false`, whether the connection rejected
+it or resolved it.
+
+`headers` is the caller's pair: `application/vnd.sap.adt.table.settings.v2+xml`
+for both, the `Content-Type` with `; charset=utf-8`. With `ifMatch` the write
+drops the charset, as every guarded document write does: the settings' ETag
+carries the media type without it, and SAP refused the guarded PUT with it
+(`412` SADT_RESOURCE/043) and accepted it without (measured on premise and on
+the cloud).
+`translation` is the `ts:translation` element's four attributes (`value`,
+`isVisible`, `isEditable`, `granularity`): SAP refuses a write without one
+(`400` `00/001`), so the read's are written back as they came. A LOCK answered
+without a handle is a refusal (`LOCK_FAILED`), and an empty `lockHandle` throws
+before the PUT is sent. On SAP_BASIS 7.40 the factory does not compile
+(`ADT_TYPES_BASIS_740` has no such API): its discovery has no
+`/ddic/db/settings`.
 
 This package does not check what you pass, and cannot: whether a document is
 complete is a question only your system can answer, and it answers it — in its
@@ -1599,7 +1690,7 @@ everything else is not.
 
 ### Single Definition Site: the contract packages
 
-Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^27.4.0`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^5.0.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the result-set contracts a factory accepts (`IClassResults`, …, since 38.0.0), the option and response types and the cross-cutting shared types all live there.
+Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^29.0.0`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^5.0.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the result-set contracts a factory accepts (`IClassResults`, …, since 38.0.0), the option and response types and the cross-cutting shared types all live there.
 
 **Import them from the package that owns them:**
 

@@ -137,6 +137,15 @@ export const TABLE = {
   uri: (name: string) => `/sap/bc/adt/ddic/tables/${seg(name)}`,
 } as const;
 
+/**
+ * A table's technical settings (`TABL/DTT`): their own resource, beside the
+ * table's, with their own lock.
+ */
+export const TABLE_SETTINGS = {
+  collection: '/sap/bc/adt/ddic/db/settings',
+  uri: (name: string) => `/sap/bc/adt/ddic/db/settings/${seg(name)}`,
+} as const;
+
 /** Structures, append structures included — ADT keeps both in one collection. */
 export const STRUCTURE = {
   collection: '/sap/bc/adt/ddic/structures',
@@ -303,6 +312,7 @@ export const RECORDS = {
   DDL_SOURCE,
   DDIC_VIEW,
   TABLE,
+  TABLE_SETTINGS,
   STRUCTURE,
   DOMAIN,
   DATA_ELEMENT,

@@ -61,6 +61,7 @@ export { utilDocuments } from './core/shared/utilResultSet';
 export type { INamedItem } from './core/shared/utilResults';
 export { structureDocuments } from './core/structure/types';
 export { tableDocuments } from './core/table/types';
+export { tableSettingsDocuments } from './core/tableSettings/types';
 export { tableTypeDocuments } from './core/tabletype/types';
 export { transformationDocuments } from './core/transformation/types';
 export { transportDocuments } from './core/transport/types';

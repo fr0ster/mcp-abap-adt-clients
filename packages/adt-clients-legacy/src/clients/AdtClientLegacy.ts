@@ -43,6 +43,7 @@ import {
   AdtServiceDefinition,
   AdtStructure,
   AdtTable,
+  AdtTableSettings,
   AdtTransformation,
   type AppendStructureValues,
   AUTHORIZATION_FIELD,
@@ -105,13 +106,16 @@ import {
   type serviceDocuments,
   type structureDocuments,
   TABLE,
+  TABLE_SETTINGS,
   TABLE_TYPE,
+  type TableSettingsValues,
   type TableTypeValues,
   type TableValues,
   TRANSFORMATION,
   type TransformationValues,
   type TransportValues,
   type tableDocuments,
+  type tableSettingsDocuments,
   type tableTypeDocuments,
   type transformationDocuments,
   transportDocuments,
@@ -145,6 +149,7 @@ import type {
   IServiceResults,
   IStructureResults,
   ITableResults,
+  ITableSettingsResults,
   ITableTypeResults,
   ITransformationResults,
   ITransportResults,
@@ -632,6 +637,29 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
       'Table',
       TABLE.collection,
       'measured',
+    );
+  }
+
+  override getTableSettings(
+    this: this & AdtServedBy<'tableSettings'>,
+  ): AdtTableSettings<
+    ResultValuesOf<typeof tableSettingsDocuments>,
+    'basis740'
+  >;
+  override getTableSettings<R extends ITableSettingsResults>(
+    this: this & AdtServedBy<'tableSettings'>,
+    results: R,
+  ): AdtTableSettings<ResultValuesOf<R>, 'basis740'>;
+  override getTableSettings(
+    this: this & AdtServedBy<'tableSettings'>,
+    _results?: ITableSettingsResults,
+  ): AdtTableSettings<TableSettingsValues, 'basis740'> {
+    this.assertConnected();
+    return absentOnLegacy<AdtTableSettings<TableSettingsValues, 'basis740'>>(
+      AdtTableSettings,
+      'TableSettings',
+      TABLE_SETTINGS.collection,
+      'not-advertised',
     );
   }
 
