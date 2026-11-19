@@ -12,7 +12,8 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { TABLE_SETTINGS } from '../../endpoints/objects';
-import { writeObjectDocument } from '../shared/documentWrite';
+import { writeQuery } from '../../utils/internalUtils';
+import { updateRequestHeaders } from '../../utils/requestHeaders';
 import { tableSettingsDocument } from './document';
 
 /**
@@ -29,13 +30,14 @@ export async function updateTableSettings(
   config: ITableSettingsUpdateConfig,
   lockHandle: string,
 ): Promise<IAdtWireResponse> {
-  return writeObjectDocument(
-    connection,
-    headers,
-    ifMatch,
-    TABLE_SETTINGS.uri(config.tableName),
-    tableSettingsDocument(config),
-    lockHandle,
-    config.transportRequest,
-  );
+  return connection.makeAdtRequest({
+    url: `${TABLE_SETTINGS.uri(config.tableName)}${writeQuery(lockHandle, config.transportRequest)}`,
+    method: 'PUT',
+    timeout: 0,
+    data: tableSettingsDocument(config),
+    // `'kept'`: the guarded write keeps `; charset=utf-8`, the media type the
+    // settings write was measured with (2026-11-19), unlike the other
+    // documents' guarded writes (`writeObjectDocument`), which drop it.
+    headers: updateRequestHeaders(headers, ifMatch, 'kept'),
+  });
 }

@@ -217,8 +217,18 @@ export const SOURCES_WITHOUT_CHARSET_WHEN_GUARDED: ReadonlySet<string> =
     'AdtMessageClassMessage.update',
   ]);
 
+/**
+ * The `updateMetadata`s whose guarded write keeps the charset: a table's
+ * technical settings, whose write was measured with
+ * `application/vnd.sap.adt.table.settings.v2+xml; charset=utf-8` (2026-11-19).
+ */
+export const DOCUMENTS_WITH_CHARSET_WHEN_GUARDED: ReadonlySet<string> = new Set(
+  ['AdtTableSettings.updateMetadata'],
+);
+
 /** Whether a member's guarded write drops the charset (see above). */
 export function dropsCharsetWhenGuarded(key: string): boolean {
+  if (DOCUMENTS_WITH_CHARSET_WHEN_GUARDED.has(key)) return false;
   return (
     key.endsWith('.updateMetadata') ||
     SOURCES_WITHOUT_CHARSET_WHEN_GUARDED.has(key)
