@@ -146,6 +146,20 @@ export {
   tableSettings,
 } from './results/tableSettings';
 export {
+  type ISelectionTextRead,
+  type ISelectionTextsDocument,
+  type ITextHeadingsDocument,
+  type ITextHeadingsRead,
+  type ITextSymbolRead,
+  type ITextSymbolsDocument,
+  readSelectionTexts,
+  readTextHeadings,
+  readTextSymbols,
+  selectionTexts,
+  textHeadings,
+  textSymbols,
+} from './results/textElements';
+export {
   compareRecordedAt,
   type IAbapTraceAccessTime,
   type IAbapTraceDbAccess,
