@@ -7,7 +7,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { readTableSettings, tableSettings } from '@mcp-abap-adt/adt-strategies';
-import type { ITableSettingsUpdateConfig } from '@mcp-abap-adt/interfaces-adt';
+import {
+  ADT_NO_FAILURE,
+  type ITableSettingsUpdateConfig,
+} from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAbapRequestOptions,
@@ -170,16 +173,25 @@ describe('the settings write', () => {
     );
   });
 
-  it('answers SAP refusing a document without a description (400, SWB_TOOL 019) as a failure, its answer kept', async () => {
+  it("propagates SAP's 400 SWB_TOOL 019 as a failure, its answer kept, after sending the description it was given", async () => {
+    // The recorded 400 answered a document carrying no adtcore:description at
+    // all (the fixture's sidecar says so); the contract requires one, so the
+    // write sends what it is given — here an empty one — and SAP's answer is
+    // passed on as the failure.
     const answer = recorded(
       'refusal-table-settings-no-description-s4-2025--01-update',
     );
-    const { connection } = recording(answer);
+    const { connection, requests } = recording(answer);
     const settings = new AdtClient(connection).getTableSettings();
     const written = await settings.updateMetadata(
       { ...CHANGED, description: '' },
       { headers: headersOf(settings, 'updateMetadata'), lockHandle: 'LH' },
     );
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.data).toBe(
+      tableSettingsDocument({ ...CHANGED, description: '' }),
+    );
+    expect(String(requests[0]?.data)).toContain('adtcore:description=""');
     expect(written.ok).toBe(false);
     const failure = !written.ok ? written.getError() : undefined;
     expect(failure?.response?.status).toBe(400);
@@ -301,6 +313,36 @@ const REFUSED = {
 };
 
 describe('a read written back', () => {
+  it('round-trips character references and edge spaces value for value, escaped once', () => {
+    const xml = String(
+      recorded('read-table-settings-s4-2025--01-settings').data,
+    )
+      .replace(
+        'adtcore:description="Flight"',
+        'adtcore:description=" Caf&#xE9; &amp; &lt;x&gt; "',
+      )
+      .replace('ts:value=""', 'ts:value="  Caf&#xE9; "');
+    const read = readTableSettings(xml);
+    expect(read.description).toBe(' Caf\u00e9 & <x> ');
+    expect(read.settings.translation.value).toBe('  Caf\u00e9 ');
+    const { isWritableByAMDP: _readOnly, ...asRead } = read.settings;
+    const body = tableSettingsDocument({
+      tableName: read.name,
+      description: read.description,
+      settings: asRead,
+    });
+    expect(body).toContain('adtcore:description=" Caf\u00e9 &amp; &lt;x&gt; "');
+    expect(body).toContain('ts:value="  Caf\u00e9 "');
+    const again = readTableSettings(
+      body.replace(
+        'adtcore:type="TABL/DTT"',
+        'adtcore:type="TABL/DTT" adtcore:version="inactive"',
+      ),
+    );
+    expect(again.description).toBe(read.description);
+    expect(again.settings).toEqual(asRead);
+  });
+
   it.each(['s4-2025', 'abap-cloud'])(
     'carries every setting as read, the translation with its four attributes (%s)',
     (release) => {
@@ -328,6 +370,25 @@ describe('a read written back', () => {
 });
 
 describe("the settings lock in the client's registry", () => {
+  it('keeps the lock when the UNLOCK failed on the wire, even when an analyser calls it ok, and unlockAll() retries it', async () => {
+    const { connection, requests } = sequence([LOCKED, REFUSED, OK]);
+    const client = new AdtClient(connection);
+    const settings = client.getTableSettings();
+    await settings.lock({ tableName: 'ZT' });
+    const unlocked = await settings.unlock({ tableName: 'ZT' }, 'LH/1', {
+      analyse: () => ADT_NO_FAILURE,
+    });
+    expect(unlocked.ok).toBe(true);
+    expect(client.pendingLocks).toEqual(['TableSettings/ZT']);
+    expect(await client.unlockAll()).toEqual([]);
+    expect(client.pendingLocks).toEqual([]);
+    expect(requests.map((r) => r.url)).toEqual([
+      '/sap/bc/adt/ddic/db/settings/zt?_action=LOCK&accessMode=MODIFY',
+      '/sap/bc/adt/ddic/db/settings/zt?_action=UNLOCK&lockHandle=LH%2F1',
+      '/sap/bc/adt/ddic/db/settings/zt?_action=UNLOCK&lockHandle=LH%2F1',
+    ]);
+  });
+
   it('keeps the lock when UNLOCK fails, so unlockAll() can try again', async () => {
     const { connection } = sequence([LOCKED, REFUSED]);
     const client = new AdtClient(connection);

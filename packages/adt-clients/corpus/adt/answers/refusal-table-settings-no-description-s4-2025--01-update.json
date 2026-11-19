@@ -15,7 +15,7 @@
     },
     "headersNote": "Caller-supplied headers only. The lock handle is not recorded; the connection adds the logon and the session below this point, none of which is recorded.",
     "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<ts:tableSettings xmlns:ts=\"http://www.sap.com/dictionary/table/settings\"\n    xmlns:adtcore=\"http://www.sap.com/adt/core\"\n    adtcore:name=\"ZMCP_TS_8C74\" adtcore:type=\"TABL/DTT\">\n  <ts:dataClassCategory>APPL1</ts:dataClassCategory>\n  <ts:sizeCategory>1</ts:sizeCategory>\n  <ts:buffering><ts:allowed>N</ts:allowed></ts:buffering>\n</ts:tableSettings>",
-    "bodyNote": "The document as the research notes give it for this step (the probe did not log the request body): the minimal document, with or without adtcore:description."
+    "bodyNote": "Not the logged body: the probe did not log request bodies. This is the minimal document the research notes give for this step — it carried no adtcore:description attribute at all, and that is what SAP refused. The library cannot send such a document (the contract requires a description); its unit test sends an empty one and passes this answer on."
   },
   "response": {
     "status": 400,
