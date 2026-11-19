@@ -71,7 +71,7 @@ nothing that compiled stops on it.
 the unpublished 45.6.0, so it meets both at once:
 
 ```typescript
-// 45.5.5: compiled with its 30 codes. 46.0.0: TS2739, missing
+// 45.5.5: compiled with its 29 codes. 46.0.0: TS2739, missing
 // "TABL/DTT", "PROG/PX", "CLAS/OCX".
 const kinds: Record<AdtTypeCode, string> = { 'CLAS/OC': 'class', /* … */ };
 ```
