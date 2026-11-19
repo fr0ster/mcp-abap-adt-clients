@@ -1,0 +1,27 @@
+{
+  "case": "write-text-selections-s4-2025",
+  "step": 1,
+  "stepTag": "update",
+  "capturedAt": "2026-11-19",
+  "note": "Recorded 2026-11-19 by the owner-approved write trial through @mcp-abap-adt/connection (the research for the text elements contract, interfaces-adt 30.0.0), in a local package with no transport; the object was created by the trial and deleted at its end. The trial log kept the status and the body; the content type is the part's media type the handler sets (CL_SEDX_ADT_C_HANDLER_*), not logged. The log's own line break after the body is not part of it. S/4HANA 2025 on premise: the selection text of P_TEST written as P_TEST=Test parameter EN; SAP answers the name padded to eight characters.",
+  "request": {
+    "method": "PUT",
+    "url": "/sap/bc/adt/textelements/programs/zmcp_txpc004/source/selections",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/textelements/programs/zmcp_txpc004/source/selections",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.textelements.selections.v1",
+      "Content-Type": "application/vnd.sap.adt.textelements.selections.v1; charset=utf-8"
+    },
+    "headersNote": "Caller-supplied headers only. The lock handle is not recorded; the connection adds the logon and the session below this point, none of which is recorded.",
+    "body": "P_TEST=Test parameter EN"
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.textelements.selections.v1; charset=UTF-8"
+    },
+    "bodyFile": "write-text-selections-s4-2025--01-update.body.txt"
+  }
+}

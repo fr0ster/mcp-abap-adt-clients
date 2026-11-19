@@ -1,0 +1,230 @@
+@MaxLength:20
+110=Referenzbenutzer
+
+@MaxLength:10
+111=Alias
+
+@MaxLength:64
+112=Bitte ein Transaktionscode wählen.
+
+@MaxLength:21
+201=Berechtigungsobjekt 1
+
+@MaxLength:25
+202=UND Berechtigungsobjekt 2
+
+@MaxLength:25
+212=UND Berechtigungsobjekt 3
+
+@MaxLength:4
+214=Wert
+
+@MaxLength:4
+215=ODER
+
+@MaxLength:3
+216=UND
+
+@MaxLength:32
+217=Werte immer konvertieren
+
+@MaxLength:30
+218=UND Berechtigungsobjekt 4
+
+@MaxLength:20
+300=Eingabewerte
+
+@MaxLength:50
+502=gesetzt
+
+@MaxLength:50
+503=nicht gesetzt
+
+@MaxLength:80
+504=Kennwortsperre (Falschanmeldungen)
+
+@MaxLength:80
+505=Benutzersperren (Administrator)
+
+@MaxLength:80
+506=Selektion nach Sperren
+
+@MaxLength:60
+507=Alle Benutzer mit Administrator- oder Kennwortsperre
+
+@MaxLength:40
+509=Nur Benutzer ohne Sperren
+
+@MaxLength:54
+702=Bitte Feldname ausfüllen
+
+@MaxLength:30
+800=Listaufbereitung
+
+@MaxLength:10
+801=Layout
+
+@MaxLength:10
+802=Titel
+
+@MaxLength:54
+803=Alle Selektionskriterien im Header anzeigen
+
+@MaxLength:40
+804=E-Mail Addresse anzeigen
+
+@MaxLength:54
+805=Selektionskriterien im Header anzeigen
+
+@MaxLength:70
+810=Protokollanzeige: Prüfung der Selektionseingaben
+
+@MaxLength:20
+C00=Selektionskriterien
+
+@MaxLength:30
+E01= Defektes Sammelprofil
+
+@MaxLength:30
+E02=wird nicht analysiert
+
+@MaxLength:30
+E03=(Sammelprofil enthält Zyklen).
+
+@MaxLength:10
+R01=Rolle
+
+@MaxLength:11
+R05=UND Profil
+
+@MaxLength:12
+R07=Profilname
+
+@MaxLength:20
+S00=Standardselektion
+
+@MaxLength:40
+S02=Aufbereitung der Selektionskriterien
+
+@MaxLength:40
+S03=Analysiere Benutzerdaten
+
+@MaxLength:40
+S04=Aufbereitung der Listausgabe
+
+@MaxLength:25
+S05=Ablauf Gültigkeit von
+
+@MaxLength:10
+S06=bis
+
+@MaxLength:10
+S07=Benutzer
+
+@MaxLength:25
+S08=Gruppe für Berechtigung
+
+@MaxLength:30
+S09=Benutzergruppe (allgemein)
+
+@MaxLength:30
+S10=Transaktionscode
+
+@MaxLength:25
+S11=Ablauf Gültigkeit von
+
+@MaxLength:25
+S12=Sicherheitsrichtlinie
+
+@MaxLength:30
+S13=Nutzertyp für Vermessung
+
+@MaxLength:20
+S14=Benutzertyp
+
+@MaxLength:20
+S15=Kostenstelle
+
+@MaxLength:54
+S16=nur ausführbare Transaktionen
+
+@MaxLength:15
+S17=SNC Name
+
+@MaxLength:15
+S18=Ausgabegerät
+
+@MaxLength:25
+S19=CATT Prüfkennzeichen
+
+@MaxLength:20
+S20=Anmeldesprache
+
+@MaxLength:25
+S21=Dezimaldarstellung
+
+@MaxLength:25
+S22=Datumsdarstellung
+
+@MaxLength:30
+S23=Zeitzone des Benutzers
+
+@MaxLength:30
+S24=Set-/Get-Parameter-Id
+
+@MaxLength:30
+S25=Selektion nach Feldname
+
+@MaxLength:25
+S26=Werte immer konvertieren
+
+@MaxLength:10
+S27=Feldname
+
+@MaxLength:10
+S28=Wert
+
+@MaxLength:30
+S29=Selektion nach Berechtigungen
+
+@MaxLength:25
+S30=Berechtigungsobjekt
+
+@MaxLength:20
+S31=Berechtigung
+
+@MaxLength:25
+S32=Selektion nach Werten
+
+@MaxLength:20
+S33=Abrechnungsnummer
+
+@MaxLength:15
+S34=Startmenü
+
+@MaxLength:25
+S35=Zeitformat (12/24h)
+
+@MaxLength:21
+S36=Kurzbeschreibung
+
+@MaxLength:20
+S37=Verantwortlicher
+
+@MaxLength:40
+S38=Kennwortanmeldung für SAP GUI zulassen
+
+@MaxLength:15
+T02=Logondaten
+
+@MaxLength:25
+T04=Festwerte/Parameter
+
+@MaxLength:20
+T06=Rollen/Profile
+
+@MaxLength:14
+T11=Berechtigungen
+
+@MaxLength:23
+T12=Dokumentation
