@@ -6,8 +6,9 @@
  * them with the table, and activating the table activates them, so there is
  * no create, delete or activation here.
  *
- * Every member is one request, and the sequence is the caller's — the
- * library's lock pattern:
+ * Every member is one request except `patchMetadata` (an inactive GET, then
+ * the guarded PUT), and the sequence is the caller's — the library's lock
+ * pattern:
  *
  * ```typescript
  * // `headers`: the request's own pair — Accept

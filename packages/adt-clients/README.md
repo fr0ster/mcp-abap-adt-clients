@@ -822,8 +822,10 @@ and a write (below). SAP created default settings when it created the table,
 and activating the table alone activated them (measured on both): the
 library has no create, delete or activation of the settings.
 
-`updateMetadata` takes the settings typed by the client's variant
-(`ITableSettingsUpdateConfig<V>` of `@mcp-abap-adt/interfaces-adt` 30.1.0) and
+`updateMetadata` takes the settings typed by the handler's variant
+(`ITableSettingsUpdateConfig<V>` of `@mcp-abap-adt/interfaces-adt` 30.1.0:
+`AdtClientCloud` and `AdtClientOnPrem` hand a handler of their own kind; the
+generic `AdtClient` getter types it for both newer kinds) and
 builds the document itself; its options refuse a `source` and require the
 `lockHandle`. **The write replaces every setting**: SAP writes the whole DD09L
 row from the document and resets a field left out

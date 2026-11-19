@@ -38,9 +38,10 @@ Released with `@mcp-abap-adt/adt-strategies` 0.26.0 and
   it too (Code, cloud); a PUT without `ts:isWritableByAMDP` read back `false`
   (measured on the cloud). 46.0.0 never wrote it, so every cloud write reset
   it. The document now writes `ts:isWritableByAMDP` whenever the settings
-  carry it, and `updateMetadata` is typed by the client's variant
-  (`ITableSettingsUpdateConfig<V>`): a cloud client's write requires it, an
-  on-premise one refuses it (nothing maps it there, Code).
+  carry it, and `updateMetadata` is typed by the handler's variant
+  (`ITableSettingsUpdateConfig<V>`): `AdtClientCloud`'s write requires it,
+  `AdtClientOnPrem`'s refuses it (nothing maps it there, Code); the generic
+  `AdtClient` getter types its handler for both newer kinds.
 - **The translation wording.** `ts:translation` is not required by SAP: the
   transformation reads it inside a `tt:cond` (Code, both systems), a document
   without it was accepted, one with an attribute missing refused `400`
@@ -64,7 +65,8 @@ Released with `@mcp-abap-adt/adt-strategies` 0.26.0 and
   `createAdtClient({ variant: 'cloud' })`, is the declaration, never inferred
   from an answer. The cloud protection of `patchMetadata` holds through them
   and through an `AdtTableSettings` constructed with `variant: 'cloud'`; a
-  generic `AdtClient` writes a read without the flag as it came — on
+  generic `AdtClient` does not refuse a read without the flag: unless the
+  patch names the flag, it writes the document without it — on
   a cloud system use the cloud client, and read with adt-strategies'
   `cloudTableSettings`.
   `AdtTableSettings<T, V>` implements `IAdtTableSettingsPatchable` and
