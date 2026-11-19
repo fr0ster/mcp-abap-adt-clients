@@ -140,6 +140,7 @@ describe('a guarded write of an XML document or a DDIC source drops the charset'
         'structure.updateMetadata',
         'table.update',
         'table.updateMetadata',
+        'tableSettings.updateMetadata',
         'transformation.updateMetadata',
       ].sort(),
     );

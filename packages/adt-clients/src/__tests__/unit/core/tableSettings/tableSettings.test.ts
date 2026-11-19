@@ -153,7 +153,7 @@ describe('the settings write', () => {
     );
   });
 
-  it('sends If-Match when the caller gives the read ETag, keeping the measured charset', async () => {
+  it('sends If-Match when the caller gives the read ETag, the charset dropped as the ETag of SAP requires', async () => {
     const { connection, requests } = recording(OK);
     const settings = new AdtClient(connection).getTableSettings();
     await settings.updateMetadata(CHANGED, {
@@ -163,7 +163,10 @@ describe('the settings write', () => {
     });
     expect(requests[0]?.headers?.['If-Match']).toBe('ETAG-1');
     expect(requests[0]?.headers?.['Content-Type']).toBe(
-      'application/vnd.sap.adt.table.settings.v2+xml; charset=utf-8',
+      // The settings' ETag carries the media type without the charset: a
+      // guarded PUT with `; charset=utf-8` is refused 412 SADT_RESOURCE/043,
+      // without it accepted (measured on premise and on the cloud, 2026-11-19).
+      'application/vnd.sap.adt.table.settings.v2+xml',
     );
   });
 

@@ -35,9 +35,11 @@ export async function updateTableSettings(
     method: 'PUT',
     timeout: 0,
     data: tableSettingsDocument(config),
-    // `'kept'`: the guarded write keeps `; charset=utf-8`, the media type the
-    // settings write was measured with (2026-11-19), unlike the other
-    // documents' guarded writes (`writeObjectDocument`), which drop it.
-    headers: updateRequestHeaders(headers, ifMatch, 'kept'),
+    // `'dropped'`, as every document's guarded write: the settings' ETag
+    // carries the media type without the charset, so a PUT with `If-Match`
+    // and `; charset=utf-8` is refused 412 SADT_RESOURCE/043 and one without
+    // it accepted; without `If-Match` the charset is sent as given (measured
+    // on premise and on the cloud, 2026-11-19).
+    headers: updateRequestHeaders(headers, ifMatch, 'dropped'),
   });
 }
