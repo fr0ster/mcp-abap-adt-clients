@@ -30,23 +30,24 @@
  * Every member answers `IAdtResponse<T>`, where T is what the result set given
  * at construction makes of that endpoint's answer.
  */
-import type {
-  AdtVariant,
-  IAdtAnalyseOptions,
-  IAdtError,
-  IAdtHeaders,
-  IAdtLockable,
-  IAdtMetadataReadable,
-  IAdtOperationOptions,
-  IAdtResponse,
-  IAdtTableSettingsUpdatable,
-  IAdtTableSettingsUpdateOptions,
-  ITableSettingsResults,
+import {
+  AdtObjectErrorCodes,
+  type AdtVariant,
+  type IAdtAnalyseOptions,
+  type IAdtError,
+  type IAdtHeaders,
+  type IAdtLockable,
+  type IAdtMetadataReadable,
+  type IAdtOperationOptions,
+  type IAdtResponse,
+  type IAdtTableSettingsUpdatable,
+  type IAdtTableSettingsUpdateOptions,
+  type ITableSettingsResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant } from '../../clients/variant';
-import { answering } from '../../utils/adtResponse';
+import { answering, answeringExchange } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
 import {
@@ -148,6 +149,14 @@ export class AdtTableSettings<
     config: ITableSettingsUpdateConfig,
     options: { headers: IAdtHeaders } & IAdtTableSettingsUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+    // **The one guard here, before any request.** The type requires a lock
+    // handle; this refuses an empty one, which the type cannot rule out and
+    // which the query would drop: the PUT would go out with no `lockHandle`.
+    if (options.lockHandle === '') {
+      throw new Error(
+        'lockHandle is required for a settings write: an empty one would send the PUT without a lock',
+      );
+    }
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options.timeout);
     return answering(
@@ -165,20 +174,36 @@ export class AdtTableSettings<
   }
 
   /**
-   * Lock the settings — one LOCK, its handle read by `lockHandleOf`. A 200
-   * carrying no handle reads as `''`; whether that is a refusal is the
-   * caller's `analyse` to say.
+   * Lock the settings — one LOCK, its handle read by `lockHandleOf`.
+   *
+   * **A LOCK answered without a handle is a refusal** (`LOCK_FAILED`, the
+   * answer kept as its `response`): the write needs the handle, and an empty
+   * one would leave the PUT with no `lockHandle` at all. It is the starting
+   * verdict, as every failure is: a caller's `analyse` sees it and may rule
+   * otherwise. Only a lock with a handle is tracked.
    */
   async lock<E extends IAdtError = IAdtError>(
     config: Partial<ITableSettingsConfig>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
-    const answer = await answering(
-      () =>
-        inStatefulSession(this.connection, () =>
+    const answer = await answeringExchange(
+      async () => {
+        const locked = await inStatefulSession(this.connection, () =>
           lockTableSettings(this.connection, name),
-        ),
+        );
+        return lockHandleOf(locked) === ''
+          ? {
+              answer: locked,
+              failure: {
+                origin: 'refusal',
+                code: AdtObjectErrorCodes.LOCK_FAILED,
+                message: `The LOCK of the technical settings of ${name} answered no lock handle`,
+                response: locked,
+              },
+            }
+          : { answer: locked };
+      },
       lockHandleOf,
       options?.analyse,
     );
@@ -188,27 +213,30 @@ export class AdtTableSettings<
     return answer;
   }
 
-  /** Unlock the settings. */
+  /**
+   * Unlock the settings. The lock leaves the client's registry only when the
+   * UNLOCK succeeded: a failed one stays tracked, so `unlockAll()` can try
+   * again.
+   */
   async unlock<E extends IAdtError = IAdtError>(
     config: Partial<ITableSettingsConfig>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {
     const name = this.name(config);
-    return answering(
-      async () => {
-        // UNLOCK must run stateful (the context cookie goes with stateful
-        // requests only); stateless after.
-        this.connection.setSessionType('stateful');
-        try {
-          return await unlockTableSettings(this.connection, name, lockHandle);
-        } finally {
-          this.connection.setSessionType('stateless');
-          this.lockTracker.untrack(name);
-        }
-      },
+    // UNLOCK must run stateful (the context cookie goes with stateful
+    // requests only); stateless after.
+    const answer = await answering(
+      () =>
+        inStatefulSession(this.connection, () =>
+          unlockTableSettings(this.connection, name, lockHandle),
+        ),
       nothing,
       options?.analyse,
     );
+    if (answer.ok) {
+      this.lockTracker.untrack(name);
+    }
+    return answer;
   }
 }
