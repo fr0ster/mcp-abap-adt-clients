@@ -16,6 +16,11 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 > **From 18.x?** Read [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md)
 > first: 19.0.0 is where members became one endpoint call each.
 >
+> **On a cloud client, 46.1.0** (on `interfaces-adt` ^30.1.0) requires
+> `isWritableByAMDP` in a settings write — 46.0.0 reset it on every cloud
+> write — and adds `patchMetadata` to `getTableSettings()`. See the
+> [CHANGELOG](CHANGELOG.md) and "A table's technical settings" below.
+>
 > **From 45.x?** 46.0.0 (on `interfaces-adt` ^30.0.0) adds `getTextElements()`
 > and `getTableSettings()`, and where-used of `PROG/PX` names its
 > `container`: a where-used call whose code is a variable of the whole union
@@ -809,19 +814,24 @@ document: SAP keeps them at `/sap/bc/adt/ddic/db/settings/{name}` (`TABL/DTT`,
 content type `application/vnd.sap.adt.table.settings.v2+xml` — a v1 Accept is
 answered `406`), under a lock of their own that the table's lock does not
 cover. `getTableSettings()` answers them: `readMetadata`, `lock`,
-`updateMetadata` and `unlock`, one request each. SAP creates default settings
+`updateMetadata` and `unlock`, one request each, and `patchMetadata`, a read
+and a write (below). SAP creates default settings
 when it creates the table, and activating the table activates them — there is
 no create, delete or activation of the settings.
 
-`updateMetadata` takes the settings typed (`ITableSettingsUpdateConfig` of
-`@mcp-abap-adt/interfaces-adt` 29.0.0 and later) and builds the document itself; its
-options refuse a `source` and require the `lockHandle`. **The write replaces
-every setting**: SAP writes the whole DD09L row from the document and resets a
-field left out, so every setting is required — read, change, write back.
-`description` is required too (SAP refuses a write without
-`adtcore:description`, `400` SWB_TOOL 019, measured on premise); it is the
-table's short text, which the read answers. `ts:isWritableByAMDP`, which the
-cloud returns, is never written.
+`updateMetadata` takes the settings typed by the client's variant
+(`ITableSettingsUpdateConfig<V>` of `@mcp-abap-adt/interfaces-adt` 30.1.0) and
+builds the document itself; its options refuse a `source` and require the
+`lockHandle`. **The write replaces every setting**: SAP writes the whole DD09L
+row from the document and resets a field left out
+(`CL_TABT_WB_PERSIST->move_adt_to_ddv`, Code on both systems; measured on
+both), so every setting is required — read, change, write back. On the cloud
+that includes `isWritableByAMDP`: the cloud's `move_adt_to_ddv` writes it from
+the document (Code), a PUT without it read back `false` (measured), so a cloud
+client's write requires it and sends `ts:isWritableByAMDP`; on premise nothing
+maps it (Code) and the type refuses it. `description` is required too (SAP
+refuses a write without `adtcore:description`, `400` SWB_TOOL 019, measured on
+both); it is the table's short text, which the read answers.
 
 ```typescript
 import { tableSettingsDocuments } from '@mcp-abap-adt/adt-clients';
@@ -852,13 +862,16 @@ try {
   if (!read.ok) throw new Error(read.getError().message);
   const current = read.getResult().value;
   if (!current.etag) throw new Error('the settings read answered no ETag');
-  // What only a read returns is not written back.
-  const { isWritableByAMDP: _readOnly, ...asRead } = current.settings;
+  // Every setting read goes back — on the cloud, isWritableByAMDP too.
   const put = await settings.updateMetadata(
     {
       ...target,
       description: current.description,
-      settings: { ...asRead, dataClassCategory: 'APPL1', sizeCategory: '1' },
+      settings: {
+        ...current.settings,
+        dataClassCategory: 'APPL1',
+        sizeCategory: '1',
+      },
     },
     { headers: SETTINGS_HEADERS, lockHandle, ifMatch: current.etag },
   );
@@ -885,13 +898,41 @@ carries the media type without it, and SAP refused the guarded PUT with it
 (`412` SADT_RESOURCE/043) and accepted it without (measured on premise and on
 the cloud).
 `translation` is the `ts:translation` element's four attributes (`value`,
-`isVisible`, `isEditable`, `granularity`): SAP refuses a write without one
-(`400` `00/001`), so the read's are written back as they came. A LOCK SAP
+`isVisible`, `isEditable`, `granularity`), written back as read. The
+transformation reads the element inside a `tt:cond` (Code, both systems): a
+document without it was accepted, one with an attribute missing refused,
+`400` `00/001` with an `XML_PATH` property (measured on both); SAP stores
+`value` alone (`move_adt_to_ddv`, Code on both). A LOCK SAP
 refused (non-2xx) keeps SAP's classification, a 2xx LOCK answered without a
 handle is a refusal (`LOCK_FAILED`), and an empty `lockHandle` throws
 before the PUT is sent. On SAP_BASIS 7.40 the factory does not compile
 (`ADT_TYPES_BASIS_740` has no such API): its discovery has no
 `/ddic/db/settings`.
+
+**`patchMetadata`** changes named settings and keeps the rest, under the
+caller's lock (decision 51 of interfaces-adt): it reads the working area
+(`?version=inactive`) with its ETag, overlays `changes`, and PUTs the whole
+document with `If-Match` and the media type without a charset — two requests,
+the exception decision 51 makes to "one endpoint, one member". Every setting
+not named is written as read, the description too, and on the cloud
+`isWritableByAMDP` unless named. `translation` changes by its `value`;
+`buffering` field by field. Refused before any request: an empty
+`lockHandle`, a change set naming no setting (`{}` does not compile). Refused
+before the PUT, as a failure carrying the read: a read without an ETag, a
+document without every setting the write needs, and an `areaKeyFields`
+change whose merged buffering type is not `G` (SAP writes the count only for
+`G`, Code on both; a resulting non-`G` type with no count named is written,
+and SAP clears the count). A refused read or PUT is answered as SAP answered
+it; nothing is retried.
+
+```typescript
+import { TABLE_SETTINGS_MEDIA_TYPE } from '@mcp-abap-adt/interfaces-adt';
+
+const patched = await settings.patchMetadata(
+  { tableName: 'ZTABLE', changes: { sizeCategory: '2' } },
+  { headers: { accept: TABLE_SETTINGS_MEDIA_TYPE }, lockHandle },
+);
+```
 
 ### Text elements
 
