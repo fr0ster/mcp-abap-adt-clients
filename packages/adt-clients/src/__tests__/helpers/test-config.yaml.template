@@ -1491,6 +1491,20 @@ create_table:
             last_changed_on    : abap.dats;
           }
 
+# A table's technical settings (TABL/DTT): a fresh table in the test package,
+# its settings written to non-default values under their own lock, the table
+# activated, the active settings read back, the table deleted.
+# The table name is fresh per run (ZAC_TS + 6 characters).
+table_settings:
+  test_cases:
+    - name: "adt_table_settings"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Technical settings of a fresh table: APPL1, size 1, buffering allowed, logging on"
+      params: {}
+        # package_name: "ZAC_PKG01"
+        # transport_request: ""
+
 # Create TableType (DDIC Table Type)
 # TableType is XML-based entity (like Domain/DataElement)
 # Create: creates empty TableType (rowType added via update)
