@@ -285,10 +285,34 @@ describe("A table's technical settings (AdtTableSettings)", () => {
         );
         const before = written;
         if (!before) throw new Error('nothing was written before the patch');
+        // The write carried every setting back: the working area reads what
+        // was written, the cloud's isWritableByAMDP as it was read.
+        const afterWrite = expectResult(
+          await settings.readMetadata(
+            { tableName },
+            { analyse: analyseException, version: 'inactive' },
+          ),
+          `read the written settings of ${tableName}`,
+        );
+        expect(afterWrite.settings).toEqual(before);
         const flag =
           before.isWritableByAMDP === undefined
             ? undefined
             : !before.isWritableByAMDP;
+        // The cloud refuses to activate a table writable by AMDP with
+        // logging on ("AMDP writes to table … not possible (Logging
+        // activated)", answered 200 with an E message, measured 2026-11-19):
+        // a patch that turns the flag on turns logging off in the same write.
+        const changes =
+          flag === undefined
+            ? { sizeCategory: '2' }
+            : flag
+              ? {
+                  sizeCategory: '2',
+                  isWritableByAMDP: true,
+                  loggingEnabled: false,
+                }
+              : { sizeCategory: '2', isWritableByAMDP: false };
         await releasing(
           async () =>
             expectResult(
@@ -296,10 +320,7 @@ describe("A table's technical settings (AdtTableSettings)", () => {
                 {
                   tableName,
                   transportRequest,
-                  changes:
-                    flag === undefined
-                      ? { sizeCategory: '2' }
-                      : { sizeCategory: '2', isWritableByAMDP: flag },
+                  changes,
                 },
                 {
                   analyse: analyseException,
@@ -315,11 +336,7 @@ describe("A table's technical settings (AdtTableSettings)", () => {
             }),
           `unlock the settings of ${tableName} after the patch`,
         );
-        written = {
-          ...before,
-          sizeCategory: '2',
-          ...(flag === undefined ? {} : { isWritableByAMDP: flag }),
-        };
+        written = { ...before, ...changes };
 
         logTestStep(
           'activate the table, which activates its settings',
