@@ -26,6 +26,8 @@
  *   const read = await settings.readMetadata({ tableName });
  *   if (!read.ok) return read;
  *   const current = read.getResult().value;
+ *   // No ETag, no write: the PUT is guarded with If-Match.
+ *   if (!current.etag) return;
  *   // …change what was read, keep the rest…
  *   const put = await settings.updateMetadata(
  *     { tableName, description: current.description, settings: changed },
@@ -70,7 +72,11 @@ import {
 } from '../../utils/resultStrategy';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
-import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
+import {
+  createLockTracker,
+  failedStatus,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { lockTableSettings } from './lock';
 import { getTableSettings } from './read';
@@ -193,18 +199,25 @@ export class AdtTableSettings<
    * answer kept as its `response`): the write needs the handle, and an empty
    * one would leave the PUT with no `lockHandle` at all. It is the starting
    * verdict, as every failure is: a caller's `analyse` sees it and may rule
-   * otherwise. Only a lock with a handle is tracked.
+   * otherwise. The registry follows the wire: a handle SAP answered with a
+   * 2xx status is tracked whatever `analyse` rules, so `unlockAll()` can
+   * release it.
    */
   async lock<E extends IAdtError = IAdtError>(
     config: Partial<ITableSettingsConfig>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
+    // The handle SAP answered with a success status: tracked whatever a
+    // caller's `analyse` rules, so `unlockAll()` can release what the wire
+    // holds.
+    let held = '';
     const answer = await answeringExchange(
       async () => {
         const locked = await inStatefulSession(this.connection, () =>
           lockTableSettings(this.connection, name),
         );
+        if (!failedStatus(locked)) held = lockHandleOf(locked);
         return lockHandleOf(locked) === ''
           ? {
               answer: locked,
@@ -220,15 +233,15 @@ export class AdtTableSettings<
       lockHandleOf,
       options?.analyse,
     );
-    if (answer.ok && answer.getResult().value) {
-      this.lockTracker.track(name, answer.getResult().value);
+    if (held) {
+      this.lockTracker.track(name, held);
     }
     return answer;
   }
 
   /**
    * Unlock the settings. The lock leaves the client's registry only when the
-   * UNLOCK succeeded on the wire — SAP answered it with a success status —
+   * UNLOCK succeeded on the wire — SAP answered it with a 2xx status —
    * whatever a caller's `analyse` makes of the answer: a failed one stays
    * tracked, so `unlockAll()` can try again.
    */
@@ -238,8 +251,8 @@ export class AdtTableSettings<
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {
     const name = this.name(config);
-    // The connection resolves a success status and rejects every other, so
-    // reaching the line after the request is the release on the wire.
+    // Released on the wire: SAP answered the UNLOCK with a 2xx status. A
+    // connection that resolves a 403 or a 500 released nothing.
     let released = false;
     // UNLOCK must run stateful (the context cookie goes with stateful
     // requests only); stateless after.
@@ -248,7 +261,7 @@ export class AdtTableSettings<
         const unlocked = await inStatefulSession(this.connection, () =>
           unlockTableSettings(this.connection, name, lockHandle),
         );
-        released = true;
+        released = !failedStatus(unlocked);
         return unlocked;
       },
       nothing,

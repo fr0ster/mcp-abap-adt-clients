@@ -410,6 +410,49 @@ describe("the settings lock in the client's registry", () => {
   });
 });
 
+describe('the registry follows the wire, not analyse', () => {
+  it('tracks a 200 with a handle that an analyser calls a failure, so unlockAll() releases it', async () => {
+    const { connection, requests } = sequence([LOCKED, OK]);
+    const client = new AdtClient(connection);
+    const locked = await client.getTableSettings().lock(
+      { tableName: 'ZT' },
+      {
+        analyse: () => ({ origin: 'refusal', message: 'the caller says no' }),
+      },
+    );
+    expect(locked.ok).toBe(false);
+    expect(client.pendingLocks).toEqual(['TableSettings/ZT']);
+    expect(await client.unlockAll()).toEqual([]);
+    expect(client.pendingLocks).toEqual([]);
+    expect(requests.map((r) => r.url)[1]).toBe(
+      '/sap/bc/adt/ddic/db/settings/zt?_action=UNLOCK&lockHandle=LH%2F1',
+    );
+  });
+
+  it('keeps the lock when the UNLOCK resolved 403, and unlockAll() retries it', async () => {
+    const resolved403 = { ...REFUSED, status: 403, statusText: 'Forbidden' };
+    const requests: IAbapRequestOptions[] = [];
+    const answers = [LOCKED, resolved403, OK];
+    const connection = {
+      setSessionType: () => {},
+      isConnected: () => true,
+      // A connection that resolves every status, the failed ones included.
+      makeAdtRequest: async (options: IAbapRequestOptions) => {
+        requests.push(options);
+        return answers.shift() ?? OK;
+      },
+    } as unknown as IAbapConnection;
+    const client = new AdtClient(connection);
+    const settings = client.getTableSettings();
+    await settings.lock({ tableName: 'ZT' });
+    await settings.unlock({ tableName: 'ZT' }, 'LH/1');
+    expect(client.pendingLocks).toEqual(['TableSettings/ZT']);
+    expect(await client.unlockAll()).toEqual([]);
+    expect(client.pendingLocks).toEqual([]);
+    expect(requests).toHaveLength(3);
+  });
+});
+
 describe('a lock without a handle', () => {
   it('is a refusal (LOCK_FAILED), its answer kept, and nothing is tracked', async () => {
     const empty = {
