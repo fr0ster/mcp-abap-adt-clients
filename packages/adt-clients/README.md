@@ -867,6 +867,10 @@ if (written && released) {
 }
 ```
 
+The example relies on the default analysis (no `analyse` passed): a refused
+PUT (`412`) or UNLOCK (`403`) is `ok: false`, whether the connection rejected
+it or resolved it.
+
 `headers` is the caller's pair: `application/vnd.sap.adt.table.settings.v2+xml`
 for both, the `Content-Type` with `; charset=utf-8`. With `ifMatch` the write
 drops the charset, as every guarded document write does: the settings' ETag

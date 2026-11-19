@@ -42,7 +42,7 @@ Released with `@mcp-abap-adt/adt-strategies` 0.24.0 and
   - `lock` — `POST ?_action=LOCK&accessMode=MODIFY`, stateful. A LOCK answered
     without a handle is a refusal (`LOCK_FAILED`, the answer kept as its
     `response`). The registry follows the wire: a handle SAP answered with a
-    2xx status is tracked whatever a caller's `analyse` rules, so
+    2xx status is tracked before any `analyse` runs, whatever it rules, so
     `unlockAll()` can release it;
   - `updateMetadata` — `PUT ?lockHandle=…[&corrNr=…]` of the document built
     from the typed `ITableSettingsUpdateConfig` (every setting and the
@@ -60,7 +60,7 @@ Released with `@mcp-abap-adt/adt-strategies` 0.24.0 and
     (measured on premise and on the cloud, 2026-11-19);
   - `unlock` — `POST ?_action=UNLOCK&lockHandle=…`, stateful. The lock leaves
     the client's registry only when SAP answered the UNLOCK with a 2xx status,
-    whatever a caller's `analyse` makes of the answer — a 403 or a 500 a
+    decided before any `analyse` runs and whatever it makes of the answer — a 403 or a 500 a
     connection resolved keeps it — so `unlockAll()` can retry a failed one.
 
   SAP creates the settings with the table and activating the table activates
@@ -73,6 +73,13 @@ Released with `@mcp-abap-adt/adt-strategies` 0.24.0 and
 
 ### Fixed
 
+- **A refusal a connection resolved instead of rejecting is a failure by
+  default.** Every member's default analysis (no `analyse`) answered `ok: true`
+  for an answer with a status outside 2xx that the connection resolved — the
+  connection contract has it reject on SAP's refusal, so the shipped
+  connection never did, but another one may. Such an answer now starts from
+  the same verdict a rejected one has (`recogniseFailure`), which a caller's
+  `analyse` may still clear.
 - **`unlockAll()` keeps a lock whose UNLOCK a connection resolved with a
   status outside 2xx** and reports it as a failure, where it dropped it as
   released; the next `unlockAll()` tries it again. A thrown UNLOCK was kept
