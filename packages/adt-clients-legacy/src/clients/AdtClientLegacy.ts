@@ -36,6 +36,7 @@ import {
   AdtEnhancement,
   AdtFeatureToggle,
   AdtMetadataExtension,
+  type AdtModernVariant,
   AdtScalarFunction,
   AdtScalarFunctionImplementation,
   type AdtServedBy,
@@ -179,6 +180,13 @@ import { AdtProgramLegacy } from '../core/program/AdtProgramLegacy';
 import { AdtUtilsLegacy } from '../core/shared/AdtUtilsLegacy';
 import { AdtRequestLegacy } from '../core/transport/AdtRequestLegacy';
 import { absentOnLegacy } from './absentOnLegacy';
+
+/**
+ * The kind of the settings handler 7.40 refuses: the base getter's on a
+ * client that declares no newer kind (`'basis740'` and both newer kinds),
+ * so the refusing handler takes every argument the root's does.
+ */
+type LegacySettingsKind = 'basis740' | AdtModernVariant;
 
 export class AdtClientLegacy extends AdtClient<'basis740'> {
   constructor(
@@ -649,18 +657,20 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
     this: this & AdtServedBy<'tableSettings'>,
   ): AdtTableSettings<
     ResultValuesOf<typeof tableSettingsDocuments>,
-    'basis740'
+    LegacySettingsKind
   >;
   override getTableSettings<R extends ITableSettingsResults>(
     this: this & AdtServedBy<'tableSettings'>,
     results: R,
-  ): AdtTableSettings<ResultValuesOf<R>, 'basis740'>;
+  ): AdtTableSettings<ResultValuesOf<R>, LegacySettingsKind>;
   override getTableSettings(
     this: this & AdtServedBy<'tableSettings'>,
     _results?: ITableSettingsResults,
-  ): AdtTableSettings<TableSettingsValues, 'basis740'> {
+  ): AdtTableSettings<TableSettingsValues, LegacySettingsKind> {
     this.assertConnected();
-    return absentOnLegacy<AdtTableSettings<TableSettingsValues, 'basis740'>>(
+    return absentOnLegacy<
+      AdtTableSettings<TableSettingsValues, LegacySettingsKind>
+    >(
       AdtTableSettings,
       'TableSettings',
       TABLE_SETTINGS.collection,
