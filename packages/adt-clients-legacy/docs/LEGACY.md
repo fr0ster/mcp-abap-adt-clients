@@ -227,6 +227,7 @@ await client.getFunctionInclude().create(config, {
 | Table | `getTable()` | `/sap/bc/adt/ddic/tables` | a table's source `404` (s11-table-read-raw) |
 | Domain | `getDomain()` | `/sap/bc/adt/ddic/domains` | `404` (s11-domain-meta-raw) |
 | Data Element | `getDataElement()` | `/sap/bc/adt/ddic/dataelements` | `404` (s11-dtel-meta-raw) |
+| Table settings | `getTableSettings()` | `/sap/bc/adt/ddic/db/settings` | not measured; not advertised (7.40's `typestructure` lists `TABL/DTT`, its discovery has no such collection) |
 | Table Type | `getTableType()` | `/sap/bc/adt/ddic/tabletypes` | not measured; not advertised |
 | Access Control | `getAccessControl()` | `/sap/bc/adt/acm/dcl/sources` | not measured; not advertised |
 | Service Definition | `getServiceDefinition()` | `/sap/bc/adt/ddic/srvd/sources` | not measured; not advertised |

@@ -361,8 +361,8 @@ types' reads. Member by member: LEGACY.md.
 `getScalarFunction()`, `getScalarFunctionImplementation()`, `getEnhancement()`,
 `getAccessControl()`, `getServiceDefinition()`, `getServiceBinding()`,
 `getBehaviorDefinition()`, `getBehaviorImplementation()`,
-`getMetadataExtension()`, `getAuthorizationField()`, `getFeatureToggle()`:
-`ADT_TYPES_BASIS_740` has no such API, so the getter does not compile on
+`getMetadataExtension()`, `getAuthorizationField()`, `getFeatureToggle()`,
+`getTableSettings()`: `ADT_TYPES_BASIS_740` has no such API, so the getter does not compile on
 `AdtClientLegacy` (since 0.2.0). Called from outside the type system, it hands
 out a handler and every member of it is **refused**.
 

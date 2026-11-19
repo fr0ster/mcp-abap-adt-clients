@@ -273,6 +273,7 @@ where 7.40 is not measured (its [LEGACY.md](https://github.com/fr0ster/mcp-abap-
 | Structures | `getStructure()` | `TABL/DS` | ✅ | ✅ | — |
 | Append structures | `getAppendStructure()` | `TABL/DS` | ✅ | ✅ | — |
 | Tables | `getTable()` | `TABL/DT` | ✅ | ✅ | — |
+| Technical settings of a table | `getTableSettings()` | `TABL/DTT` | ✅ | ✅ | — |
 | Table types | `getTableType()` | `TTYP/DA` | ✅ | ✅ | — |
 | DDL sources (CDS views) | `getDdl()` | `DDLS/DF` | ✅ | ✅ | ✅ |
 | Access controls | `getAccessControl()` | `DCLS/DL` | ✅ | ✅ | — |
@@ -793,6 +794,58 @@ metadata document".
 
 Watch the read. ADT answers a read of a not-yet-ready object with **HTTP 200 and
 an empty body**, never a 404, so what you edit may be nothing at all.
+
+### A table's technical settings
+
+Data class, size category, buffering and logging are not part of the table's
+document: SAP keeps them at `/sap/bc/adt/ddic/db/settings/{name}` (`TABL/DTT`,
+content type `application/vnd.sap.adt.table.settings.v2+xml` — a v1 Accept is
+answered `406`), under a lock of their own that the table's lock does not
+cover. `getTableSettings()` answers them: `readMetadata`, `lock`,
+`updateMetadata` and `unlock`, one request each. SAP creates default settings
+when it creates the table, and activating the table activates them — there is
+no create, delete or activation of the settings.
+
+`updateMetadata` takes the settings typed (`ITableSettingsUpdateConfig` of
+`@mcp-abap-adt/interfaces-adt` 28.0.0) and builds the document itself; its
+options refuse a `source` and require the `lockHandle`. **The write replaces
+every setting**: SAP writes the whole DD09L row from the document and resets a
+field left out, so every setting is required — read, change, write back.
+`description` is required too (SAP refuses a write without
+`adtcore:description`, `400` SWB_TOOL 019, measured on premise); it is the
+table's short text, which the read answers. `ts:isWritableByAMDP`, which the
+cloud returns, is never written.
+
+```typescript
+const settings = client.getTableSettings();
+const target = { tableName: 'ZTABLE' };
+
+const locked = await settings.lock(target);
+if (!locked.ok) throw new Error(locked.getError().message);
+const lockHandle = locked.getResult().value;
+try {
+  // Read under the lock, so no edit made before it is lost.
+  const read = await settings.readMetadata(target, { version: 'inactive' });
+  const current = readSettings(read); // your reading of ts:tableSettings
+  await settings.updateMetadata(
+    {
+      ...target,
+      description: current.description,
+      settings: { ...current.settings, dataClassCategory: 'APPL1', sizeCategory: '1' },
+    },
+    { headers: TABLE_SETTINGS, lockHandle, ifMatch: current.etag },
+  );
+} finally {
+  await settings.unlock(target, lockHandle);
+}
+await client.getTable().activate(target, { headers: ACTIVATION });
+```
+
+`headers` is the caller's pair: `application/vnd.sap.adt.table.settings.v2+xml`
+for both, the `Content-Type` with `; charset=utf-8` (dropped when `ifMatch` is
+given, as for every guarded document write). On SAP_BASIS 7.40 the factory does
+not compile (`ADT_TYPES_BASIS_740` has no such API): its discovery has no
+`/ddic/db/settings`.
 
 This package does not check what you pass, and cannot: whether a document is
 complete is a question only your system can answer, and it answers it — in its
