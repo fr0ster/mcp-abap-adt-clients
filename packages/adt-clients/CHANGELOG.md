@@ -39,14 +39,24 @@ Released with `@mcp-abap-adt/adt-strategies` 0.24.0 and
   - `readMetadata` — `GET` with the v2 Accept
     (`application/vnd.sap.adt.table.settings.v2+xml`; a v1 Accept is answered
     `406`), the document answered as it arrived;
-  - `lock` — `POST ?_action=LOCK&accessMode=MODIFY`, stateful;
+  - `lock` — `POST ?_action=LOCK&accessMode=MODIFY`, stateful. A LOCK answered
+    without a handle is a refusal (`LOCK_FAILED`, the answer kept as its
+    `response`), and only a lock with a handle is tracked;
   - `updateMetadata` — `PUT ?lockHandle=…[&corrNr=…]` of the document built
     from the typed `ITableSettingsUpdateConfig` (every setting and the
     `description`; `lockHandle` required, `source` refused), `If-Match` when
     `ifMatch` is given. **It replaces every setting**: SAP writes the whole
     DD09L row and resets a field left out — read, change, write back. The
-    cloud's `ts:isWritableByAMDP` is never written;
-  - `unlock` — `POST ?_action=UNLOCK&lockHandle=…`, stateful.
+    translation goes out with all four attributes (`ts:value`, `ts:isVisible`,
+    `ts:isEditable`, `ts:granularity`), which SAP requires (`400` `00/001`
+    without `ts:isVisible`, measured); the cloud's `ts:isWritableByAMDP` is
+    never written. An empty `lockHandle` throws before any request, since the
+    query would drop it. The `Content-Type` keeps `; charset=utf-8` with
+    `If-Match` too, the media type the write was measured with — unlike the
+    other documents' guarded writes, which drop it;
+  - `unlock` — `POST ?_action=UNLOCK&lockHandle=…`, stateful. The lock leaves
+    the client's registry only after a successful UNLOCK, so `unlockAll()`
+    can retry a failed one.
 
   SAP creates the settings with the table and activating the table activates
   them, so there is no create, delete or activation of their own. The result
@@ -58,15 +68,17 @@ Released with `@mcp-abap-adt/adt-strategies` 0.24.0 and
 
 ### Changed
 
-- **`@mcp-abap-adt/interfaces-adt` is `^28.0.0`** (was `^27.4.0`): the release
-  that adds the table settings contract and `tableSettings` / `TABL/DTT` to the
-  type tables. A consumer whose exhaustive map over `AdtApiName`,
-  `AdtTypeCode`, `AdtObjectKind` or a union derived from the tables (`AdtApi`,
+- **`@mcp-abap-adt/interfaces-adt` is `^29.0.0`** (was `^27.4.0`): 28.0.0
+  added the table settings contract and `tableSettings` / `TABL/DTT` to the
+  type tables, 29.0.0 made the settings' `translation` its four attributes. A
+  consumer whose exhaustive map over `AdtApiName`, `AdtTypeCode`,
+  `AdtObjectKind` or a union derived from the tables (`AdtApi`,
   `AdtTypeCodeOf`, `AdtApiWith`, …) types its keys adds the new member —
-  interfaces-adt 28.0.0's migration note.
+  interfaces-adt 28.0.0's and 29.0.0's migration notes.
 - The type-table conformance check records the missing `TABL/DTT` sample as an
-  open divergence: the research recorded the settings reads and writes, not
-  the template and urimapper answers a sample needs.
+  open divergence: the live conformance run builds a sample's reads from its
+  recorded files, so a code with none has to be seeded first — a separate
+  tooling task.
 
 ## [45.5.5] - 2026-11-18
 

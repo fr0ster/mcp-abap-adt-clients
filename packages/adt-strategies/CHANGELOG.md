@@ -18,12 +18,21 @@ The tags made before the packages moved under `packages/` are
 
 Released with `@mcp-abap-adt/adt-clients` 45.6.0.
 
+### Added
+
+- **`tableSettings`**: the reading of `getTableSettings().readMetadata`'s
+  answer — `{ name, description, version, settings, etag }`, `settings` an
+  `ITableSettingsRead` with every setting the full-replacement write needs,
+  the translation's four attributes included, and the cloud's
+  `isWritableByAMDP` where the read has it. An element or attribute the read
+  lacks throws, naming it: the write would otherwise store a value SAP never
+  sent. `readTableSettings(xml)` reads the text alone.
+
 ### Changed
 
-- **`@mcp-abap-adt/interfaces-adt` is `^28.0.0`** (was `^27.4.0`), so a
-  consumer of adt-clients 45.6.0 holds one copy of the contract. No reading or
-  verdict changes: 28.0.0 adds the table settings contract and widens the type
-  tables, which this package does not map.
+- **`@mcp-abap-adt/interfaces-adt` is `^29.0.0`** (was `^27.4.0`), so a
+  consumer of adt-clients 45.6.0 holds one copy of the contract. No existing
+  reading or verdict changes.
 
 ## [0.23.5] - 2026-11-18
 

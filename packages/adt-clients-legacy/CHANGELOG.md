@@ -19,7 +19,7 @@ Released with `@mcp-abap-adt/adt-clients` 45.6.0.
 
 ### Changed
 
-- **`@mcp-abap-adt/interfaces-adt` is `^28.0.0`** (was `^27.4.0`), and the
+- **`@mcp-abap-adt/interfaces-adt` is `^29.0.0`** (was `^27.4.0`), and the
   `@mcp-abap-adt/adt-clients` range `^45.6.0` (was `^45.5.3`), peer and dev:
   the factory this release overrides comes from 45.6.0.
 
