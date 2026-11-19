@@ -208,16 +208,16 @@ export class AdtTableSettings<
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
-    // The handle SAP answered with a success status: tracked whatever a
-    // caller's `analyse` rules, so `unlockAll()` can release what the wire
-    // holds.
-    let held = '';
-    const answer = await answeringExchange(
+    return answeringExchange(
       async () => {
         const locked = await inStatefulSession(this.connection, () =>
           lockTableSettings(this.connection, name),
         );
-        if (!failedStatus(locked)) held = lockHandleOf(locked);
+        // The registry follows the wire, before any `analyse` runs: a handle
+        // SAP answered with a 2xx status is tracked whatever a caller rules,
+        // so `unlockAll()` can release what the wire holds.
+        const held = failedStatus(locked) ? '' : lockHandleOf(locked);
+        if (held) this.lockTracker.track(name, held);
         return lockHandleOf(locked) === ''
           ? {
               answer: locked,
@@ -233,10 +233,6 @@ export class AdtTableSettings<
       lockHandleOf,
       options?.analyse,
     );
-    if (held) {
-      this.lockTracker.track(name, held);
-    }
-    return answer;
   }
 
   /**
@@ -251,25 +247,21 @@ export class AdtTableSettings<
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {
     const name = this.name(config);
-    // Released on the wire: SAP answered the UNLOCK with a 2xx status. A
-    // connection that resolves a 403 or a 500 released nothing.
-    let released = false;
     // UNLOCK must run stateful (the context cookie goes with stateful
     // requests only); stateless after.
-    const answer = await answering(
+    return answering(
       async () => {
         const unlocked = await inStatefulSession(this.connection, () =>
           unlockTableSettings(this.connection, name, lockHandle),
         );
-        released = !failedStatus(unlocked);
+        // Released on the wire — SAP answered the UNLOCK with a 2xx status —
+        // and untracked then, before any `analyse` runs. A connection that
+        // resolves a 403 or a 500 released nothing.
+        if (!failedStatus(unlocked)) this.lockTracker.untrack(name);
         return unlocked;
       },
       nothing,
       options?.analyse,
     );
-    if (released) {
-      this.lockTracker.untrack(name);
-    }
-    return answer;
   }
 }
