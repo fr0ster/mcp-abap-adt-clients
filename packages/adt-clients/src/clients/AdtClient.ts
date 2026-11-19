@@ -616,9 +616,11 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
 
   /**
    * A table's technical settings (`TABL/DTT`): read, lock, write and unlock,
-   * each one request. Not part of `getTable()`: SAP keeps the settings at
-   * their own resource, under their own lock; activating the table activates
-   * them.
+   * each one request, and `patchMetadata`, a GET and then the PUT. Not part
+   * of `getTable()`: SAP keeps the settings at their own resource, under their
+   * own lock (ESDICT `TABT`, Code on both systems; held beside the table's,
+   * measured on both); activating the table alone activated them (measured on
+   * both).
    */
   getTableSettings(
     this: this & AdtServedBy<'tableSettings'>,

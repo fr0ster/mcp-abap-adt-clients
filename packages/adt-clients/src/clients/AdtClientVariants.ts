@@ -19,8 +19,8 @@ import type { AdtServedBy } from './variant';
 
 /**
  * S/4HANA 2025 on premise — `ADT_TYPES_ONPREM`. Its table settings handler
- * is the on-premise one: a write refuses `isWritableByAMDP` (nothing maps it
- * there, Code).
+ * is typed for the on-premise kind: the type of its write refuses
+ * `isWritableByAMDP` (nothing maps it there, Code); no runtime check.
  */
 export class AdtClientOnPrem extends AdtClient<'onprem'> {
   override getTableSettings(
@@ -44,9 +44,11 @@ export class AdtClientOnPrem extends AdtClient<'onprem'> {
 
 /**
  * ABAP cloud — `ADT_TYPES_CLOUD`. Choosing it is the declaration that the
- * system is a cloud one, and the one runtime use of it: its table settings
- * handler knows the system is a cloud one (`patchMetadata` refuses a read
- * without `ts:isWritableByAMDP`). Its getter overrides the base's, as
+ * system is a cloud one. Its table settings handler is typed for the cloud
+ * kind (the type of its write requires `isWritableByAMDP`) and, the one
+ * runtime use of the declaration, constructed with `variant: 'cloud'`:
+ * `patchMetadata` refuses a read without `ts:isWritableByAMDP`, whatever
+ * static type the instance is held as. Its getter overrides the base's, as
  * `AdtClientLegacy` overrides the getters it serves differently.
  */
 export class AdtClientCloud extends AdtClient<'cloud'> {
