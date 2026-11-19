@@ -279,6 +279,12 @@ export const CONFIGS: Record<string, Record<string, unknown>> = {
       loggingEnabled: false,
     },
   },
+  getTextElements: {
+    objectKind: 'program',
+    objectName: 'ZGUARD_PROG',
+    part: 'symbols',
+    symbols: [{ key: '001', text: 'guard', maxLength: 5 }],
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -498,6 +504,7 @@ const ABSENT = {
   getAccessControl: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
   getAppendStructure: [...SOURCE_OBJECT_MEMBERS],
   getTableSettings: ['lock', 'readMetadata', 'unlock', 'updateMetadata'],
+  getTextElements: ['lock', 'read', 'unlock', 'update'],
   getAuthorizationField: [
     'activate',
     'check',
@@ -634,6 +641,7 @@ const CLIENT_GETTERS = [
   'getTable',
   'getTableSettings',
   'getTableType',
+  'getTextElements',
   'getTransformation',
   'getUtils',
 ] as const;
