@@ -387,6 +387,30 @@ export const HANDLERS = {
     capabilities: ['metadataReadable', 'lockable'],
     why: "a table's technical settings (TABL/DTT): their own resource and lock, created, activated and deleted with the table; the write takes its body from the config (interfaces-adt 28.0.0, decision 49)",
   },
+  textElements: {
+    factory: (c: AdtClient) => c.getTextElements(),
+    subject: '/sap/bc/adt/textelements/programs/ZGUARD_PROG',
+    config: {
+      objectKind: 'program',
+      objectName: 'ZGUARD_PROG',
+      part: 'symbols',
+      symbols: [{ key: '001', text: 'guard', maxLength: 5 }],
+    },
+    requests: {
+      read: '/sap/bc/adt/textelements/programs/zguard_prog/source/symbols',
+      update: '/sap/bc/adt/textelements/programs/zguard_prog/source/symbols',
+      lock: '/sap/bc/adt/textelements/programs/zguard_prog',
+      unlock: '/sap/bc/adt/textelements/programs/zguard_prog',
+    },
+    // The read is `IAdtTextElementsReadable.read` and the write
+    // `IAdtTextElementsUpdatable.update`, not `IAdtReadable` / `IAdtUpdatable`:
+    // the config names the part, a class only `symbols`, and the write's body
+    // is the config with its lock handle required. They are checked by their
+    // own tests (`unit/core/textElements`), and `requests` still names their
+    // addresses.
+    capabilities: ['lockable'],
+    why: "a program's, a class's or a function group's text elements (PROG/PX, CLAS/OCX): their own resource and TEXT lock, one part per write, activated together with the object (interfaces-adt 30.0.0, decision 50)",
+  },
   structure: {
     factory: (c: AdtClient) => c.getStructure(),
     subject: '/sap/bc/adt/ddic/structures/ZGUARD_STRU',
