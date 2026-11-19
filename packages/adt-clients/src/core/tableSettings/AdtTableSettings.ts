@@ -69,7 +69,11 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant } from '../../clients/variant';
-import { answering, answeringExchange } from '../../utils/adtResponse';
+import {
+  answering,
+  answeringExchange,
+  type IAdtExchange,
+} from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
 import {
@@ -269,10 +273,13 @@ export class AdtTableSettings<
     const connection = withCallTimeout(this.connection, options.timeout);
     const name = config.tableName;
     const mediaType = options.headers.accept;
-    const refusal = (message: string, response: IAdtWireResponse) => ({
+    const refusal = (
+      message: string,
+      response: IAdtWireResponse,
+    ): IAdtExchange => ({
       answer: response,
       failure: {
-        origin: 'refusal' as const,
+        origin: 'refusal',
         code: AdtObjectErrorCodes.UPDATE_FAILED,
         message: `The settings patch of ${name}: ${message}; nothing was written`,
         response,
