@@ -260,6 +260,20 @@ export const CONFIGS: Record<string, Record<string, unknown>> = {
     packageName: '$TMP',
     description: 'guard',
   },
+  getTableSettings: {
+    tableName: 'ZGUARD_TAB',
+    description: 'guard',
+    settings: {
+      dataClassCategory: 'APPL0',
+      sizeCategory: '0',
+      buffering: { allowed: 'N', type: '', areaKeyFields: 0 },
+      storageType: 'C',
+      sharingType: '',
+      loadUnit: '',
+      translation: '',
+      loggingEnabled: false,
+    },
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -478,6 +492,7 @@ const MSAG_URI = MESSAGE_CLASS.uri('ZGUARD_MSG');
 const ABSENT = {
   getAccessControl: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
   getAppendStructure: [...SOURCE_OBJECT_MEMBERS],
+  getTableSettings: ['lock', 'readMetadata', 'unlock', 'updateMetadata'],
   getAuthorizationField: [
     'activate',
     'check',
@@ -612,6 +627,7 @@ const CLIENT_GETTERS = [
   'getServiceDefinition',
   'getStructure',
   'getTable',
+  'getTableSettings',
   'getTableType',
   'getTransformation',
   'getUtils',
@@ -1538,6 +1554,11 @@ export const NON_PUBLIC: Record<string, { file: string; className: string }> = {
           'AdtStructure',
         ],
         ['getTable', '../adt-clients/src/core/table/AdtTable.ts', 'AdtTable'],
+        [
+          'getTableSettings',
+          '../adt-clients/src/core/tableSettings/AdtTableSettings.ts',
+          'AdtTableSettings',
+        ],
         [
           'getTableType',
           '../adt-clients/src/core/tabletype/AdtDdicTableType.ts',
