@@ -908,6 +908,31 @@ if (written && released) {
 }
 ```
 
+On premise the read is `tableSettings` on an `AdtClientOnPrem`, and the
+cloud-only field is left out of the write (its reading types it
+`isWritableByAMDP?: boolean | undefined`, which the on-premise write
+refuses):
+
+```typescript
+import { AdtClientOnPrem, tableSettingsDocuments } from '@mcp-abap-adt/adt-clients';
+import { tableSettings } from '@mcp-abap-adt/adt-strategies';
+
+const onPremise = new AdtClientOnPrem(connection).getTableSettings({
+  ...tableSettingsDocuments,
+  metadata: tableSettings,
+});
+// …lock and read as above, then:
+const { isWritableByAMDP: _cloudOnly, ...asRead } = current.settings;
+await onPremise.updateMetadata(
+  {
+    ...target,
+    description: current.description,
+    settings: { ...asRead, dataClassCategory: 'APPL1', sizeCategory: '1' },
+  },
+  { headers: SETTINGS_HEADERS, lockHandle, ifMatch: current.etag },
+);
+```
+
 The example relies on the default analysis (no `analyse` passed): a refused
 PUT (`412`) or UNLOCK (`403`) is `ok: false`, whether the connection rejected
 it or resolved it.

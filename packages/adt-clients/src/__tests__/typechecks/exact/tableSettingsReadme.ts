@@ -1,6 +1,6 @@
 /**
- * The README's settings example ("A table's technical settings"), compiled
- * against a cloud client: a read through `cloudTableSettings` written back as
+ * The README's settings examples ("A table's technical settings"), compiled
+ * against a cloud client and an on-premise one. On the cloud: a read through `cloudTableSettings` written back as
  * a whole compiles, the cloud's `isWritableByAMDP` carried as a `boolean`.
  *
  * Compiled by `npm run test:check` under `tsconfig.test.exact.json`, against
@@ -9,9 +9,13 @@
 
 import {
   AdtClientCloud,
+  AdtClientOnPrem,
   tableSettingsDocuments,
 } from '@mcp-abap-adt/adt-clients';
-import { cloudTableSettings } from '@mcp-abap-adt/adt-strategies';
+import {
+  cloudTableSettings,
+  tableSettings,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 
 declare const connection: IAbapConnection;
@@ -41,6 +45,29 @@ export async function example(lockHandle: string): Promise<boolean> {
         dataClassCategory: 'APPL1',
         sizeCategory: '1',
       },
+    },
+    { headers: SETTINGS_HEADERS, lockHandle, ifMatch: current.etag },
+  );
+  return put.ok;
+}
+
+/** The on-premise example: `tableSettings`, the cloud-only field left out. */
+export async function onPremiseExample(lockHandle: string): Promise<boolean> {
+  const onPremise = new AdtClientOnPrem(connection).getTableSettings({
+    ...tableSettingsDocuments,
+    metadata: tableSettings,
+  });
+  const target = { tableName: 'ZTABLE' };
+  const read = await onPremise.readMetadata(target, { version: 'inactive' });
+  if (!read.ok) return false;
+  const current = read.getResult().value;
+  if (!current.etag) return false;
+  const { isWritableByAMDP: _cloudOnly, ...asRead } = current.settings;
+  const put = await onPremise.updateMetadata(
+    {
+      ...target,
+      description: current.description,
+      settings: { ...asRead, dataClassCategory: 'APPL1', sizeCategory: '1' },
     },
     { headers: SETTINGS_HEADERS, lockHandle, ifMatch: current.etag },
   );
