@@ -140,6 +140,12 @@ export {
   readObjectOutline,
 } from './results/outline';
 export {
+  type ITableSettingsAnswer,
+  type ITableSettingsDocument,
+  readTableSettings,
+  tableSettings,
+} from './results/tableSettings';
+export {
   compareRecordedAt,
   type IAbapTraceAccessTime,
   type IAbapTraceDbAccess,
