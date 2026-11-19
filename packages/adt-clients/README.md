@@ -943,8 +943,14 @@ before the PUT, as a failure carrying the read: a read without an ETag, a
 document without every setting the write needs, and an `areaKeyFields`
 change whose merged buffering type is not `G` (SAP writes the count only for
 `G`, Code on both; a resulting non-`G` type with no count named is written,
-and SAP clears the count). A refused read or PUT is answered as SAP answered
-it; nothing is retried.
+and SAP clears the count). On a cloud client (`AdtClientCloud`, which
+`createAdtClient({ variant: 'cloud' })` answers) a read without
+`ts:isWritableByAMDP` is refused before the PUT too: choosing the cloud client
+is the declaration that the system is a cloud one, never inferred from an
+answer. A generic `AdtClient` declares no system kind and writes what it
+read: on a cloud system, use the cloud client, and read with adt-strategies'
+`cloudTableSettings`, which throws for such a read. A refused read or PUT is
+answered as SAP answered it; nothing is retried.
 
 ```typescript
 import { TABLE_SETTINGS_MEDIA_TYPE } from '@mcp-abap-adt/interfaces-adt';

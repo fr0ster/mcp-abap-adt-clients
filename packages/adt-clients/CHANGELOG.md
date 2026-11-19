@@ -56,7 +56,16 @@ Released with `@mcp-abap-adt/adt-strategies` 0.26.0 and
   a change set naming no setting. Refused before the PUT, as a failure
   carrying the read: a read without an ETag, a document without every
   setting the write needs, an `areaKeyFields` change whose merged buffering
-  type is not `G` (SAP writes the count only for `G`, Code on both).
+  type is not `G` (SAP writes the count only for `G`, Code on both), and on
+  a cloud client a read without `ts:isWritableByAMDP`.
+- **`AdtClientCloud.getTableSettings()` hands the handler the declared
+  system kind** (`variant: 'cloud'`), as `AdtClientLegacy` overrides the
+  getters it serves differently: choosing the cloud client, or
+  `createAdtClient({ variant: 'cloud' })`, is the declaration, never inferred
+  from an answer. The cloud protection of `patchMetadata` holds only through
+  them: a generic `AdtClient` writes a read without the flag as it came — on
+  a cloud system use the cloud client, and read with adt-strategies'
+  `cloudTableSettings`.
   `AdtTableSettings<T, V>` implements `IAdtTableSettingsPatchable` and
   `IAdtTableSettingsUpdatable` of its variant (a typecheck pins both).
 - **Function group text elements on the cloud.** ABAP cloud serves function
