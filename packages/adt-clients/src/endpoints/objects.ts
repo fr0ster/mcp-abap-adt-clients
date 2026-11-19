@@ -146,6 +146,25 @@ export const TABLE_SETTINGS = {
   uri: (name: string) => `/sap/bc/adt/ddic/db/settings/${seg(name)}`,
 } as const;
 
+/**
+ * The text elements of a program, a class or a function group: one address
+ * per object, one sub-resource per part (`source/symbols`,
+ * `source/selections`, `source/headings`). A function group goes by its plain
+ * name (`…/functiongroups/{group}`; the `sapl{group}` form answers 404,
+ * measured on premise).
+ */
+export const TEXT_ELEMENTS = {
+  programs: '/sap/bc/adt/textelements/programs',
+  classes: '/sap/bc/adt/textelements/classes',
+  functionGroups: '/sap/bc/adt/textelements/functiongroups',
+  uri: (kind: 'program' | 'class' | 'functionGroup', name: string) =>
+    kind === 'program'
+      ? `/sap/bc/adt/textelements/programs/${seg(name)}`
+      : kind === 'class'
+        ? `/sap/bc/adt/textelements/classes/${seg(name)}`
+        : `/sap/bc/adt/textelements/functiongroups/${seg(name)}`,
+} as const;
+
 /** Structures, append structures included — ADT keeps both in one collection. */
 export const STRUCTURE = {
   collection: '/sap/bc/adt/ddic/structures',
@@ -313,6 +332,7 @@ export const RECORDS = {
   DDIC_VIEW,
   TABLE,
   TABLE_SETTINGS,
+  TEXT_ELEMENTS,
   STRUCTURE,
   DOMAIN,
   DATA_ELEMENT,
