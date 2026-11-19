@@ -819,6 +819,34 @@ describe('patchMetadata', () => {
     expect(requests.map((r) => r.method)).toEqual(['GET']);
   });
 
+  it.each(['9'.repeat(400), '9007199254740993'])(
+    'refuses a read whose area-key count is no safe integer (%#) before any PUT',
+    async (digits) => {
+      const answer = readWithEtag('s4-2025', 'E');
+      const { connection, requests } = sequence([
+        {
+          ...answer,
+          data: String(answer.data).replace(
+            '<ts:areaKeyFields>0</ts:areaKeyFields>',
+            `<ts:areaKeyFields>${digits}</ts:areaKeyFields>`,
+          ),
+        },
+        OK,
+      ]);
+      const patched = await new AdtClient(connection)
+        .getTableSettings()
+        .patchMetadata(
+          { tableName: 'SFLIGHT', changes: { loggingEnabled: false } },
+          { headers: { accept: PATCH_ACCEPT }, lockHandle: 'LH' },
+        );
+      expect(patched.ok).toBe(false);
+      expect(!patched.ok && patched.getError().message).toContain(
+        'without every setting the write needs',
+      );
+      expect(requests.map((r) => r.method)).toEqual(['GET']);
+    },
+  );
+
   it('refuses a read that answers no ETag before any PUT', async () => {
     const { connection, requests } = sequence([readWithEtag('s4-2025'), OK]);
     const settings = new AdtClient(connection).getTableSettings();

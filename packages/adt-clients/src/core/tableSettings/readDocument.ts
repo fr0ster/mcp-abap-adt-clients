@@ -69,7 +69,10 @@ function count(value: string | undefined): number | undefined {
   for (const character of value) {
     if (character < '0' || character > '9') return undefined;
   }
-  return Number(value);
+  // A digit string past the safe integers (Infinity among them) is no count
+  // this reading may write back: it is refused, as an unreadable document.
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : undefined;
 }
 
 /**
