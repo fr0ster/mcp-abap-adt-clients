@@ -1,0 +1,6 @@
+listHeader=List header EN
+
+columnHeader_1=Col one
+columnHeader_2=Col two
+columnHeader_3=Col three
+columnHeader_4=
