@@ -829,7 +829,13 @@ both), so every setting is required — read, change, write back. On the cloud
 that includes `isWritableByAMDP`: the cloud's `move_adt_to_ddv` writes it from
 the document (Code), a PUT without it read back `false` (measured), so a cloud
 client's write requires it and sends `ts:isWritableByAMDP`; on premise nothing
-maps it (Code) and the type refuses it. `description` is required too (SAP
+maps it (Code) and the type refuses it. **The cloud does not activate a
+table writable by AMDP with logging on**: the write is accepted, and the
+table's activation answers `200` with an `E` message, "AMDP writes to table
+… not possible (Logging activated)", leaving it inactive (measured on the
+cloud, 2026-11-19; the check in SAP's code is not yet read). Turn
+`loggingEnabled` off in the same write that turns `isWritableByAMDP` on.
+`description` is required too (SAP
 refuses a write without `adtcore:description`, `400` SWB_TOOL 019, measured on
 both); it is the table's short text, which the read answers.
 

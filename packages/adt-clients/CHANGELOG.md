@@ -70,6 +70,15 @@ Released with `@mcp-abap-adt/adt-strategies` 0.26.0 and
   cloud); a class's text elements on the inactive list as `PROG/PX`
   `ZCL_…====CP`; the cloud function group's write, lists and activation.
 
+### SAP's rule, documented
+
+- The cloud does not activate a table writable by AMDP with logging on: the
+  settings write is accepted, the activation answers `200` with an `E`
+  message ("AMDP writes to table … not possible (Logging activated)") and the
+  table stays inactive (measured on the cloud, 2026-11-19; the check in SAP's
+  code not yet read). The README says so; the live case turns logging off in
+  the patch that turns the flag on.
+
 ### Activation verdict, checked
 
 An activation can be answered `activationExecuted="true"`
