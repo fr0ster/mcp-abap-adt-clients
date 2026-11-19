@@ -1516,8 +1516,8 @@ text_elements:
         # transport_request: ""
     - name: "adt_text_elements_function_group"
       enabled: true
-      # ABAP cloud creates no function group, so there is none to write text elements to.
-      available_in: ["onprem"]
+      # On premise and on the cloud: ABAP cloud serves function groups and their
+      # text elements (FUGR/F + PROG/PX activated together, measured 2026-11-19).
       description: "Text elements of a fresh function group: symbols written, activated with the group (FUGR/F + PROG/PX under functiongroups), read back active, found by where-used with container functionGroup"
       params: {}
         # package_name: "ZAC_PKG01"
