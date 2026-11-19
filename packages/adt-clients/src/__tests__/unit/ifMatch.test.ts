@@ -17,6 +17,8 @@
 import { join } from 'node:path';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClient } from '../../clients/AdtClient';
+import { AdtTextElements } from '../../core/textElements/AdtTextElements';
+import { textElementsDocuments } from '../../core/textElements/types';
 import { updateRequestHeaders } from '../../utils/requestHeaders';
 import { createLibraryLogger } from '../helpers/testLogger';
 import { HANDLERS, type HandlerEntry } from './capabilities/manifest';
@@ -28,6 +30,7 @@ import {
   NOT_A_DOCUMENT_WRITE,
   ownerOfUpdateRow,
   UPDATE_MEMBERS,
+  type UpdateRow,
   updateRows,
 } from './ifMatchGuard';
 import {
@@ -38,7 +41,24 @@ import {
 const modern = (connection: IAbapConnection, entry: HandlerEntry) =>
   entry.factory(new AdtClient(connection, createLibraryLogger()));
 
-const ROWS = updateRows(modern);
+/**
+ * The text elements, constructed directly: their factory on the client
+ * arrives with interfaces-adt 30.0.0, whose tables name `textElements`.
+ */
+const textElementsRow: UpdateRow = {
+  name: 'textElements',
+  member: 'update',
+  build: (connection) =>
+    new AdtTextElements(connection, { results: textElementsDocuments }),
+  config: {
+    objectKind: 'program',
+    objectName: 'ZGUARD_PROG',
+    part: 'symbols',
+    symbols: [{ key: '001', text: 'guard', maxLength: 5 }],
+  },
+};
+
+const ROWS = [...updateRows(modern), textElementsRow];
 
 let scanned: ReturnType<typeof scanImplementations> | undefined;
 

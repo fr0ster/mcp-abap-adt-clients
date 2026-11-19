@@ -23,6 +23,8 @@ import { AdtExecutor } from '../../clients/AdtExecutor';
 import { abapGitDocuments } from '../../clients/abapGit/types';
 import { AdtUtils } from '../../core/shared/AdtUtils';
 import { utilDocuments } from '../../core/shared/utilResultSet';
+import { AdtTextElements } from '../../core/textElements/AdtTextElements';
+import { textElementsDocuments } from '../../core/textElements/types';
 import { TraceScheduling } from '../../executors/traceScheduling';
 import { traceSchedulingDocuments } from '../../index.executors';
 import {
@@ -76,7 +78,25 @@ function otherRows(): Row[] {
   const amdp = (connection: IAbapConnection) =>
     new AmdpDebugger(connection, { results: amdpDebuggerDocuments });
   const trace = { description: 'guard' };
+  // Constructed directly: the factory arrives with interfaces-adt 30.0.0.
+  const texts = (connection: IAbapConnection) =>
+    new AdtTextElements(connection, { results: textElementsDocuments });
   return [
+    {
+      name: 'textElements',
+      member: 'update',
+      build: texts,
+      call: (h, headers) =>
+        m(h, 'update')(
+          {
+            objectKind: 'program',
+            objectName: 'ZGUARD_PROG',
+            part: 'symbols',
+            symbols: [{ key: '001', text: 'guard', maxLength: 5 }],
+          },
+          { headers, lockHandle: 'GUARD-HANDLE' },
+        ),
+    },
     {
       name: 'abapGit',
       member: 'link',
