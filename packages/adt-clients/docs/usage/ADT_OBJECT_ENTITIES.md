@@ -234,7 +234,7 @@ Top-level client classes instantiated directly (not via `AdtClient.getXxx()`). T
 ### AdtClientOnPrem
 - Source: `src/clients/AdtClientVariants.ts`
 - Extends: `AdtClient<'onprem'>`
-- Public methods: —
+- Public methods: `getTableSettings`
 
 ### AdtClientsWS
 - Source: `src/clients/AdtClientsWS.ts`
