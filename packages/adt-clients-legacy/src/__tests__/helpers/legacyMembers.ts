@@ -503,7 +503,13 @@ const MSAG_URI = MESSAGE_CLASS.uri('ZGUARD_MSG');
 const ABSENT = {
   getAccessControl: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
   getAppendStructure: [...SOURCE_OBJECT_MEMBERS],
-  getTableSettings: ['lock', 'readMetadata', 'unlock', 'updateMetadata'],
+  getTableSettings: [
+    'lock',
+    'patchMetadata',
+    'readMetadata',
+    'unlock',
+    'updateMetadata',
+  ],
   getTextElements: ['lock', 'read', 'unlock', 'update'],
   getAuthorizationField: [
     'activate',
