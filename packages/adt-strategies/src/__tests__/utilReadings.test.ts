@@ -228,8 +228,8 @@ describe('utilInactiveObjects', () => {
   it('reads each entry into a reference activateObjectsGroup takes', () => {
     expect(utilInactiveObjects(wire(INACTIVE_XML))).toEqual({
       objects: [
-        { type: 'CLAS/OC', name: 'ZCL_A' },
-        { type: 'TABL/DT', name: 'ZT' },
+        { type: 'CLAS/OC', name: 'ZCL_A', uri: '/sap/bc/adt/oo/classes/zcl_a' },
+        { type: 'TABL/DT', name: 'ZT', uri: '/sap/bc/adt/ddic/tables/zt' },
       ],
     });
   });
