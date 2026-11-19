@@ -10,21 +10,34 @@
  * library's lock pattern:
  *
  * ```typescript
- * const settings = client.getTableSettings();
+ * // `headers`: the request's own pair — Accept
+ * // `application/vnd.sap.adt.table.settings.v2+xml`, Content-Type the same
+ * // with `; charset=utf-8`; `TABLE_SETTINGS` is the address, not the headers.
+ * const settings = client.getTableSettings({
+ *   ...tableSettingsDocuments,
+ *   metadata: tableSettings, // adt-strategies: every setting, the ETag
+ * });
  * const locked = await settings.lock({ tableName });
  * if (!locked.ok) return locked;
  * const lockHandle = locked.getResult().value;
+ * let written = false;
+ * let released = false;
  * try {
  *   const read = await settings.readMetadata({ tableName });
+ *   if (!read.ok) return read;
+ *   const current = read.getResult().value;
  *   // …change what was read, keep the rest…
- *   await settings.updateMetadata(
- *     { tableName, description, settings: changed },
- *     { headers, lockHandle },
+ *   const put = await settings.updateMetadata(
+ *     { tableName, description: current.description, settings: changed },
+ *     { headers, lockHandle, ifMatch: current.etag },
  *   );
+ *   written = put.ok;
  * } finally {
- *   await settings.unlock({ tableName }, lockHandle);
+ *   released = (await settings.unlock({ tableName }, lockHandle)).ok;
  * }
- * await client.getTable().activate({ tableName }, { headers });
+ * if (written && released) {
+ *   await client.getTable().activate({ tableName }, { headers: activationHeaders });
+ * }
  * ```
  *
  * Every member answers `IAdtResponse<T>`, where T is what the result set given
@@ -215,8 +228,9 @@ export class AdtTableSettings<
 
   /**
    * Unlock the settings. The lock leaves the client's registry only when the
-   * UNLOCK succeeded: a failed one stays tracked, so `unlockAll()` can try
-   * again.
+   * UNLOCK succeeded on the wire — SAP answered it with a success status —
+   * whatever a caller's `analyse` makes of the answer: a failed one stays
+   * tracked, so `unlockAll()` can try again.
    */
   async unlock<E extends IAdtError = IAdtError>(
     config: Partial<ITableSettingsConfig>,
@@ -224,17 +238,23 @@ export class AdtTableSettings<
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {
     const name = this.name(config);
+    // The connection resolves a success status and rejects every other, so
+    // reaching the line after the request is the release on the wire.
+    let released = false;
     // UNLOCK must run stateful (the context cookie goes with stateful
     // requests only); stateless after.
     const answer = await answering(
-      () =>
-        inStatefulSession(this.connection, () =>
+      async () => {
+        const unlocked = await inStatefulSession(this.connection, () =>
           unlockTableSettings(this.connection, name, lockHandle),
-        ),
+        );
+        released = true;
+        return unlocked;
+      },
       nothing,
       options?.analyse,
     );
-    if (answer.ok) {
+    if (released) {
       this.lockTracker.untrack(name);
     }
     return answer;
