@@ -170,6 +170,11 @@ export const ACCEPT_TABLE =
   'application/vnd.sap.adt.blues.v1+xml, application/vnd.sap.adt.tables.v2+xml';
 export const CT_TABLE = 'application/vnd.sap.adt.tables.v2+xml';
 
+// Table technical settings (TABL/DTT). Only v2 is served: a v1 Accept is
+// answered 406 (measured on premise, 2026-11-19).
+export const CT_TABLE_SETTINGS =
+  'application/vnd.sap.adt.table.settings.v2+xml';
+
 // Table Types
 export const CT_TABLE_TYPE = 'application/vnd.sap.adt.tabletype.v1+xml';
 
