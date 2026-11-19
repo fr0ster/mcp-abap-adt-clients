@@ -41,7 +41,9 @@ Released with `@mcp-abap-adt/adt-strategies` 0.24.0 and
     `406`), the document answered as it arrived;
   - `lock` — `POST ?_action=LOCK&accessMode=MODIFY`, stateful. A LOCK answered
     without a handle is a refusal (`LOCK_FAILED`, the answer kept as its
-    `response`), and only a lock with a handle is tracked;
+    `response`). The registry follows the wire: a handle SAP answered with a
+    2xx status is tracked whatever a caller's `analyse` rules, so
+    `unlockAll()` can release it;
   - `updateMetadata` — `PUT ?lockHandle=…[&corrNr=…]` of the document built
     from the typed `ITableSettingsUpdateConfig` (every setting and the
     `description`; `lockHandle` required, `source` refused), `If-Match` when
@@ -57,9 +59,9 @@ Released with `@mcp-abap-adt/adt-strategies` 0.24.0 and
     `; charset=utf-8` (`412` SADT_RESOURCE/043) and accepted it without
     (measured on premise and on the cloud, 2026-11-19);
   - `unlock` — `POST ?_action=UNLOCK&lockHandle=…`, stateful. The lock leaves
-    the client's registry only when the UNLOCK succeeded on the wire, whatever
-    a caller's `analyse` makes of the answer, so `unlockAll()` can retry a
-    failed one.
+    the client's registry only when SAP answered the UNLOCK with a 2xx status,
+    whatever a caller's `analyse` makes of the answer — a 403 or a 500 a
+    connection resolved keeps it — so `unlockAll()` can retry a failed one.
 
   SAP creates the settings with the table and activating the table activates
   them, so there is no create, delete or activation of their own. The result
@@ -68,6 +70,20 @@ Released with `@mcp-abap-adt/adt-strategies` 0.24.0 and
   whose discovery has no such collection.
 - Recorded answers of the settings read (on premise and cloud), the write, and
   the write refused without a description (`corpus/adt/answers/*table-settings*`).
+
+### Fixed
+
+- **`unlockAll()` keeps a lock whose UNLOCK a connection resolved with a
+  status outside 2xx** and reports it as a failure, where it dropped it as
+  released; the next `unlockAll()` tries it again. A thrown UNLOCK was kept
+  before and still is. This holds for every handler that tracks its locks in
+  the client's registry: class and its local includes, interface, program,
+  function group, function module, function include, DDL source, table,
+  table settings, structure, append structure, table type, domain, data
+  element, package, message class, access control, behavior definition,
+  metadata extension, service definition, scalar function, scalar function
+  implementation, transformation, enhancement, feature toggle and
+  authorization field.
 
 ### Changed
 

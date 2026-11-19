@@ -1,6 +1,6 @@
 /**
  * The settings document a write sends, built from the caller's typed
- * settings (interfaces-adt 28.0.0, decision 49).
+ * settings (interfaces-adt 29.0.0, decision 49).
  *
  * **Every setting, every time.** SAP writes the whole DD09L row from the
  * document (`CL_TABT_WB_PERSIST`, `DDIF_TABT_PUT`), so the contract requires
