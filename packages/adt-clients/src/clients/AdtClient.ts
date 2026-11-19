@@ -228,6 +228,16 @@ function answersIsConnected(
   );
 }
 
+/**
+ * The settings handler's kind on a client that does not declare one system
+ * kind: both newer kinds, without the cloud declaration — whatever else `V`
+ * is stays (a subclass's own kind). `AdtClientOnPrem` and `AdtClientCloud`
+ * override the getter with their declared kind.
+ */
+type UndeclaredSettingsVariant<V extends AdtVariant> =
+  | Exclude<V, AdtModernVariant>
+  | AdtModernVariant;
+
 export class AdtClient<V extends AdtVariant = AdtModernVariant> {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -614,16 +624,16 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     this: this & AdtServedBy<'tableSettings'>,
   ): AdtTableSettings<
     ResultValuesOf<typeof tableSettingsDocuments>,
-    AdtModernVariant
+    UndeclaredSettingsVariant<V>
   >;
   getTableSettings<R extends ITableSettingsResults>(
     this: this & AdtServedBy<'tableSettings'>,
     results: R,
-  ): AdtTableSettings<ResultValuesOf<R>, AdtModernVariant>;
+  ): AdtTableSettings<ResultValuesOf<R>, UndeclaredSettingsVariant<V>>;
   getTableSettings(
     this: this & AdtServedBy<'tableSettings'>,
     results: ITableSettingsResults = tableSettingsDocuments,
-  ): AdtTableSettings<TableSettingsValues, AdtModernVariant> {
+  ): AdtTableSettings<TableSettingsValues, UndeclaredSettingsVariant<V>> {
     this.assertConnected();
     // A client that declares no one system kind: the handler of both newer
     // kinds, without the cloud declaration. AdtClientOnPrem and
