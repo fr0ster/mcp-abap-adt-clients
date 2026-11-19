@@ -154,14 +154,26 @@ export class AdtTableSettings<
 
   protected readonly results: ResultStrategiesOf<T>;
 
+  /** Whether the client declared the system a cloud one (see the constructor). */
+  private readonly declaredCloud: boolean;
+
   constructor(
     connection: IAbapConnection,
     options: AdtHandlerOptions<
       ResultStrategiesOf<T>,
       'logger' | 'lockRegistry'
-    >,
+    > & {
+      /**
+       * `'cloud'` when the caller declared the system a cloud one —
+       * `AdtClientCloud`, which `createAdtClient({ variant: 'cloud' })`
+       * answers. Never inferred from an answer. With it, `patchMetadata`
+       * refuses a read without `ts:isWritableByAMDP` before any PUT.
+       */
+      readonly variant?: 'cloud' | undefined;
+    },
   ) {
     const { logger, lockRegistry } = options;
+    this.declaredCloud = options.variant === 'cloud';
     this.results = options.results;
     this.connection = connection;
     this.logger = logger;
@@ -304,6 +316,18 @@ export class AdtTableSettings<
         if (!document) {
           return refusal(
             'the read answered a document without every setting the write needs',
+            read,
+          );
+        }
+        // A declared cloud system answers ts:isWritableByAMDP on every read
+        // (Measured), and a write without it resets it (Measured): a read
+        // that lacks it is incomplete, refused before the PUT.
+        if (
+          this.declaredCloud &&
+          document.settings.isWritableByAMDP === undefined
+        ) {
+          return refusal(
+            'the cloud read answered no ts:isWritableByAMDP, which a write without it would reset',
             read,
           );
         }

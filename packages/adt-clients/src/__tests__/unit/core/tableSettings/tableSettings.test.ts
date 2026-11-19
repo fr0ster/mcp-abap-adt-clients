@@ -724,6 +724,43 @@ describe('patchMetadata', () => {
     }
   });
 
+  it('on a cloud client, refuses a read without ts:isWritableByAMDP before any PUT; a generic client writes', async () => {
+    const without = (): IAdtWireResponse => {
+      const answer = readWithEtag('abap-cloud', 'E-3');
+      return {
+        ...answer,
+        data: String(answer.data).replace(
+          '<ts:isWritableByAMDP>false</ts:isWritableByAMDP>',
+          '',
+        ),
+      };
+    };
+    const cloud = sequence([without(), OK]);
+    const patched = await new AdtClientCloud(cloud.connection)
+      .getTableSettings()
+      .patchMetadata(
+        { tableName: 'Z0001FLIGHT', changes: { sizeCategory: '2' } },
+        { headers: { accept: PATCH_ACCEPT }, lockHandle: 'LH' },
+      );
+    expect(patched.ok).toBe(false);
+    expect(!patched.ok && patched.getError().message).toContain(
+      'answered no ts:isWritableByAMDP',
+    );
+    expect(cloud.requests.map((r) => r.method)).toEqual(['GET']);
+
+    // The generic client declares no system kind: it writes what it read.
+    const generic = sequence([without(), OK]);
+    const written = await new AdtClient(generic.connection)
+      .getTableSettings()
+      .patchMetadata(
+        { tableName: 'Z0001FLIGHT', changes: { sizeCategory: '2' } },
+        { headers: { accept: PATCH_ACCEPT }, lockHandle: 'LH' },
+      );
+    expect(written.ok).toBe(true);
+    expect(generic.requests.map((r) => r.method)).toEqual(['GET', 'PUT']);
+    expect(String(generic.requests[1]?.data)).not.toContain('isWritableByAMDP');
+  });
+
   it('changes the translation by its value alone, the other attributes as read', async () => {
     const { connection, requests } = sequence([
       readWithEtag('s4-2025', 'E'),
