@@ -24,6 +24,83 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [46.1.0] - 2026-11-19
+
+Released with `@mcp-abap-adt/adt-strategies` 0.26.0 and
+`@mcp-abap-adt/adt-clients-legacy` 0.11.1, on `@mcp-abap-adt/interfaces-adt`
+`^30.1.0`.
+
+### Fixed
+
+- **A cloud settings write no longer resets `isWritableByAMDP`.** SAP writes
+  every DD09L field from the settings document, and the cloud's
+  `CL_TABT_WB_PERSIST->move_adt_to_ddv` writes `allowed_for_amdp_write` from
+  it too (Code, cloud); a PUT without `ts:isWritableByAMDP` read back `false`
+  (measured on the cloud). 46.0.0 never wrote it, so every cloud write reset
+  it. The document now writes `ts:isWritableByAMDP` whenever the settings
+  carry it, and `updateMetadata` is typed by the client's variant
+  (`ITableSettingsUpdateConfig<V>`): a cloud client's write requires it, an
+  on-premise one refuses it (nothing maps it there, Code).
+- **The translation wording.** `ts:translation` is not required by SAP: the
+  transformation reads it inside a `tt:cond` (Code, both systems), a document
+  without it was accepted, one with an attribute missing refused `400`
+  `00/001` with an `XML_PATH` property (measured on both). The README and the
+  document builder said every attribute was required on every write.
+
+### Added
+
+- **`AdtTableSettings.patchMetadata`** (interfaces-adt 30.1.0, decision 51):
+  reads `?version=inactive` with its ETag, overlays the named changes and PUTs
+  the whole document with `If-Match` and the media type without a charset,
+  under the caller's lock. Refused before any request: an empty lock handle,
+  a change set naming no setting. Refused before the PUT, as a failure
+  carrying the read: a read without an ETag, a document without every
+  setting the write needs, an `areaKeyFields` change whose merged buffering
+  type is not `G` (SAP writes the count only for `G`, Code on both).
+  `AdtTableSettings<T, V>` implements `IAdtTableSettingsPatchable` and
+  `IAdtTableSettingsUpdatable` of its variant (a typecheck pins both).
+- **Function group text elements on the cloud.** ABAP cloud serves function
+  groups and their text elements: the group (`FUGR/F`) and its text elements
+  (`PROG/PX` at `/textelements/functiongroups/{group}`) activated in one
+  request and left the inactive list (measured 2026-11-19). The live case
+  `adt_text_elements_function_group` runs on both systems, and activates
+  through the client of the system under test.
+- Recorded answers: a table activation SAP executed and cancelled
+  (`activationExecuted="true"` with `E` messages, on premise and on the
+  cloud); a class's text elements on the inactive list as `PROG/PX`
+  `ZCL_…====CP`; the cloud function group's write, lists and activation.
+
+### Activation verdict, checked
+
+An activation can be answered `activationExecuted="true"`
+`generationExecuted="false"` with messages of type `E`, the object left
+inactive (measured on both systems: a data class SAP stored but its
+activation refuses). adt-clients judges no activation: every activation
+member hands the answer to the caller's `analyse`, and reads the inactive
+list only after a checklist that does not state its outcome (silent, or no
+verdict with warnings alone) — not after this one. The shipped verdict,
+adt-strategies' `analyseActivation`, refuses any checklist with an `E`
+message, whatever `activationExecuted` says. A test drives the recorded
+answers through every member that shares the code: the `activate` of
+`accessControl`, `appendStructure`, `authorizationField`,
+`behaviorDefinition`, `behaviorImplementation` (through its class), `class`,
+`dataElement`, `ddl`, `domain`, `enhancement`, `featureToggle`,
+`functionGroup`, `functionInclude`, `functionModule`, `include`,
+`interface`, `localDefinitions`, `localMacros`, `localTestClass`,
+`localTypes`, `metadataExtension`, `program`, `scalarFunction`,
+`scalarFunctionImplementation`, `serviceBinding`, `serviceDefinition`,
+`structure`, `table`, `tableType`, `transformation`, and
+`AdtUtils.activateObjects`. With no `analyse` the default verdict reads the
+status alone, as for every member.
+
+### Source break (TypeScript)
+
+- Code that writes settings through a cloud client (`AdtClientCloud`, or a
+  client typed `'cloud'`) without `isWritableByAMDP` fails to compile
+  (TS2322): pass the value read (`current.settings` as a whole) or the one
+  wanted. That code reset the flag on every write; the type now says so.
+  On-premise and variant-generic clients compile as before.
+
 ## [46.0.0] - 2026-11-19
 
 Released with `@mcp-abap-adt/adt-strategies` 0.25.0 and
