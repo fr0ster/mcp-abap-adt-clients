@@ -280,6 +280,7 @@ const HANDLER: {
   package: (c) => c.getPackage(),
   ddl: (c) => c.getDdl(),
   table: (c) => c.getTable(),
+  tableSettings: (c) => c.getTableSettings(),
   structure: (c) => c.getStructure(),
   appendStructure: (c) => c.getAppendStructure(),
   tableType: (c) => c.getTableType(),
