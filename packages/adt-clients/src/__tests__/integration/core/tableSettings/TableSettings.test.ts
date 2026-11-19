@@ -1,6 +1,6 @@
 /**
  * Live: a table's technical settings written to non-default values
- * (`getTableSettings()`, adt-clients 45.6.0). On premise and on the cloud.
+ * (`getTableSettings()`, adt-clients 46.0.0). On premise and on the cloud.
  *
  * Creates a table under a fresh name in the test package, writes its DDL and
  * activates it. Then, under the settings' own lock: reads the settings with

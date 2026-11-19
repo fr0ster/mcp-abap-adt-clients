@@ -952,13 +952,13 @@ const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
     accept: 'application/vnd.sap.adt.tables.v2+xml',
     contentType: 'application/vnd.sap.adt.tables.v2+xml; charset=utf-8',
   },
-  // Not in 35.0.0: added with 45.6.0. The pair the settings write was measured
+  // Not in 35.0.0: added with 46.0.0. The pair the settings write was measured
   // with on S/4HANA 2025 and ABAP cloud (2026-11-19); v1 is answered 406.
   'AdtTableSettings.updateMetadata': {
     accept: 'application/vnd.sap.adt.table.settings.v2+xml',
     contentType: 'application/vnd.sap.adt.table.settings.v2+xml; charset=utf-8',
   },
-  // Not in 35.0.0: added with the text elements. The pair the symbols write
+  // Not in 35.0.0: added with 46.0.0. The pair the symbols write
   // was measured with on S/4HANA 2025 and ABAP cloud (2026-11-19); each part
   // has its own media type (`TEXT_ELEMENTS_MEDIA_TYPES`), and its write sends
   // that part's.
