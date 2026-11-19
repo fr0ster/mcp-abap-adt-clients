@@ -229,7 +229,7 @@ Top-level client classes instantiated directly (not via `AdtClient.getXxx()`). T
 ### AdtClientCloud
 - Source: `src/clients/AdtClientVariants.ts`
 - Extends: `AdtClient<'cloud'>`
-- Public methods: —
+- Public methods: `getTableSettings`
 
 ### AdtClientOnPrem
 - Source: `src/clients/AdtClientVariants.ts`
