@@ -24,6 +24,50 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [45.6.0] - 2026-11-19
+
+Released with `@mcp-abap-adt/adt-strategies` 0.24.0 and
+`@mcp-abap-adt/adt-clients-legacy` 0.10.0.
+
+### Added
+
+- **`getTableSettings()`: a table's technical settings** (`TABL/DTT`) —
+  data class, size category, buffering, logging and the rest of DD09L, at
+  their own resource `/sap/bc/adt/ddic/db/settings/{name}`, under their own
+  lock (ESDICT `TABT`, which the table's lock does not cover). `AdtTableSettings`
+  has four members, one request each:
+  - `readMetadata` — `GET` with the v2 Accept
+    (`application/vnd.sap.adt.table.settings.v2+xml`; a v1 Accept is answered
+    `406`), the document answered as it arrived;
+  - `lock` — `POST ?_action=LOCK&accessMode=MODIFY`, stateful;
+  - `updateMetadata` — `PUT ?lockHandle=…[&corrNr=…]` of the document built
+    from the typed `ITableSettingsUpdateConfig` (every setting and the
+    `description`; `lockHandle` required, `source` refused), `If-Match` when
+    `ifMatch` is given. **It replaces every setting**: SAP writes the whole
+    DD09L row and resets a field left out — read, change, write back. The
+    cloud's `ts:isWritableByAMDP` is never written;
+  - `unlock` — `POST ?_action=UNLOCK&lockHandle=…`, stateful.
+
+  SAP creates the settings with the table and activating the table activates
+  them, so there is no create, delete or activation of their own. The result
+  set is `tableSettingsDocuments` (`metadata`, `metadataUpdated`), the address
+  `TABLE_SETTINGS`. Served on premise and on the cloud; not on SAP_BASIS 7.40,
+  whose discovery has no such collection.
+- Recorded answers of the settings read (on premise and cloud), the write, and
+  the write refused without a description (`corpus/adt/answers/*table-settings*`).
+
+### Changed
+
+- **`@mcp-abap-adt/interfaces-adt` is `^28.0.0`** (was `^27.4.0`): the release
+  that adds the table settings contract and `tableSettings` / `TABL/DTT` to the
+  type tables. A consumer whose exhaustive map over `AdtApiName`,
+  `AdtTypeCode`, `AdtObjectKind` or a union derived from the tables (`AdtApi`,
+  `AdtTypeCodeOf`, `AdtApiWith`, …) types its keys adds the new member —
+  interfaces-adt 28.0.0's migration note.
+- The type-table conformance check records the missing `TABL/DTT` sample as an
+  open divergence: the research recorded the settings reads and writes, not
+  the template and urimapper answers a sample needs.
+
 ## [45.5.5] - 2026-11-18
 
 The same code as 45.5.4, released together with adt-strategies 0.23.5 from one

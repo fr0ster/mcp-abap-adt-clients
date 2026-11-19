@@ -4,6 +4,25 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [0.10.0] - 2026-11-19
+
+Released with `@mcp-abap-adt/adt-clients` 45.6.0.
+
+### Added
+
+- **`getTableSettings()` is refused on 7.40** — `absentOnLegacy`, every member
+  answers `UNSUPPORTED_OPERATION` without a request, not measured: the
+  `/sap/bc/adt/ddic/db/settings` collection is absent from 7.40 SP04's
+  discovery (its `typestructure` lists `TABL/DTT`, a workbench type, not an
+  ADT service). `ADT_TYPES_BASIS_740` has no `tableSettings`, so the getter
+  does not compile on `AdtClientLegacy`.
+
+### Changed
+
+- **`@mcp-abap-adt/interfaces-adt` is `^28.0.0`** (was `^27.4.0`), and the
+  `@mcp-abap-adt/adt-clients` range `^45.6.0` (was `^45.5.3`), peer and dev:
+  the factory this release overrides comes from 45.6.0.
+
 ## [0.9.6] - 2026-11-18
 
 Released with `@mcp-abap-adt/adt-clients` 45.5.3.

@@ -14,6 +14,17 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.24.0] - 2026-11-19
+
+Released with `@mcp-abap-adt/adt-clients` 45.6.0.
+
+### Changed
+
+- **`@mcp-abap-adt/interfaces-adt` is `^28.0.0`** (was `^27.4.0`), so a
+  consumer of adt-clients 45.6.0 holds one copy of the contract. No reading or
+  verdict changes: 28.0.0 adds the table settings contract and widens the type
+  tables, which this package does not map.
+
 ## [0.23.5] - 2026-11-18
 
 The same code as 0.23.3, released together with adt-clients 45.5.5 from one
