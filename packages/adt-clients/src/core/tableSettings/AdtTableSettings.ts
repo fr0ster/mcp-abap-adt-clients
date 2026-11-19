@@ -2,19 +2,22 @@
  * AdtTableSettings - a table's technical settings (`TABL/DTT`).
  *
  * Their own resource, `/sap/bc/adt/ddic/db/settings/{name}`, with their own
- * lock (ESDICT `TABT`, which the table's lock does not cover). SAP creates
- * them with the table, and activating the table activates them, so there is
- * no create, delete or activation here.
+ * lock: `ENQUEUE_ESDICT` with `objtype` `TABT` (`CL_TABT_WB_PERSIST->lock`,
+ * Code on both systems), held beside the table's lock in either order
+ * (measured on both). SAP created default settings when it created the table,
+ * and activating the table alone activated them (measured on both): this
+ * handler has no create, delete or activation.
  *
- * Every member is one request except `patchMetadata` (an inactive GET, then
- * the guarded PUT), and the sequence is the caller's — the library's lock
- * pattern:
+ * `patchMetadata` sends a GET and then the guarded PUT, and may stop before
+ * either; every other member sends one request. The library retries nothing
+ * (the connection may refresh its CSRF token and resend). The sequence is
+ * the caller's — the library's lock pattern:
  *
  * ```typescript
  * // `headers`: the request's own pair — Accept
  * // `application/vnd.sap.adt.table.settings.v2+xml`, Content-Type the same
  * // with `; charset=utf-8`; `TABLE_SETTINGS` is the address, not the headers.
- * const settings = client.getTableSettings({
+ * const settings = new AdtClientOnPrem(connection).getTableSettings({
  *   ...tableSettingsDocuments,
  *   metadata: tableSettings, // adt-strategies: every setting, the ETag
  * });
@@ -29,9 +32,14 @@
  *   const current = read.getResult().value;
  *   // No ETag, no write: the PUT is guarded with If-Match.
  *   if (!current.etag) return;
- *   // …change what was read, keep the rest…
+ *   // On premise the read's cloud-only field is left out of the write.
+ *   const { isWritableByAMDP: _cloudOnly, ...asRead } = current.settings;
  *   const put = await settings.updateMetadata(
- *     { tableName, description: current.description, settings: changed },
+ *     {
+ *       tableName,
+ *       description: current.description,
+ *       settings: { ...asRead, sizeCategory: '1' },
+ *     },
  *     { headers, lockHandle, ifMatch: current.etag },
  *   );
  *   written = put.ok;
@@ -43,8 +51,9 @@
  * }
  * ```
  *
- * Every member answers `IAdtResponse<T>`, where T is what the result set given
- * at construction makes of that endpoint's answer.
+ * The result set given at construction makes the value of `readMetadata`
+ * (`metadata`) and of the writes (`metadataUpdated`); `lock` answers the lock
+ * handle, `unlock` nothing.
  */
 import {
   AdtObjectErrorCodes,
@@ -103,8 +112,9 @@ import { unlockTableSettings } from './unlock';
 import { updateTableSettings } from './update';
 
 /**
- * The settings' variant: one of the newer systems (SAP_BASIS 7.40 serves no
- * settings; its client refuses the factory).
+ * The settings' variant: one of the newer systems. SAP_BASIS 7.40 SP04's
+ * discovery has no `/ddic/db/settings` collection, and the legacy client's
+ * getter refuses every member without a request.
  */
 type SettingsVariant<V extends AdtVariant> = Extract<V, AdtModernVariant>;
 
@@ -113,9 +123,10 @@ type SettingsVariant<V extends AdtVariant> = Extract<V, AdtModernVariant>;
  * `ITableSettingsChangesOf<W>` holds a conditional type, which, generic in a
  * class's `V`, makes TypeScript compare the clients structurally (and the
  * variant clients then fail to widen). Over this map of resolved types the
- * class stays covariant in `V`. `AdtTableSettings<T, W>` implements
- * `IAdtTableSettingsPatchable<…, W>` for each `W`
- * (`tableSettingsPatchable.typecheck`).
+ * class stays covariant in `V`. The class declares no `implements
+ * IAdtTableSettingsPatchable`; the typecheck
+ * `typechecks/exact/tableSettingsVariants.ts` assigns `AdtTableSettings` of
+ * each kind to `IAdtTableSettingsPatchable` of that kind.
  */
 interface ITableSettingsChangesByVariant {
   readonly onprem: ITableSettingsChangesOf<'onprem'>;
@@ -134,7 +145,8 @@ export type TableSettingsPatchConfig<V extends AdtVariant> =
  * The declared system kind a handler is constructed with, tied to its `V`: a
  * cloud handler (`V` `'cloud'`) requires `variant: 'cloud'` — the
  * declaration `AdtClientCloud` makes, never inferred from an answer — and
- * every other `V` forbids it. With it, `patchMetadata` refuses a read without
+ * every other `V` forbids it. A direct construction names `'cloud'` as its
+ * type argument: inferred type arguments do not reach the cloud branch. With it, `patchMetadata` refuses a read without
  * `ts:isWritableByAMDP` before any PUT.
  */
 export type TableSettingsVariantOption<V extends AdtVariant> = [V] extends [
@@ -223,7 +235,12 @@ export class AdtTableSettings<
    * when given, `transportRequest` as `corrNr`.
    *
    * **The whole content, every time.** This is a replace, never a merge: SAP
-   * writes every setting from the document; read, change, write back.
+   * writes every DD09L field the transformation maps from the document
+   * (`move_adt_to_ddv`, Code on both systems); read, change, write back.
+   *
+   * The variant rules on `isWritableByAMDP` are the type's
+   * (`ITableSettingsUpdateConfig<V>`); at run time this checks only the
+   * empty lock handle, and the document carries any boolean it is given.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: ITableSettingsUpdateConfig<SettingsVariant<V>>,
@@ -257,22 +274,28 @@ export class AdtTableSettings<
    * Patch the settings under the caller's lock: read the working area
    * (`version: 'inactive'`) with its ETag, overlay `config.changes`, and write
    * the whole document guarded by `If-Match` (decision 51 of
-   * interfaces-adt). SAP resets every setting a write leaves out
-   * (`CL_TABT_WB_PERSIST->move_adt_to_ddv`, Code on both systems; measured on
-   * both), so the whole document is written: the description read, every
-   * setting not named as read, the cloud's `isWritableByAMDP` as read unless
-   * named.
+   * interfaces-adt). SAP writes every field the transformation maps from the
+   * document (`CL_TABT_WB_PERSIST->move_adt_to_ddv`, Code on both systems; a
+   * field left out read back reset, measured on both), so the whole document
+   * is written: the description read, every setting not named as read
+   * (the area-key count too, which SAP clears itself when the resulting type
+   * is not `G`), and `isWritableByAMDP` as read unless named.
    *
    * The PUT's `Content-Type` is the media type without a charset: with
    * `; charset=utf-8` beside a fresh `If-Match` SAP answered `412`
    * `SADT_RESOURCE/043`, without it `200` (measured on both).
    *
-   * Refused before any request (the caller's arguments): an empty lock handle,
-   * a change set that names no setting. Refused before the PUT (what SAP's
-   * read answered): a read with no ETag, a document this reading cannot read,
-   * an `areaKeyFields` change whose resulting type is not `G` (SAP writes it
-   * only for `G`, Code on both). A refused read or PUT is answered as SAP
-   * answered it; nothing is retried.
+   * Thrown before any request (the caller's arguments): an empty lock
+   * handle, a change set whose top-level fields are all absent or
+   * `undefined` — the runtime check looks at the top level only; an empty
+   * nested change (`{ buffering: {} }`) is refused by the type alone.
+   * Answered as a failure before the PUT (what SAP's read answered): a read
+   * with no ETag, a document this reading cannot read, on a declared cloud
+   * handler a read without `ts:isWritableByAMDP`, and an `areaKeyFields`
+   * change whose resulting type is not `G` (SAP writes it only for `G`, Code
+   * on both). These verdicts and SAP's own refusals go through `analyse`,
+   * which may clear them. The library retries nothing; the connection may
+   * refresh its CSRF token and resend.
    */
   async patchMetadata<E extends IAdtError = IAdtError>(
     config: TableSettingsPatchConfig<V>,

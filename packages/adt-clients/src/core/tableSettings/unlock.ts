@@ -1,5 +1,7 @@
 /**
- * Release the settings' lock. Must use the session and handle of the lock.
+ * Release the settings' lock with its handle, in the stateful session the
+ * lock was taken in, as every UNLOCK of this library is sent; that SAP
+ * refuses another session is not measured here.
  */
 
 import type {

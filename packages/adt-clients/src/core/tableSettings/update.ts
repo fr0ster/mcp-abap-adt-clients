@@ -20,8 +20,10 @@ import {
  * One PUT, under the caller's lock.
  *
  * **The whole content, every time.** This is a replace, never a merge: SAP
- * writes every setting from the document, so the caller reads, changes and
- * writes back the whole set.
+ * writes every DD09L field the transformation maps from the document
+ * (`move_adt_to_ddv`, Code on both systems; a field left out read back
+ * reset, measured on both), so the caller reads, changes and writes back
+ * the whole set.
  */
 export async function updateTableSettings(
   connection: IAbapConnection,

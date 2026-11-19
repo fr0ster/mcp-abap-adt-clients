@@ -12,6 +12,8 @@
  *   a cloud write without it resets it to `false` (measured on the cloud).
  * - A field a caller set to `undefined` (possible without
  *   `exactOptionalPropertyTypes`) is not named: the value read is kept.
+ * - The patch sends the area-key count read when no count is named, whatever
+ *   the resulting type; SAP keeps it only for `G`.
  */
 
 import type {
@@ -24,7 +26,11 @@ export type SettingsMerge =
   | { readonly ok: true; readonly settings: ITableSettingsRead }
   | { readonly ok: false; readonly reason: string };
 
-/** Whether `changes` names a setting at all (an explicit `undefined` names none). */
+/**
+ * Whether `changes` names a setting at all, at the top level: an explicit
+ * `undefined` names none. A nested change is not looked into — `{ buffering:
+ * {} }` passes here, and the type (`ITableSettingsChangesOf`) refuses it.
+ */
 export function namesASetting(changes: ITableSettingsChanges): boolean {
   return Object.values(changes).some((value) => value !== undefined);
 }

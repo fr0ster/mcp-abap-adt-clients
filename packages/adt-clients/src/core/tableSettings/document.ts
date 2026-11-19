@@ -2,19 +2,21 @@
  * The settings document a write sends, built from the caller's typed
  * settings (interfaces-adt 30.1.0, decision 49).
  *
- * **Every setting, every time.** SAP writes the whole DD09L row from the
- * document (`CL_TABT_WB_PERSIST->move_adt_to_ddv`, Code on both systems; a
- * field left out read back reset, measured on both), so the contract requires
- * every field, and every one is written here — nothing is defaulted and
- * nothing left out. The element order is the transformation's
- * (`SDDIC_ADT_TTAB`).
+ * **Every setting, every time.** SAP writes every DD09L field the
+ * transformation maps from the document (`CL_TABT_WB_PERSIST->
+ * move_adt_to_ddv`, Code on both systems; a field left out read back reset,
+ * measured on both), so the contract requires every field, and every one is
+ * written here — nothing is defaulted and nothing left out. The element
+ * order is the transformation's (`SDDIC_ADT_TTAB`, Code on both); booleans
+ * are written `true` / `false`, as the recorded reads carry them.
  *
  * **`ts:isWritableByAMDP` as given.** The cloud's `move_adt_to_ddv` writes it
  * from the document (Code, cloud), and a cloud PUT without it reset it to
- * `false` (measured): it is written whenever the settings carry it — a cloud
- * write requires it (`ITableSettingsOf<'cloud'>`), an on-premise one refuses
- * it, since nothing maps it there (Code). The serializer reads the fields it
- * writes by name, so nothing else a caller passes reaches the document.
+ * `false` (measured). The serializer writes it whenever the settings carry
+ * it, any boolean, `false` included: that a cloud write carries it and an
+ * on-premise one does not is the type's rule (`ITableSettingsOf<V>`), not a
+ * check here. It reads the fields it writes by name, so nothing else a
+ * caller passes reaches the document.
  */
 
 import type {
