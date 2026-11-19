@@ -29,6 +29,8 @@ describe('a part read and written back is the answer it was read from', () => {
     'read-text-symbols-umlauts-s4-2025--01-symbols',
     'read-text-symbols-empty-s4-2025--01-symbols',
     'write-text-symbols-abap-cloud--01-update',
+    'write-text-symbols-function-group-s4-2025--01-update',
+    'read-text-symbols-letter-key-s4-2025--01-symbols',
   ])('symbols: %s', (step) => {
     const answer = body(step);
     const read = readTextSymbols(answer);
@@ -39,6 +41,10 @@ describe('a part read and written back is the answer it was read from', () => {
   it.each([
     'read-text-selections-s4-2025--01-selections',
     'write-text-selections-s4-2025--01-update',
+    'read-text-selections-ddic-s4-2025--01-selections',
+    'read-text-selections-placeholders-s4-2025--01-selections',
+    'write-text-selections-ddic-s4-2025--01-update',
+    'read-text-selections-abap-cloud--01-selections',
   ])('selections: %s', (step) => {
     const answer = body(step);
     const read = readSelectionTexts(answer);
@@ -46,8 +52,12 @@ describe('a part read and written back is the answer it was read from', () => {
     expect(textElementsBody(read)).toBe(answer);
   });
 
-  it('headings: read-text-headings-s4-2025--01-headings', () => {
-    const answer = body('read-text-headings-s4-2025--01-headings');
+  it.each([
+    'read-text-headings-s4-2025--01-headings',
+    'write-text-headings-s4-2025--01-update',
+    'read-text-headings-column-empty-s4-2025--01-headings',
+  ])('headings: %s', (step) => {
+    const answer = body(step);
     const read = readTextHeadings(answer);
     expect(textHeadingsBody(read.headings)).toBe(answer);
     expect(textElementsBody(read)).toBe(answer);
@@ -68,8 +78,19 @@ describe('the body the measured write sent', () => {
 
   it('a selection text as given: SAP pads the name, the library does not', () => {
     expect(
-      selectionTextsBody([{ name: 'P_TEST', text: 'Test parameter EN' }]),
+      selectionTextsBody([
+        { name: 'P_TEST', text: 'Test parameter EN', ddicReference: false },
+      ]),
     ).toBe('P_TEST=Test parameter EN');
+  });
+
+  it('several selection texts: an empty line between, @DDICReference before a dictionary one', () => {
+    expect(
+      selectionTextsBody([
+        { name: 'P_CHAR', text: 'Character parameter', ddicReference: false },
+        { name: 'P_ARBGB', text: '', ddicReference: true },
+      ]),
+    ).toBe('P_CHAR=Character parameter\r\n\r\n@DDICReference\r\nP_ARBGB=');
   });
 
   it('an empty list is the empty body: the write deletes every entry', () => {
@@ -133,7 +154,8 @@ describe('a value the format cannot carry is refused before any request', () => 
     ],
     [
       '"=" in a selection name',
-      () => selectionTextsBody([{ name: 'P=X', text: 'a' }]),
+      () =>
+        selectionTextsBody([{ name: 'P=X', text: 'a', ddicReference: false }]),
       "selection text 1 ('P=X')'s name is empty or holds '='",
     ],
     [

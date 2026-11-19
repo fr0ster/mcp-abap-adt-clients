@@ -33,6 +33,7 @@ export interface ITextSymbolInput {
 export interface ISelectionTextInput {
   readonly name: string;
   readonly text: string;
+  readonly ddicReference: boolean;
 }
 
 /** The list and column headings. */
@@ -98,16 +99,22 @@ export function textSymbolsBody(symbols: readonly ITextSymbolInput[]): string {
   return lines.join(CRLF);
 }
 
-/** The selections part: one `NAME=text` per line; none is the empty body. */
+/**
+ * The selections part: `NAME=text` per entry, an empty line between two
+ * entries, `@DDICReference` on its own line before a dictionary text — the
+ * form SAP answers (measured on premise); none is the empty body. Names go
+ * as given: SAP pads them on a read and takes them padded or not.
+ */
 export function selectionTextsBody(
   selections: readonly ISelectionTextInput[],
 ): string {
   return selections
     .map((selection, index) => {
       const what = `selection text ${index + 1} ('${selection.name}')`;
-      return `${lineKey(selection.name, `${what}'s name`)}=${lineValue(selection.text, `${what}'s text`)}`;
+      const line = `${lineKey(selection.name, `${what}'s name`)}=${lineValue(selection.text, `${what}'s text`)}`;
+      return selection.ddicReference ? `@DDICReference${CRLF}${line}` : line;
     })
-    .join(CRLF);
+    .join(`${CRLF}${CRLF}`);
 }
 
 /**
