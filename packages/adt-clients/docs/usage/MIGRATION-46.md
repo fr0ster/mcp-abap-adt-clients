@@ -66,7 +66,7 @@ nothing that compiled stops on it.
 `AdtClientOnPrem` and `AdtClientCloud` gain `getTableSettings()` and
 `getTextElements()`; the code sets the client is typed by (interfaces-adt's
 `AdtTypeCode`, `AdtApiName`, `AdtObjectKind` and their projections) gain
-`TABL/DTT` and `tableSettings` (28.0.0), and `PROG/PX`, `CLAS/OCX`,
+`TABL/DTT`, `tableSettings` and `table_settings` (28.0.0), and `PROG/PX`, `CLAS/OCX`,
 `textElements` and `text_elements` (30.0.0). A consumer on 45.5.5 skipped
 the unpublished 45.6.0, so it meets both at once:
 
