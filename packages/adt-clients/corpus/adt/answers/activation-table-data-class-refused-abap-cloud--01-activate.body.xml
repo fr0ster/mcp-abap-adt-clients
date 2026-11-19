@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist">
+  <chkl:properties checkExecuted="true" activationExecuted="true" generationExecuted="false"/>
+  <msg objDescr="Database Table ZMCP_TVD00B" type="E" line="1" href="/sap/bc/adt/ddic/tables/zmcp_tvd00b/source/main#start=6,13;end=6,24" code="DT(609)">
+    <shortText>
+      <txt>Value in field Data Class; value ZZNOP not permitted</txt>
+    </shortText>
+    <t100Key msgid="DT" msgno="609" msgv1="Data Class" msgv2="ZZNOP"/>
+    <atom:link href="/sap/bc/adt/vit/ddic/logs/db/SAPUSER0120261119175216" rel="http://www.sap.com/adt/relations/ddic/activationlog" type="application/vnd.sap.sapgui" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/ddic/logs/db/SAPUSER0120261119175216" rel="http://www.sap.com/adt/relations/ddic/activationlog" type="application/vnd.sap.adt.logs+xml" xmlns:atom="http://www.w3.org/2005/Atom"/>
+    <atom:link href="/sap/bc/adt/messageclass/DT/messages/609/longtext?language=E&amp;msgv1=Data%20Class&amp;msgv2=ZZNOP" rel="http://www.sap.com/adt/relations/longtext" type="text/html" xmlns:atom="http://www.w3.org/2005/Atom"/>
+  </msg>
+</chkl:messages>
