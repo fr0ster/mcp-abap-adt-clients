@@ -3,10 +3,7 @@
  * document built from the caller's typed settings.
  */
 
-import type {
-  IAdtHeaders,
-  ITableSettingsUpdateConfig,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -14,7 +11,10 @@ import type {
 import { TABLE_SETTINGS } from '../../endpoints/objects';
 import { writeQuery } from '../../utils/internalUtils';
 import { updateRequestHeaders } from '../../utils/requestHeaders';
-import { tableSettingsDocument } from './document';
+import {
+  type ITableSettingsDocumentInput,
+  tableSettingsDocument,
+} from './document';
 
 /**
  * One PUT, under the caller's lock.
@@ -27,7 +27,9 @@ export async function updateTableSettings(
   connection: IAbapConnection,
   headers: IAdtHeaders,
   ifMatch: string | undefined,
-  config: ITableSettingsUpdateConfig,
+  config: ITableSettingsDocumentInput & {
+    readonly transportRequest?: string | undefined;
+  },
   lockHandle: string,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
