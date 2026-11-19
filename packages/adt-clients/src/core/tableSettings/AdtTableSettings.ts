@@ -290,11 +290,13 @@ export class AdtTableSettings<
    * `undefined` — the runtime check looks at the top level only; an empty
    * nested change (`{ buffering: {} }`) is refused by the type alone.
    * Answered as a failure before the PUT (what SAP's read answered): a read
-   * with no ETag, a document this reading cannot read, on a declared cloud
+   * with no ETag, on a declared cloud
    * handler a read without `ts:isWritableByAMDP`, and an `areaKeyFields`
    * change whose resulting type is not `G` (SAP writes it only for `G`, Code
    * on both). These verdicts and SAP's own refusals go through `analyse`,
-   * which may clear them. The library retries nothing; the connection may
+   * which may clear them. A document the reading cannot read fails the call
+   * as a connection failure with no response attached; no PUT is sent. The
+   * library retries nothing; the connection may
    * refresh its CSRF token and resend.
    */
   async patchMetadata<E extends IAdtError = IAdtError>(

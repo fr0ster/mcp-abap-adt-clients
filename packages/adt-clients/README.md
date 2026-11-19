@@ -975,11 +975,11 @@ Thrown before any request: an empty `lockHandle`, a change set whose
 top-level fields are all absent or `undefined` (`{}` does not compile; the
 runtime check looks at the top level only, so `{ buffering: {} }` is refused
 by the type alone). Answered as a failure carrying the read, before the PUT:
-a read without an ETag, a document without every setting the write needs,
-an `areaKeyFields` change whose merged buffering type is not `G` (SAP writes
+a read without an ETag, an `areaKeyFields` change whose merged buffering type is not `G` (SAP writes
 the count only for `G`, Code on both), and — on a declared cloud handler — a
 read without `ts:isWritableByAMDP`. A custom `analyse` may clear any of
-these. The library retries nothing; the connection may refresh its CSRF
+these. A settings document the reading cannot read fails the call as a
+connection failure with no response attached, and no PUT is sent. The library retries nothing; the connection may refresh its CSRF
 token and resend.
 
 **The cloud refusal follows the instance, not the static type.**

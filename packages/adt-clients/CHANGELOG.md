@@ -32,7 +32,10 @@ Released with `@mcp-abap-adt/adt-strategies` 0.26.0 and
 
 ### Fixed
 
-- **A cloud settings write no longer resets `isWritableByAMDP`.** SAP writes
+- **A cloud settings write through the cloud client no longer resets
+  `isWritableByAMDP`** (`AdtClientCloud`, a handler declared `'cloud'`, or a
+  read through `cloudTableSettings`; a generic `AdtClient` still writes a
+  flagless read without it, see below). SAP writes
   every DD09L field the transformation maps from the settings document, and
   the cloud's `CL_TABT_WB_PERSIST->move_adt_to_ddv` maps
   `allowed_for_amdp_write` too (Code, cloud); a PUT without
