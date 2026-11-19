@@ -6,6 +6,7 @@
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { readTableSettings, tableSettings } from '@mcp-abap-adt/adt-strategies';
 import type { ITableSettingsUpdateConfig } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -69,7 +70,12 @@ const CHANGED: ITableSettingsUpdateConfig = {
     storageType: 'C',
     sharingType: '',
     loadUnit: '',
-    translation: '',
+    translation: {
+      value: '',
+      isVisible: false,
+      isEditable: false,
+      granularity: '2',
+    },
     loggingEnabled: true,
   },
 };
@@ -147,7 +153,7 @@ describe('the settings write', () => {
     );
   });
 
-  it('sends If-Match when the caller gives the read ETag', async () => {
+  it('sends If-Match when the caller gives the read ETag, keeping the measured charset', async () => {
     const { connection, requests } = recording(OK);
     const settings = new AdtClient(connection).getTableSettings();
     await settings.updateMetadata(CHANGED, {
@@ -156,6 +162,9 @@ describe('the settings write', () => {
       ifMatch: 'ETAG-1',
     });
     expect(requests[0]?.headers?.['If-Match']).toBe('ETAG-1');
+    expect(requests[0]?.headers?.['Content-Type']).toBe(
+      'application/vnd.sap.adt.table.settings.v2+xml; charset=utf-8',
+    );
   });
 
   it('answers SAP refusing a document without a description (400, SWB_TOOL 019) as a failure, its answer kept', async () => {
@@ -194,7 +203,7 @@ describe('the settings document', () => {
       '<ts:storageType>C</ts:storageType>',
       '<ts:sharingType/>',
       '<ts:loadUnit/>',
-      '<ts:translation ts:value=""/>',
+      '<ts:translation ts:value="" ts:isVisible="false" ts:isEditable="false" ts:granularity="2"/>',
       '<ts:loggingEnabled>true</ts:loggingEnabled>',
     ];
     let at = -1;
@@ -253,6 +262,117 @@ describe('the settings lock', () => {
       'stateful',
       'stateless',
     ]);
+  });
+});
+
+/** A connection answering each request in turn; a status of 400 or more rejects. */
+function sequence(answers: IAdtWireResponse[]) {
+  const requests: IAbapRequestOptions[] = [];
+  const connection = {
+    setSessionType: () => {},
+    isConnected: () => true,
+    makeAdtRequest: async (options: IAbapRequestOptions) => {
+      requests.push(options);
+      const answer = answers.shift() ?? OK;
+      if (answer.status >= 400) {
+        throw {
+          message: `Request failed with status code ${answer.status}`,
+          response: answer,
+        };
+      }
+      return answer;
+    },
+  } as unknown as IAbapConnection;
+  return { connection, requests };
+}
+
+const LOCKED = {
+  ...OK,
+  data: '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE>LH/1</LOCK_HANDLE></DATA></asx:values></asx:abap>',
+};
+const REFUSED = {
+  status: 500,
+  statusText: 'Internal Server Error',
+  headers: {},
+  data: '',
+};
+
+describe('a read written back', () => {
+  it.each(['s4-2025', 'abap-cloud'])(
+    'carries every setting as read, the translation with its four attributes (%s)',
+    (release) => {
+      const answer = recorded(`read-table-settings-${release}--01-settings`);
+      const read = tableSettings(answer);
+      const { isWritableByAMDP: _readOnly, ...asRead } = read.settings;
+      const body = tableSettingsDocument({
+        tableName: read.name,
+        description: read.description,
+        settings: asRead,
+      });
+      expect(body).toContain(
+        '<ts:translation ts:value="" ts:isVisible="false" ts:isEditable="false" ts:granularity="2"/>',
+      );
+      // Every setting the read held, but what only a read returns, is written:
+      // the document read back with the read's own version gives the same.
+      const withVersion = body.replace(
+        'adtcore:type="TABL/DTT"',
+        `adtcore:type="TABL/DTT" adtcore:version="${read.version}"`,
+      );
+      expect(readTableSettings(withVersion).settings).toEqual(asRead);
+      expect(body).not.toContain('isWritableByAMDP');
+    },
+  );
+});
+
+describe("the settings lock in the client's registry", () => {
+  it('keeps the lock when UNLOCK fails, so unlockAll() can try again', async () => {
+    const { connection } = sequence([LOCKED, REFUSED]);
+    const client = new AdtClient(connection);
+    const settings = client.getTableSettings();
+    await settings.lock({ tableName: 'ZT' });
+    const unlocked = await settings.unlock({ tableName: 'ZT' }, 'LH/1');
+    expect(unlocked.ok).toBe(false);
+    expect(client.pendingLocks).toEqual(['TableSettings/ZT']);
+  });
+
+  it('drops the lock after a successful UNLOCK', async () => {
+    const { connection } = sequence([LOCKED, OK]);
+    const client = new AdtClient(connection);
+    const settings = client.getTableSettings();
+    await settings.lock({ tableName: 'ZT' });
+    const unlocked = await settings.unlock({ tableName: 'ZT' }, 'LH/1');
+    expect(unlocked.ok).toBe(true);
+    expect(client.pendingLocks).toEqual([]);
+  });
+});
+
+describe('a lock without a handle', () => {
+  it('is a refusal (LOCK_FAILED), its answer kept, and nothing is tracked', async () => {
+    const empty = {
+      ...OK,
+      data: '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE/></DATA></asx:values></asx:abap>',
+    };
+    const { connection } = sequence([empty]);
+    const client = new AdtClient(connection);
+    const locked = await client.getTableSettings().lock({ tableName: 'ZT' });
+    expect(locked.ok).toBe(false);
+    const failure = !locked.ok ? locked.getError() : undefined;
+    expect(failure?.code).toBe('ADT_LOCK_FAILED');
+    expect(failure?.response?.status).toBe(200);
+    expect(failure?.response?.data).toBe(empty.data);
+    expect(client.pendingLocks).toEqual([]);
+  });
+
+  it('is refused by the write before any request: an empty lockHandle never leaves the PUT', async () => {
+    const { connection, requests } = sequence([]);
+    const settings = new AdtClient(connection).getTableSettings();
+    await expect(
+      settings.updateMetadata(CHANGED, {
+        headers: headersOf(settings, 'updateMetadata'),
+        lockHandle: '',
+      }),
+    ).rejects.toThrow('lockHandle');
+    expect(requests).toEqual([]);
   });
 });
 

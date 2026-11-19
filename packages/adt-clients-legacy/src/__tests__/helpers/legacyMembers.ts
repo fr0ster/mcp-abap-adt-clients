@@ -270,7 +270,12 @@ export const CONFIGS: Record<string, Record<string, unknown>> = {
       storageType: 'C',
       sharingType: '',
       loadUnit: '',
-      translation: '',
+      translation: {
+        value: '',
+        isVisible: false,
+        isEditable: false,
+        granularity: '2',
+      },
       loggingEnabled: false,
     },
   },

@@ -363,7 +363,12 @@ export const HANDLERS = {
         storageType: 'C',
         sharingType: '',
         loadUnit: '',
-        translation: '',
+        translation: {
+          value: '',
+          isVisible: false,
+          isEditable: false,
+          granularity: '2',
+        },
         loggingEnabled: false,
       },
     },
