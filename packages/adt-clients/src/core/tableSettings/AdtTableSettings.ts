@@ -55,11 +55,18 @@ import {
   type IAdtMetadataReadable,
   type IAdtOperationOptions,
   type IAdtResponse,
+  type IAdtTableSettingsPatchable,
+  type IAdtTableSettingsPatchHeaders,
+  type IAdtTableSettingsPatchOptions,
   type IAdtTableSettingsUpdatable,
   type IAdtTableSettingsUpdateOptions,
+  type ITableSettingsChangesOf,
   type ITableSettingsResults,
 } from '@mcp-abap-adt/interfaces-adt';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type {
+  IAbapConnection,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant } from '../../clients/variant';
 import { answering, answeringExchange } from '../../utils/adtResponse';
@@ -79,7 +86,9 @@ import {
 } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { lockTableSettings } from './lock';
+import { mergeSettings, namesASetting } from './merge';
 import { getTableSettings } from './read';
+import { readSettingsDocument } from './readDocument';
 import type {
   ITableSettingsConfig,
   ITableSettingsUpdateConfig,
@@ -87,6 +96,34 @@ import type {
 } from './types';
 import { unlockTableSettings } from './unlock';
 import { updateTableSettings } from './update';
+
+/**
+ * The settings' variant: one of the newer systems (SAP_BASIS 7.40 serves no
+ * settings; its client refuses the factory).
+ */
+type SettingsVariant<V extends AdtVariant> = Extract<V, AdtModernVariant>;
+
+/**
+ * The patch's changes per system kind, resolved: the contract's
+ * `ITableSettingsChangesOf<W>` holds a conditional type, which, generic in a
+ * class's `V`, makes TypeScript compare the clients structurally (and the
+ * variant clients then fail to widen). Over this map of resolved types the
+ * class stays covariant in `V`. `AdtTableSettings<T, W>` implements
+ * `IAdtTableSettingsPatchable<…, W>` for each `W`
+ * (`tableSettingsPatchable.typecheck`).
+ */
+interface ITableSettingsChangesByVariant {
+  readonly onprem: ITableSettingsChangesOf<'onprem'>;
+  readonly cloud: ITableSettingsChangesOf<'cloud'>;
+}
+
+/** What `patchMetadata` takes on variant `V`. */
+export type TableSettingsPatchConfig<V extends AdtVariant> =
+  ITableSettingsConfig & {
+    changes: {
+      [W in SettingsVariant<V>]: ITableSettingsChangesByVariant[W];
+    }[SettingsVariant<V>];
+  };
 
 /** What each slot of the result set answers. */
 export type TableSettingsValues = {
@@ -98,7 +135,7 @@ export class AdtTableSettings<
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtMetadataReadable<ITableSettingsConfig, T['metadata']>,
-    IAdtTableSettingsUpdatable<T['metadataUpdated']>,
+    IAdtTableSettingsUpdatable<T['metadataUpdated'], SettingsVariant<V>>,
     IAdtLockable<ITableSettingsConfig>
 {
   /**
@@ -165,7 +202,7 @@ export class AdtTableSettings<
    * writes every setting from the document; read, change, write back.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
-    config: ITableSettingsUpdateConfig,
+    config: ITableSettingsUpdateConfig<SettingsVariant<V>>,
     options: { headers: IAdtHeaders } & IAdtTableSettingsUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // **The one guard here, before any request.** The type requires a lock
@@ -187,6 +224,98 @@ export class AdtTableSettings<
           config,
           options.lockHandle,
         ),
+      this.results.metadataUpdated,
+      options.analyse,
+    );
+  }
+
+  /**
+   * Patch the settings under the caller's lock: read the working area
+   * (`version: 'inactive'`) with its ETag, overlay `config.changes`, and write
+   * the whole document guarded by `If-Match` (decision 51 of
+   * interfaces-adt). SAP resets every setting a write leaves out
+   * (`CL_TABT_WB_PERSIST->move_adt_to_ddv`, Code on both systems; measured on
+   * both), so the whole document is written: the description read, every
+   * setting not named as read, the cloud's `isWritableByAMDP` as read unless
+   * named.
+   *
+   * The PUT's `Content-Type` is the media type without a charset: with
+   * `; charset=utf-8` beside a fresh `If-Match` SAP answered `412`
+   * `SADT_RESOURCE/043`, without it `200` (measured on both).
+   *
+   * Refused before any request (the caller's arguments): an empty lock handle,
+   * a change set that names no setting. Refused before the PUT (what SAP's
+   * read answered): a read with no ETag, a document this reading cannot read,
+   * an `areaKeyFields` change whose resulting type is not `G` (SAP writes it
+   * only for `G`, Code on both). A refused read or PUT is answered as SAP
+   * answered it; nothing is retried.
+   */
+  async patchMetadata<E extends IAdtError = IAdtError>(
+    config: TableSettingsPatchConfig<V>,
+    options: {
+      headers: IAdtTableSettingsPatchHeaders;
+    } & IAdtTableSettingsPatchOptions<E>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+    if (options.lockHandle === '') {
+      throw new Error(
+        'lockHandle is required for a settings patch: an empty one would send the PUT without a lock',
+      );
+    }
+    if (!namesASetting(config.changes)) {
+      throw new Error(
+        'a settings patch names no setting: there is nothing to change',
+      );
+    }
+    const connection = withCallTimeout(this.connection, options.timeout);
+    const name = config.tableName;
+    const mediaType = options.headers.accept;
+    const refusal = (message: string, response: IAdtWireResponse) => ({
+      answer: response,
+      failure: {
+        origin: 'refusal' as const,
+        code: AdtObjectErrorCodes.UPDATE_FAILED,
+        message: `The settings patch of ${name}: ${message}; nothing was written`,
+        response,
+      },
+    });
+    return answeringExchange(
+      async () => {
+        const read = await getTableSettings(connection, name, {
+          version: 'inactive',
+          accept: mediaType,
+        });
+        // A refusal SAP answered, which a connection resolved: the default
+        // verdict reads it, as for every member.
+        if (failedStatus(read)) return { answer: read };
+        const etag = headerValue(read.headers, 'etag');
+        if (etag === undefined) {
+          return refusal('the read answered no ETag to guard the write', read);
+        }
+        const document = readSettingsDocument(
+          typeof read.data === 'string' ? read.data : '',
+        );
+        if (!document) {
+          return refusal(
+            'the read answered a document without every setting the write needs',
+            read,
+          );
+        }
+        const merged = mergeSettings(document.settings, config.changes);
+        if (!merged.ok) return refusal(merged.reason, read);
+        const written = await updateTableSettings(
+          connection,
+          { accept: mediaType, contentType: mediaType },
+          etag,
+          {
+            tableName: name,
+            description: document.description,
+            settings: merged.settings,
+            transportRequest: config.transportRequest,
+          },
+          options.lockHandle,
+        );
+        return { answer: written };
+      },
       this.results.metadataUpdated,
       options.analyse,
     );
@@ -269,4 +398,21 @@ export class AdtTableSettings<
       options?.analyse,
     );
   }
+}
+
+/** A header's value whatever the case of its name (`etag`, `ETag`). */
+function headerValue(
+  headers: Readonly<Record<string, unknown>> | undefined,
+  name: string,
+): string | undefined {
+  for (const [key, value] of Object.entries(headers ?? {})) {
+    if (
+      key.toLowerCase() === name &&
+      typeof value === 'string' &&
+      value !== ''
+    ) {
+      return value;
+    }
+  }
+  return undefined;
 }
