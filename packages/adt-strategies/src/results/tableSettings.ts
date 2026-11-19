@@ -21,9 +21,9 @@ import { field, isElement, leafText } from '../parsed';
  * naming it. Our own reading failing on a document is ours: the library runs
  * a result strategy outside its catch for that reason.
  *
- * Read beside the settings: `version`, and the cloud's `isWritableByAMDP`
- * (absent on premise, whose transformation does not define it, Code), which
- * a write now carries back. `supportsLoggingAssessment`, which both recorded
+ * Read beside the settings: `version`. Inside the settings, on the cloud:
+ * `isWritableByAMDP` (absent on premise, whose transformation does not
+ * define it, Code), which a write now carries back. `supportsLoggingAssessment`, which both recorded
  * reads carry and the transformation only writes, is not read.
  */
 
