@@ -2,16 +2,19 @@
  * Where-used operations for ABAP objects
  */
 
-import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtHeaders,
+  TextElementsWhereUsedContainer,
+} from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { AdtAddressableCode } from '../../endpoints/codes';
+import { TEXT_ELEMENTS } from '../../endpoints/objects';
 import { buildObjectUri } from '../../utils/activationUtils';
 import { requestHeaders } from '../../utils/requestHeaders';
 import type { AdtCodes } from './codeSets';
-import type { IGetWhereUsedParams, IGetWhereUsedScopeParams } from './types';
 
 /**
  * Modify where-used scope to enable/disable specific object types
@@ -108,14 +111,20 @@ export type WhereUsedAddressCode = Exclude<
   AdtCodes<'FUGR/I'>
 >;
 
-/** What the where-used requests take: their params, `object_type` addressable. */
-export type IWhereUsedScopeRequest = Omit<
-  IGetWhereUsedScopeParams,
-  'object_type'
-> & { object_type: WhereUsedAddressCode };
-export type IWhereUsedRequest = Omit<IGetWhereUsedParams, 'object_type'> & {
-  object_type: WhereUsedAddressCode;
-};
+/**
+ * What the where-used requests take: the object's name, an addressable code
+ * and, for `PROG/PX`, the container its text elements belong to — the typed
+ * parameters (`IAdtWhereUsedParamsOf<V>`) require it there and refuse it
+ * elsewhere (interfaces-adt 30.0.0).
+ */
+export interface IWhereUsedScopeRequest {
+  readonly object_name: string;
+  readonly object_type: WhereUsedAddressCode;
+  readonly container?: TextElementsWhereUsedContainer | undefined;
+}
+export interface IWhereUsedRequest extends IWhereUsedScopeRequest {
+  readonly scopeXml?: string | undefined;
+}
 
 /**
  * The address a where-used request asks about.
@@ -133,7 +142,14 @@ export type IWhereUsedRequest = Omit<IGetWhereUsedParams, 'object_type'> & {
 export function whereUsedObjectUri(
   objectName: string,
   objectType: WhereUsedAddressCode,
+  container?: TextElementsWhereUsedContainer,
 ): string {
+  // `PROG/PX` is a program's text elements and a function group's: both
+  // resolve to `PROG/PX` and both are served (measured on premise), and the
+  // container says which address. The tables keep one collection per code.
+  if (objectType === 'PROG/PX' && container === 'functionGroup') {
+    return TEXT_ELEMENTS.uri('functionGroup', objectName);
+  }
   if (objectType === 'FUGR/FF') {
     const [group, fm] = objectName.split('|');
     if (!group || !fm) {
@@ -179,7 +195,11 @@ export async function getWhereUsedScope(
   headers: IAdtHeaders,
   params: IWhereUsedScopeRequest,
 ): Promise<IAdtWireResponse> {
-  const objectUri = whereUsedObjectUri(params.object_name, params.object_type);
+  const objectUri = whereUsedObjectUri(
+    params.object_name,
+    params.object_type,
+    params.container,
+  );
   const scopeUrl = `/sap/bc/adt/repository/informationsystem/usageReferences/scope?uri=${encodeURIComponent(objectUri)}`;
   const scopeRequestBody =
     '<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageScopeRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:affectedObjects/></usagereferences:usageScopeRequest>';
@@ -212,7 +232,11 @@ export async function getWhereUsed(
   headers: IAdtHeaders,
   params: IWhereUsedRequest,
 ): Promise<IAdtWireResponse> {
-  const objectUri = whereUsedObjectUri(params.object_name, params.object_type);
+  const objectUri = whereUsedObjectUri(
+    params.object_name,
+    params.object_type,
+    params.container,
+  );
 
   // Step 2: perform the actual where-used search.
   // We do NOT auto-fetch a default scope here. The Eclipse ADT client posts

@@ -32,7 +32,10 @@ const WHERE_USED: IAdtHeaders = {
 export async function whereUsed(
   client: AdtClient,
   objectName: string,
-  objectType: AdtWhereUsedCode<AdtModernVariant> = 'CLAS/OC',
+  // A program's or a function group's text elements (`PROG/PX`) name their
+  // container as well (interfaces-adt 30.0.0); this example asks about the
+  // other codes.
+  objectType: Exclude<AdtWhereUsedCode<AdtModernVariant>, 'PROG/PX'> = 'CLAS/OC',
   searchOnlyIn?: string[],
 ): Promise<string> {
   const utils = client.getUtils();
