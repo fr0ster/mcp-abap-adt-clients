@@ -33,6 +33,19 @@ export interface ISessionController {
   setSessionType(type: 'stateful' | 'stateless'): void;
 }
 
+/**
+ * Whether a release's answer is one SAP refused: a response whose status is
+ * outside 2xx. An answer with no status (a thunk that resolves nothing) is
+ * not a refusal.
+ */
+export function failedStatus(answer: unknown): boolean {
+  if (typeof answer !== 'object' || answer === null || !('status' in answer)) {
+    return false;
+  }
+  const { status } = answer;
+  return typeof status === 'number' && (status < 200 || status >= 300);
+}
+
 export class LockRegistry {
   private readonly locks = new Map<string, UnlockThunk>();
 
@@ -61,7 +74,8 @@ export class LockRegistry {
 
   /**
    * Release every lock still held. Successfully released locks are dropped;
-   * locks whose unlock throws are kept and returned as failures.
+   * locks whose unlock throws, or resolves a status outside 2xx, are kept and
+   * returned as failures.
    *
    * **A credential refusal SAP was never asked about ends the batch.** Every
    * further unlock would only ask the credential provider again, so the loop
@@ -82,8 +96,14 @@ export class LockRegistry {
     try {
       for (const [key, unlock] of [...this.locks]) {
         try {
-          await unlock();
-          this.locks.delete(key);
+          const answer = await unlock();
+          // The registry follows the wire: a release a connection resolved
+          // with a status outside 2xx released nothing, so the lock stays.
+          if (failedStatus(answer)) {
+            failures.push({ key, error: answer });
+          } else {
+            this.locks.delete(key);
+          }
         } catch (error) {
           if (isUnansweredCredentialRefusal(error)) throw error;
           failures.push({ key, error });
