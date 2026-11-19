@@ -12,7 +12,7 @@
     "headers": {
       "Accept": "application/xml"
     },
-    "headersNote": "The Accept and Content-Type the probe sent for the part (the probe log records the request line and body only). The lock handle is not recorded.",
+    "headersNote": "Reconstructed, not recorded: the probe log keeps the request line and the request body (both recorded here as sent) and the answer's status, content type and body, not the request's headers. The Accept and Content-Type are the part's media type the probe used; the lock handle is not recorded.",
     "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\"><adtcore:objectReference adtcore:uri=\"/sap/bc/adt/functions/groups/zmcp_txg4480\" adtcore:type=\"FUGR/F\" adtcore:name=\"ZMCP_TXG4480\"/><adtcore:objectReference adtcore:uri=\"/sap/bc/adt/textelements/functiongroups/zmcp_txg4480\" adtcore:type=\"PROG/PX\" adtcore:name=\"ZMCP_TXG4480\"/></adtcore:objectReferences>"
   },
   "response": {

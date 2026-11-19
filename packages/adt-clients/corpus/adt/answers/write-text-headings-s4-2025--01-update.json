@@ -13,7 +13,7 @@
       "Accept": "application/vnd.sap.adt.textelements.headings.v1",
       "Content-Type": "application/vnd.sap.adt.textelements.headings.v1; charset=utf-8"
     },
-    "headersNote": "The Accept and Content-Type the probe sent for the part (the probe log records the request line and body only). The lock handle is not recorded.",
+    "headersNote": "Reconstructed, not recorded: the probe log keeps the request line and the request body (both recorded here as sent) and the answer's status, content type and body, not the request's headers. The Accept and Content-Type are the part's media type the probe used; the lock handle is not recorded.",
     "body": "listHeader=List header EN\r\n\r\ncolumnHeader_1=Col one\r\ncolumnHeader_2=Col two\r\ncolumnHeader_3=Col three"
   },
   "response": {
