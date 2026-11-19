@@ -16,6 +16,12 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 > **From 18.x?** Read [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md)
 > first: 19.0.0 is where members became one endpoint call each.
 >
+> **From 45.x?** 46.0.0 (on `interfaces-adt` ^30.0.0) adds `getTextElements()`
+> and `getTableSettings()`, and where-used of `PROG/PX` names its
+> `container`: a where-used call whose code is a variable of the whole union
+> excludes `PROG/PX` or handles it apart. See
+> [`docs/usage/MIGRATION-46.md`](docs/usage/MIGRATION-46.md).
+>
 > **From 44.x?** 45.0.0 (on `interfaces-adt` ^27.0.0): `IUtilResults` has the
 > required `objectActivation` slot, read by the new `getUtils().activateObjects`
 > (`POST /activation`, for a system whose discovery lists no
@@ -274,6 +280,7 @@ where 7.40 is not measured (its [LEGACY.md](https://github.com/fr0ster/mcp-abap-
 | Append structures | `getAppendStructure()` | `TABL/DS` | ✅ | ✅ | — |
 | Tables | `getTable()` | `TABL/DT` | ✅ | ✅ | — |
 | Technical settings of a table | `getTableSettings()` | `TABL/DTT` | ✅ | ✅ | — |
+| Text elements of a program, a class or a function group | `getTextElements()` | `PROG/PX`, `CLAS/OCX` | ✅ | ✅ | — |
 | Table types | `getTableType()` | `TTYP/DA` | ✅ | ✅ | — |
 | DDL sources (CDS views) | `getDdl()` | `DDLS/DF` | ✅ | ✅ | ✅ |
 | Access controls | `getAccessControl()` | `DCLS/DL` | ✅ | ✅ | — |
@@ -807,7 +814,7 @@ when it creates the table, and activating the table activates them — there is
 no create, delete or activation of the settings.
 
 `updateMetadata` takes the settings typed (`ITableSettingsUpdateConfig` of
-`@mcp-abap-adt/interfaces-adt` 29.0.0) and builds the document itself; its
+`@mcp-abap-adt/interfaces-adt` 29.0.0 and later) and builds the document itself; its
 options refuse a `source` and require the `lockHandle`. **The write replaces
 every setting**: SAP writes the whole DD09L row from the document and resets a
 field left out, so every setting is required — read, change, write back.
@@ -884,6 +891,92 @@ without a handle is a refusal (`LOCK_FAILED`), and an empty `lockHandle` throws
 before the PUT is sent. On SAP_BASIS 7.40 the factory does not compile
 (`ADT_TYPES_BASIS_740` has no such API): its discovery has no
 `/ddic/db/settings`.
+
+### Text elements
+
+A program's, a class's or a function group's text symbols, selection texts
+and list and column headings are not part of its source: SAP keeps them at
+`/sap/bc/adt/textelements/{programs|classes|functiongroups}/{name}`, one part
+per sub-resource (`…/source/symbols`, `…/source/selections`,
+`…/source/headings`), each with its own media type
+(`TEXT_ELEMENTS_MEDIA_TYPES`), under a lock of their own (`TEXT`) that the
+object's lock does not cover. `getTextElements()` answers them: `read`,
+`lock`, `update` and `unlock`, one request each (`@mcp-abap-adt/interfaces-adt`
+30.0.0, `IAdtTextElements.ts`). A class has text symbols only.
+
+- **`read(config, version?)`** sends the part's media type as `Accept`;
+  `version` is `active`, `inactive` or `workingArea`, absent the working area.
+  `textSymbols`, `selectionTexts` and `textHeadings` of
+  `@mcp-abap-adt/adt-strategies` read the parts as SAP wrote them (a selection
+  text's name padded to eight, `@DDICReference` as `ddicReference`) and throw
+  naming any line they cannot read.
+- **`update(config, { headers, lockHandle })` writes one whole part**: SAP
+  deletes every entry the list leaves out, so create, change and delete are
+  the same write — read, change, write back. The body is built from the typed
+  list (`textSymbolsBody`, `selectionTextsBody`, `textHeadingsBody`); a part
+  read and written back unchanged is the same bytes. A line break in a value,
+  `=` in a key or a name, or a length that is not a count is refused before
+  any request.
+- **The texts are the original language's**: SAP ignores the logon language
+  for them (measured).
+- **A write lands inactive.** One activation naming the object and its text
+  elements activates both — `textElementsActivationReferences` builds the
+  pair (a function group's text elements are `PROG/PX` under
+  `/textelements/functiongroups/{group}`); naming the object alone runs
+  nothing for them (measured).
+
+```typescript
+import {
+  textElementsActivationReferences,
+  textElementsDocuments,
+} from '@mcp-abap-adt/adt-clients';
+import { textSymbols } from '@mcp-abap-adt/adt-strategies';
+
+const SYMBOLS_HEADERS = {
+  accept: 'application/vnd.sap.adt.textelements.symbols.v1',
+  contentType: 'application/vnd.sap.adt.textelements.symbols.v1; charset=utf-8',
+};
+const texts = client.getTextElements({
+  ...textElementsDocuments,
+  source: textSymbols,
+});
+const object = { objectKind: 'class', objectName: 'ZCL_TOOL' } as const;
+
+const locked = await texts.lock(object);
+if (!locked.ok) throw new Error(locked.getError().message);
+const lockHandle = locked.getResult().value;
+let written = false;
+let released = false;
+try {
+  const read = await texts.read({ ...object, part: 'symbols' });
+  if (!read.ok) throw new Error(read.getError().message);
+  const { symbols } = read.getResult().value;
+  const put = await texts.update(
+    {
+      ...object,
+      part: 'symbols',
+      symbols: [...symbols, { key: '010', text: 'Saved', maxLength: 20 }],
+    },
+    { headers: SYMBOLS_HEADERS, lockHandle },
+  );
+  written = put.ok;
+} finally {
+  released = (await texts.unlock(object, lockHandle)).ok;
+}
+if (written && released) {
+  await client
+    .getUtils()
+    .activateObjects(textElementsActivationReferences(object), true, {
+      headers: ACTIVATION_HEADERS,
+    });
+}
+```
+
+Where-used of a program's or a function group's text elements names its
+`container` (`'program'` or `'functionGroup'`, required with `PROG/PX`);
+`CLAS/OCX` is not asked of — the systems measured serve no where-used for it.
+On SAP_BASIS 7.40 the factory does not compile and `AdtClientLegacy` refuses
+it: 7.40's discovery has no `/textelements`.
 
 This package does not check what you pass, and cannot: whether a document is
 complete is a question only your system can answer, and it answers it — in its
