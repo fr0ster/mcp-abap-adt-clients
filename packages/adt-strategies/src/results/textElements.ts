@@ -29,10 +29,14 @@ export interface ITextSymbolRead {
   maxLength: number;
 }
 
-/** One selection text: `NAME=text`, the name as SAP pads it. */
+/**
+ * One selection text: `NAME=text`, the name as SAP pads it, after an
+ * `@DDICReference` line when the text is the dictionary field's label.
+ */
 export interface ISelectionTextRead {
   name: string;
   text: string;
+  ddicReference: boolean;
 }
 
 /** The list and column headings. */
@@ -141,12 +145,38 @@ export function readTextSymbols(body: string): ITextSymbolsDocument {
   return { part: 'symbols', symbols };
 }
 
-/** The selections part's text, read: one `NAME=text` per line. */
+const DDIC_REFERENCE = '@DDICReference';
+
+/**
+ * The selections part's text, read: `NAME=text` per entry, an empty line
+ * between two entries, an `@DDICReference` line before an entry whose text is
+ * the dictionary's (`CL_SEDX_ADT_C_HANDLER_SELECTIS`, measured on premise).
+ */
 export function readSelectionTexts(body: string): ISelectionTextsDocument {
-  const selections = linesOf(body).map((line, index) => {
+  const lines = linesOf(body);
+  const selections: ISelectionTextRead[] = [];
+  let index = 0;
+  while (index < lines.length) {
+    if (selections.length > 0) {
+      if (lines[index] !== '') {
+        throw new Error(
+          `text elements selections: line ${index + 1} is not the empty line between two entries`,
+        );
+      }
+      index += 1;
+    }
+    const ddicReference = lines[index] === DDIC_REFERENCE;
+    if (ddicReference) index += 1;
+    const line = lines[index];
+    if (line === undefined) {
+      throw new Error(
+        `text elements selections: line ${index + 1} is missing: no entry after '${DDIC_REFERENCE}'`,
+      );
+    }
     const { key, text } = keyAndText(line, 'selections', index);
-    return { name: key, text };
-  });
+    selections.push({ name: key, text, ddicReference });
+    index += 1;
+  }
   return { part: 'selections', selections };
 }
 
