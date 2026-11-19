@@ -1,8 +1,5 @@
-export {
-  AdtTextElements,
-  type TextElementsUpdateOptions,
-  type TextElementsValues,
-} from './AdtTextElements';
+export { AdtTextElements, type TextElementsValues } from './AdtTextElements';
+export { textElementsActivationReferences } from './activation';
 export {
   type ISelectionTextInput,
   type ITextHeadingsInput,

@@ -17,42 +17,24 @@
  * the caller meant would delete or rename entries: these throw, naming the
  * entry.
  *
- * The input shapes are those of `TextElementsDocument` in
- * `@mcp-abap-adt/interfaces-adt` 30.0.0, declared here until this package
- * depends on that release.
+ * The input shapes are the contract's (`TextElementsDocument`,
+ * `@mcp-abap-adt/interfaces-adt` 30.0.0).
  */
 
-/** One text symbol. */
-export interface ITextSymbolInput {
-  readonly key: string;
-  readonly text: string;
-  readonly maxLength: number;
-}
+import type {
+  ISelectionText,
+  ITextHeadings,
+  ITextSymbol,
+  TextElementsDocument,
+} from '@mcp-abap-adt/interfaces-adt';
 
-/** One selection text. */
-export interface ISelectionTextInput {
-  readonly name: string;
-  readonly text: string;
-  readonly ddicReference: boolean;
-}
-
-/** The list and column headings. */
-export interface ITextHeadingsInput {
-  readonly listHeader: string;
-  readonly columnHeader1: string;
-  readonly columnHeader2: string;
-  readonly columnHeader3: string;
-  readonly columnHeader4: string;
-}
+/** One text symbol, one selection text, the headings: the contract's. */
+export type ITextSymbolInput = ITextSymbol;
+export type ISelectionTextInput = ISelectionText;
+export type ITextHeadingsInput = ITextHeadings;
 
 /** One part with its whole list. */
-export type TextElementsPartInput =
-  | { readonly part: 'symbols'; readonly symbols: readonly ITextSymbolInput[] }
-  | {
-      readonly part: 'selections';
-      readonly selections: readonly ISelectionTextInput[];
-    }
-  | { readonly part: 'headings'; readonly headings: ITextHeadingsInput };
+export type TextElementsPartInput = TextElementsDocument;
 
 const CRLF = '\r\n';
 

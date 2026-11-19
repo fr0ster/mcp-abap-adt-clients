@@ -50,8 +50,13 @@ import {
   type IAdtAnalyseOptions,
   type IAdtError,
   type IAdtHeaders,
+  type IAdtLockable,
   type IAdtResponse,
-  type IAdtUpdateOptions,
+  type IAdtTextElementsReadable,
+  type IAdtTextElementsReadOptions,
+  type IAdtTextElementsUpdatable,
+  type IAdtTextElementsUpdateOptions,
+  type ITextElementsResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -82,21 +87,14 @@ import type {
   ITextElementsPartConfig,
   ITextElementsUpdateConfig,
   TextElementsObjectKind,
-  TextElementsReadOptions,
   TextElementsReadVersion,
   textElementsDocuments,
 } from './types';
 
 /** What each slot of the result set answers. */
 export type TextElementsValues = {
-  readonly [K in keyof typeof textElementsDocuments]: unknown;
+  readonly [K in keyof ITextElementsResults]: unknown;
 };
-
-/** The options of a write: no `source`, the lock handle required. */
-export type TextElementsUpdateOptions<E extends IAdtError = IAdtError> = Omit<
-  IAdtUpdateOptions<E>,
-  'source' | 'lockHandle'
-> & { source?: never; lockHandle: string };
 
 /** The kind and the name an identifying member names. */
 type TextElementsObject = Pick<
@@ -107,7 +105,11 @@ type TextElementsObject = Pick<
 export class AdtTextElements<
   T extends TextElementsValues = ResultValuesOf<typeof textElementsDocuments>,
   V extends AdtVariant = AdtModernVariant,
-> {
+> implements
+    IAdtTextElementsReadable<T['source']>,
+    IAdtTextElementsUpdatable<T['updated']>,
+    IAdtLockable<ITextElementsConfig, 'objectKind' | 'objectName'>
+{
   /**
    * The release variant this serves, as a type only — never set. The
    * factories' and members' gates read it (see `clients/variant.ts`).
@@ -152,7 +154,7 @@ export class AdtTextElements<
   async read<E extends IAdtError = IAdtError>(
     config: ITextElementsPartConfig,
     version?: TextElementsReadVersion,
-    options?: TextElementsReadOptions<E>,
+    options?: IAdtTextElementsReadOptions<E>,
   ): Promise<IAdtResponse<T['source'], E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
@@ -178,7 +180,7 @@ export class AdtTextElements<
    */
   async update<E extends IAdtError = IAdtError>(
     config: ITextElementsUpdateConfig,
-    options: { headers: IAdtHeaders } & TextElementsUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtTextElementsUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The type requires a lock handle; an empty one would drop out of the
     // query and send the PUT with no lock at all.

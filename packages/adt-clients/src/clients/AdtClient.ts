@@ -49,6 +49,7 @@ import type {
   ITableResults,
   ITableSettingsResults,
   ITableTypeResults,
+  ITextElementsResults,
   ITransformationResults,
   ITransportResults,
   IUtilResults,
@@ -195,6 +196,11 @@ import {
   type TableTypeValues,
   tableTypeDocuments,
 } from '../core/tabletype';
+import {
+  AdtTextElements,
+  type TextElementsValues,
+  textElementsDocuments,
+} from '../core/textElements';
 import {
   AdtTransformation,
   type TransformationValues,
@@ -617,6 +623,32 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
   ): AdtTableSettings<TableSettingsValues, V> {
     this.assertConnected();
     return new AdtTableSettings<TableSettingsValues, V>(this.connection, {
+      logger: this.logger,
+      lockRegistry: this.lockRegistry,
+      results,
+    });
+  }
+
+  /**
+   * The text elements of a program, a class or a function group (`PROG/PX`,
+   * `CLAS/OCX`): read, lock, write and unlock one part, each one request.
+   * Not part of `getProgram()` or `getClass()`: SAP keeps them at their own
+   * resource, under their own lock; one activation naming the object and
+   * them activates both (`textElementsActivationReferences`).
+   */
+  getTextElements(
+    this: this & AdtServedBy<'textElements'>,
+  ): AdtTextElements<ResultValuesOf<typeof textElementsDocuments>, V>;
+  getTextElements<R extends ITextElementsResults>(
+    this: this & AdtServedBy<'textElements'>,
+    results: R,
+  ): AdtTextElements<ResultValuesOf<R>, V>;
+  getTextElements(
+    this: this & AdtServedBy<'textElements'>,
+    results: ITextElementsResults = textElementsDocuments,
+  ): AdtTextElements<TextElementsValues, V> {
+    this.assertConnected();
+    return new AdtTextElements<TextElementsValues, V>(this.connection, {
       logger: this.logger,
       lockRegistry: this.lockRegistry,
       results,

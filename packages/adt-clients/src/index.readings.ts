@@ -63,6 +63,7 @@ export { structureDocuments } from './core/structure/types';
 export { tableDocuments } from './core/table/types';
 export { tableSettingsDocuments } from './core/tableSettings/types';
 export { tableTypeDocuments } from './core/tabletype/types';
+export { textElementsDocuments } from './core/textElements/types';
 export { transformationDocuments } from './core/transformation/types';
 export { transportDocuments } from './core/transport/types';
 /**
