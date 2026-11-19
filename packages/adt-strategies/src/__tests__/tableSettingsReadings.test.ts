@@ -68,4 +68,30 @@ describe('tableSettings', () => {
       'no ts:tableSettings document',
     );
   });
+
+  it('decodes character references and entities, and keeps spaces, in attributes and text', () => {
+    const xml = String(recorded('read-table-settings-s4-2025').data)
+      .replace(
+        'adtcore:description="Flight"',
+        'adtcore:description=" Caf&#xE9; &amp; &#233;t&#xe9; "',
+      )
+      .replace('ts:value=""', 'ts:value="  a &lt;b&gt; "')
+      .replace(
+        '<ts:loadUnit/>',
+        '<ts:loadUnit> Caf&#xE9; &amp; x </ts:loadUnit>',
+      );
+    const read = readTableSettings(xml);
+    expect(read.description).toBe(' Caf\u00e9 & \u00e9t\u00e9 ');
+    expect(read.settings.translation.value).toBe('  a <b> ');
+    expect(read.settings.loadUnit).toBe(' Caf\u00e9 & x ');
+  });
+});
+
+describe('the ETag header', () => {
+  it.each(['etag', 'ETag', 'Etag'])('is read whatever its case (%s)', (key) => {
+    const answer = recorded('read-table-settings-s4-2025');
+    expect(tableSettings({ ...answer, headers: { [key]: '"E-1"' } }).etag).toBe(
+      '"E-1"',
+    );
+  });
 });

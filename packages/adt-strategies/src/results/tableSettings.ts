@@ -40,13 +40,37 @@ export interface ITableSettingsAnswer extends ITableSettingsDocument {
   etag: string | undefined;
 }
 
+// Values are read as SAP wrote them: not trimmed (a translation value or a
+// description may begin or end with a space, and a write must send it back as
+// it was), and with every reference decoded — the predefined entities and the
+// character references (`&#xE9;`), in attributes and in text.
 const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
   removeNSPrefix: true,
   parseTagValue: false,
   parseAttributeValue: false,
+  trimValues: false,
+  processEntities: true,
+  htmlEntities: true,
 });
+
+/** A header's value whatever the case of its name (`etag`, `ETag`). */
+function headerValue(
+  headers: Readonly<Record<string, unknown>> | undefined,
+  name: string,
+): string | undefined {
+  for (const [key, value] of Object.entries(headers ?? {})) {
+    if (
+      key.toLowerCase() === name &&
+      typeof value === 'string' &&
+      value !== ''
+    ) {
+      return value;
+    }
+  }
+  return undefined;
+}
 
 /** A child element's text: `''` when empty, a throw naming it when absent. */
 function text(node: unknown, key: string): string {
@@ -148,9 +172,8 @@ export function readTableSettings(xml: string): ITableSettingsDocument {
 export const tableSettings: IResultStrategy<ITableSettingsAnswer> = (
   answer,
 ) => {
-  const etag = answer.headers?.etag;
   return {
     ...readTableSettings(typeof answer.data === 'string' ? answer.data : ''),
-    etag: typeof etag === 'string' && etag !== '' ? etag : undefined,
+    etag: headerValue(answer.headers, 'etag'),
   };
 };
