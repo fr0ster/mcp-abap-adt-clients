@@ -22,21 +22,24 @@ Released with `@mcp-abap-adt/adt-clients` 46.1.0, on
 ### Added
 
 - **`utilInactiveObjects` carries each entry's `uri` and `parentUri`.** SAP
-  lists a class's text elements as `PROG/PX` named after the class pool
-  (`ZCL_…====CP`) at `/textelements/classes/{class}`, and a function group's
-  as `PROG/PX` `SAPL{GROUP}` at `/textelements/functiongroups/{group}`, each
-  with its object as `parentUri` (measured on premise and on the cloud;
-  `CL_SEDX_ADT_SRC_UTIL=>get_type_and_name_from_uri`, Code). The name alone
-  addresses a program of that name; with its `uri`, a `PROG/PX` entry handed
-  to `activateObjectsGroup` is activated where SAP listed it.
-  `IInactiveObject` gains the two optional fields.
+  listed a class's text elements as `PROG/PX` named after the class pool
+  (`ZCL_…====CP`) at `/textelements/classes/{class}` (measured on premise),
+  and a function group's as `PROG/PX` `SAPL{GROUP}` at
+  `/textelements/functiongroups/{group}` (measured on the cloud), each with
+  its object as `parentUri`; the pool name comes from
+  `CL_SEDX_ADT_SRC_UTIL=>get_type_and_name_from_uri` (Code). The entry's
+  name is not the object's: a `PROG/PX` reference without a `uri` is
+  addressed `/textelements/programs/{name}`. The `uri` is now there for a
+  caller building its own references; the cloud capture activated the group
+  through the synchronous `/activation` naming the group, not by passing the
+  listed entry on. `IInactiveObject` gains the two optional fields.
 
 - **`cloudTableSettings`**, the settings reading for a cloud system: the
   settings carry `isWritableByAMDP` as a `boolean`
   (`ITableSettingsReadOf<'cloud'>`), so a cloud client's write takes them
   back as they are, and a read without `ts:isWritableByAMDP` throws, naming
-  it (the cloud answers it on every read, Measured; a write without it resets
-  it, Measured). On premise `tableSettings` reads as before.
+  it (the cloud answered it on every read measured; a write without it reset
+  it, measured). On premise `tableSettings` reads as before.
 
 ### Checked
 

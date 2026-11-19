@@ -94,15 +94,15 @@ export interface IWhereUsedListResult {
  * `activateObjectsGroup`; an `unknownType` is not one, so a caller decides
  * about it.
  *
- * **The address, not the name, identifies a text elements entry.** SAP lists
- * a class's text elements as `PROG/PX` named after the class pool
- * (`ZCL_…====CP`), at `/textelements/classes/{class}`, and a function group's
- * as `PROG/PX` `SAPL{GROUP}` at `/textelements/functiongroups/{group}`, each
- * with its object as `parentUri` (measured on premise and on the cloud;
- * `CL_SEDX_ADT_SRC_UTIL=>get_type_and_name_from_uri`, Code). A `PROG/PX`
- * reference handed back with its `uri` is activated at that address
- * (`activateObjectsGroup`); one built from the name alone would address a
- * program of that name.
+ * **The address, not the name, identifies a text elements entry.** SAP
+ * listed a class's text elements as `PROG/PX` named after the class pool
+ * (`ZCL_…====CP`) at `/textelements/classes/{class}` (measured on premise),
+ * and a function group's as `PROG/PX` `SAPL{GROUP}` at
+ * `/textelements/functiongroups/{group}` (measured on the cloud), each with
+ * its object as `parentUri` (`CL_SEDX_ADT_SRC_UTIL=>
+ * get_type_and_name_from_uri`, Code). A `PROG/PX` reference without a `uri`
+ * is addressed `/textelements/programs/{name}`, which for these names is no
+ * object; `uri` is the address SAP listed.
  */
 export type IInactiveObject = IAdtAnsweredObject & {
   name: string;

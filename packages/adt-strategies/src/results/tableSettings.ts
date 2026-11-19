@@ -12,25 +12,34 @@ import { field, isElement, leafText } from '../parsed';
  * `SDDIC_ADT_TTAB`.
  *
  * **Every setting a write needs, or a throw naming the one missing.** The
- * settings write replaces the whole DD09L row, so a reading that filled an
+ * settings write replaces every DD09L field the transformation maps
+ * (`move_adt_to_ddv`, Code on both systems), so a reading that filled an
  * absent element with a value of its own would hand the caller a value SAP
- * never sent, and the write would store it. An element that is present but
- * empty (`<ts:sharingType/>`) is `''`; one that is absent throws, naming it.
- * Our own reading failing on a document is ours: the library runs a result
- * strategy outside its catch for that reason.
+ * never sent, and the write would store it. A text element that is present
+ * but empty (`<ts:sharingType/>`) is `''`; an empty boolean or count throws,
+ * as one that is not `true`/`false` or not a count; an absent one throws,
+ * naming it. Our own reading failing on a document is ours: the library runs
+ * a result strategy outside its catch for that reason.
  *
- * What only a read returns is read too: `isWritableByAMDP` (the cloud's;
- * absent on premise) on the settings, `version` beside them.
- * `supportsLoggingAssessment`, which SAP computes on every read, is not read.
+ * Read beside the settings: `version`, and the cloud's `isWritableByAMDP`
+ * (absent on premise, whose transformation does not define it, Code), which
+ * a write now carries back. `supportsLoggingAssessment`, which both recorded
+ * reads carry and the transformation only writes, is not read.
  */
 
 /** The settings document, read. */
 export interface ITableSettingsDocument {
   /** `adtcore:name`. */
   name: string;
-  /** `adtcore:description`: the table's short text, which a write must carry. */
+  /**
+   * `adtcore:description`, which a write must carry (SWB_TOOL 019 without
+   * it, measured on both).
+   */
   description: string;
-  /** `adtcore:version`: `active`, `inactive` or `new`. */
+  /**
+   * `adtcore:version`: `active` and `inactive` in the recorded reads; `new`
+   * answered right after the table's creation (measured on both).
+   */
   version: string;
   settings: ITableSettingsRead;
 }
@@ -192,7 +201,7 @@ export interface ICloudTableSettingsAnswer
 /**
  * {@link tableSettings} for a cloud system: a read without
  * `ts:isWritableByAMDP` is an incomplete answer and throws, naming it. The
- * cloud answers it on every read (Measured) and writes it from the document
+ * cloud answered it on every read measured, and writes it from the document
  * (`move_adt_to_ddv`, Code); a write built from a read that lacked it would
  * reset it. On premise the element does not exist (Code): read it there with
  * {@link tableSettings}.
