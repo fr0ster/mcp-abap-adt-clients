@@ -17,8 +17,30 @@ import type { ResultValuesOf } from '../utils/resultStrategy';
 import { AdtClient } from './AdtClient';
 import type { AdtServedBy } from './variant';
 
-/** S/4HANA 2025 on premise — `ADT_TYPES_ONPREM`. */
-export class AdtClientOnPrem extends AdtClient<'onprem'> {}
+/**
+ * S/4HANA 2025 on premise — `ADT_TYPES_ONPREM`. Its table settings handler
+ * is the on-premise one: a write refuses `isWritableByAMDP` (nothing maps it
+ * there, Code).
+ */
+export class AdtClientOnPrem extends AdtClient<'onprem'> {
+  override getTableSettings(
+    this: this & AdtServedBy<'tableSettings'>,
+  ): AdtTableSettings<ResultValuesOf<typeof tableSettingsDocuments>, 'onprem'>;
+  override getTableSettings<R extends ITableSettingsResults>(
+    this: this & AdtServedBy<'tableSettings'>,
+    results: R,
+  ): AdtTableSettings<ResultValuesOf<R>, 'onprem'>;
+  override getTableSettings(
+    this: this & AdtServedBy<'tableSettings'>,
+    results: ITableSettingsResults = tableSettingsDocuments,
+  ): AdtTableSettings<TableSettingsValues, 'onprem'> {
+    this.assertConnected();
+    return new AdtTableSettings<TableSettingsValues, 'onprem'>(
+      this.connection,
+      { logger: this.logger, lockRegistry: this.lockRegistry, results },
+    );
+  }
+}
 
 /**
  * ABAP cloud — `ADT_TYPES_CLOUD`. Choosing it is the declaration that the

@@ -129,6 +129,19 @@ export type TableSettingsPatchConfig<V extends AdtVariant> =
     }[SettingsVariant<V>];
   };
 
+/**
+ * The declared system kind a handler is constructed with, tied to its `V`: a
+ * cloud handler (`V` `'cloud'`) requires `variant: 'cloud'` — the
+ * declaration `AdtClientCloud` makes, never inferred from an answer — and
+ * every other `V` forbids it. With it, `patchMetadata` refuses a read without
+ * `ts:isWritableByAMDP` before any PUT.
+ */
+export type TableSettingsVariantOption<V extends AdtVariant> = [V] extends [
+  'cloud',
+]
+  ? { readonly variant: 'cloud' }
+  : { readonly variant?: undefined };
+
 /** What each slot of the result set answers. */
 export type TableSettingsValues = {
   readonly [K in keyof ITableSettingsResults]: unknown;
@@ -162,15 +175,8 @@ export class AdtTableSettings<
     options: AdtHandlerOptions<
       ResultStrategiesOf<T>,
       'logger' | 'lockRegistry'
-    > & {
-      /**
-       * `'cloud'` when the caller declared the system a cloud one —
-       * `AdtClientCloud`, which `createAdtClient({ variant: 'cloud' })`
-       * answers. Never inferred from an answer. With it, `patchMetadata`
-       * refuses a read without `ts:isWritableByAMDP` before any PUT.
-       */
-      readonly variant?: 'cloud' | undefined;
-    },
+    > &
+      TableSettingsVariantOption<V>,
   ) {
     const { logger, lockRegistry } = options;
     this.declaredCloud = options.variant === 'cloud';

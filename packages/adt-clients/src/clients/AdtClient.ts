@@ -612,21 +612,30 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    */
   getTableSettings(
     this: this & AdtServedBy<'tableSettings'>,
-  ): AdtTableSettings<ResultValuesOf<typeof tableSettingsDocuments>, V>;
+  ): AdtTableSettings<
+    ResultValuesOf<typeof tableSettingsDocuments>,
+    AdtModernVariant
+  >;
   getTableSettings<R extends ITableSettingsResults>(
     this: this & AdtServedBy<'tableSettings'>,
     results: R,
-  ): AdtTableSettings<ResultValuesOf<R>, V>;
+  ): AdtTableSettings<ResultValuesOf<R>, AdtModernVariant>;
   getTableSettings(
     this: this & AdtServedBy<'tableSettings'>,
     results: ITableSettingsResults = tableSettingsDocuments,
-  ): AdtTableSettings<TableSettingsValues, V> {
+  ): AdtTableSettings<TableSettingsValues, AdtModernVariant> {
     this.assertConnected();
-    return new AdtTableSettings<TableSettingsValues, V>(this.connection, {
-      logger: this.logger,
-      lockRegistry: this.lockRegistry,
-      results,
-    });
+    // A client that declares no one system kind: the handler of both newer
+    // kinds, without the cloud declaration. AdtClientOnPrem and
+    // AdtClientCloud, the declarations, override this getter with their own.
+    return new AdtTableSettings<TableSettingsValues, AdtModernVariant>(
+      this.connection,
+      {
+        logger: this.logger,
+        lockRegistry: this.lockRegistry,
+        results,
+      },
+    );
   }
 
   /**

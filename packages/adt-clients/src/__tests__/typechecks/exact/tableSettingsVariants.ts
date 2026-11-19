@@ -9,12 +9,19 @@
  * the built declarations (`npm run build` first). Nothing here runs.
  */
 
-import type { AdtTableSettings } from '@mcp-abap-adt/adt-clients/core';
+import {
+  AdtClientCloud,
+  AdtClientOnPrem,
+  type ResultValuesOf,
+  tableSettingsDocuments,
+} from '@mcp-abap-adt/adt-clients';
+import { AdtTableSettings } from '@mcp-abap-adt/adt-clients/core';
 import type {
   IAdtTableSettingsPatchable,
   IAdtTableSettingsUpdatable,
   ITableSettings,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 
 declare const cloud: AdtTableSettings<
   { metadata: string; metadataUpdated: string },
@@ -68,3 +75,39 @@ export const cloudPatchFlag = cloud.patchMetadata(
     lockHandle: 'H',
   },
 );
+
+// The declared system kind is tied to the handler's type (Codex round 2).
+declare const connection: IAbapConnection;
+
+// The cloud client's handler is inferred cloud-typed: a flagless write fails.
+const inferredCloud = new AdtClientCloud(connection).getTableSettings();
+export const inferredCloudFlagless = inferredCloud.updateMetadata(
+  // @ts-expect-error a cloud write without isWritableByAMDP would reset it
+  { tableName: 'ZT', description: 'd', settings },
+  { headers, lockHandle: 'H' },
+);
+// The on-premise client's handler is on-premise-typed.
+export const inferredOnPremise: AdtTableSettings<
+  ResultValuesOf<typeof tableSettingsDocuments>,
+  'onprem'
+> = new AdtClientOnPrem(connection).getTableSettings();
+
+// An explicit on-premise handler refuses the cloud declaration.
+export const onPremiseDeclaredCloud = new AdtTableSettings<
+  ResultValuesOf<typeof tableSettingsDocuments>,
+  'onprem'
+>(connection, {
+  results: tableSettingsDocuments,
+  // @ts-expect-error only a cloud handler takes the cloud declaration
+  variant: 'cloud',
+});
+// A cloud handler requires it.
+export const cloudUndeclared = new AdtTableSettings<
+  ResultValuesOf<typeof tableSettingsDocuments>,
+  'cloud'
+  // @ts-expect-error a cloud handler requires variant: 'cloud'
+>(connection, { results: tableSettingsDocuments });
+export const cloudDeclared = new AdtTableSettings<
+  ResultValuesOf<typeof tableSettingsDocuments>,
+  'cloud'
+>(connection, { results: tableSettingsDocuments, variant: 'cloud' });
