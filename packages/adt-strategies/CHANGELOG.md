@@ -26,7 +26,11 @@ Released with `@mcp-abap-adt/adt-clients` 45.6.0.
   the translation's four attributes included, and the cloud's
   `isWritableByAMDP` where the read has it. An element or attribute the read
   lacks throws, naming it: the write would otherwise store a value SAP never
-  sent. `readTableSettings(xml)` reads the text alone.
+  sent. Values are read as SAP wrote them: character references and entities
+  decoded (`Caf&#xE9;` is `Café`), in attributes and text, and nothing
+  trimmed, so a write sends back exactly what was read. The ETag header is
+  read whatever the case of its name. `readTableSettings(xml)` reads the text
+  alone.
 
 ### Changed
 

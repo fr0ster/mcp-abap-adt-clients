@@ -57,8 +57,9 @@ Released with `@mcp-abap-adt/adt-strategies` 0.24.0 and
     `; charset=utf-8` (`412` SADT_RESOURCE/043) and accepted it without
     (measured on premise and on the cloud, 2026-11-19);
   - `unlock` — `POST ?_action=UNLOCK&lockHandle=…`, stateful. The lock leaves
-    the client's registry only after a successful UNLOCK, so `unlockAll()`
-    can retry a failed one.
+    the client's registry only when the UNLOCK succeeded on the wire, whatever
+    a caller's `analyse` makes of the answer, so `unlockAll()` can retry a
+    failed one.
 
   SAP creates the settings with the table and activating the table activates
   them, so there is no create, delete or activation of their own. The result

@@ -807,7 +807,7 @@ when it creates the table, and activating the table activates them — there is
 no create, delete or activation of the settings.
 
 `updateMetadata` takes the settings typed (`ITableSettingsUpdateConfig` of
-`@mcp-abap-adt/interfaces-adt` 28.0.0) and builds the document itself; its
+`@mcp-abap-adt/interfaces-adt` 29.0.0) and builds the document itself; its
 options refuse a `source` and require the `lockHandle`. **The write replaces
 every setting**: SAP writes the whole DD09L row from the document and resets a
 field left out, so every setting is required — read, change, write back.
