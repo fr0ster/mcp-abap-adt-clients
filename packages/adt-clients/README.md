@@ -817,34 +817,65 @@ table's short text, which the read answers. `ts:isWritableByAMDP`, which the
 cloud returns, is never written.
 
 ```typescript
-const settings = client.getTableSettings();
+import { tableSettingsDocuments } from '@mcp-abap-adt/adt-clients';
+import { tableSettings } from '@mcp-abap-adt/adt-strategies';
+
+// The request's own pair: the address is the library's, the headers yours.
+const SETTINGS_HEADERS = {
+  accept: 'application/vnd.sap.adt.table.settings.v2+xml',
+  contentType: 'application/vnd.sap.adt.table.settings.v2+xml; charset=utf-8',
+};
+
+// `tableSettings` reads the document: every setting, the description, the ETag.
+const settings = client.getTableSettings({
+  ...tableSettingsDocuments,
+  metadata: tableSettings,
+});
 const target = { tableName: 'ZTABLE' };
 
 const locked = await settings.lock(target);
 if (!locked.ok) throw new Error(locked.getError().message);
 const lockHandle = locked.getResult().value;
+
+let written = false;
+let released = false;
 try {
   // Read under the lock, so no edit made before it is lost.
   const read = await settings.readMetadata(target, { version: 'inactive' });
-  const current = readSettings(read); // your reading of ts:tableSettings
-  await settings.updateMetadata(
+  if (!read.ok) throw new Error(read.getError().message);
+  const current = read.getResult().value;
+  if (!current.etag) throw new Error('the settings read answered no ETag');
+  // What only a read returns is not written back.
+  const { isWritableByAMDP: _readOnly, ...asRead } = current.settings;
+  const put = await settings.updateMetadata(
     {
       ...target,
       description: current.description,
-      settings: { ...current.settings, dataClassCategory: 'APPL1', sizeCategory: '1' },
+      settings: { ...asRead, dataClassCategory: 'APPL1', sizeCategory: '1' },
     },
-    { headers: TABLE_SETTINGS, lockHandle, ifMatch: current.etag },
+    { headers: SETTINGS_HEADERS, lockHandle, ifMatch: current.etag },
   );
+  if (!put.ok) throw new Error(put.getError().message);
+  written = true;
 } finally {
-  await settings.unlock(target, lockHandle);
+  const unlocked = await settings.unlock(target, lockHandle);
+  released = unlocked.ok;
 }
-await client.getTable().activate(target, { headers: ACTIVATION });
+// Activate the table — which activates its settings — only after both.
+if (written && released) {
+  await client.getTable().activate(target, { headers: ACTIVATION_HEADERS });
+}
 ```
 
 `headers` is the caller's pair: `application/vnd.sap.adt.table.settings.v2+xml`
-for both, the `Content-Type` with `; charset=utf-8` (dropped when `ifMatch` is
-given, as for every guarded document write). On SAP_BASIS 7.40 the factory does
-not compile (`ADT_TYPES_BASIS_740` has no such API): its discovery has no
+for both, the `Content-Type` with `; charset=utf-8` — kept on the guarded write
+too (`ifMatch`), the media type the settings write was measured with.
+`translation` is the `ts:translation` element's four attributes (`value`,
+`isVisible`, `isEditable`, `granularity`): SAP refuses a write without one
+(`400` `00/001`), so the read's are written back as they came. A LOCK answered
+without a handle is a refusal (`LOCK_FAILED`), and an empty `lockHandle` throws
+before the PUT is sent. On SAP_BASIS 7.40 the factory does not compile
+(`ADT_TYPES_BASIS_740` has no such API): its discovery has no
 `/ddic/db/settings`.
 
 This package does not check what you pass, and cannot: whether a document is
