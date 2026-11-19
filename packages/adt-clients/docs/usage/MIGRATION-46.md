@@ -8,6 +8,11 @@ and the text elements. Everything else is an addition.
 - [Where-used of a program's or a function group's text elements names its container](#where-used-of-a-programs-or-a-function-groups-text-elements-names-its-container)
 - [A class's text elements are not asked of](#a-classs-text-elements-are-not-asked-of)
 - [A map over the client's codes or APIs adds the text elements](#a-map-over-the-clients-codes-or-apis-adds-the-text-elements)
+- [The where-used parameters are type aliases, their code and container readonly](#the-where-used-parameters-are-type-aliases-their-code-and-container-readonly)
+
+Each case below compiled against adt-clients 45.5.5 (interfaces-adt 27.4.0,
+from the registry) and fails against 46.0.0 with the error named; each
+remedy compiles against 46.0.0.
 
 ## Where-used of a program's or a function group's text elements names its container
 
@@ -58,9 +63,32 @@ nothing that compiled stops on it.
 
 ## A map over the client's codes or APIs adds the text elements
 
-`AdtClientOnPrem` and `AdtClientCloud` gain `getTextElements()`; the code
-sets the client is typed by (interfaces-adt's `AdtTypeCode`, `AdtApiName`,
-`AdtObjectKind` and their projections) gain `PROG/PX`, `CLAS/OCX`,
-`textElements` and `text_elements`. A consumer's exhaustive map or `switch`
-over any of them adds the members — interfaces-adt 30.0.0's README,
-"Migrating to 30.0.0", lists every union.
+`AdtClientOnPrem` and `AdtClientCloud` gain `getTableSettings()` and
+`getTextElements()`; the code sets the client is typed by (interfaces-adt's
+`AdtTypeCode`, `AdtApiName`, `AdtObjectKind` and their projections) gain
+`TABL/DTT` and `tableSettings` (28.0.0), and `PROG/PX`, `CLAS/OCX`,
+`textElements` and `text_elements` (30.0.0). A consumer on 45.5.5 skipped
+the unpublished 45.6.0, so it meets both at once:
+
+```typescript
+// 45.5.5: compiled with its 30 codes. 46.0.0: TS2739, missing
+// "TABL/DTT", "PROG/PX", "CLAS/OCX".
+const kinds: Record<AdtTypeCode, string> = { 'CLAS/OC': 'class', /* … */ };
+```
+
+Add the three codes. Any other exhaustive map or `switch` over these unions
+adds the members — interfaces-adt's README, "Migrating to 28.0.0" and
+"Migrating to 30.0.0", list every union.
+
+## The where-used parameters are type aliases, their code and container readonly
+
+interfaces-adt 30.0.0 makes `IGetWhereUsedParams` and
+`IGetWhereUsedScopeParams` type aliases (an object joined with "`PROG/PX` and
+its container, or another code without one"), constrains their code to every
+code but `CLAS/OCX`, and makes `object_type` and `container` readonly.
+
+| 45.5.5 code | 46.0.0 | what to do |
+|---|---|---|
+| `interface X extends IGetWhereUsedParams { … }` (or the scope params) | `TS2312` | `type X = IGetWhereUsedParams & { … }` |
+| `params.object_type = 'CLAS/OC'` | `TS2540` (readonly) | build a new value: `{ object_name: params.object_name, object_type: 'CLAS/OC' }` |
+| `IGetWhereUsedParams<AdtTypeCode>` (or the scope params) | `TS2344` | drop the argument (the default is every code where-used is asked of), or `IGetWhereUsedParams<Exclude<AdtTypeCode, 'CLAS/OCX'>>` |

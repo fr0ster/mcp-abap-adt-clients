@@ -45,9 +45,17 @@ release carries their table settings and adds the text elements. See
   systems measured serve no where-used for it. The address of a `PROG/PX`
   where-used follows the container (`/textelements/programs/{name}` or
   `…/functiongroups/{name}`).
-- **The client's code and API sets gain the text elements** (`PROG/PX`,
-  `CLAS/OCX`, `textElements`, `text_elements`), so a consumer's exhaustive map
-  over them adds the members (interfaces-adt 30.0.0).
+- **The client's code and API sets gain the table settings and the text
+  elements** (`TABL/DTT`, `PROG/PX`, `CLAS/OCX`, `tableSettings`,
+  `textElements`, `table_settings`, `text_elements`), so a consumer's
+  exhaustive map over them adds the members: a `Record<AdtTypeCode, …>`
+  written for 45.5.5 misses three keys (`TS2739`).
+- **The where-used parameters (interfaces-adt 30.0.0) are type aliases**,
+  their `object_type` and `container` readonly and their code every code but
+  `CLAS/OCX`: extending them as an interface (`TS2312`), assigning
+  `object_type` (`TS2540`) and `IGetWhereUsedParams<AdtTypeCode>` (`TS2344`)
+  stop compiling. Each case was compiled against 45.5.5 from the registry and
+  against 46.0.0; MIGRATION-46 has the remedies.
 
 ### Added
 
