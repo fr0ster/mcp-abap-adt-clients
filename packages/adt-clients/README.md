@@ -811,13 +811,16 @@ an empty body**, never a 404, so what you edit may be nothing at all.
 
 Data class, size category, buffering and logging are not part of the table's
 document: SAP keeps them at `/sap/bc/adt/ddic/db/settings/{name}` (`TABL/DTT`,
-content type `application/vnd.sap.adt.table.settings.v2+xml` — a v1 Accept is
-answered `406`), under a lock of their own that the table's lock does not
-cover. `getTableSettings()` answers them: `readMetadata`, `lock`,
+content type `application/vnd.sap.adt.table.settings.v2+xml` — a v1 Accept
+was answered `406` SADT_RESOURCE 037, measured on premise), under a lock of
+their own that the table's lock does not cover (`ENQUEUE_ESDICT` with
+`objtype` `TABT` in `CL_TABT_WB_PERSIST->lock`, Code on both systems; the
+table's lock and the settings' held at once, in either order, measured on
+both). `getTableSettings()` answers them: `readMetadata`, `lock`,
 `updateMetadata` and `unlock`, one request each, and `patchMetadata`, a read
-and a write (below). SAP creates default settings
-when it creates the table, and activating the table activates them — there is
-no create, delete or activation of the settings.
+and a write (below). SAP created default settings when it created the table,
+and activating the table alone activated them (measured on both): the
+library has no create, delete or activation of the settings.
 
 `updateMetadata` takes the settings typed by the client's variant
 (`ITableSettingsUpdateConfig<V>` of `@mcp-abap-adt/interfaces-adt` 30.1.0) and
@@ -830,10 +833,13 @@ that includes `isWritableByAMDP`: the cloud's `move_adt_to_ddv` writes it from
 the document (Code), a PUT without it read back `false` (measured), so a cloud
 client's write requires it and sends `ts:isWritableByAMDP`; on premise nothing
 maps it (Code) and the type refuses it. **The cloud does not activate a
-table writable by AMDP that is buffered, logged or replaced**: the write is
-accepted, and the table's activation answers `200` with an `E` message per
-condition, DT 771 "AMDP writes to table &1 not possible (&2)", leaving it
-inactive. Only with `allowed_for_amdp_write = 'X'`, each condition that
+table writable by AMDP that is buffered, logged or replaced**. A write with
+the flag and logging on was accepted (measured on the cloud); the check is
+the activation's (Code, below), and the table's activation answered `200`
+with an `E` message, "AMDP writes to table … not possible (Logging
+activated)", the table left inactive (measured on the cloud in the 46.1.0
+live run). The message is DT 771 "AMDP writes to table &1 not possible
+(&2)", one per condition. Only with `allowed_for_amdp_write = 'X'`, each condition that
 applies reported: buffering `allowed` not `N` ("Buffering allowed", which
 covers allowed but switched off), logging on ("Logging activated"), a
 replacement object (`viewref`, "replacement object exists")
@@ -846,8 +852,8 @@ refuses a write without `adtcore:description`, `400` SWB_TOOL 019, measured on
 both); it is the table's short text, which the read answers.
 
 ```typescript
-import { tableSettingsDocuments } from '@mcp-abap-adt/adt-clients';
-import { tableSettings } from '@mcp-abap-adt/adt-strategies';
+import { AdtClientCloud, tableSettingsDocuments } from '@mcp-abap-adt/adt-clients';
+import { cloudTableSettings } from '@mcp-abap-adt/adt-strategies';
 
 // The request's own pair: the address is the library's, the headers yours.
 const SETTINGS_HEADERS = {
@@ -855,10 +861,13 @@ const SETTINGS_HEADERS = {
   contentType: 'application/vnd.sap.adt.table.settings.v2+xml; charset=utf-8',
 };
 
-// `tableSettings` reads the document: every setting, the description, the ETag.
+// `cloudTableSettings` reads the document: every setting, the cloud's
+// isWritableByAMDP as a boolean (a read without it throws), the description,
+// the ETag. On premise, `tableSettings` and an `AdtClientOnPrem`.
+const client = new AdtClientCloud(connection);
 const settings = client.getTableSettings({
   ...tableSettingsDocuments,
-  metadata: tableSettings,
+  metadata: cloudTableSettings,
 });
 const target = { tableName: 'ZTABLE' };
 

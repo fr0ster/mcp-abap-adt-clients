@@ -73,8 +73,10 @@ Released with `@mcp-abap-adt/adt-strategies` 0.26.0 and
 ### SAP's rule, documented
 
 - The cloud does not activate a table writable by AMDP that is buffered,
-  logged or replaced: the settings write is accepted, the activation answers
-  `200` with an `E` message per condition (DT 771 "AMDP writes to table &1
+  logged or replaced: a write with the flag and logging on was accepted
+  (measured on the cloud), and the activation answered `200` with an `E`
+  message (measured on the cloud in the 46.1.0 live run), one per condition
+  (DT 771 "AMDP writes to table &1
   not possible (&2)": "Buffering allowed" for `allowed` not `N`, "Logging
   activated", "replacement object exists" for a `viewref`) and the table
   stays inactive. Checked only with `allowed_for_amdp_write = 'X'`
@@ -110,9 +112,10 @@ status alone, as for every member.
 
 - Code that writes settings through a cloud client (`AdtClientCloud`, or a
   client typed `'cloud'`) without `isWritableByAMDP` fails to compile
-  (TS2322): pass the value read (`current.settings` as a whole) or the one
-  wanted. That code reset the flag on every write; the type now says so.
-  On-premise and variant-generic clients compile as before.
+  (TS2322): read with adt-strategies' `cloudTableSettings` (0.26.0), whose
+  settings carry the flag as a `boolean`, and pass them back as a whole — or
+  name the value wanted. That code reset the flag on every write; the type
+  now says so. On-premise and variant-generic clients compile as before.
 
 ## [46.0.0] - 2026-11-19
 
