@@ -17,6 +17,7 @@
 import type {
   ITableSettings,
   ITableSettingsUpdateConfig,
+  ITableTranslation,
 } from '@mcp-abap-adt/interfaces-adt';
 import { escapeXmlAttr, escapeXmlText } from '../../utils/xml';
 
@@ -28,6 +29,22 @@ function element(name: string, value: string): string {
   return value === ''
     ? `<${name}/>`
     : `<${name}>${escapeXmlText(value)}</${name}>`;
+}
+
+/**
+ * `ts:translation` with its four attributes, in the transformation's order.
+ * SAP requires every one on a write (`400` `00/001`, "The system expected the
+ * attribute …isVisible", measured on premise and on the cloud): they are
+ * written as the caller gives them — as read.
+ */
+function translationXml(translation: ITableTranslation): string {
+  return (
+    '<ts:translation' +
+    ` ts:value="${escapeXmlAttr(translation.value)}"` +
+    ` ts:isVisible="${String(translation.isVisible)}"` +
+    ` ts:isEditable="${String(translation.isEditable)}"` +
+    ` ts:granularity="${escapeXmlAttr(translation.granularity)}"/>`
+  );
 }
 
 /** The `ts:*` elements, in the transformation's order. */
@@ -44,7 +61,7 @@ function settingsXml(settings: ITableSettings): string {
     element('ts:storageType', settings.storageType) +
     element('ts:sharingType', settings.sharingType) +
     element('ts:loadUnit', settings.loadUnit) +
-    `<ts:translation ts:value="${escapeXmlAttr(settings.translation)}"/>` +
+    translationXml(settings.translation) +
     element('ts:loggingEnabled', String(settings.loggingEnabled))
   );
 }
