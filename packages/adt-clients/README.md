@@ -868,8 +868,11 @@ if (written && released) {
 ```
 
 `headers` is the caller's pair: `application/vnd.sap.adt.table.settings.v2+xml`
-for both, the `Content-Type` with `; charset=utf-8` — kept on the guarded write
-too (`ifMatch`), the media type the settings write was measured with.
+for both, the `Content-Type` with `; charset=utf-8`. With `ifMatch` the write
+drops the charset, as every guarded document write does: the settings' ETag
+carries the media type without it, and SAP refused the guarded PUT with it
+(`412` SADT_RESOURCE/043) and accepted it without (measured on premise and on
+the cloud).
 `translation` is the `ts:translation` element's four attributes (`value`,
 `isVisible`, `isEditable`, `granularity`): SAP refuses a write without one
 (`400` `00/001`), so the read's are written back as they came. A LOCK answered

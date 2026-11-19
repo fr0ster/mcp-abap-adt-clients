@@ -51,9 +51,11 @@ Released with `@mcp-abap-adt/adt-strategies` 0.24.0 and
     `ts:isEditable`, `ts:granularity`), which SAP requires (`400` `00/001`
     without `ts:isVisible`, measured); the cloud's `ts:isWritableByAMDP` is
     never written. An empty `lockHandle` throws before any request, since the
-    query would drop it. The `Content-Type` keeps `; charset=utf-8` with
-    `If-Match` too, the media type the write was measured with — unlike the
-    other documents' guarded writes, which drop it;
+    query would drop it. With `If-Match` the `Content-Type` goes without its
+    charset, as every guarded document write: the settings' ETag carries the
+    media type without it, and SAP refused the guarded PUT with
+    `; charset=utf-8` (`412` SADT_RESOURCE/043) and accepted it without
+    (measured on premise and on the cloud, 2026-11-19);
   - `unlock` — `POST ?_action=UNLOCK&lockHandle=…`, stateful. The lock leaves
     the client's registry only after a successful UNLOCK, so `unlockAll()`
     can retry a failed one.
