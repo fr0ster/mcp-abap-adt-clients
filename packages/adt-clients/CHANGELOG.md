@@ -24,6 +24,133 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [46.1.0] - 2026-11-19
+
+Released with `@mcp-abap-adt/adt-strategies` 0.26.0 and
+`@mcp-abap-adt/adt-clients-legacy` 0.11.1, on `@mcp-abap-adt/interfaces-adt`
+`^30.1.0`.
+
+### Fixed
+
+- **A cloud settings write through the cloud client no longer resets
+  `isWritableByAMDP`** (`AdtClientCloud`, a handler declared `'cloud'`, or a
+  read through `cloudTableSettings`; a generic `AdtClient` still writes a
+  flagless read without it, see below). SAP writes
+  every DD09L field the transformation maps from the settings document, and
+  the cloud's `CL_TABT_WB_PERSIST->move_adt_to_ddv` maps
+  `allowed_for_amdp_write` too (Code, cloud); a PUT without
+  `ts:isWritableByAMDP` read back `false` (measured on the cloud). 46.0.0
+  never wrote it, so every cloud write reset it. The document now carries
+  `ts:isWritableByAMDP` whenever the settings carry it, any boolean, `false`
+  included. `updateMetadata` is typed by the handler's variant
+  (`ITableSettingsUpdateConfig<V>`): the type of `AdtClientCloud`'s handler
+  requires the flag and that of `AdtClientOnPrem`'s refuses it (nothing maps
+  it there, Code); the generic `AdtClient` getter types its handler for both
+  newer kinds. These are type rules: at run time `updateMetadata` checks only
+  the empty lock handle.
+- **The translation wording.** `ts:translation` is not required by SAP: the
+  transformation reads it inside a `tt:cond` (Code, both systems), a document
+  without it was accepted, one with an attribute missing refused `400`
+  `00/001` with an `XML_PATH` property (measured on both). The README and the
+  document builder said every attribute was required on every write.
+
+### Added
+
+- **`AdtTableSettings.patchMetadata`** (interfaces-adt 30.1.0, decision 51):
+  a GET of `?version=inactive` with its ETag, then the whole document, the
+  named changes overlaid, PUT with `If-Match` and the media type without a
+  charset, under the caller's lock. Thrown before any request: an empty lock
+  handle, a change set whose top-level fields are all absent or `undefined`
+  (an empty nested change, `{ buffering: {} }`, is refused by the type
+  alone). Answered as a failure carrying the read, before the PUT: a read
+  without an ETag, a document without every setting the write needs (an
+  area-key count past the safe integers included), an `areaKeyFields` change
+  whose merged buffering type is not `G` (SAP writes the count only for `G`,
+  Code on both), and on a declared cloud handler a read without
+  `ts:isWritableByAMDP`. A custom `analyse` may clear any of these. The
+  library retries nothing; the connection may refresh its CSRF token and
+  resend.
+- **The declared cloud kind reaches the settings handler.**
+  `AdtClientCloud.getTableSettings()` overrides the base getter, as
+  `AdtClientLegacy` overrides the getters it serves differently, and
+  constructs the handler with `variant: 'cloud'` — the declaration, never
+  inferred from an answer. The refusal above follows the instance, not the
+  static type: an `AdtClientCloud` held as `AdtClient<'cloud'>`, or answered
+  by the union overload of `await createAdtClient(connection, { variant })`
+  with `variant` `'cloud'`, refuses too. An `AdtClient` constructed directly
+  does not: it writes a read without the flag as read — without the flag,
+  unless the patch names it, in which case it writes the value named,
+  `false` included. On a cloud system use `AdtClientCloud` (or
+  `createAdtClient`), and read with adt-strategies' `cloudTableSettings`. A
+  handler constructed directly gets the cloud guard when constructed with
+  `variant: 'cloud'`, which its type parameter must admit. The class declares no `implements
+  IAdtTableSettingsPatchable`; `typechecks/exact/tableSettingsVariants.ts`
+  assigns each kind's handler to `IAdtTableSettingsPatchable` and
+  `IAdtTableSettingsUpdatable` of that kind.
+- **Function group text elements on the cloud.** ABAP cloud serves function
+  groups and their text elements: the group (`FUGR/F`) and its text elements
+  (`PROG/PX` at `/textelements/functiongroups/{group}`) activated in one
+  synchronous `/activation` request and left the inactive list (measured
+  2026-11-19). The live case `adt_text_elements_function_group` runs on both
+  systems, and activates through the client of the system under test.
+- Recorded answers: a table activation SAP executed and cancelled
+  (`activationExecuted="true"` with `E` messages, on premise and on the
+  cloud); a class's text elements on the inactive list as `PROG/PX`
+  `ZCL_…====CP` (on premise); the cloud function group's write, lists and
+  activation.
+
+### SAP's rule, documented
+
+- The cloud does not activate a table writable by AMDP that is buffered,
+  logged or replaced: a write with the flag and logging on was accepted
+  (measured on the cloud), and the activation answered `200` with an `E`
+  message, the table left inactive (measured on the cloud in the 46.1.0 live
+  run). The message is DT 771 "AMDP writes to table &1 not possible (&2)",
+  one per condition: "Buffering allowed" for `allowed` not `N`, "Logging
+  activated", "replacement object exists" for a `viewref`. Checked only with
+  `allowed_for_amdp_write = 'X'` (`CL_DDACT_TABL_CHECK_TCHSET_CL` → local
+  class `chk_writable_amdp_usage` → `RADTTCHK` FORM
+  `chk_writable_amdp_usage`, Code on the cloud; on premise no such check,
+  Code). The README says so; the live case sets buffering `N` and logging off
+  in the patch that turns the flag on.
+
+### Activation verdict, checked
+
+An activation can be answered `activationExecuted="true"`
+`generationExecuted="false"` with messages of type `E`, the object left
+inactive (measured on both systems: a data class SAP stored but its
+activation refuses). adt-clients judges no activation itself: every
+activation member hands the answer to the caller's `analyse`. It reads the
+inactive list once only after a checklist that does not state its outcome —
+`activationExecuted="false"` with no message (silent), or no
+`activationExecuted` with `W`/`I`/`S` messages alone — and not after this
+one. With no `analyse` the default verdict reads the status: a `2xx`
+checklist is no failure, except that after a silent one a failed list read
+is the call's failure (after the warnings-only one it is not). The shipped
+verdict, adt-strategies' `analyseActivation`, refuses any checklist with an
+`E` message, whatever `activationExecuted` says. A test drives the recorded
+answers through every member that shares the code: the `activate` of
+`accessControl`, `appendStructure`, `authorizationField`,
+`behaviorDefinition`, `behaviorImplementation` (through its class), `class`,
+`dataElement`, `ddl`, `domain`, `enhancement`, `featureToggle`,
+`functionGroup`, `functionInclude`, `functionModule`, `include`,
+`interface`, `localDefinitions`, `localMacros`, `localTestClass`,
+`localTypes`, `metadataExtension`, `program`, `scalarFunction`,
+`scalarFunctionImplementation`, `serviceBinding`, `serviceDefinition`,
+`structure`, `table`, `tableType`, `transformation`, and
+`AdtUtils.activateObjects`.
+
+### Source break (TypeScript)
+
+- Code that writes settings through `AdtClientCloud` (or a handler typed
+  `'cloud'`) without `isWritableByAMDP` fails to compile (TS2322 or TS2345,
+  depending on how the argument is written; the generic `AdtClient<'cloud'>`
+  getter still types its handler for both newer kinds, so it does not): read
+  with adt-strategies' `cloudTableSettings` (0.26.0), whose settings carry
+  the flag as a `boolean`, and pass them back as a whole — or name the value
+  wanted. That code reset the flag on every write; the type now says so.
+  On-premise and variant-generic clients compile as before.
+
 ## [46.0.0] - 2026-11-19
 
 Released with `@mcp-abap-adt/adt-strategies` 0.25.0 and

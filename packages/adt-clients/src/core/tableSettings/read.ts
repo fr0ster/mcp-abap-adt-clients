@@ -11,7 +11,8 @@ import type { IReadOptions } from '../shared/types';
 
 /**
  * The settings document, answered as it arrived. Accept is v2 unless the
- * caller names another: a v1 Accept is answered 406.
+ * caller names another: a v1 Accept was answered `406` SADT_RESOURCE 037
+ * (measured on premise).
  */
 export async function getTableSettings(
   connection: IAbapConnection,

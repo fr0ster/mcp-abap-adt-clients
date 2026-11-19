@@ -1,0 +1,27 @@
+{
+  "case": "text-elements-function-group-abap-cloud",
+  "step": 1,
+  "stepTag": "update",
+  "capturedAt": "2026-11-19",
+  "note": "Recorded 2026-11-19 by the owner-approved probe through @mcp-abap-adt/connection (the research for interfaces-adt 30.1.0 and adt-clients 46.1.0); objects created by the probe and deleted at its end, in a local package with no transport. Scrubbed of host, user (SAPUSER01), system id, package (ZLOCAL_PKG) and lock handle. ABAP cloud: a symbol written to a function group's text elements (/textelements/functiongroups/{group}), under the TEXT lock.",
+  "request": {
+    "method": "PUT",
+    "url": "/sap/bc/adt/textelements/functiongroups/zmcp_txc5563/source/symbols?lockHandle=LOCKHANDLE",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/textelements/functiongroups/zmcp_txc5563/source/symbols?lockHandle=LOCKHANDLE",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.textelements.symbols.v1",
+      "Content-Type": "application/vnd.sap.adt.textelements.symbols.v1; charset=utf-8"
+    },
+    "headersNote": "The headers the library sends for this request (the probe log records the request line and body only). The lock handle is not recorded.",
+    "body": "@MaxLength:20\r\n001=Cloud FUGR symbol"
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.textelements.symbols.v1; charset=UTF-8"
+    },
+    "bodyFile": "text-elements-function-group-abap-cloud--01-update.body.txt"
+  }
+}

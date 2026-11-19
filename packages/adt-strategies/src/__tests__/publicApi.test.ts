@@ -50,6 +50,7 @@ describe('the published surface', () => {
       'atcSystemCheckVariant',
       'atcWaitingRun',
       'atcWorklistId',
+      'cloudTableSettings',
       'compareRecordedAt',
       'extractRunId',
       'featureToggleCheckState',

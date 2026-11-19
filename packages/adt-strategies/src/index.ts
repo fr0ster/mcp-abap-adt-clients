@@ -140,6 +140,8 @@ export {
   readObjectOutline,
 } from './results/outline';
 export {
+  cloudTableSettings,
+  type ICloudTableSettingsAnswer,
   type ITableSettingsAnswer,
   type ITableSettingsDocument,
   readTableSettings,

@@ -517,8 +517,11 @@ describe('Text elements (AdtTextElements)', () => {
     },
     getTimeout('test'),
   );
-  // On premise only — the case lists `available_in: ["onprem"]`: ABAP cloud
-  // creates no function group, so there is none to write text elements to.
+  // On premise and on the cloud: ABAP cloud serves function groups and their
+  // text elements — the group (FUGR/F) and its text elements (PROG/PX under
+  // /textelements/functiongroups) activated in one request and left the
+  // inactive list (measured 2026-11-19, corpus
+  // text-elements-function-group-abap-cloud).
   gate(SECTION, GROUP_CASE)(
     "writes a function group's symbols, activates them with the group and finds them by where-used",
     async () => {
@@ -608,11 +611,9 @@ describe('Text elements (AdtTextElements)', () => {
             uri: `/sap/bc/adt/textelements/functiongroups/${functionGroupName.toLowerCase()}`,
           },
         ]);
-        const onPremise = await createAdtClient(connection, {
-          variant: 'onprem',
-          logger: libraryLogger,
-        });
-        const utils = onPremise.getUtils();
+        // FUGR/F and PROG/PX activate on both systems: the client of the
+        // system under test sends them.
+        const utils = client.getUtils();
         expectResult(
           await utils.activateObjects(references, true, {
             analyse: judged(analyseActivation),

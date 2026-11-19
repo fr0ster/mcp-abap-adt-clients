@@ -418,6 +418,73 @@ describe.each([
   );
 });
 
+/**
+ * An activation SAP executed and cancelled (V6, recorded 2026-11-19 on
+ * premise and on the cloud): `activationExecuted="true"` with messages of
+ * type E, the object left inactive. Every activation member hands the answer
+ * as it came and reads nothing more; the shipped verdict refuses it by its
+ * messages, never passing it on the attribute alone.
+ */
+describe.each([
+  [
+    's4-2025',
+    'Activation was cancelled.; Value in field Data Class (value ZZNOP not permitted); TABL ZMCP_TV443E was not activated',
+  ],
+  ['abap-cloud', 'Value in field Data Class; value ZZNOP not permitted'],
+])(
+  'every activation member refuses an executed activation with errors (%s)',
+  (release, words) => {
+    const cancelled = recorded(
+      `activation-table-data-class-refused-${release}`,
+      '01-activate',
+    );
+    it.each(ACTIVATING_APIS)(
+      "%s: one request, refused in SAP's words",
+      async (api) => {
+        const { handler, config, calls } = activatingHandler(
+          api,
+          cancelled.data,
+        );
+        const answer = await handler.activate(config, {
+          headers: headersOf(handler, 'activate', config),
+          analyse: analyseActivation,
+        });
+        expect(calls.map((c) => c.method)).toEqual(['POST']);
+        expect(answer).toMatchObject({ ok: false });
+        const verdict = analyseActivation(ADT_NO_FAILURE, cancelled);
+        expect(verdict !== ADT_NO_FAILURE && verdict.message).toBe(
+          `Activation failed: ${words}`,
+        );
+      },
+    );
+
+    it('activateObjects: one request, refused', async () => {
+      const requests: string[] = [];
+      const connection: IAbapConnection = {
+        connect: async () => undefined,
+        getBaseUrl: async () => '',
+        getSessionId: () => null,
+        setSessionType: () => undefined,
+        makeAdtRequest: async (options) => {
+          requests.push(options.method);
+          return cancelled;
+        },
+      };
+      const answer = await new AdtClient(connection)
+        .getUtils()
+        .activateObjects([{ name: 'ZMCP_TV443E', type: 'TABL/DT' }], true, {
+          headers: headersOf(
+            new AdtClient(connection).getUtils(),
+            'activateObjects',
+          ),
+          analyse: analyseActivation,
+        });
+      expect(requests).toEqual(['POST']);
+      expect(answer.ok).toBe(false);
+    });
+  },
+);
+
 describe('the session mark: each answer names the request it is built from', () => {
   /**
    * Regression checks (interfaces-adt 27.3.0): the activation's answer and

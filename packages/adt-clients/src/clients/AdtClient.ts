@@ -228,6 +228,16 @@ function answersIsConnected(
   );
 }
 
+/**
+ * The settings handler's kind on a client that does not declare one system
+ * kind: both newer kinds, without the cloud declaration — whatever else `V`
+ * is stays (a subclass's own kind). `AdtClientOnPrem` and `AdtClientCloud`
+ * override the getter with their declared kind.
+ */
+type UndeclaredSettingsVariant<V extends AdtVariant> =
+  | Exclude<V, AdtModernVariant>
+  | AdtModernVariant;
+
 export class AdtClient<V extends AdtVariant = AdtModernVariant> {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -606,27 +616,38 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
 
   /**
    * A table's technical settings (`TABL/DTT`): read, lock, write and unlock,
-   * each one request. Not part of `getTable()`: SAP keeps the settings at
-   * their own resource, under their own lock; activating the table activates
-   * them.
+   * each one request, and `patchMetadata`, a GET and then the PUT. Not part
+   * of `getTable()`: SAP keeps the settings at their own resource, under their
+   * own lock (ESDICT `TABT`, Code on both systems; held beside the table's,
+   * measured on both); activating the table alone activated them (measured on
+   * both).
    */
   getTableSettings(
     this: this & AdtServedBy<'tableSettings'>,
-  ): AdtTableSettings<ResultValuesOf<typeof tableSettingsDocuments>, V>;
+  ): AdtTableSettings<
+    ResultValuesOf<typeof tableSettingsDocuments>,
+    UndeclaredSettingsVariant<V>
+  >;
   getTableSettings<R extends ITableSettingsResults>(
     this: this & AdtServedBy<'tableSettings'>,
     results: R,
-  ): AdtTableSettings<ResultValuesOf<R>, V>;
+  ): AdtTableSettings<ResultValuesOf<R>, UndeclaredSettingsVariant<V>>;
   getTableSettings(
     this: this & AdtServedBy<'tableSettings'>,
     results: ITableSettingsResults = tableSettingsDocuments,
-  ): AdtTableSettings<TableSettingsValues, V> {
+  ): AdtTableSettings<TableSettingsValues, UndeclaredSettingsVariant<V>> {
     this.assertConnected();
-    return new AdtTableSettings<TableSettingsValues, V>(this.connection, {
-      logger: this.logger,
-      lockRegistry: this.lockRegistry,
-      results,
-    });
+    // A client that declares no one system kind: the handler of both newer
+    // kinds, without the cloud declaration. AdtClientOnPrem and
+    // AdtClientCloud, the declarations, override this getter with their own.
+    return new AdtTableSettings<TableSettingsValues, AdtModernVariant>(
+      this.connection,
+      {
+        logger: this.logger,
+        lockRegistry: this.lockRegistry,
+        results,
+      },
+    );
   }
 
   /**

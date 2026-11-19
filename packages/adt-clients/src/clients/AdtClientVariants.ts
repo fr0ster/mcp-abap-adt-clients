@@ -7,10 +7,68 @@
  * `@mcp-abap-adt/adt-clients-legacy`.
  */
 
+import type { ITableSettingsResults } from '@mcp-abap-adt/interfaces-adt';
+import {
+  AdtTableSettings,
+  type TableSettingsValues,
+  tableSettingsDocuments,
+} from '../core/tableSettings';
+import type { ResultValuesOf } from '../utils/resultStrategy';
 import { AdtClient } from './AdtClient';
+import type { AdtServedBy } from './variant';
 
-/** S/4HANA 2025 on premise — `ADT_TYPES_ONPREM`. */
-export class AdtClientOnPrem extends AdtClient<'onprem'> {}
+/**
+ * S/4HANA 2025 on premise — `ADT_TYPES_ONPREM`. Its table settings handler
+ * is typed for the on-premise kind: the type of its write refuses
+ * `isWritableByAMDP` (nothing maps it there, Code); no runtime check.
+ */
+export class AdtClientOnPrem extends AdtClient<'onprem'> {
+  override getTableSettings(
+    this: this & AdtServedBy<'tableSettings'>,
+  ): AdtTableSettings<ResultValuesOf<typeof tableSettingsDocuments>, 'onprem'>;
+  override getTableSettings<R extends ITableSettingsResults>(
+    this: this & AdtServedBy<'tableSettings'>,
+    results: R,
+  ): AdtTableSettings<ResultValuesOf<R>, 'onprem'>;
+  override getTableSettings(
+    this: this & AdtServedBy<'tableSettings'>,
+    results: ITableSettingsResults = tableSettingsDocuments,
+  ): AdtTableSettings<TableSettingsValues, 'onprem'> {
+    this.assertConnected();
+    return new AdtTableSettings<TableSettingsValues, 'onprem'>(
+      this.connection,
+      { logger: this.logger, lockRegistry: this.lockRegistry, results },
+    );
+  }
+}
 
-/** ABAP cloud — `ADT_TYPES_CLOUD`. */
-export class AdtClientCloud extends AdtClient<'cloud'> {}
+/**
+ * ABAP cloud — `ADT_TYPES_CLOUD`. Choosing it is the declaration that the
+ * system is a cloud one. Its table settings handler is typed for the cloud
+ * kind (the type of its write requires `isWritableByAMDP`) and, the one
+ * runtime use of the declaration, constructed with `variant: 'cloud'`:
+ * `patchMetadata` refuses a read without `ts:isWritableByAMDP`, whatever
+ * static type the instance is held as. Its getter overrides the base's, as
+ * `AdtClientLegacy` overrides the getters it serves differently.
+ */
+export class AdtClientCloud extends AdtClient<'cloud'> {
+  override getTableSettings(
+    this: this & AdtServedBy<'tableSettings'>,
+  ): AdtTableSettings<ResultValuesOf<typeof tableSettingsDocuments>, 'cloud'>;
+  override getTableSettings<R extends ITableSettingsResults>(
+    this: this & AdtServedBy<'tableSettings'>,
+    results: R,
+  ): AdtTableSettings<ResultValuesOf<R>, 'cloud'>;
+  override getTableSettings(
+    this: this & AdtServedBy<'tableSettings'>,
+    results: ITableSettingsResults = tableSettingsDocuments,
+  ): AdtTableSettings<TableSettingsValues, 'cloud'> {
+    this.assertConnected();
+    return new AdtTableSettings<TableSettingsValues, 'cloud'>(this.connection, {
+      logger: this.logger,
+      lockRegistry: this.lockRegistry,
+      results,
+      variant: 'cloud',
+    });
+  }
+}

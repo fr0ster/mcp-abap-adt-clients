@@ -4,6 +4,18 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [0.11.1] - 2026-11-19
+
+Released with `@mcp-abap-adt/adt-clients` 46.1.0, on
+`@mcp-abap-adt/interfaces-adt` `^30.1.0`; `@mcp-abap-adt/adt-clients`
+`^46.1.0`.
+
+### Changed
+
+- `getTableSettings()`'s new `patchMetadata` is refused on 7.40 like the
+  handler's other members (`absentOnLegacy`, no request): the member
+  inventory decides it.
+
 ## [0.11.0] - 2026-11-19
 
 Released with `@mcp-abap-adt/adt-clients` 46.0.0, on

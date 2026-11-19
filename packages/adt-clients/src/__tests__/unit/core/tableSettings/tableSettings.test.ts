@@ -17,6 +17,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClient } from '../../../../clients/AdtClient';
+import { AdtClientCloud } from '../../../../clients/AdtClientVariants';
 import { tableSettingsDocument } from '../../../../core/tableSettings/document';
 import { recogniseFailure } from '../../../../utils/adtResponse';
 import { headersOf } from '../../../helpers/adtHeaders';
@@ -230,12 +231,17 @@ describe('the settings document', () => {
     }
   });
 
-  it('never writes ts:isWritableByAMDP, even when a read result is passed back as it is', () => {
-    const fromARead = {
+  it('writes ts:isWritableByAMDP last when the settings carry it (the cloud), and not otherwise', () => {
+    // The cloud's move_adt_to_ddv writes allowed_for_amdp_write from the
+    // document (Code, cloud); a PUT without it read back false (measured).
+    const cloud = tableSettingsDocument({
       ...CHANGED,
       settings: { ...CHANGED.settings, isWritableByAMDP: true },
-    } as unknown as ITableSettingsUpdateConfig;
-    expect(tableSettingsDocument(fromARead)).not.toContain('isWritableByAMDP');
+    });
+    expect(cloud).toContain(
+      '<ts:loggingEnabled>true</ts:loggingEnabled><ts:isWritableByAMDP>true</ts:isWritableByAMDP></ts:tableSettings>',
+    );
+    expect(body).not.toContain('isWritableByAMDP');
   });
 
   it('escapes the description and the codes', () => {
@@ -583,5 +589,306 @@ describe('AdtClient.getTableSettings', () => {
     expect(new AdtClient(connection).getTableSettings().objectType).toBe(
       'TableSettings',
     );
+  });
+});
+
+describe('the cloud write carries isWritableByAMDP back', () => {
+  it.each([true, false])(
+    'a read with isWritableByAMDP %s, written back through updateMetadata, sends the same flag and reads back the same settings',
+    async (flag) => {
+      const xml = String(
+        recorded('read-table-settings-abap-cloud--01-settings').data,
+      ).replace(
+        '<ts:isWritableByAMDP>false</ts:isWritableByAMDP>',
+        `<ts:isWritableByAMDP>${flag}</ts:isWritableByAMDP>`,
+      );
+      const read = readTableSettings(xml);
+      const { isWritableByAMDP } = read.settings;
+      expect(isWritableByAMDP).toBe(flag);
+      if (isWritableByAMDP === undefined) return;
+      const { connection, requests } = recording(OK);
+      const settings = new AdtClientCloud(connection).getTableSettings();
+      await settings.updateMetadata(
+        {
+          tableName: read.name,
+          description: read.description,
+          settings: { ...read.settings, isWritableByAMDP },
+        },
+        { headers: headersOf(settings, 'updateMetadata'), lockHandle: 'LH' },
+      );
+      const sent = String(requests[0]?.data);
+      expect(sent).toContain(
+        `<ts:isWritableByAMDP>${flag}</ts:isWritableByAMDP>`,
+      );
+      const again = readTableSettings(
+        sent.replace(
+          'adtcore:type="TABL/DTT"',
+          `adtcore:type="TABL/DTT" adtcore:version="${read.version}"`,
+        ),
+      );
+      expect(again.settings).toEqual(read.settings);
+    },
+  );
+});
+
+/**
+ * The patch over the recorded reads. The on-premise sidecar carries SAP's
+ * ETag; the cloud's does not (its recorder kept the content type alone), so a
+ * read here is the recorded body with the ETag the test names — the patch's
+ * guard is what is tested — or with none.
+ */
+describe('patchMetadata', () => {
+  const PATCH_ACCEPT = 'application/vnd.sap.adt.table.settings.v2+xml';
+  function readWithEtag(release: string, etag?: string): IAdtWireResponse {
+    const answer = recorded(`read-table-settings-${release}--01-settings`);
+    const headers = Object.fromEntries(
+      Object.entries(answer.headers ?? {}).filter(
+        ([key]) => key.toLowerCase() !== 'etag',
+      ),
+    );
+    return {
+      ...answer,
+      headers: etag === undefined ? headers : { ...headers, ETag: etag },
+    };
+  }
+
+  it("sends SAP's recorded ETag back as If-Match", async () => {
+    const answer = recorded('read-table-settings-s4-2025--01-settings');
+    const { connection, requests } = sequence([answer, OK]);
+    const settings = new AdtClient(connection).getTableSettings();
+    await settings.patchMetadata(
+      { tableName: 'SFLIGHT', changes: { loggingEnabled: false } },
+      { headers: { accept: PATCH_ACCEPT }, lockHandle: 'LH' },
+    );
+    expect(requests[1]?.headers?.['If-Match']).toBe(
+      '20190325110154001application/vnd.sap.adt.table.settings.v2+xmlF9+mnRD+h0kHbJVOCx4zRS71l5E=',
+    );
+  });
+
+  it('reads the working area, then PUTs the whole document with If-Match, the media type without a charset, the lock and corrNr', async () => {
+    const { connection, requests } = sequence([
+      readWithEtag('s4-2025', 'E-1'),
+      OK,
+    ]);
+    const settings = new AdtClient(connection).getTableSettings();
+    const read = readTableSettings(
+      String(recorded('read-table-settings-s4-2025--01-settings').data),
+    );
+    const patched = await settings.patchMetadata(
+      {
+        tableName: 'SFLIGHT',
+        transportRequest: 'DEVK900001',
+        changes: { dataClassCategory: 'APPL2' },
+      },
+      { headers: { accept: PATCH_ACCEPT }, lockHandle: 'LH/1' },
+    );
+    expect(patched.ok).toBe(true);
+    expect(requests.map((r) => [r.method, r.url])).toEqual([
+      ['GET', '/sap/bc/adt/ddic/db/settings/sflight?version=inactive'],
+      [
+        'PUT',
+        '/sap/bc/adt/ddic/db/settings/sflight?lockHandle=LH%2F1&corrNr=DEVK900001',
+      ],
+    ]);
+    const put = requests[1];
+    expect(put?.headers?.['If-Match']).toBe('E-1');
+    expect(put?.headers?.['Content-Type']).toBe(PATCH_ACCEPT);
+    const { isWritableByAMDP: _none, ...asRead } = read.settings;
+    expect(put?.data).toBe(
+      tableSettingsDocument({
+        tableName: 'SFLIGHT',
+        description: read.description,
+        settings: { ...asRead, dataClassCategory: 'APPL2' },
+      }),
+    );
+  });
+
+  it('keeps the cloud flag as read when the change does not name it, and writes the named one when it does', async () => {
+    for (const [changes, expected] of [
+      [{ sizeCategory: '2' }, 'false'],
+      [{ isWritableByAMDP: true }, 'true'],
+    ] as const) {
+      const { connection, requests } = sequence([
+        readWithEtag('abap-cloud', 'E-2'),
+        OK,
+      ]);
+      const settings = new AdtClientCloud(connection).getTableSettings();
+      const patched = await settings.patchMetadata(
+        { tableName: 'Z0001FLIGHT', changes },
+        { headers: { accept: PATCH_ACCEPT }, lockHandle: 'LH' },
+      );
+      expect(patched.ok).toBe(true);
+      expect(String(requests[1]?.data)).toContain(
+        `<ts:isWritableByAMDP>${expected}</ts:isWritableByAMDP>`,
+      );
+    }
+  });
+
+  it('on a cloud client, refuses a read without ts:isWritableByAMDP before any PUT; a generic client writes', async () => {
+    const without = (): IAdtWireResponse => {
+      const answer = readWithEtag('abap-cloud', 'E-3');
+      return {
+        ...answer,
+        data: String(answer.data).replace(
+          '<ts:isWritableByAMDP>false</ts:isWritableByAMDP>',
+          '',
+        ),
+      };
+    };
+    const cloud = sequence([without(), OK]);
+    const patched = await new AdtClientCloud(cloud.connection)
+      .getTableSettings()
+      .patchMetadata(
+        { tableName: 'Z0001FLIGHT', changes: { sizeCategory: '2' } },
+        { headers: { accept: PATCH_ACCEPT }, lockHandle: 'LH' },
+      );
+    expect(patched.ok).toBe(false);
+    expect(!patched.ok && patched.getError().message).toContain(
+      'answered no ts:isWritableByAMDP',
+    );
+    expect(cloud.requests.map((r) => r.method)).toEqual(['GET']);
+
+    // The generic client declares no system kind: it writes what it read.
+    const generic = sequence([without(), OK]);
+    const written = await new AdtClient(generic.connection)
+      .getTableSettings()
+      .patchMetadata(
+        { tableName: 'Z0001FLIGHT', changes: { sizeCategory: '2' } },
+        { headers: { accept: PATCH_ACCEPT }, lockHandle: 'LH' },
+      );
+    expect(written.ok).toBe(true);
+    expect(generic.requests.map((r) => r.method)).toEqual(['GET', 'PUT']);
+    expect(String(generic.requests[1]?.data)).not.toContain('isWritableByAMDP');
+  });
+
+  it('changes the translation by its value alone, the other attributes as read', async () => {
+    const { connection, requests } = sequence([
+      readWithEtag('s4-2025', 'E'),
+      OK,
+    ]);
+    const settings = new AdtClient(connection).getTableSettings();
+    await settings.patchMetadata(
+      { tableName: 'SFLIGHT', changes: { translation: { value: 'B' } } },
+      { headers: { accept: PATCH_ACCEPT }, lockHandle: 'LH' },
+    );
+    expect(String(requests[1]?.data)).toContain(
+      '<ts:translation ts:value="B" ts:isVisible="false" ts:isEditable="false" ts:granularity="2"/>',
+    );
+  });
+
+  it('changes buffering field by field and keeps the rest as read', async () => {
+    const { connection, requests } = sequence([
+      readWithEtag('s4-2025', 'E'),
+      OK,
+    ]);
+    const settings = new AdtClient(connection).getTableSettings();
+    await settings.patchMetadata(
+      {
+        tableName: 'SFLIGHT',
+        changes: { buffering: { type: 'G', areaKeyFields: 2 } },
+      },
+      { headers: { accept: PATCH_ACCEPT }, lockHandle: 'LH' },
+    );
+    const read = readTableSettings(
+      String(recorded('read-table-settings-s4-2025--01-settings').data),
+    );
+    expect(String(requests[1]?.data)).toContain(
+      `<ts:buffering><ts:allowed>${read.settings.buffering.allowed}</ts:allowed><ts:type>G</ts:type><ts:areaKeyFields>2</ts:areaKeyFields></ts:buffering>`,
+    );
+  });
+
+  it('refuses an areaKeyFields change whose resulting type is not G before any PUT', async () => {
+    const { connection, requests } = sequence([
+      readWithEtag('s4-2025', 'E'),
+      OK,
+    ]);
+    const settings = new AdtClient(connection).getTableSettings();
+    const patched = await settings.patchMetadata(
+      {
+        tableName: 'SFLIGHT',
+        // The read's type is empty (not buffered): a count without a type
+        // compiles, and the merged type is what is refused.
+        changes: { buffering: { areaKeyFields: 2 } },
+      },
+      { headers: { accept: PATCH_ACCEPT }, lockHandle: 'LH' },
+    );
+    expect(patched.ok).toBe(false);
+    expect(!patched.ok && patched.getError().message).toContain(
+      "kept by SAP only with buffering type G; the resulting type is ''",
+    );
+    expect(requests.map((r) => r.method)).toEqual(['GET']);
+  });
+
+  it.each(['9'.repeat(400), '9007199254740993'])(
+    'refuses a read whose area-key count is no safe integer (%#) before any PUT',
+    async (digits) => {
+      const answer = readWithEtag('s4-2025', 'E');
+      const { connection, requests } = sequence([
+        {
+          ...answer,
+          data: String(answer.data).replace(
+            '<ts:areaKeyFields>0</ts:areaKeyFields>',
+            `<ts:areaKeyFields>${digits}</ts:areaKeyFields>`,
+          ),
+        },
+        OK,
+      ]);
+      const patched = await new AdtClient(connection)
+        .getTableSettings()
+        .patchMetadata(
+          { tableName: 'SFLIGHT', changes: { loggingEnabled: false } },
+          { headers: { accept: PATCH_ACCEPT }, lockHandle: 'LH' },
+        );
+      expect(patched.ok).toBe(false);
+      expect(!patched.ok && patched.getError().message).toContain(
+        'without every setting the write needs',
+      );
+      expect(requests.map((r) => r.method)).toEqual(['GET']);
+    },
+  );
+
+  it('refuses a read that answers no ETag before any PUT', async () => {
+    const { connection, requests } = sequence([readWithEtag('s4-2025'), OK]);
+    const settings = new AdtClient(connection).getTableSettings();
+    const patched = await settings.patchMetadata(
+      { tableName: 'SFLIGHT', changes: { loggingEnabled: false } },
+      { headers: { accept: PATCH_ACCEPT }, lockHandle: 'LH' },
+    );
+    expect(patched.ok).toBe(false);
+    expect(!patched.ok && patched.getError().message).toContain(
+      'the read answered no ETag',
+    );
+    expect(requests.map((r) => r.method)).toEqual(['GET']);
+  });
+
+  it('answers a refused read as SAP answered it, with no PUT', async () => {
+    const { connection, requests } = sequence([REFUSED]);
+    const settings = new AdtClient(connection).getTableSettings();
+    const patched = await settings.patchMetadata(
+      { tableName: 'SFLIGHT', changes: { loggingEnabled: false } },
+      { headers: { accept: PATCH_ACCEPT }, lockHandle: 'LH' },
+    );
+    expect(patched.ok).toBe(false);
+    expect(!patched.ok && patched.getError().response?.status).toBe(500);
+    expect(requests).toHaveLength(1);
+  });
+
+  it('throws on a change set naming no setting, and on an empty lock handle, before any request', async () => {
+    const { connection, requests } = sequence([]);
+    const settings = new AdtClient(connection).getTableSettings();
+    await expect(
+      settings.patchMetadata(
+        // @ts-expect-error the contract refuses an empty change set
+        { tableName: 'SFLIGHT', changes: {} },
+        { headers: { accept: PATCH_ACCEPT }, lockHandle: 'LH' },
+      ),
+    ).rejects.toThrow('names no setting');
+    await expect(
+      settings.patchMetadata(
+        { tableName: 'SFLIGHT', changes: { loggingEnabled: true } },
+        { headers: { accept: PATCH_ACCEPT }, lockHandle: '' },
+      ),
+    ).rejects.toThrow('lockHandle is required');
+    expect(requests).toHaveLength(0);
   });
 });

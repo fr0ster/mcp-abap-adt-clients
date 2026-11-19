@@ -1,22 +1,26 @@
 /**
  * The settings document a write sends, built from the caller's typed
- * settings (interfaces-adt 29.0.0, decision 49).
+ * settings (interfaces-adt 30.1.0, decision 49).
  *
- * **Every setting, every time.** SAP writes the whole DD09L row from the
- * document (`CL_TABT_WB_PERSIST`, `DDIF_TABT_PUT`), so the contract requires
- * every field, and every one is written here — nothing is defaulted and
- * nothing left out. The element order is the transformation's
- * (`SDDIC_ADT_TTAB`).
+ * **Every setting, every time.** SAP writes every DD09L field the
+ * transformation maps from the document (`CL_TABT_WB_PERSIST->
+ * move_adt_to_ddv`, Code on both systems; a field left out read back reset,
+ * measured on both), so the contract requires every field, and every one is
+ * written here — nothing is defaulted and nothing left out. The element
+ * order is the transformation's (`SDDIC_ADT_TTAB`, Code on both); booleans
+ * are written `true` / `false`, as the recorded reads carry them.
  *
- * **Never `ts:isWritableByAMDP`.** The cloud returns it; this contract does
- * not write it (unmeasured, and the on-premise transformation does not define
- * it). The serializer reads the fields it writes by name, so nothing a caller
- * passes beside them reaches the document.
+ * **`ts:isWritableByAMDP` as given.** The cloud's `move_adt_to_ddv` writes it
+ * from the document (Code, cloud), and a cloud PUT without it reset it to
+ * `false` (measured). The serializer writes it whenever the settings carry
+ * it, any boolean, `false` included: that a cloud write carries it and an
+ * on-premise one does not is the type's rule (`ITableSettingsOf<V>`), not a
+ * check here. It reads the fields it writes by name, so nothing else a
+ * caller passes reaches the document.
  */
 
 import type {
-  ITableSettings,
-  ITableSettingsUpdateConfig,
+  ITableSettingsRead,
   ITableTranslation,
 } from '@mcp-abap-adt/interfaces-adt';
 import { escapeXmlAttr, escapeXmlText } from '../../utils/xml';
@@ -32,10 +36,12 @@ function element(name: string, value: string): string {
 }
 
 /**
- * `ts:translation` with its four attributes, in the transformation's order.
- * SAP requires every one on a write (`400` `00/001`, "The system expected the
- * attribute …isVisible", measured on premise and on the cloud): they are
- * written as the caller gives them — as read.
+ * `ts:translation` with its four attributes, in the transformation's order,
+ * as the caller gives them — as read. The transformation reads the element
+ * inside a `tt:cond` (Code, both systems): an absent element was accepted,
+ * one written with an attribute missing was refused, 400 `00/001` with an
+ * `XML_PATH` property (measured on both). SAP stores `value` alone
+ * (`move_adt_to_ddv`, Code on both).
  */
 function translationXml(translation: ITableTranslation): string {
   return (
@@ -48,7 +54,7 @@ function translationXml(translation: ITableTranslation): string {
 }
 
 /** The `ts:*` elements, in the transformation's order. */
-function settingsXml(settings: ITableSettings): string {
+function settingsXml(settings: ITableSettingsRead): string {
   const { buffering } = settings;
   return (
     element('ts:dataClassCategory', settings.dataClassCategory) +
@@ -62,17 +68,27 @@ function settingsXml(settings: ITableSettings): string {
     element('ts:sharingType', settings.sharingType) +
     element('ts:loadUnit', settings.loadUnit) +
     translationXml(settings.translation) +
-    element('ts:loggingEnabled', String(settings.loggingEnabled))
+    element('ts:loggingEnabled', String(settings.loggingEnabled)) +
+    (settings.isWritableByAMDP === undefined
+      ? ''
+      : element('ts:isWritableByAMDP', String(settings.isWritableByAMDP)))
   );
+}
+
+/** What a document is built from: a write's config, or a patch's merge. */
+export interface ITableSettingsDocumentInput {
+  readonly tableName: string;
+  readonly description: string;
+  readonly settings: ITableSettingsRead;
 }
 
 /**
  * `ts:tableSettings` for `config`: the table's name as `adtcore:name`, its
  * description as `adtcore:description` (SAP refuses a write without it,
- * SWB_TOOL 019), and every setting.
+ * SWB_TOOL 019, measured on both), and every setting.
  */
 export function tableSettingsDocument(
-  config: ITableSettingsUpdateConfig,
+  config: ITableSettingsDocumentInput,
 ): string {
   return (
     '<?xml version="1.0" encoding="UTF-8"?>' +

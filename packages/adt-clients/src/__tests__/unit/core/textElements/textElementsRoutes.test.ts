@@ -152,6 +152,43 @@ describe('activation: the object with its text elements', () => {
   });
 });
 
+describe('activation on the cloud: a function group with its text elements', () => {
+  it('the cloud client sends exactly the body of the recorded cloud activation', async () => {
+    const { connection, requests } = recording();
+    const utils = new AdtUtils<ResultValuesOf<typeof utilDocuments>, 'cloud'>(
+      connection,
+      {
+        logger: createLibraryLogger(),
+        results: utilDocuments,
+      },
+    );
+    await utils.activateObjects(
+      textElementsActivationReferences({
+        objectKind: 'functionGroup',
+        objectName: 'ZMCP_TXC5563',
+      }),
+      true,
+      { headers },
+    );
+    const recordedRequest = JSON.parse(
+      fs.readFileSync(
+        path.join(
+          ANSWERS,
+          'text-elements-function-group-abap-cloud--03-activate.json',
+        ),
+        'utf8',
+      ),
+    ).request;
+    expect(requests[0]?.url).toBe(recordedRequest.url);
+    // The same references in the same order; the library indents its body.
+    const flat = String(requests[0]?.data)
+      .split('\n')
+      .map((line) => line.trim())
+      .join('');
+    expect(flat).toBe(recordedRequest.body);
+  });
+});
+
 // Every code the helper sends activates on both newer releases.
 type Within<A, B> = [A] extends [B] ? true : false;
 const _modern: Within<

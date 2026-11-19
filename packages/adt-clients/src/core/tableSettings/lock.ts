@@ -1,6 +1,7 @@
 /**
- * The settings' own lock: ESDICT `TABT`, which the table's lock does not
- * cover.
+ * The settings' own lock: `ENQUEUE_ESDICT` with `objtype` `TABT`
+ * (`CL_TABT_WB_PERSIST->lock`, Code on both systems), held beside the
+ * table's lock in either order (measured on both).
  */
 
 import type {

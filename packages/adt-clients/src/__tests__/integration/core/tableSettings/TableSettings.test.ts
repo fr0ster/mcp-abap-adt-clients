@@ -26,7 +26,10 @@ import {
   analyseException,
   tableSettings,
 } from '@mcp-abap-adt/adt-strategies';
-import type { ITableSettings } from '@mcp-abap-adt/interfaces-adt';
+import {
+  type ITableSettingsRead,
+  TABLE_SETTINGS_MEDIA_TYPE,
+} from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -108,11 +111,12 @@ define table ${tableName.toLowerCase()} {
 describe("A table's technical settings (AdtTableSettings)", () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
+  let isCloudSystem = false;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(connectionLogger);
-      const isCloudSystem = await isCloudEnvironment(connection);
+      isCloudSystem = await isCloudEnvironment(connection);
       const systemContext = await resolveSystemContext(
         connection,
         isCloudSystem,
@@ -137,7 +141,7 @@ describe("A table's technical settings (AdtTableSettings)", () => {
   });
 
   gate(SECTION, CASE)(
-    'writes non-default settings under their lock, activates the table and reads them back',
+    'writes non-default settings under their lock, patches one, activates the table and reads them back — the cloud flag isWritableByAMDP kept',
     async () => {
       const testCase = configuredCase(SECTION, CASE);
       if (!testCase) throw new Error(missingCaseMessage(SECTION, CASE));
@@ -161,7 +165,7 @@ describe("A table's technical settings (AdtTableSettings)", () => {
         ...tableSettingsDocuments,
         metadata: tableSettings,
       });
-      let written: ITableSettings | undefined;
+      let written: ITableSettingsRead | undefined;
       let tableCreated = false;
       let failed: { error: unknown } | undefined;
       try {
@@ -227,13 +231,23 @@ describe("A table's technical settings (AdtTableSettings)", () => {
                 `the settings read of ${tableName} answered no ETag: the write cannot be guarded with If-Match`,
               );
             }
-            // What only a read returns is not written back.
-            const { isWritableByAMDP: _readOnly, ...asRead } = read.settings;
+            // Every setting read is written back, the cloud's
+            // isWritableByAMDP included: a cloud PUT without it reset it to
+            // false (measured 2026-11-19).
+            if (isCloudSystem && read.settings.isWritableByAMDP === undefined) {
+              throw new Error(
+                `the cloud settings read of ${tableName} answered no ts:isWritableByAMDP`,
+              );
+            }
             written = {
-              ...asRead,
+              ...read.settings,
               dataClassCategory: 'APPL1',
               sizeCategory: '1',
-              buffering: { ...asRead.buffering, allowed: 'X', type: 'P' },
+              buffering: {
+                ...read.settings.buffering,
+                allowed: 'X',
+                type: 'P',
+              },
               loggingEnabled: true,
             };
             return expectResult(
@@ -262,6 +276,75 @@ describe("A table's technical settings (AdtTableSettings)", () => {
         );
 
         logTestStep(
+          'patch one setting (and, on the cloud, isWritableByAMDP) under the lock',
+          testsLogger,
+        );
+        const patchLock = expectResult(
+          await settings.lock({ tableName }, { analyse: analyseException }),
+          `lock the settings of ${tableName} for the patch`,
+        );
+        const before = written;
+        if (!before) throw new Error('nothing was written before the patch');
+        // The write carried every setting back: the working area reads what
+        // was written, the cloud's isWritableByAMDP as it was read.
+        const afterWrite = expectResult(
+          await settings.readMetadata(
+            { tableName },
+            { analyse: analyseException, version: 'inactive' },
+          ),
+          `read the written settings of ${tableName}`,
+        );
+        expect(afterWrite.settings).toEqual(before);
+        const flag =
+          before.isWritableByAMDP === undefined
+            ? undefined
+            : !before.isWritableByAMDP;
+        // The cloud refuses to activate a table writable by AMDP with
+        // buffering allowed or logging on (DT 771, RADTTCHK FORM
+        // chk_writable_amdp_usage, Code; answered 200 with an E message,
+        // measured 2026-11-19): a patch that turns the flag on turns
+        // buffering and logging off in the same write.
+        const changes =
+          flag === undefined
+            ? { sizeCategory: '2' }
+            : flag
+              ? {
+                  sizeCategory: '2',
+                  isWritableByAMDP: true,
+                  buffering: { allowed: 'N', type: '' },
+                  loggingEnabled: false,
+                }
+              : { sizeCategory: '2', isWritableByAMDP: false };
+        await releasing(
+          async () =>
+            expectResult(
+              await settings.patchMetadata(
+                {
+                  tableName,
+                  transportRequest,
+                  changes,
+                },
+                {
+                  analyse: analyseException,
+                  headers: { accept: TABLE_SETTINGS_MEDIA_TYPE },
+                  lockHandle: patchLock,
+                },
+              ),
+              `patch the settings of ${tableName}`,
+            ),
+          () =>
+            settings.unlock({ tableName }, patchLock, {
+              analyse: analyseException,
+            }),
+          `unlock the settings of ${tableName} after the patch`,
+        );
+        written = {
+          ...before,
+          ...changes,
+          buffering: { ...before.buffering, ...changes.buffering },
+        };
+
+        logTestStep(
           'activate the table, which activates its settings',
           testsLogger,
         );
@@ -281,10 +364,9 @@ describe("A table's technical settings (AdtTableSettings)", () => {
           ),
           `read the active settings of ${tableName}`,
         );
-        // Every setting is what was written, the unchanged ones included.
-        const { isWritableByAMDP: _activeReadOnly, ...activeSettings } =
-          active.settings;
-        expect(activeSettings).toEqual(written);
+        // Every setting is what was written and patched, the unchanged ones
+        // and the cloud's isWritableByAMDP included.
+        expect(active.settings).toEqual(written);
         logTestSuccess(testsLogger, TITLE);
       } catch (error) {
         failed = { error };

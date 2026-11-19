@@ -89,11 +89,28 @@ export interface IWhereUsedListResult {
 }
 
 /**
- * One object of the inactive-objects listing: its name and its code. A known
- * code is an `IObjectReference` to hand to `activateObjectsGroup`; an
- * `unknownType` is not one, so a caller decides about it.
+ * One object of the inactive-objects listing: its name, its code, and the
+ * address SAP listed it at. A known code is an `IObjectReference` to hand to
+ * `activateObjectsGroup`; an `unknownType` is not one, so a caller decides
+ * about it.
+ *
+ * **The address, not the name, identifies a text elements entry.** SAP
+ * listed a class's text elements as `PROG/PX` named after the class pool
+ * (`ZCL_…====CP`) at `/textelements/classes/{class}` (measured on premise),
+ * and a function group's as `PROG/PX` `SAPL{GROUP}` at
+ * `/textelements/functiongroups/{group}` (measured on the cloud), each with
+ * its object as `parentUri` (`CL_SEDX_ADT_SRC_UTIL=>
+ * get_type_and_name_from_uri`, Code). A `PROG/PX` reference without a `uri`
+ * is addressed `/textelements/programs/{name}`, which for these names is no
+ * object; `uri` is the address SAP listed.
  */
-export type IInactiveObject = IAdtAnsweredObject & { name: string };
+export type IInactiveObject = IAdtAnsweredObject & {
+  name: string;
+  /** `adtcore:uri` as listed, when the entry carries one. */
+  uri?: string;
+  /** `adtcore:parentUri` as listed: the object a part belongs to. */
+  parentUri?: string;
+};
 
 /** What the inactive-objects listing answers, read. */
 export interface IInactiveObjectsResponse {
@@ -350,9 +367,15 @@ export const utilInactiveObjects: IResultStrategy<IInactiveObjectsResponse> = (
       | XmlRecord
       | undefined;
     if (!ref) continue;
+    const uri = ref['@_adtcore:uri'];
+    const parentUri = ref['@_adtcore:parentUri'];
     objects.push({
       ...answeredObject(String(ref['@_adtcore:type'] ?? '')),
       name: String(ref['@_adtcore:name'] ?? ''),
+      ...(typeof uri === 'string' && uri !== '' ? { uri } : {}),
+      ...(typeof parentUri === 'string' && parentUri !== ''
+        ? { parentUri }
+        : {}),
     });
   }
   return { objects };
