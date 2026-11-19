@@ -72,12 +72,16 @@ Released with `@mcp-abap-adt/adt-strategies` 0.26.0 and
 
 ### SAP's rule, documented
 
-- The cloud does not activate a table writable by AMDP with logging on: the
-  settings write is accepted, the activation answers `200` with an `E`
-  message ("AMDP writes to table … not possible (Logging activated)") and the
-  table stays inactive (measured on the cloud, 2026-11-19; the check in SAP's
-  code not yet read). The README says so; the live case turns logging off in
-  the patch that turns the flag on.
+- The cloud does not activate a table writable by AMDP that is buffered,
+  logged or replaced: the settings write is accepted, the activation answers
+  `200` with an `E` message per condition (DT 771 "AMDP writes to table &1
+  not possible (&2)": "Buffering allowed" for `allowed` not `N`, "Logging
+  activated", "replacement object exists" for a `viewref`) and the table
+  stays inactive. Checked only with `allowed_for_amdp_write = 'X'`
+  (`CL_DDACT_TABL_CHECK_TCHSET_CL` → local class `chk_writable_amdp_usage`
+  → `RADTTCHK` FORM `chk_writable_amdp_usage`, Code on the cloud; on premise
+  no such check, Code). The README says so; the live case sets buffering `N`
+  and logging off in the patch that turns the flag on.
 
 ### Activation verdict, checked
 

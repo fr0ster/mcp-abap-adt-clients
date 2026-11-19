@@ -830,10 +830,16 @@ that includes `isWritableByAMDP`: the cloud's `move_adt_to_ddv` writes it from
 the document (Code), a PUT without it read back `false` (measured), so a cloud
 client's write requires it and sends `ts:isWritableByAMDP`; on premise nothing
 maps it (Code) and the type refuses it. **The cloud does not activate a
-table writable by AMDP with logging on**: the write is accepted, and the
-table's activation answers `200` with an `E` message, "AMDP writes to table
-… not possible (Logging activated)", leaving it inactive (measured on the
-cloud, 2026-11-19; the check in SAP's code is not yet read). Turn
+table writable by AMDP that is buffered, logged or replaced**: the write is
+accepted, and the table's activation answers `200` with an `E` message per
+condition, DT 771 "AMDP writes to table &1 not possible (&2)", leaving it
+inactive. Only with `allowed_for_amdp_write = 'X'`, each condition that
+applies reported: buffering `allowed` not `N` ("Buffering allowed", which
+covers allowed but switched off), logging on ("Logging activated"), a
+replacement object (`viewref`, "replacement object exists")
+(`CL_DDACT_TABL_CHECK_TCHSET_CL`, local class `chk_writable_amdp_usage`,
+`RADTTCHK` FORM `chk_writable_amdp_usage`, Code on the cloud; on premise
+there is no such check, Code). Set `buffering.allowed` to `N` and
 `loggingEnabled` off in the same write that turns `isWritableByAMDP` on.
 `description` is required too (SAP
 refuses a write without `adtcore:description`, `400` SWB_TOOL 019, measured on
