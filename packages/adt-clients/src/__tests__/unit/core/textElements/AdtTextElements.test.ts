@@ -17,6 +17,7 @@ import type {
 import { LockRegistry } from '../../../../core/shared/LockRegistry';
 import { AdtTextElements } from '../../../../core/textElements/AdtTextElements';
 import { textElementsDocuments } from '../../../../core/textElements/types';
+import { recogniseFailure } from '../../../../utils/adtResponse';
 
 const ANSWERS = path.resolve(__dirname, '../../../../../corpus/adt/answers');
 
@@ -324,6 +325,34 @@ describe('the lock, and the registry following the wire', () => {
     await texts.unlock(object, 'HANDLE1', { analyse: () => ADT_NO_FAILURE });
     expect(registry.pending).toEqual(['TextElements/class/ZCL_X']);
     expect(await registry.unlockAll()).toEqual([]);
+    expect(registry.pending).toEqual([]);
+  });
+
+  it("a LOCK SAP refused and the connection resolved keeps SAP's classification, not LOCK_FAILED", async () => {
+    const { connection } = recording(
+      recorded('refusal-lock-held-by-other--01-lock'),
+    );
+    const registry = new LockRegistry();
+    const texts = new AdtTextElements(connection, {
+      results: textElementsDocuments,
+      lockRegistry: registry,
+    });
+    const locked = await texts.lock({
+      objectKind: 'class',
+      objectName: 'ZCL_X',
+    });
+    expect(locked.ok).toBe(false);
+    const failure = !locked.ok ? locked.getError() : undefined;
+    expect(failure?.code).not.toBe('ADT_LOCK_FAILED');
+    expect(failure?.response?.status).toBe(403);
+    // The verdict every member gives a refusal a connection resolved: the
+    // one it would have had thrown, with SAP's answer as its response.
+    expect(failure).toEqual(
+      recogniseFailure({
+        message: 'Request failed with status code 403',
+        response: failure?.response,
+      }),
+    );
     expect(registry.pending).toEqual([]);
   });
 

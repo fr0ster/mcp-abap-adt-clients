@@ -206,8 +206,8 @@ export class AdtTextElements<
 
   /**
    * Lock the object's text elements — one LOCK, its handle read by
-   * `lockHandleOf`. A LOCK answered without a handle is a refusal
-   * (`LOCK_FAILED`). The registry follows the wire, before any `analyse`
+   * `lockHandleOf`. A 2xx LOCK answered without a handle is a refusal
+   * (`LOCK_FAILED`); a LOCK SAP refused keeps SAP's own classification. The registry follows the wire, before any `analyse`
    * runs: a handle SAP answered with a 2xx status is tracked whatever a
    * caller rules, so `unlockAll()` can release it.
    */
@@ -221,9 +221,13 @@ export class AdtTextElements<
         const locked = await inStatefulSession(this.connection, () =>
           lockTextElements(this.connection, objectKind, objectName),
         );
-        const held = failedStatus(locked) ? '' : lockHandleOf(locked);
+        const refused = failedStatus(locked);
+        const held = refused ? '' : lockHandleOf(locked);
         if (held) this.lockTrackers[objectKind].track(objectName, held);
-        return lockHandleOf(locked) === ''
+        // A LOCK SAP refused keeps SAP's classification (the default verdict
+        // of a resolved refusal); only a 2xx answer without a handle is
+        // `LOCK_FAILED`.
+        return !refused && held === ''
           ? {
               answer: locked,
               failure: {
