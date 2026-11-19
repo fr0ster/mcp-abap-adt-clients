@@ -1,0 +1,26 @@
+{
+  "case": "activate-group-text-elements-function-group-s4-2025",
+  "step": 1,
+  "stepTag": "activate",
+  "capturedAt": "2026-11-19",
+  "note": "Recorded 2026-11-19 by the owner-approved probe through @mcp-abap-adt/connection (the research for the text elements contract, interfaces-adt 30.0.0); on premise in a local package with no transport, the objects created by the probe and deleted at its end; on the cloud read-only. Scrubbed of host, user, system id and lock handle. S/4HANA 2025 on premise: one activation of a function group (FUGR/F) and its text elements (PROG/PX, /textelements/functiongroups/{group}); executed.",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
+    "headers": {
+      "Accept": "application/xml"
+    },
+    "headersNote": "Reconstructed, not recorded: the probe log keeps the request line and the request body (both recorded here as sent: an activation's objectReferences XML) and the answer's status, content type and body, not the request's headers. Accept application/xml is the one the library's activation sends; the probe's own headers are not recorded, and no Content-Type is stated here.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\"><adtcore:objectReference adtcore:uri=\"/sap/bc/adt/functions/groups/zmcp_txg4480\" adtcore:type=\"FUGR/F\" adtcore:name=\"ZMCP_TXG4480\"/><adtcore:objectReference adtcore:uri=\"/sap/bc/adt/textelements/functiongroups/zmcp_txg4480\" adtcore:type=\"PROG/PX\" adtcore:name=\"ZMCP_TXG4480\"/></adtcore:objectReferences>"
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/xml; charset=utf-8"
+    },
+    "bodyFile": "activate-group-text-elements-function-group-s4-2025--01-activate.body.txt"
+  }
+}

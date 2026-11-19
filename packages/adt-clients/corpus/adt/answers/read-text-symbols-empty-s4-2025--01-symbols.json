@@ -1,0 +1,26 @@
+{
+  "case": "read-text-symbols-empty-s4-2025",
+  "step": 1,
+  "stepTag": "symbols",
+  "capturedAt": "2026-11-19",
+  "note": "Recorded 2026-11-19 by a hand-run read-only probe through @mcp-abap-adt/connection (the research for the text elements contract, interfaces-adt 30.0.0); the probe logged the status, the content type and the body, and nothing else. S/4HANA 2025 on premise: the program RSPARAM has no text symbols; the answer is empty.",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/textelements/programs/rsparam/source/symbols",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/textelements/programs/rsparam/source/symbols",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.textelements.symbols.v1"
+    },
+    "headersNote": "Caller-supplied headers only. The lock handle is not recorded; the connection adds the logon and the session below this point, none of which is recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.textelements.symbols.v1; charset=UTF-8"
+    },
+    "bodyFile": "read-text-symbols-empty-s4-2025--01-symbols.body.txt"
+  }
+}

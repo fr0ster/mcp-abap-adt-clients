@@ -1,0 +1,5 @@
+@MaxLength:20
+001=FUGR symbol one
+
+@MaxLength:15
+002=FUGR symbol 2

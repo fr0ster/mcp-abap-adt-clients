@@ -281,6 +281,7 @@ const HANDLER: {
   ddl: (c) => c.getDdl(),
   table: (c) => c.getTable(),
   tableSettings: (c) => c.getTableSettings(),
+  textElements: (c) => c.getTextElements(),
   structure: (c) => c.getStructure(),
   appendStructure: (c) => c.getAppendStructure(),
   tableType: (c) => c.getTableType(),

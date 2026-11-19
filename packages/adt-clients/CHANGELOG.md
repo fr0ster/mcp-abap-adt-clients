@@ -24,9 +24,101 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [45.6.0] - 2026-11-19
+## [46.0.0] - 2026-11-19
 
-Released with `@mcp-abap-adt/adt-strategies` 0.24.0 and
+Released with `@mcp-abap-adt/adt-strategies` 0.25.0 and
+`@mcp-abap-adt/adt-clients-legacy` 0.11.0, on `@mcp-abap-adt/interfaces-adt`
+`^30.0.0`. 45.6.0, 0.24.0 and 0.10.0 were tagged but never published: this
+release carries their table settings and adds the text elements. See
+[`docs/usage/MIGRATION-46.md`](docs/usage/MIGRATION-46.md).
+
+### Breaking
+
+- **Where-used of `PROG/PX` names its `container`.** interfaces-adt 30.0.0
+  adds `PROG/PX` (a program's text elements, and a function group's) to the
+  codes `getWhereUsed` and `getWhereUsedScope` take, with `container:
+  'program' | 'functionGroup'` required, and every other code refuses a
+  `container`. A call whose `object_type` is a variable of the whole
+  where-used union no longer compiles (`TS2345`): exclude `PROG/PX` from it or
+  handle it apart (measured with `examples/where-used.ts`, which compiled on
+  45.5.5 and now excludes it). `CLAS/OCX` is not in the where-used codes: the
+  systems measured serve no where-used for it. The address of a `PROG/PX`
+  where-used follows the container (`/textelements/programs/{name}` or
+  `…/functiongroups/{name}`).
+- **The client's code and API sets gain the table settings and the text
+  elements** (`TABL/DTT`, `PROG/PX`, `CLAS/OCX`, `tableSettings`,
+  `textElements`, `table_settings`, `text_elements`), so a consumer's
+  exhaustive map over them adds the members: a `Record<AdtTypeCode, …>`
+  written for 45.5.5 misses three keys (`TS2739`).
+- **The where-used parameters (interfaces-adt 30.0.0) are type aliases**,
+  their `object_type` and `container` readonly and their code every code but
+  `CLAS/OCX`: extending them as an interface (`TS2312`), assigning
+  `object_type` (`TS2540`) and `IGetWhereUsedParams<AdtTypeCode>` (`TS2344`)
+  stop compiling. Each case was compiled against 45.5.5 from the registry and
+  against 46.0.0; MIGRATION-46 has the remedies.
+
+### Added
+
+- **`getTextElements()`: a program's, a class's or a function group's text
+  elements** — text symbols, selection texts, list and column headings — at
+  `/sap/bc/adt/textelements/{programs|classes|functiongroups}/{name}`, one
+  part per sub-resource, under their own lock (`TEXT`). `AdtTextElements`
+  implements `IAdtTextElementsReadable`, `IAdtTextElementsUpdatable` and
+  `IAdtLockable`, one request each:
+  - `read(config, version?)` — `GET …/source/{part}[?version=…]` with the
+    part's media type (`TEXT_ELEMENTS_MEDIA_TYPES`) as `Accept`;
+  - `lock` / `unlock` — stateful `_action=LOCK&accessMode=MODIFY` /
+    `UNLOCK` on the object's address; the registry follows the wire before
+    any `analyse` runs, one tracker per kind, so `unlockAll()` releases each
+    at its own address; a LOCK SAP refused (non-2xx) keeps SAP's
+    classification, and only a 2xx answer without a handle is `LOCK_FAILED`;
+  - `update` — `PUT …/source/{part}?lockHandle=…[&corrNr=…]` of the whole
+    part, built from the typed list (`textSymbolsBody`, `selectionTextsBody`,
+    `textHeadingsBody`, `textElementsBody`). SAP deletes every entry the list
+    leaves out. A part read and written back unchanged is the same bytes,
+    over every recorded answer; a line break in a value, `=` in a key or a
+    name, or a length that is not a count is refused before any request; an
+    empty `lockHandle` throws.
+  - `textElementsActivationReferences(object)`: the object's reference and
+    its text elements', for one activation through `activateObjects` (a
+    write lands inactive, and naming the object alone runs nothing for them —
+    measured). `PROG/PX` and `CLAS/OCX` are sent though their API lists no
+    `activate`, and a `PROG/PX` reference's own `uri` is its address, so a
+    function group's text elements go under `functiongroups` (measured on
+    premise).
+  - Not on SAP_BASIS 7.40: the factory does not compile there, and
+    adt-clients-legacy refuses it.
+- **`getTableSettings()`: a table's technical settings** (`TABL/DTT`), as
+  45.6.0 describes below — `readMetadata`, `lock`, `updateMetadata` (the
+  whole DD09L row from the typed settings, `lockHandle` required, the
+  translation's four attributes, `If-Match` without the charset) and
+  `unlock`, the registry following the wire; activating the table activates
+  them.
+- `TEXT_ELEMENTS` (the address records) and `textElementsDocuments` (the
+  shipped result set) exported.
+
+### Fixed
+
+- **A settings LOCK SAP refused keeps SAP's classification.** In the
+  unpublished 45.6.0 a refused (non-2xx) LOCK that a connection resolved was
+  answered `LOCK_FAILED`, because its body has no handle; now it gets the
+  default verdict of a resolved refusal, and `LOCK_FAILED` applies only to a
+  2xx answer without a handle. The text elements' lock does the same.
+- Recorded answers of the text elements research in `corpus/adt/answers/`
+  (`*text-*`): reads and writes on premise and on the cloud, refusals
+  (`406` `SEDX_ADT/101`, `102`, `106`, `110`), and a function group's
+  activation with its text elements.
+
+### Changed
+
+- **`@mcp-abap-adt/interfaces-adt` is `^30.0.0`** (was `^29.0.0` in the
+  unpublished 45.6.0, `^27.4.0` in 45.5.5), and `@mcp-abap-adt/adt-strategies`
+  `^0.25.0`.
+
+## [45.6.0] - 2026-11-19 (tagged, not published)
+
+Tagged as `adt-clients-v45.6.0` and never published; its content ships in
+46.0.0. Released with `@mcp-abap-adt/adt-strategies` 0.24.0 and
 `@mcp-abap-adt/adt-clients-legacy` 0.10.0.
 
 ### Added

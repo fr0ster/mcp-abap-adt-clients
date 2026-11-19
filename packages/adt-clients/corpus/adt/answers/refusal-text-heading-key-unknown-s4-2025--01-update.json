@@ -1,0 +1,27 @@
+{
+  "case": "refusal-text-heading-key-unknown-s4-2025",
+  "step": 1,
+  "stepTag": "update",
+  "capturedAt": "2026-11-19",
+  "note": "Recorded 2026-11-19 by the owner-approved probe through @mcp-abap-adt/connection (the research for the text elements contract, interfaces-adt 30.0.0); on premise in a local package with no transport, the objects created by the probe and deleted at its end; on the cloud read-only. Scrubbed of host, user, system id and lock handle. S/4HANA 2025 on premise: the heading key columnHeader_5 refuses the write, 406 SEDX_ADT/101.",
+  "request": {
+    "method": "PUT",
+    "url": "/sap/bc/adt/textelements/programs/zmcp_txk4480/source/headings?lockHandle=<handle>",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/textelements/programs/zmcp_txk4480/source/headings?lockHandle=<handle>",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.textelements.headings.v1",
+      "Content-Type": "application/vnd.sap.adt.textelements.headings.v1; charset=utf-8"
+    },
+    "headersNote": "Reconstructed, not recorded: the probe log keeps the request line and the request body (both recorded here as sent) and the answer's status, content type and body, not the request's headers. The Accept and Content-Type are the part's media type the probe used; the lock handle is not recorded.",
+    "body": "listHeader=List header EN\r\ncolumnHeader_5=Five"
+  },
+  "response": {
+    "status": 406,
+    "statusText": "Not Acceptable",
+    "headers": {
+      "content-type": "application/xml"
+    },
+    "bodyFile": "refusal-text-heading-key-unknown-s4-2025--01-update.body.txt"
+  }
+}

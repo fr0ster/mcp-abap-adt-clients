@@ -64,6 +64,19 @@ export async function getActivationResults(
 }
 
 /**
+ * A reference's address: the one its code names, except a text elements
+ * reference (`PROG/PX`) that carries its own `uri` — a function group's text
+ * elements are `PROG/PX` at `/sap/bc/adt/textelements/functiongroups/{group}`
+ * (measured on premise, the URI deciding), and the tables keep one
+ * collection per code, so the reference's `uri` says which
+ * (interfaces-adt 30.0.0: activation stays on `IObjectReference.uri`).
+ */
+function referenceUri(obj: IAdtGroupReference<AdtAddressableCode>): string {
+  if (obj.type === 'PROG/PX' && obj.uri) return obj.uri;
+  return buildObjectUri(obj.name, obj.type, obj.parentName);
+}
+
+/**
  * The body of a group activation: one `adtcore:objectReference` per object,
  * with its uri, type and name. Both group members send it —
  * `activateObjectsGroup` to `/activation/runs`, `activateObjects` to
@@ -74,7 +87,7 @@ function groupActivationBody(
 ): string {
   const objectReferences = objects
     .map((obj) => {
-      const uri = buildObjectUri(obj.name, obj.type, obj.parentName);
+      const uri = referenceUri(obj);
       return `  <adtcore:objectReference adtcore:uri="${uri}" adtcore:type="${obj.type}" adtcore:name="${obj.name}"/>`;
     })
     .join('\n');

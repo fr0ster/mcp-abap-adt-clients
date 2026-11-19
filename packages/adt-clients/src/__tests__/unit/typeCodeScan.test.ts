@@ -116,9 +116,9 @@ describe('the literal scan of type codes', () => {
 
   it('fails a comment naming a code neither the tables nor the run registry hold', () => {
     expect(
-      scan(['export const x = 1;', '// Runs a `CLAS/OCX` include.'].join('\n')),
+      scan(['export const x = 1;', '// Runs a `CLAS/OCT` include.'].join('\n')),
     ).toEqual([
-      "src/__typeCodeScanFixture__/fixture.ts:2 'CLAS/OCX' — named in a comment, not a code of the tables",
+      "src/__typeCodeScanFixture__/fixture.ts:2 'CLAS/OCT' — named in a comment, not a code of the tables",
     ]);
   });
 

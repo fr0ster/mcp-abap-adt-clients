@@ -18,6 +18,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClient } from '../../../../clients/AdtClient';
 import { tableSettingsDocument } from '../../../../core/tableSettings/document';
+import { recogniseFailure } from '../../../../utils/adtResponse';
 import { headersOf } from '../../../helpers/adtHeaders';
 
 const ANSWERS = path.resolve(__dirname, '../../../../../corpus/adt/answers');
@@ -536,6 +537,30 @@ describe('a lock without a handle', () => {
     expect(failure?.code).toBe('ADT_LOCK_FAILED');
     expect(failure?.response?.status).toBe(200);
     expect(failure?.response?.data).toBe(empty.data);
+    expect(client.pendingLocks).toEqual([]);
+  });
+
+  it("a LOCK SAP refused and the connection resolved keeps SAP's classification, not LOCK_FAILED", async () => {
+    const refused = recorded('refusal-lock-held-by-other--01-lock');
+    const connection = {
+      setSessionType: () => undefined,
+      isConnected: () => true,
+      makeAdtRequest: async () => refused,
+    } as unknown as IAbapConnection;
+    const client = new AdtClient(connection);
+    const locked = await client.getTableSettings().lock({ tableName: 'ZT' });
+    expect(locked.ok).toBe(false);
+    const failure = !locked.ok ? locked.getError() : undefined;
+    expect(failure?.code).not.toBe('ADT_LOCK_FAILED');
+    expect(failure?.response?.status).toBe(403);
+    // The verdict every member gives a refusal a connection resolved: the
+    // one it would have had thrown, with SAP's answer as its response.
+    expect(failure).toEqual(
+      recogniseFailure({
+        message: 'Request failed with status code 403',
+        response: failure?.response,
+      }),
+    );
     expect(client.pendingLocks).toEqual([]);
   });
 

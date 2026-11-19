@@ -191,6 +191,16 @@ export {
   type TableTypeValues,
 } from './core/tabletype';
 export {
+  AdtTextElements,
+  selectionTextsBody,
+  TEXT_ELEMENTS_MEDIA_TYPES,
+  type TextElementsValues,
+  textElementsActivationReferences,
+  textElementsBody,
+  textHeadingsBody,
+  textSymbolsBody,
+} from './core/textElements';
+export {
   AdtTransformation,
   type TransformationValues,
 } from './core/transformation';
@@ -235,6 +245,7 @@ export {
   TABLE,
   TABLE_SETTINGS,
   TABLE_TYPE,
+  TEXT_ELEMENTS,
   TRANSFORMATION,
   TRANSPORT_REQUEST,
   versionsUri,

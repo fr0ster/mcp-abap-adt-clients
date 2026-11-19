@@ -1,0 +1,5 @@
+@MaxLength:20
+001=Symbol one EN
+
+@MaxLength:20
+002=Symbol two EN

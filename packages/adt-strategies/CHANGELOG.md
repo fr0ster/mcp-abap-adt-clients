@@ -14,9 +14,42 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
-## [0.24.0] - 2026-11-19
+## [0.25.0] - 2026-11-19
 
-Released with `@mcp-abap-adt/adt-clients` 45.6.0.
+Released with `@mcp-abap-adt/adt-clients` 46.0.0, on
+`@mcp-abap-adt/interfaces-adt` `^30.0.0`. 0.24.0 was tagged
+(`adt-strategies-v0.24.0`) but never published: this release carries its
+`tableSettings` reading and adds the text elements readings.
+
+### Added
+
+- **`textSymbols`, `selectionTexts`, `textHeadings`**: the readings of a text
+  elements part — `getTextElements().read` and `update`'s answer — and
+  `readTextSymbols`, `readSelectionTexts`, `readTextHeadings` for the text
+  alone. Each answers the part with its list in the shape of the contract's
+  `TextElementsDocument`: symbols `{ key, text, maxLength }` from
+  `@MaxLength:N` and `KEY=text` blocks; selection texts
+  `{ name, text, ddicReference }`, an empty line between entries and
+  `@DDICReference` before a dictionary text; headings `listHeader` and
+  `columnHeader1`–`4` from their six lines. Everything is read as SAP wrote
+  it — a leading space kept, a selection name's padding kept — so a write
+  sends back the bytes it read. A line out of the grammar throws, naming the
+  part and the line: a part is written back whole, and a skipped line would
+  be a deleted entry. Tested over the recorded answers, on premise and on
+  the cloud.
+- **`tableSettings`**, as 0.24.0 describes below: the settings read, every
+  setting or a throw naming the one missing, with the ETag.
+
+### Changed
+
+- **`@mcp-abap-adt/interfaces-adt` is `^30.0.0`** (was `^29.0.0` in the
+  unpublished 0.24.0, `^27.4.0` in 0.23.5). No existing reading or verdict
+  changes.
+
+## [0.24.0] - 2026-11-19 (tagged, not published)
+
+Tagged as `adt-strategies-v0.24.0` and never published; its content ships in
+0.25.0. Released with `@mcp-abap-adt/adt-clients` 45.6.0.
 
 ### Added
 

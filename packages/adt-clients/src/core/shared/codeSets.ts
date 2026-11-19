@@ -175,10 +175,12 @@ export type AdtUtilityCodeOf<
  * `AdtWhereUsedCode<V>` (`utilsTypedAtoms.test.ts` holds them equal per
  * variant): every code of `V` but a function include, whose group where-used
  * has no field for (a function module names it as `GROUP|FM`), and a message
- * class message, which has no address of its own; and `VIEW/DV`.
+ * class message, which has no address of its own, and a class's text
+ * elements (`CLAS/OCX`), which the systems measured serve no where-used for
+ * (interfaces-adt 30.0.0); and `VIEW/DV`.
  */
 export type AdtWhereUsedCode<V extends AdtVariant> =
-  | Exclude<AdtCodeOf<V>, AdtCodes<'FUGR/I' | 'MSAG/NN'>>
+  | Exclude<AdtCodeOf<V>, AdtCodes<'FUGR/I' | 'MSAG/NN' | 'CLAS/OCX'>>
   | AdtUtilityCodeOf<V, 'whereUsed'>;
 
 /**
@@ -189,6 +191,11 @@ export type AdtWhereUsedCode<V extends AdtVariant> =
  */
 export const ACTIVATED_WITHOUT_TABLE = {
   'DEVC/K': true,
+  // The text elements: `textElements` lists no `activate`, and one activation
+  // naming the object and its text elements activates both (measured on
+  // premise for a program and a function group, on the cloud for a class).
+  'PROG/PX': true,
+  'CLAS/OCX': true,
 } as const satisfies Partial<Record<AdtTypeCode, true>>;
 
 /**

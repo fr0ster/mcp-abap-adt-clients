@@ -1,0 +1,11 @@
+@DDICReference
+P_ARBGB =Application Area
+
+P_CHAR  =Character parameter
+
+P_FLAG  =A checkbox
+
+S_DATE  =Date range
+
+@DDICReference
+S_MSGNR =Message

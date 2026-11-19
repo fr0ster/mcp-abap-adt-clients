@@ -1505,6 +1505,24 @@ table_settings:
         # package_name: "ZAC_PKG01"
         # transport_request: ""
 
+text_elements:
+  test_cases:
+    - name: "adt_text_elements"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Text elements of a fresh program (on premise) or class (cloud): symbols 001/002 and P_TEST written, activated with the object, 002 deleted"
+      params: {}
+        # package_name: "ZAC_PKG01"
+        # transport_request: ""
+    - name: "adt_text_elements_function_group"
+      enabled: true
+      # ABAP cloud creates no function group, so there is none to write text elements to.
+      available_in: ["onprem"]
+      description: "Text elements of a fresh function group: symbols written, activated with the group (FUGR/F + PROG/PX under functiongroups), read back active, found by where-used with container functionGroup"
+      params: {}
+        # package_name: "ZAC_PKG01"
+        # transport_request: ""
+
 # Create TableType (DDIC Table Type)
 # TableType is XML-based entity (like Domain/DataElement)
 # Create: creates empty TableType (rowType added via update)

@@ -82,6 +82,7 @@ import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
  */
 
 import type {
+  AdtGroupOnlyCode,
   AdtOperation,
   AdtVariant,
   IAdtAnalyseOptions,
@@ -175,6 +176,7 @@ import {
 // Import types
 import {
   type AdtActivationCode,
+  type AdtCodes,
   type AdtDeletionCheckCode,
   type AdtDeletionCode,
   type AdtMetadataReadCodeOf,
@@ -203,6 +205,17 @@ import type {
   ISearchObjectsParams,
 } from './types';
 import type { utilDocuments } from './utilResultSet';
+
+/**
+ * The codes a where-used parameter names on variant `V`: `AdtWhereUsedCode<V>`,
+ * held to the contract's constraint (every code but `CLAS/OCX`, and the
+ * group-only ones) so a generic `V` satisfies it — the two are the same set
+ * per variant (`utilsTypedAtoms.test.ts`).
+ */
+type WhereUsedParamCode<V extends AdtVariant> = Extract<
+  AdtWhereUsedCode<V>,
+  Exclude<AdtTypeCode, AdtCodes<'CLAS/OCX'>> | AdtGroupOnlyCode
+>;
 
 /**
  * Declared against every atom, not only `IAdtSearchable`.
@@ -405,12 +418,16 @@ export class AdtUtils<
    * });
    */
   async getWhereUsedScope<E extends IAdtError = IAdtError>(
-    params: IGetWhereUsedScopeParams<AdtWhereUsedCode<V>>,
+    params: IGetWhereUsedScopeParams<WhereUsedParamCode<V>>,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['whereUsedScope'], E>> {
     // Built before the request: a type where-used cannot address is the
     // caller's argument, not something the server said.
-    whereUsedObjectUri(params.object_name, params.object_type);
+    whereUsedObjectUri(
+      params.object_name,
+      params.object_type,
+      params.container,
+    );
 
     return answering(
       () => getWhereUsedScope(this.connection, options.headers, params),
@@ -495,11 +512,15 @@ export class AdtUtils<
    * });
    */
   async getWhereUsed<E extends IAdtError = IAdtError>(
-    params: IGetWhereUsedParams<AdtWhereUsedCode<V>>,
+    params: IGetWhereUsedParams<WhereUsedParamCode<V>>,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['whereUsed'], E>> {
     // See getWhereUsedScope: an unknown type is thrown, not asked about.
-    whereUsedObjectUri(params.object_name, params.object_type);
+    whereUsedObjectUri(
+      params.object_name,
+      params.object_type,
+      params.container,
+    );
 
     return answering(
       () => getWhereUsed(this.connection, options.headers, params),

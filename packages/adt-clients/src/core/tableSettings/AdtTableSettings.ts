@@ -195,8 +195,9 @@ export class AdtTableSettings<
   /**
    * Lock the settings — one LOCK, its handle read by `lockHandleOf`.
    *
-   * **A LOCK answered without a handle is a refusal** (`LOCK_FAILED`, the
-   * answer kept as its `response`): the write needs the handle, and an empty
+   * **A 2xx LOCK answered without a handle is a refusal** (`LOCK_FAILED`, the
+   * answer kept as its `response`); a LOCK SAP refused keeps SAP's own
+   * classification: the write needs the handle, and an empty
    * one would leave the PUT with no `lockHandle` at all. It is the starting
    * verdict, as every failure is: a caller's `analyse` sees it and may rule
    * otherwise. The registry follows the wire: a handle SAP answered with a
@@ -216,9 +217,13 @@ export class AdtTableSettings<
         // The registry follows the wire, before any `analyse` runs: a handle
         // SAP answered with a 2xx status is tracked whatever a caller rules,
         // so `unlockAll()` can release what the wire holds.
-        const held = failedStatus(locked) ? '' : lockHandleOf(locked);
+        const refused = failedStatus(locked);
+        const held = refused ? '' : lockHandleOf(locked);
         if (held) this.lockTracker.track(name, held);
-        return lockHandleOf(locked) === ''
+        // A LOCK SAP refused keeps SAP's classification (the default verdict
+        // of a resolved refusal); only a 2xx answer without a handle is
+        // `LOCK_FAILED`.
+        return !refused && held === ''
           ? {
               answer: locked,
               failure: {

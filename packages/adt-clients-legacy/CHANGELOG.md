@@ -4,9 +4,32 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
-## [0.10.0] - 2026-11-19
+## [0.11.0] - 2026-11-19
 
-Released with `@mcp-abap-adt/adt-clients` 45.6.0.
+Released with `@mcp-abap-adt/adt-clients` 46.0.0, on
+`@mcp-abap-adt/interfaces-adt` `^30.0.0`. 0.10.0 was tagged
+(`adt-clients-legacy-v0.10.0`) but never published: this release carries its
+`getTableSettings()` refusal and adds the text elements'.
+
+### Added
+
+- **`getTextElements()` is refused on 7.40** — `absentOnLegacy`, every member
+  answers `UNSUPPORTED_OPERATION` without a request, not measured: 7.40
+  SP04's discovery has no `/sap/bc/adt/textelements` collection.
+  `ADT_TYPES_BASIS_740` has no `textElements`, so the getter does not compile
+  on `AdtClientLegacy`.
+- **`getTableSettings()` is refused on 7.40**, as 0.10.0 describes below.
+
+### Changed
+
+- **`@mcp-abap-adt/interfaces-adt` is `^30.0.0`** (was `^29.0.0` in the
+  unpublished 0.10.0), and the `@mcp-abap-adt/adt-clients` range `^46.0.0`
+  (peer and dev), `@mcp-abap-adt/adt-strategies` `^0.25.0`.
+
+## [0.10.0] - 2026-11-19 (tagged, not published)
+
+Tagged as `adt-clients-legacy-v0.10.0` and never published; its content ships
+in 0.11.0. Released with `@mcp-abap-adt/adt-clients` 45.6.0.
 
 ### Added
 

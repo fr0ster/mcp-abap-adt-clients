@@ -264,6 +264,7 @@ const ABSENT_ON_LEGACY = [
   'ScalarFunctionImplementation',
   'AppendStructure',
   'TableSettings',
+  'TextElements',
 ];
 
 /** A connection that refuses every request: the reference handlers send none. */

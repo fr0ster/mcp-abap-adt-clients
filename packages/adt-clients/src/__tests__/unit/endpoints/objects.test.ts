@@ -175,6 +175,7 @@ describe('records', () => {
         'TABLE',
         'TABLE_SETTINGS',
         'TABLE_TYPE',
+        'TEXT_ELEMENTS',
         'TRANSFORMATION',
         'TRANSPORT_REQUEST',
       ].sort(),

@@ -39,6 +39,7 @@ import {
   TABLE,
   TABLE_SETTINGS,
   TABLE_TYPE,
+  TEXT_ELEMENTS,
   TRANSFORMATION,
 } from '../../../endpoints/objects';
 import { buildObjectUri } from '../../../utils/activationUtils';
@@ -59,6 +60,11 @@ const EXPECTED: Readonly<Record<Exclude<AdtTypeCode, 'MSAG/NN'>, string>> = {
   'DDLS/DF': DDL_SOURCE.uri(NAME),
   'TABL/DT': TABLE.uri(NAME),
   'TABL/DTT': TABLE_SETTINGS.uri(NAME),
+  // The code's address is a program's text elements; a function group's are
+  // the same code under `functiongroups`, named by the where-used container or
+  // the activation reference's uri.
+  'PROG/PX': TEXT_ELEMENTS.uri('program', NAME),
+  'CLAS/OCX': TEXT_ELEMENTS.uri('class', NAME),
   'TABL/DS': STRUCTURE.uri(NAME),
   'TTYP/DA': TABLE_TYPE.uri(NAME),
   'DOMA/DD': DOMAIN.uri(NAME),

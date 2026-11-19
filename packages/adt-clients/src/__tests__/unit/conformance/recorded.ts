@@ -41,6 +41,27 @@ const MESSAGE_OWN_URI =
 const TABLE_SETTINGS_SAMPLE =
   "open: no TABL/DTT sample is recorded: the live conformance run builds each sample's template, urimapper and metadata reads from that sample's recorded files, so a code with none cannot be recorded until a sample is seeded; seeding it (SFLIGHT on premise, Z0001FLIGHT on cloud) is a separate tooling task";
 
+const TEXT_ELEMENTS_SAMPLE =
+  "open: no PROG/PX or CLAS/OCX sample is recorded: the live conformance run builds each sample's template, urimapper and metadata reads from that sample's recorded files, so a code with none cannot be recorded until a sample is seeded (RSPARAM's text elements on premise and on the cloud, a class's); seeding them is a separate tooling task";
+
+/** The text elements' two codes, with no sample on either release. */
+const TEXT_ELEMENTS_DIVERGENCES: IDivergence[] = [
+  {
+    rule: 'sample',
+    api: 'textElements',
+    code: 'CLAS/OCX',
+    detail: 'no sample is recorded',
+    reason: TEXT_ELEMENTS_SAMPLE,
+  },
+  {
+    rule: 'sample',
+    api: 'textElements',
+    code: 'PROG/PX',
+    detail: 'no sample is recorded',
+    reason: TEXT_ELEMENTS_SAMPLE,
+  },
+];
+
 /** Per release, every conflict the check reports against its recorded answers. */
 export const DIVERGENCES: { readonly [R in RecordedRelease]: IDivergence[] } = {
   's4-2025': [
@@ -51,6 +72,7 @@ export const DIVERGENCES: { readonly [R in RecordedRelease]: IDivergence[] } = {
       detail: 'no sample is recorded',
       reason: TABLE_SETTINGS_SAMPLE,
     },
+    ...TEXT_ELEMENTS_DIVERGENCES,
     {
       rule: 'address',
       api: 'messageClassMessage',
@@ -68,6 +90,7 @@ export const DIVERGENCES: { readonly [R in RecordedRelease]: IDivergence[] } = {
       detail: 'no sample is recorded',
       reason: TABLE_SETTINGS_SAMPLE,
     },
+    ...TEXT_ELEMENTS_DIVERGENCES,
     {
       rule: 'address',
       api: 'messageClassMessage',

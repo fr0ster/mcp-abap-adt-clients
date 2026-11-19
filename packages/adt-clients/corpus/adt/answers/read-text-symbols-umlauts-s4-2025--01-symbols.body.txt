@@ -1,0 +1,44 @@
+@MaxLength:54
+001=Fehler, als Objekt ist nur TEXT,STYL,FORM,PRIN möglich
+
+@MaxLength:52
+002=Fehler, als Modus ist nur EXPORT oder IMPORT möglich
+
+@MaxLength:42
+003=Das Objekt darf nicht überschrieben werden
+
+@MaxLength:34
+005=Objektselektion und Modussteuerung
+
+@MaxLength:35
+006=Steuerparameter für Datei-Operation
+
+@MaxLength:30
+007=Kontrolle über Sprachversionen
+
+@MaxLength:40
+008=Modus (Export/Import)
+
+@MaxLength:30
+R01=Gerätetyp
+
+@MaxLength:30
+R02=Formular
+
+@MaxLength:30
+R03=Stil
+
+@MaxLength:30
+R04=Standardtext
+
+@MaxLength:30
+R11=Von/auf Applikationsserver
+
+@MaxLength:30
+R12=Von/auf Frontend
+
+@MaxLength:10
+T01=Text-ID
+
+@MaxLength:10
+T02=Sprache
