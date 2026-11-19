@@ -3,13 +3,17 @@
  * (`getTableSettings()`, adt-clients 45.6.0). On premise and on the cloud.
  *
  * Creates a table under a fresh name in the test package, writes its DDL and
- * activates it. Then, under the settings' own lock: reads the settings,
- * changes them to non-default values (data class APPL1, size category 1,
- * buffering allowed X with single-record buffering, logging on) keeping every
- * other setting as read, writes the whole set with the read's ETag, and
- * unlocks — also when a step failed. Activates the table, which activates
- * its settings, reads the active settings back and checks the written values.
- * Deletes the table and reads its absence back — also when a step failed.
+ * activates it. Then, under the settings' own lock: reads the settings with
+ * the library's reading (`tableSettings` of adt-strategies, which throws
+ * naming any setting the read lacks), changes data class (APPL1), size
+ * category (1), buffering (allowed X, single records) and logging (on), keeps
+ * every other setting — the translation's four attributes included — as read,
+ * and writes the whole set with the read's ETag as `If-Match` (a read with no
+ * ETag fails the test); unlocks on every path. Activates the table, which
+ * activates its settings, reads the active settings back and asserts that
+ * every setting is what was written, the unchanged ones included. Cleanup
+ * releases any lock still held, then deletes the table and reads its absence
+ * back — also when a step failed.
  *
  * Run: npm test -- --testPathPatterns 'integration/core/tableSettings/TableSettings\.test\.ts$'
  */
@@ -20,6 +24,7 @@ import {
   analyseActivation,
   analyseDeletion,
   analyseException,
+  tableSettings,
 } from '@mcp-abap-adt/adt-strategies';
 import type { ITableSettings } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -28,10 +33,8 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
-import { XMLParser } from 'fast-xml-parser';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { tableSettingsDocuments } from '../../../../core/tableSettings/types';
-import { wireItself } from '../../../../utils/resultStrategy';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { freshSuffix } from '../../../helpers/abapUnitProbes';
 import { integrationHeadersOf } from '../../../helpers/adtHeaders';
@@ -102,46 +105,6 @@ define table ${tableName.toLowerCase()} {
 `;
 }
 
-/** The text of a `ts:` element of the settings document; `''` when empty. */
-function text(node: unknown): string {
-  if (node === undefined || node === null) return '';
-  if (typeof node === 'object') {
-    const inner = (node as Record<string, unknown>)['#text'];
-    return inner === undefined ? '' : String(inner);
-  }
-  return String(node);
-}
-
-/**
- * The settings a read answered, as the write states them: every setting,
- * so the write keeps what it does not change.
- */
-function settingsOf(document: string): ITableSettings {
-  const tree = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '@_',
-    removeNSPrefix: true,
-    parseTagValue: false,
-  }).parse(document);
-  const root = tree?.tableSettings;
-  if (!root) throw new Error('the settings read answered no ts:tableSettings');
-  const buffering = root.buffering ?? {};
-  return {
-    dataClassCategory: text(root.dataClassCategory),
-    sizeCategory: text(root.sizeCategory),
-    buffering: {
-      allowed: text(buffering.allowed),
-      type: text(buffering.type),
-      areaKeyFields: Number(text(buffering.areaKeyFields) || '0'),
-    },
-    storageType: text(root.storageType),
-    sharingType: text(root.sharingType),
-    loadUnit: text(root.loadUnit),
-    translation: String(root.translation?.['@_value'] ?? ''),
-    loggingEnabled: text(root.loggingEnabled) === 'true',
-  };
-}
-
 describe("A table's technical settings (AdtTableSettings)", () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
@@ -192,12 +155,13 @@ describe("A table's technical settings (AdtTableSettings)", () => {
       });
 
       const table = client.getTable();
-      // The read answers the whole exchange, so the ETag is read beside the
-      // document.
+      // The library's reading: every setting, the description and the ETag;
+      // a setting the read lacks throws, naming it.
       const settings = client.getTableSettings({
         ...tableSettingsDocuments,
-        metadata: wireItself,
+        metadata: tableSettings,
       });
+      let written: ITableSettings | undefined;
       let tableCreated = false;
       let failed: { error: unknown } | undefined;
       try {
@@ -258,27 +222,33 @@ describe("A table's technical settings (AdtTableSettings)", () => {
               ),
               `read the settings of ${tableName}`,
             );
-            const current = settingsOf(String(read.data));
-            const etag = read.headers?.etag;
+            if (!read.etag) {
+              throw new Error(
+                `the settings read of ${tableName} answered no ETag: the write cannot be guarded with If-Match`,
+              );
+            }
+            // What only a read returns is not written back.
+            const { isWritableByAMDP: _readOnly, ...asRead } = read.settings;
+            written = {
+              ...asRead,
+              dataClassCategory: 'APPL1',
+              sizeCategory: '1',
+              buffering: { ...asRead.buffering, allowed: 'X', type: 'P' },
+              loggingEnabled: true,
+            };
             return expectResult(
               await settings.updateMetadata(
                 {
                   tableName,
                   transportRequest,
-                  description,
-                  settings: {
-                    ...current,
-                    dataClassCategory: 'APPL1',
-                    sizeCategory: '1',
-                    buffering: { allowed: 'X', type: 'P', areaKeyFields: 0 },
-                    loggingEnabled: true,
-                  },
+                  description: read.description,
+                  settings: written,
                 },
                 {
                   analyse: analyseException,
                   headers: integrationHeadersOf(settings, 'updateMetadata'),
                   lockHandle: settingsLock,
-                  ...(typeof etag === 'string' ? { ifMatch: etag } : {}),
+                  ifMatch: read.etag,
                 },
               ),
               `write the settings of ${tableName}`,
@@ -311,12 +281,10 @@ describe("A table's technical settings (AdtTableSettings)", () => {
           ),
           `read the active settings of ${tableName}`,
         );
-        const written = settingsOf(String(active.data));
-        expect(written.dataClassCategory).toBe('APPL1');
-        expect(written.sizeCategory).toBe('1');
-        expect(written.buffering.allowed).toBe('X');
-        expect(written.buffering.type).toBe('P');
-        expect(written.loggingEnabled).toBe(true);
+        // Every setting is what was written, the unchanged ones included.
+        const { isWritableByAMDP: _activeReadOnly, ...activeSettings } =
+          active.settings;
+        expect(activeSettings).toEqual(written);
         logTestSuccess(testsLogger, TITLE);
       } catch (error) {
         failed = { error };
@@ -326,6 +294,13 @@ describe("A table's technical settings (AdtTableSettings)", () => {
       // Cleanup deletes only what this run created and reads the absence back.
       logTestStep('delete the table and read back (cleanup)', testsLogger);
       const refusals: string[] = [];
+      // A lock whose UNLOCK failed stays in the client's registry: release it
+      // before the delete, which a held lock would refuse.
+      for (const failure of await client.unlockAll()) {
+        refusals.push(
+          `lock ${failure.key} still held after unlockAll: ${failure.error instanceof Error ? failure.error.message : String(failure.error)}`,
+        );
+      }
       if (tableCreated) {
         refusals.push(
           await removeAndReadBack(
