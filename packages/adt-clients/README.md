@@ -886,8 +886,9 @@ carries the media type without it, and SAP refused the guarded PUT with it
 the cloud).
 `translation` is the `ts:translation` element's four attributes (`value`,
 `isVisible`, `isEditable`, `granularity`): SAP refuses a write without one
-(`400` `00/001`), so the read's are written back as they came. A LOCK answered
-without a handle is a refusal (`LOCK_FAILED`), and an empty `lockHandle` throws
+(`400` `00/001`), so the read's are written back as they came. A LOCK SAP
+refused (non-2xx) keeps SAP's classification, a 2xx LOCK answered without a
+handle is a refusal (`LOCK_FAILED`), and an empty `lockHandle` throws
 before the PUT is sent. On SAP_BASIS 7.40 the factory does not compile
 (`ADT_TYPES_BASIS_740` has no such API): its discovery has no
 `/ddic/db/settings`.

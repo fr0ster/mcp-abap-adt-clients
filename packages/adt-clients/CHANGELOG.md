@@ -70,7 +70,8 @@ release carries their table settings and adds the text elements. See
   - `lock` / `unlock` — stateful `_action=LOCK&accessMode=MODIFY` /
     `UNLOCK` on the object's address; the registry follows the wire before
     any `analyse` runs, one tracker per kind, so `unlockAll()` releases each
-    at its own address; a LOCK answered without a handle is `LOCK_FAILED`;
+    at its own address; a LOCK SAP refused (non-2xx) keeps SAP's
+    classification, and only a 2xx answer without a handle is `LOCK_FAILED`;
   - `update` — `PUT …/source/{part}?lockHandle=…[&corrNr=…]` of the whole
     part, built from the typed list (`textSymbolsBody`, `selectionTextsBody`,
     `textHeadingsBody`, `textElementsBody`). SAP deletes every entry the list
@@ -95,6 +96,14 @@ release carries their table settings and adds the text elements. See
   them.
 - `TEXT_ELEMENTS` (the address records) and `textElementsDocuments` (the
   shipped result set) exported.
+
+### Fixed
+
+- **A settings LOCK SAP refused keeps SAP's classification.** In the
+  unpublished 45.6.0 a refused (non-2xx) LOCK that a connection resolved was
+  answered `LOCK_FAILED`, because its body has no handle; now it gets the
+  default verdict of a resolved refusal, and `LOCK_FAILED` applies only to a
+  2xx answer without a handle. The text elements' lock does the same.
 - Recorded answers of the text elements research in `corpus/adt/answers/`
   (`*text-*`): reads and writes on premise and on the cloud, refusals
   (`406` `SEDX_ADT/101`, `102`, `106`, `110`), and a function group's
