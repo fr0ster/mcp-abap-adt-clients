@@ -453,6 +453,75 @@ describe('the registry follows the wire, not analyse', () => {
   });
 });
 
+/** A connection that resolves every answer, refusals included. */
+function resolving(answers: IAdtWireResponse[]) {
+  const requests: IAbapRequestOptions[] = [];
+  const connection = {
+    setSessionType: () => {},
+    isConnected: () => true,
+    makeAdtRequest: async (options: IAbapRequestOptions) => {
+      requests.push(options);
+      return answers.shift() ?? OK;
+    },
+  } as unknown as IAbapConnection;
+  return { connection, requests };
+}
+
+describe('the default analysis of a refusal a connection resolved', () => {
+  it('answers a resolved PUT 412 as a failure', async () => {
+    const { connection } = resolving([
+      { status: 412, statusText: 'Precondition Failed', headers: {}, data: '' },
+    ]);
+    const settings = new AdtClient(connection).getTableSettings();
+    const written = await settings.updateMetadata(CHANGED, {
+      headers: headersOf(settings, 'updateMetadata'),
+      lockHandle: 'LH',
+      ifMatch: 'E-1',
+    });
+    expect(written.ok).toBe(false);
+    expect(!written.ok && written.getError().response?.status).toBe(412);
+  });
+
+  it('answers a resolved UNLOCK 403 as a failure', async () => {
+    const { connection } = resolving([
+      LOCKED,
+      { status: 403, statusText: 'Forbidden', headers: {}, data: '' },
+    ]);
+    const settings = new AdtClient(connection).getTableSettings();
+    await settings.lock({ tableName: 'ZT' });
+    const unlocked = await settings.unlock({ tableName: 'ZT' }, 'LH/1');
+    expect(unlocked.ok).toBe(false);
+  });
+});
+
+describe('the registry is updated before any analyse runs', () => {
+  const throwing = () => {
+    throw new Error("the caller's analyser threw");
+  };
+
+  it('tracks a 2xx LOCK with a handle even when the analyser throws', async () => {
+    const { connection } = sequence([LOCKED]);
+    const client = new AdtClient(connection);
+    await expect(
+      client
+        .getTableSettings()
+        .lock({ tableName: 'ZT' }, { analyse: throwing }),
+    ).rejects.toThrow('analyser threw');
+    expect(client.pendingLocks).toEqual(['TableSettings/ZT']);
+  });
+
+  it('untracks a 2xx UNLOCK even when the analyser throws', async () => {
+    const { connection } = sequence([LOCKED, OK]);
+    const client = new AdtClient(connection);
+    const settings = client.getTableSettings();
+    await settings.lock({ tableName: 'ZT' });
+    await expect(
+      settings.unlock({ tableName: 'ZT' }, 'LH/1', { analyse: throwing }),
+    ).rejects.toThrow('analyser threw');
+    expect(client.pendingLocks).toEqual([]);
+  });
+});
+
 describe('a lock without a handle', () => {
   it('is a refusal (LOCK_FAILED), its answer kept, and nothing is tracked', async () => {
     const empty = {
