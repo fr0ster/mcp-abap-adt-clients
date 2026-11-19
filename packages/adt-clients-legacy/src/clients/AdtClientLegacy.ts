@@ -44,6 +44,7 @@ import {
   AdtStructure,
   AdtTable,
   AdtTableSettings,
+  AdtTextElements,
   AdtTransformation,
   type AppendStructureValues,
   AUTHORIZATION_FIELD,
@@ -111,12 +112,15 @@ import {
   type TableSettingsValues,
   type TableTypeValues,
   type TableValues,
+  TEXT_ELEMENTS,
+  type TextElementsValues,
   TRANSFORMATION,
   type TransformationValues,
   type TransportValues,
   type tableDocuments,
   type tableSettingsDocuments,
   type tableTypeDocuments,
+  type textElementsDocuments,
   type transformationDocuments,
   transportDocuments,
   type UtilValues,
@@ -151,6 +155,7 @@ import type {
   ITableResults,
   ITableSettingsResults,
   ITableTypeResults,
+  ITextElementsResults,
   ITransformationResults,
   ITransportResults,
   IUtilResults,
@@ -659,6 +664,27 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
       AdtTableSettings,
       'TableSettings',
       TABLE_SETTINGS.collection,
+      'not-advertised',
+    );
+  }
+
+  override getTextElements(
+    this: this & AdtServedBy<'textElements'>,
+  ): AdtTextElements<ResultValuesOf<typeof textElementsDocuments>, 'basis740'>;
+  override getTextElements<R extends ITextElementsResults>(
+    this: this & AdtServedBy<'textElements'>,
+    results: R,
+  ): AdtTextElements<ResultValuesOf<R>, 'basis740'>;
+  override getTextElements(
+    this: this & AdtServedBy<'textElements'>,
+    _results?: ITextElementsResults,
+  ): AdtTextElements<TextElementsValues, 'basis740'> {
+    this.assertConnected();
+    // 7.40's discovery has no /sap/bc/adt/textelements collection.
+    return absentOnLegacy<AdtTextElements<TextElementsValues, 'basis740'>>(
+      AdtTextElements,
+      'TextElements',
+      TEXT_ELEMENTS.programs,
       'not-advertised',
     );
   }
