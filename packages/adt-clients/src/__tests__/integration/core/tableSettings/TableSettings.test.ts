@@ -300,9 +300,10 @@ describe("A table's technical settings (AdtTableSettings)", () => {
             ? undefined
             : !before.isWritableByAMDP;
         // The cloud refuses to activate a table writable by AMDP with
-        // logging on ("AMDP writes to table … not possible (Logging
-        // activated)", answered 200 with an E message, measured 2026-11-19):
-        // a patch that turns the flag on turns logging off in the same write.
+        // buffering allowed or logging on (DT 771, RADTTCHK FORM
+        // chk_writable_amdp_usage, Code; answered 200 with an E message,
+        // measured 2026-11-19): a patch that turns the flag on turns
+        // buffering and logging off in the same write.
         const changes =
           flag === undefined
             ? { sizeCategory: '2' }
@@ -310,6 +311,7 @@ describe("A table's technical settings (AdtTableSettings)", () => {
               ? {
                   sizeCategory: '2',
                   isWritableByAMDP: true,
+                  buffering: { allowed: 'N', type: '' },
                   loggingEnabled: false,
                 }
               : { sizeCategory: '2', isWritableByAMDP: false };
@@ -336,7 +338,11 @@ describe("A table's technical settings (AdtTableSettings)", () => {
             }),
           `unlock the settings of ${tableName} after the patch`,
         );
-        written = { ...before, ...changes };
+        written = {
+          ...before,
+          ...changes,
+          buffering: { ...before.buffering, ...changes.buffering },
+        };
 
         logTestStep(
           'activate the table, which activates its settings',
