@@ -181,6 +181,10 @@ export {
   type TableValues,
 } from './core/table';
 export {
+  AdtTableSettings,
+  type TableSettingsValues,
+} from './core/tableSettings';
+export {
   AdtDdicTableType,
   type ITableTypeChanges,
   patchTableTypeDocument,
@@ -229,6 +233,7 @@ export {
   SERVICE_DEFINITION,
   STRUCTURE,
   TABLE,
+  TABLE_SETTINGS,
   TABLE_TYPE,
   TRANSFORMATION,
   TRANSPORT_REQUEST,

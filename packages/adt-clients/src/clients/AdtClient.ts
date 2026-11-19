@@ -47,6 +47,7 @@ import type {
   IServiceResults,
   IStructureResults,
   ITableResults,
+  ITableSettingsResults,
   ITableTypeResults,
   ITransformationResults,
   ITransportResults,
@@ -184,6 +185,11 @@ import {
   structureDocuments,
 } from '../core/structure';
 import { AdtTable, type TableValues, tableDocuments } from '../core/table';
+import {
+  AdtTableSettings,
+  type TableSettingsValues,
+  tableSettingsDocuments,
+} from '../core/tableSettings';
 import {
   AdtDdicTableType,
   type TableTypeValues,
@@ -587,6 +593,31 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     return new AdtTable<TableValues, V>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
+      results,
+    });
+  }
+
+  /**
+   * A table's technical settings (`TABL/DTT`): read, lock, write and unlock,
+   * each one request. Not part of `getTable()`: SAP keeps the settings at
+   * their own resource, under their own lock; activating the table activates
+   * them.
+   */
+  getTableSettings(
+    this: this & AdtServedBy<'tableSettings'>,
+  ): AdtTableSettings<ResultValuesOf<typeof tableSettingsDocuments>, V>;
+  getTableSettings<R extends ITableSettingsResults>(
+    this: this & AdtServedBy<'tableSettings'>,
+    results: R,
+  ): AdtTableSettings<ResultValuesOf<R>, V>;
+  getTableSettings(
+    this: this & AdtServedBy<'tableSettings'>,
+    results: ITableSettingsResults = tableSettingsDocuments,
+  ): AdtTableSettings<TableSettingsValues, V> {
+    this.assertConnected();
+    return new AdtTableSettings<TableSettingsValues, V>(this.connection, {
+      logger: this.logger,
       lockRegistry: this.lockRegistry,
       results,
     });
