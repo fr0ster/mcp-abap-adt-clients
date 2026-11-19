@@ -123,9 +123,7 @@ inactive list once only after a checklist that does not state its outcome —
 `activationExecuted` with `W`/`I`/`S` messages alone — and not after this
 one. With no `analyse` the default verdict reads the status: a `2xx`
 checklist is no failure, except that after a silent one a failed list read
-is the call's failure (after the warnings-only one it is not); a credential
-refusal raised before SAP was asked for the list is rethrown in either
-case, before any verdict. The shipped
+is the call's failure (after the warnings-only one it is not). The shipped
 verdict, adt-strategies' `analyseActivation`, refuses any checklist with an
 `E` message, whatever `activationExecuted` says. A test drives the recorded
 answers through every member that shares the code: the `activate` of
