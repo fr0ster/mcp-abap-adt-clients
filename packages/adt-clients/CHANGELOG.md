@@ -79,9 +79,8 @@ Released with `@mcp-abap-adt/adt-strategies` 0.26.0 and
   unless the patch names it, in which case it writes the value named,
   `false` included. On a cloud system use `AdtClientCloud` (or
   `createAdtClient`), and read with adt-strategies' `cloudTableSettings`. A
-  handler constructed directly takes `variant: 'cloud'` only as an
-  `AdtTableSettings<T, 'cloud'>` (explicit type arguments, or a target typed
-  so). The class declares no `implements
+  handler constructed directly gets the cloud guard when constructed with
+  `variant: 'cloud'`, which its type parameter must admit. The class declares no `implements
   IAdtTableSettingsPatchable`; `typechecks/exact/tableSettingsVariants.ts`
   assigns each kind's handler to `IAdtTableSettingsPatchable` and
   `IAdtTableSettingsUpdatable` of that kind.
@@ -125,7 +124,8 @@ inactive list once only after a checklist that does not state its outcome —
 one. With no `analyse` the default verdict reads the status: a `2xx`
 checklist is no failure, except that after a silent one a failed list read
 is the call's failure (after the warnings-only one it is not); a credential
-refusal of that list read is rethrown in either case, before any verdict. The shipped
+refusal raised before SAP was asked for the list is rethrown in either
+case, before any verdict. The shipped
 verdict, adt-strategies' `analyseActivation`, refuses any checklist with an
 `E` message, whatever `activationExecuted` says. A test drives the recorded
 answers through every member that shares the code: the `activate` of
