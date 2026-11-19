@@ -217,7 +217,8 @@ export class AdtTableSettings<
 
   /**
    * Write every setting, under the caller's lock: one PUT of the document
-   * built from `config` (never `ts:isWritableByAMDP`), with `lockHandle` and,
+   * built from `config` (with `ts:isWritableByAMDP` whenever the settings
+   * carry it, `false` included), with `lockHandle` and,
    * when given, `transportRequest` as `corrNr`.
    *
    * **The whole content, every time.** This is a replace, never a merge: SAP

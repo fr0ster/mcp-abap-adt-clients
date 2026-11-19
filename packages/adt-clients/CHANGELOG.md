@@ -62,8 +62,9 @@ Released with `@mcp-abap-adt/adt-strategies` 0.26.0 and
   system kind** (`variant: 'cloud'`), as `AdtClientLegacy` overrides the
   getters it serves differently: choosing the cloud client, or
   `createAdtClient({ variant: 'cloud' })`, is the declaration, never inferred
-  from an answer. The cloud protection of `patchMetadata` holds only through
-  them: a generic `AdtClient` writes a read without the flag as it came — on
+  from an answer. The cloud protection of `patchMetadata` holds through them
+  and through an `AdtTableSettings` constructed with `variant: 'cloud'`; a
+  generic `AdtClient` writes a read without the flag as it came — on
   a cloud system use the cloud client, and read with adt-strategies'
   `cloudTableSettings`.
   `AdtTableSettings<T, V>` implements `IAdtTableSettingsPatchable` and
@@ -119,9 +120,10 @@ status alone, as for every member.
 
 ### Source break (TypeScript)
 
-- Code that writes settings through a cloud client (`AdtClientCloud`, or a
-  client typed `'cloud'`) without `isWritableByAMDP` fails to compile
-  (TS2322): read with adt-strategies' `cloudTableSettings` (0.26.0), whose
+- Code that writes settings through `AdtClientCloud` (or a handler typed
+  `'cloud'`) without `isWritableByAMDP` fails to compile (TS2322; the
+  generic `AdtClient<'cloud'>` getter still types its handler for both newer
+  kinds, so it does not): read with adt-strategies' `cloudTableSettings` (0.26.0), whose
   settings carry the flag as a `boolean`, and pass them back as a whole — or
   name the value wanted. That code reset the flag on every write; the type
   now says so. On-premise and variant-generic clients compile as before.
