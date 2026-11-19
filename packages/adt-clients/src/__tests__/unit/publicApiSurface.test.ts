@@ -239,6 +239,7 @@ const RUNTIME_EXPORTS = [
   'TABLE',
   'TABLE_SETTINGS',
   'TABLE_TYPE',
+  'TEXT_ELEMENTS',
   'tableDocuments',
   'tableSettingsDocuments',
   'TEXT_ELEMENTS_MEDIA_TYPES',
