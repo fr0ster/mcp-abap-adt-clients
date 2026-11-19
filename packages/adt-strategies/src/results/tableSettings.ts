@@ -1,6 +1,7 @@
 import type {
   IResultStrategy,
   ITableSettingsRead,
+  ITableSettingsReadOf,
 } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
 import { field, isElement, leafText } from '../parsed';
@@ -176,4 +177,35 @@ export const tableSettings: IResultStrategy<ITableSettingsAnswer> = (
     ...readTableSettings(typeof answer.data === 'string' ? answer.data : ''),
     etag: headerValue(answer.headers, 'etag'),
   };
+};
+
+/**
+ * {@link ITableSettingsAnswer} of a cloud read: the settings carry
+ * `isWritableByAMDP` as a `boolean`, so they go back to a cloud client's
+ * write as they are (`ITableSettingsUpdateConfig<'cloud'>`).
+ */
+export interface ICloudTableSettingsAnswer
+  extends Omit<ITableSettingsAnswer, 'settings'> {
+  settings: ITableSettingsReadOf<'cloud'>;
+}
+
+/**
+ * {@link tableSettings} for a cloud system: a read without
+ * `ts:isWritableByAMDP` is an incomplete answer and throws, naming it. The
+ * cloud answers it on every read (Measured) and writes it from the document
+ * (`move_adt_to_ddv`, Code); a write built from a read that lacked it would
+ * reset it. On premise the element does not exist (Code): read it there with
+ * {@link tableSettings}.
+ */
+export const cloudTableSettings: IResultStrategy<ICloudTableSettingsAnswer> = (
+  answer,
+) => {
+  const read = tableSettings(answer);
+  const { isWritableByAMDP, ...settings } = read.settings;
+  if (isWritableByAMDP === undefined) {
+    throw new Error(
+      'ts:tableSettings: ts:isWritableByAMDP is missing — a cloud read answers it',
+    );
+  }
+  return { ...read, settings: { ...settings, isWritableByAMDP } };
 };

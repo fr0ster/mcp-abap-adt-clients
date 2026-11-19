@@ -1,5 +1,9 @@
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
-import { readTableSettings, tableSettings } from '../results/tableSettings';
+import {
+  cloudTableSettings,
+  readTableSettings,
+  tableSettings,
+} from '../results/tableSettings';
 import { stepsOf } from './corpus';
 
 /**
@@ -92,6 +96,28 @@ describe('the ETag header', () => {
     const answer = recorded('read-table-settings-s4-2025');
     expect(tableSettings({ ...answer, headers: { [key]: '"E-1"' } }).etag).toBe(
       '"E-1"',
+    );
+  });
+});
+
+describe('cloudTableSettings', () => {
+  it('reads the cloud flag as a boolean', () => {
+    const read = cloudTableSettings(recorded('read-table-settings-abap-cloud'));
+    const flag: boolean = read.settings.isWritableByAMDP;
+    expect(flag).toBe(false);
+  });
+
+  it('throws for a cloud read without ts:isWritableByAMDP, naming it', () => {
+    const answer = recorded('read-table-settings-abap-cloud');
+    const without = {
+      ...answer,
+      data: String(answer.data).replace(
+        '<ts:isWritableByAMDP>false</ts:isWritableByAMDP>',
+        '',
+      ),
+    };
+    expect(() => cloudTableSettings(without)).toThrow(
+      'ts:isWritableByAMDP is missing',
     );
   });
 });

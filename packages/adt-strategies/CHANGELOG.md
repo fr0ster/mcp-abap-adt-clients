@@ -31,6 +31,13 @@ Released with `@mcp-abap-adt/adt-clients` 46.1.0, on
   to `activateObjectsGroup` is activated where SAP listed it.
   `IInactiveObject` gains the two optional fields.
 
+- **`cloudTableSettings`**, the settings reading for a cloud system: the
+  settings carry `isWritableByAMDP` as a `boolean`
+  (`ITableSettingsReadOf<'cloud'>`), so a cloud client's write takes them
+  back as they are, and a read without `ts:isWritableByAMDP` throws, naming
+  it (the cloud answers it on every read, Measured; a write without it resets
+  it, Measured). On premise `tableSettings` reads as before.
+
 ### Checked
 
 - `analyseActivation` refuses an executed activation that carries `E`
