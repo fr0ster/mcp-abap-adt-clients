@@ -13,6 +13,13 @@
  * any lock still held, deletes the object and reads its absence back — also
  * when a step failed.
  *
+ * A second case, on premise only (ABAP cloud creates no function group):
+ * a function group's text elements — written through `getTextElements()`
+ * with kind `functionGroup`, activated with the group through the typed
+ * `activateObjects` (`FUGR/F` and `PROG/PX` at
+ * `/textelements/functiongroups/{group}`), read back active, and found by
+ * where-used with `container: 'functionGroup'`; the group deleted after.
+ *
  * Run: npm test -- --testPathPatterns 'integration/core/textElements/TextElements\.test\.ts$'
  */
 
@@ -91,6 +98,9 @@ const SECTION = 'text_elements';
 const CASE = 'adt_text_elements';
 const TITLE =
   'TextElements - symbols and a selection text written, changed and deleted';
+const GROUP_CASE = 'adt_text_elements_function_group';
+const GROUP_TITLE =
+  "TextElements - a function group's symbols written, activated with the group, found by where-used";
 
 /** A program with one parameter, so it has a selection text to write. */
 function programSource(name: string): string {
@@ -503,6 +513,176 @@ describe('Text elements (AdtTextElements)', () => {
         );
       }
       logTestEnd(testsLogger, TITLE);
+      raiseAfterCleanup(failed, refusals);
+    },
+    getTimeout('test'),
+  );
+  // On premise only — the case lists `available_in: ["onprem"]`: ABAP cloud
+  // creates no function group, so there is none to write text elements to.
+  gate(SECTION, GROUP_CASE)(
+    "writes a function group's symbols, activates them with the group and finds them by where-used",
+    async () => {
+      const testCase = configuredCase(SECTION, GROUP_CASE);
+      if (!testCase) throw new Error(missingCaseMessage(SECTION, GROUP_CASE));
+      const params = testCase.params ?? {};
+      const packageName = resolvePackageName(params.package_name);
+      if (!packageName) throw new Error('package_name not configured');
+      const transportRequest =
+        resolveTransportRequest(params.transport_request) || undefined;
+      const functionGroupName = `ZAC_TEG${freshSuffix()}`;
+      const groupConfig = { functionGroupName, transportRequest };
+      logTestStart(testsLogger, GROUP_TITLE, {
+        name: GROUP_CASE,
+        params: { functionGroupName, packageName },
+      });
+
+      const group = client.getFunctionGroup();
+      const texts = client.getTextElements({
+        ...textElementsDocuments,
+        source: textSymbols,
+      });
+      const object = {
+        objectKind: 'functionGroup',
+        objectName: functionGroupName,
+      } as const;
+      let created = false;
+      let failed: { error: unknown } | undefined;
+      try {
+        logTestStep('create the function group', testsLogger);
+        expectResult(
+          await group.create(
+            {
+              functionGroupName,
+              packageName,
+              transportRequest,
+              description: 'Text elements probe',
+            },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(group, 'create'),
+            },
+          ),
+          `create function group ${functionGroupName}`,
+        );
+        created = true;
+
+        logTestStep(
+          'lock TEXT, write symbols 001 and 002, unlock',
+          testsLogger,
+        );
+        const lockHandle = expectResult(
+          await texts.lock(object, { analyse: analyseException }),
+          `lock the text elements of ${functionGroupName}`,
+        );
+        await releasing(
+          async () =>
+            expectResult(
+              await texts.update(
+                { ...object, part: 'symbols', symbols: BOTH, transportRequest },
+                {
+                  analyse: analyseException,
+                  headers: integrationHeadersOf(texts, 'update'),
+                  lockHandle,
+                },
+              ),
+              `write the symbols of ${functionGroupName}`,
+            ),
+          () => texts.unlock(object, lockHandle, { analyse: analyseException }),
+          `unlock the text elements of ${functionGroupName}`,
+        );
+
+        logTestStep(
+          'activate the group with its text elements (FUGR/F and PROG/PX under functiongroups)',
+          testsLogger,
+        );
+        const references = textElementsActivationReferences(object);
+        expect(references).toEqual([
+          {
+            name: functionGroupName,
+            type: 'FUGR/F',
+            uri: `/sap/bc/adt/functions/groups/${functionGroupName.toLowerCase()}`,
+          },
+          {
+            name: functionGroupName,
+            type: 'PROG/PX',
+            uri: `/sap/bc/adt/textelements/functiongroups/${functionGroupName.toLowerCase()}`,
+          },
+        ]);
+        const onPremise = await createAdtClient(connection, {
+          variant: 'onprem',
+          logger: libraryLogger,
+        });
+        const utils = onPremise.getUtils();
+        expectResult(
+          await utils.activateObjects(references, true, {
+            analyse: judged(analyseActivation),
+            headers: integrationHeadersOf(utils, 'activateObjects'),
+          }),
+          `activate ${functionGroupName} with its text elements`,
+        );
+
+        logTestStep('read the active symbols back', testsLogger);
+        const active = expectResult(
+          await texts.read({ ...object, part: 'symbols' }, 'active', {
+            analyse: analyseException,
+          }),
+          `read the active symbols of ${functionGroupName}`,
+        );
+        expect(active.symbols).toEqual(BOTH);
+
+        logTestStep(
+          "where-used of the group's text elements (container functionGroup)",
+          testsLogger,
+        );
+        expectResult(
+          await utils.getWhereUsed(
+            {
+              object_name: functionGroupName,
+              object_type: 'PROG/PX',
+              container: 'functionGroup',
+            },
+            {
+              analyse: analyseException,
+              headers: integrationHeadersOf(utils, 'getWhereUsed'),
+            },
+          ),
+          `where-used of the text elements of ${functionGroupName}`,
+        );
+        logTestSuccess(testsLogger, GROUP_TITLE);
+      } catch (error) {
+        failed = { error };
+        logTestError(testsLogger, GROUP_TITLE, error);
+      }
+
+      // Cleanup deletes only what this run created and reads the absence back.
+      logTestStep(
+        'delete the function group and read back (cleanup)',
+        testsLogger,
+      );
+      const refusals: string[] = [];
+      for (const failure of await client.unlockAll()) {
+        refusals.push(
+          `lock ${failure.key} still held after unlockAll: ${failure.error instanceof Error ? failure.error.message : String(failure.error)}`,
+        );
+      }
+      if (created) {
+        refusals.push(
+          await removeAndReadBack(
+            () =>
+              group.delete(groupConfig, {
+                analyse: judged(analyseDeletion),
+                headers: integrationHeadersOf(group, 'delete'),
+              }),
+            () =>
+              group.readMetadata(
+                { functionGroupName },
+                { analyse: analyseException },
+              ),
+            `function group ${functionGroupName}`,
+          ),
+        );
+      }
+      logTestEnd(testsLogger, GROUP_TITLE);
       raiseAfterCleanup(failed, refusals);
     },
     getTimeout('test'),

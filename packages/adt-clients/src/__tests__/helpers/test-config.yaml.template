@@ -1514,6 +1514,14 @@ text_elements:
       params: {}
         # package_name: "ZAC_PKG01"
         # transport_request: ""
+    - name: "adt_text_elements_function_group"
+      enabled: true
+      # ABAP cloud creates no function group, so there is none to write text elements to.
+      available_in: ["onprem"]
+      description: "Text elements of a fresh function group: symbols written, activated with the group (FUGR/F + PROG/PX under functiongroups), read back active, found by where-used with container functionGroup"
+      params: {}
+        # package_name: "ZAC_PKG01"
+        # transport_request: ""
 
 # Create TableType (DDIC Table Type)
 # TableType is XML-based entity (like Domain/DataElement)
