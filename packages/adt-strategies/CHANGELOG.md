@@ -26,6 +26,15 @@ tree holds one copy).
 
 ### Added
 
+- **The facts are strict** (review of adt-clients#326): a document is read
+  only when it is a string and well-formed XML (the parser's `XMLValidator`;
+  a mismatched closing tag no longer yields usable fields); R7's fact is SAP's
+  fixed `DEMO STATUS` and nothing else; R12's content is a text body
+  (`text/plain`, or no `Content-Type`); `messageNumber` is exactly three
+  digits, else absent; `abapGitErrorFacts(answer, route?)` reads
+  `http_status` for `checked` (R11) alone; `appLogKey` is the decoded segment
+  of the `log_link` (`A%2FB` is `A/B`), an empty, `.` or `..` one none.
+
 - **`abapGitFacts`**, the facts reducer of `AdtAbapGitClient`'s new forms: one
   reducer per new-form slot (`reposFacts`, `linkedFacts`, `repoPulled`,
   `repoPulledInDialog`, `modifiedObjects`, `status`, `runLog`, `staging`,

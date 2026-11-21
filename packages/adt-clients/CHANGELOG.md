@@ -74,6 +74,24 @@ facts reducer `abapGitFacts` is now a runtime dependency), on
   analyser or the client's logger sees anything. Strict by default: every
   non-2xx is the error; an analyser clears a failure only where there are
   facts to read. The new members log fixed words only.
+- **No thrown value leaves a new form:** a refused SAP credential
+  (`AuthRefusedError`) SAP never saw is `noResponse`, status `0`, its cause —
+  an identity provider's headers and body — left behind. The git host's
+  status (`gitHttpStatus`, `gitHostRefused`) is R11's alone.
+- **Request documents read against SAP's transformations (Code):** the
+  selective pull writes `overwriteObjects`, `packageWarningObjects`, their
+  entries and `action` in `agitpullmodifiedobjects`
+  (`ABAPGIT_ST_REPO_SELECTIVE_PULL` L5, L42, L55); a push writes all three
+  stage lists in order (`ABAPGIT_ST_REPO_STAGE` L14, L25, L36) and `wbkey` /
+  `version` only when not empty; the pulls send the caller's `Content-Type`
+  exactly (SAP refuses a `; charset=…` suffix).
+- **Signatures and result types:** `link` and `checkExternalRepo` declare the
+  deprecated overload last, so `Parameters<…>` and `ReturnType<…>` are
+  46.1.0's. A new-form slot's value in a values map is boxed
+  (`AbapGitFactsSlotValue<X>`), so a reader's own `undefined` is kept apart
+  from an optional slot's; with facts slots, `new` takes its values map
+  (`new AdtAbapGitClient<AbapGitValuesOf<typeof results>>(…)`), `create`
+  infers it.
 - **Every new form sends `timeout: 0`, `noLog`, `noResend` and
   `stateless`.** The legacy forms and `unlink` send none of them, as before.
 - **`AdtBatchConnection` refuses a request carrying `noLog` or `noResend`**
@@ -117,11 +135,8 @@ facts reducer `abapGitFacts` is now a runtime dependency), on
 
 ### Not verified
 
-- The selective pull document (`pull.req.v1`): its namespace and element
-  names beyond `user` / `password` mirror R6's document (Inference; the
-  transformation `ABAPGIT_ST_REPO_SELECTIVE_PULL` was not read). The place of
-  `folderLogic` in R2 and of `branch` / `package` in R14 is Inference too.
-  The live run settles them.
+- That SAP accepts the corrected selective pull and push documents: read from
+  the transformations (Code), not yet sent; the live run settles them.
 
 ## [46.1.0] - 2026-11-19
 
