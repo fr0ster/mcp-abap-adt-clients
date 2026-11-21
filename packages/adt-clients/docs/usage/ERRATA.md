@@ -172,6 +172,22 @@ library judges none of them: each is an answer the caller reads.
   runs or waits (R9, `RES_REPO_STAGE->get` L164, L178).
 - **`unlink`'s `transportRequest` sends a `corrNr` neither handler reads**
   (R3); it is kept as it was.
+- **Onprem ignores `link`'s `folderLogic` silently.** Its transformation
+  `ZABAPGIT_ST_REPO_POST` has no such field and skips unknown elements
+  (`extensible="deep"`, L8); cloud's `ABAPGIT_ST_REPO_POST_V3` reads it
+  (L20–24). The library sends it when given, on either system.
+- **A selective pull with its lists in the wrong namespace pulls nothing.**
+  `ABAPGIT_ST_REPO_SELECTIVE_PULL` (cloud) reads `overwriteObjects`,
+  `packageWarningObjects`, their `abapgitobjects` and `action` in R6's
+  namespace `agitpullmodifiedobjects` (L5, L42, L55;
+  `ABAPGIT_ST_PULL_MODIFIED_OBJS` L46, L52) and skips anything else silently:
+  the job then sets every entry to `'N'` and answers `202`. The library writes
+  them there; the two pull handlers pick the document by the exact
+  `Content-Type` (a `; charset=…` suffix answers 400, `RES_REPO_PULL` L167–182).
+- **A push needs all three stage lists.** `ABAPGIT_ST_REPO_STAGE` reads
+  `unstaged_objects`, `staged_objects` and `ignored_objects` as literal
+  elements, in that order (cloud L14, L25, L36; onprem the same); the library
+  writes the first and the last empty.
 - **`getStatus` (R7) answers a fixed text**, `DEMO STATUS`
   (`RES_REPO_PULL->get` L139).
 - **The success status of `checkRepo` (R11) and `switchBranch` (R15)** is the
