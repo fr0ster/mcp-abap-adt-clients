@@ -1,13 +1,22 @@
 import type {
+  IAbapGitCredentials,
   IAbapGitPullArgs,
+  IAbapGitPullRepoArgs,
   IAdtHeaders,
 } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
+  IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { requestHeaders } from '../../utils/requestHeaders';
-import { buildPullBody } from './xmlBuilder';
+import { NEW_FORM } from './newForm';
+import { repoPath } from './paths';
+import {
+  buildPullBody,
+  buildPullRepoBody,
+  buildSelectivePullBody,
+} from './xmlBuilder';
 
 /**
  * Start a pull — one POST to the link the caller passes.
@@ -38,4 +47,28 @@ export async function postPullLink(
     headers: requestHeaders(headers),
     data: buildPullBody(args, args.branchName),
   });
+}
+
+/**
+ * R4 (`pullRepo`) and R5 (`pullRepoInDialog`, `…/pull/v2`), by key: the
+ * `repo.v3` document, or with a selection the `pull.req.v1` one (cloud). The
+ * media types are the caller's: a selection goes with `pull.req.v1`.
+ */
+export function postPullByKey(
+  headers: IAdtHeaders,
+  args: IAbapGitPullRepoArgs,
+  credentials: IAbapGitCredentials | null,
+  dialog: boolean,
+): IAbapRequestOptions {
+  const { selection } = args;
+  return {
+    method: 'POST',
+    url: dialog ? repoPath(args.key, 'pull', 'v2') : repoPath(args.key, 'pull'),
+    headers: requestHeaders(headers),
+    data:
+      selection === undefined
+        ? buildPullRepoBody(args, credentials)
+        : buildSelectivePullBody({ ...args, selection }, credentials),
+    ...NEW_FORM,
+  };
 }
