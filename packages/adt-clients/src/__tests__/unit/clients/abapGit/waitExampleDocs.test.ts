@@ -15,7 +15,10 @@ const DOC = fs.readFileSync(
 
 describe('the abapGit wait example', () => {
   const start = DOC.indexOf('### AbapGit (ADT-integrated)');
-  const block = DOC.slice(start, DOC.indexOf('```\n', DOC.indexOf('```typescript', start) + 3));
+  const block = DOC.slice(
+    start,
+    DOC.indexOf('```\n', DOC.indexOf('```typescript', start) + 3),
+  );
 
   it('requires a new log link and a terminal status before unlink', () => {
     const guard = block.indexOf('if (!finished)');
