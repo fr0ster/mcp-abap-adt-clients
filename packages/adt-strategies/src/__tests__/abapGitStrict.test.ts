@@ -136,6 +136,18 @@ describe('R7 status: SAP’s fixed text and nothing else', () => {
 describe('R12 file: a text body', () => {
   const args = { filename: 'zcl_demo.clas.abap', version: 'remote' } as const;
 
+  it.each([
+    'text/plain',
+    'TEXT/PLAIN',
+    'text/plain;charset=utf-8',
+    'text/plain ; charset=utf-8',
+  ])('reads a %s body', (type) => {
+    expect(
+      abapGitFacts.file(withData('x', { 'Content-Type': type }), args).facts
+        .content,
+    ).toBe('x');
+  });
+
   it('reads a text/plain body', () => {
     expect(
       abapGitFacts.file(
@@ -154,6 +166,15 @@ describe('R12 file: a text body', () => {
     ],
     ['an object', withData(OBJECT)],
     ['a number', withData(42)],
+    ['text/plain+xml', withData('x', { 'content-type': 'text/plain+xml' })],
+    ['text/plainx', withData('x', { 'content-type': 'text/plainx' })],
+    [
+      'an array-valued Content-Type',
+      {
+        ...withData('x'),
+        headers: { 'content-type': ['text/html'] },
+      } as unknown as IAdtWireResponse,
+    ],
   ])('%s is unreadable', (_name, wire) => {
     expect(() => abapGitFacts.file(wire, args)).toThrow(UNREADABLE);
   });
