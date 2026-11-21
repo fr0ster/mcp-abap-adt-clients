@@ -10,6 +10,10 @@ import { markEnvelopeFailure } from '../utils/requestTrace';
 import { buildBatchPayload, innerRequest, parseBatchResponse } from './wire';
 
 type Session = 'stateful' | 'stateless';
+
+/** The refusal of a request carrying `noLog` or `noResend`. */
+export const BATCH_REFUSES_FLAGGED =
+  'this request cannot be recorded into a batch';
 interface Pending {
   request: IAbapRequestOptions;
   stateful: boolean;
@@ -66,6 +70,13 @@ export class AdtBatchConnection implements IAbapConnection {
   makeAdtRequest<T = unknown, D = unknown>(
     request: IAbapRequestOptions,
   ): Promise<IAdtWireResponse<T, D>> {
+    // A request that must not be logged or resent cannot be a part: the
+    // envelope is logged and sent as a whole, at another time. Refused with
+    // a synchronous throw, before anything is queued — not as a rejected
+    // promise, since a recorder above this one numbers and keeps an entry
+    // before it sees a rejection.
+    if (request.noLog === true || request.noResend === true)
+      throw new Error(BATCH_REFUSES_FLAGGED);
     if (this.settlementFailure)
       return Promise.reject(this.settlementFailure.error);
     const headers = { ...request.headers };
