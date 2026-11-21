@@ -11,7 +11,7 @@
  * | answered, any other status | `abapGitErrorFacts` | `refused` / `refusedWithMessage` / `gitHostRefused` |
  * | threw, with SAP's answer | `abapGitErrorFacts` | the same three |
  * | threw, no answer | — | `noResponse`, status `0` |
- * | the SAP credential refused before SAP was asked | — | `noResponse`, status `0`: the thrown refusal never leaves |
+ * | the SAP credential refused (`AuthRefusedError`, any cause) | — | `noResponse`, status `0`: the thrown refusal never leaves |
  *
  * The error is built fresh: its message is one of `ABAPGIT_ERROR_MESSAGES`,
  * its facts the status and the T100 key, its request the method and the path
@@ -43,7 +43,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   failed,
-  isUnansweredCredentialRefusal,
+  isCredentialRefusal,
   succeeded,
 } from '../../utils/adtResponse';
 import type { AbapGitFactsSlot } from './types';
@@ -166,13 +166,13 @@ export async function answeringFactsExchange<
       }
     }
   } catch (error: unknown) {
-    // A refusal of the SAP credential SAP never saw carries no answer of
-    // SAP's — its cause may hold an identity provider's headers and body —
-    // so it leaves as `noResponse`, like anything else without one: no error
-    // a new form answers with is the object that was thrown (review of #326).
-    const wire = isUnansweredCredentialRefusal(error)
-      ? undefined
-      : answerOf(error);
+    // A refusal of the SAP credential leaves as `noResponse`, like anything
+    // else without SAP's answer. Every one, a `401` cause included:
+    // connection 25.1.0's refusal names no field that tells SAP's answer from
+    // a provider's own (an identity provider's 401), and its cause may hold
+    // that provider's headers and body. No error a new form answers with is
+    // the object that was thrown (review of #326).
+    const wire = isCredentialRefusal(error) ? undefined : answerOf(error);
     verdict =
       wire === undefined
         ? structuredError(

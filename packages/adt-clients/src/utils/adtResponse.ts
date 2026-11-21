@@ -140,6 +140,18 @@ function credentialRefusal(error: unknown): ICredentialRefusal | undefined {
 }
 
 /**
+ * Whether `error` is the connection's credential refusal at all, whatever its
+ * cause carries. connection 25.1.0 names no field that tells SAP's answer
+ * apart from a provider's (its cause is a fact copy of either), so a caller
+ * that must keep no provider text treats every one alike.
+ *
+ * Module-internal (not in the package's index).
+ */
+export function isCredentialRefusal(error: unknown): boolean {
+  return credentialRefusal(error) !== undefined;
+}
+
+/**
  * Whether `error` is a credential refusal SAP was never asked about: the
  * connection's refusal with no `401` from SAP as its cause.
  *
