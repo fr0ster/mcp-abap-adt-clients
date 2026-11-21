@@ -59,4 +59,3 @@ export const externalOptionKeys: Equal<
 > = true;
 export const options46Keys: Equal<keyof Options46, 'headers' | 'analyse'> =
   true;
-
