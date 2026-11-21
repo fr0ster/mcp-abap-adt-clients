@@ -644,8 +644,8 @@ if (!started.ok) throw new Error(started.getError().message);
 // finish. Until 19.0.0 `pull` ran this loop, and an AbortSignal passed to it
 // stopped only this loop — never the server's job. Written here, that is
 // visible instead of explained.
-// A run is this pull's only once the repository shows a log link other than
-// the one it had before the POST (`linked`, read before it) AND a terminal
+// A run is this pull's only once the repository shows a log link — present,
+// and other than the one it had before the POST (`linked`, read before it) AND a terminal
 // status: blank (initial) and `R` mean waiting, and a terminal status under the
 // old log link is the previous run's (onprem reports neither, and its pull has
 // already run when `pull` answers).
@@ -653,15 +653,15 @@ const before = linked.logLink;
 const terminal = (status: string) => ['S', 'W', 'E', 'A'].includes(status);
 const deadline = Date.now() + 600_000;
 let repo = await findRepo();
-while (
-  !(repo.logLink !== before && terminal(repo.status)) &&
-  Date.now() < deadline
-) {
+// A log link that is there AND not the one before, with a terminal status.
+const fresh = (r: typeof repo) =>
+  r.logLink !== undefined && r.logLink !== before && terminal(r.status);
+while (!fresh(repo) && Date.now() < deadline) {
   await new Promise((resolve) => setTimeout(resolve, 2000));
   repo = await findRepo();
   console.log(`status: ${repo.status} — ${repo.statusText}`);
 }
-const finished = repo.logLink !== before && terminal(repo.status);
+const finished = fresh(repo);
 if (!finished) throw new Error('the pull has not finished: nothing is unlinked');
 
 // The error log is read from the link the repository reports — on a failed
