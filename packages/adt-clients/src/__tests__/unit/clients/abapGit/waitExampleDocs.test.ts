@@ -25,9 +25,13 @@ describe('the abapGit wait example', () => {
     const unlink = block.indexOf('abapGit.unlink(');
     expect(block).toContain('const before = linked.logLink;');
     expect(block).toContain("['S', 'W', 'E', 'A']");
-    expect(block).toContain('repo.logLink !== before && terminal(repo.status)');
+    expect(block).toContain('const fresh = (r: typeof repo) =>');
     expect(guard).toBeGreaterThan(0);
     expect(unlink).toBeGreaterThan(guard);
+    expect(block).toContain(
+      'r.logLink !== undefined && r.logLink !== before && terminal(r.status)',
+    );
+    expect(block).not.toContain('repo.logLink !== before && terminal');
     expect(block).not.toContain("while (repo.status === 'R'");
   });
 });
