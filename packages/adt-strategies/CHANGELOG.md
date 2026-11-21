@@ -19,7 +19,10 @@ The tags made before the packages moved under `packages/` are
 Released with `@mcp-abap-adt/adt-clients` 46.2.0, on
 `@mcp-abap-adt/interfaces-adt` `^30.2.0` (was `^30.1.0`: the facts contracts
 `IAbapGitFactsResponse`, `IAbapGitErrorFacts`, `IAbapGitPullSelection` and
-`IAbapGitStagedObject` are its).
+`IAbapGitStagedObject` are its), and `@mcp-abap-adt/interfaces-adt-connection`
+`^5.2.0` (was `^5.0.0`; no new type of it is used: the range follows
+adt-clients', so the two declare the same range for what they share and the
+tree holds one copy).
 
 ### Added
 
