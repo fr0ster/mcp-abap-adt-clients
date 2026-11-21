@@ -52,6 +52,19 @@ export async function calls(): Promise<void> {
   await git.getErrorLog('/sap/bc/adt/abapgit/repos/K/log/L');
   void repos;
 }
+
+// A caller that extracts a signature gets 46.1.0's: the deprecated overload
+// is the last one. The 46.1.0 types, written out from its declarations.
+import type { IAbapGitExternalRepoCredentials, IAbapGitLinkArgs, IAdtAnalyseOptions, IAdtError, IAdtHeaders, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+type Mutual<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+type Options46 = { headers: IAdtHeaders } & IAdtAnalyseOptions<IAdtError>;
+type Shipped = AdtAbapGitClient;
+export const signatures: [
+  Mutual<Parameters<Shipped['link']>, [IAbapGitLinkArgs, Options46]>,
+  Mutual<ReturnType<Shipped['link']>, Promise<IAdtResponse<void, IAdtError>>>,
+  Mutual<Parameters<Shipped['checkExternalRepo']>, [IAbapGitExternalRepoCredentials, Options46]>,
+  Mutual<ReturnType<Shipped['checkExternalRepo']>, Promise<IAdtResponse<string, IAdtError>>>,
+] = [true, true, true, true];
 `;
 
 const NEW_CONSUMER = `

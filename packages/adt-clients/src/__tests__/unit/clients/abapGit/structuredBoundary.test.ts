@@ -17,7 +17,7 @@ import type { IAbapRequestOptions } from '@mcp-abap-adt/interfaces-adt-connectio
 import { AdtAbapGitClient } from '../../../../clients/AdtAbapGitClient';
 import type {
   AbapGitFactsSlot,
-  AbapGitValues,
+  AbapGitValuesOf,
 } from '../../../../clients/abapGit/types';
 import { abapGitDocuments } from '../../../../clients/abapGit/types';
 import {
@@ -51,10 +51,10 @@ type Analyser = (
   verdict: IAbapGitStructuredError | typeof ADT_NO_FAILURE,
   answer?: IAbapGitFactsResponse<unknown>,
 ) => IAbapGitStructuredError | typeof ADT_NO_FAILURE;
-type Call = (
-  git: AdtAbapGitClient<AbapGitValues>,
-  analyse?: Analyser,
-) => Promise<unknown>;
+// Any client: the forms are called the same way whatever its result set.
+// biome-ignore lint/suspicious/noExplicitAny: a values map of any shape
+type AnyGit = AdtAbapGitClient<any>;
+type Call = (git: AnyGit, analyse?: Analyser) => Promise<unknown>;
 
 /** Every new form: its slot, a success document holding canaries, and the call. */
 const NEW_FORMS: ReadonlyArray<readonly [AbapGitFactsSlot, string, Call]> = [
@@ -253,7 +253,7 @@ describe('the facts exchange, per new form', () => {
     '%s: an answered failure reaches the analyser as facts alone',
     async (slot, call) => {
       const { read, analysed, results, analyse } = recorded();
-      const git = new AdtAbapGitClient(
+      const git = new AdtAbapGitClient<AbapGitValuesOf<typeof results>>(
         new ScriptedConnection(answeredFailure),
         { results },
       );
@@ -291,9 +291,12 @@ describe('the facts exchange, per new form', () => {
     '%s: a thrown failure is reduced before the analyser, its message and response dropped',
     async (_slot, call) => {
       const { analysed, results, analyse } = recorded();
-      const git = new AdtAbapGitClient(new ScriptedConnection(thrownFailure), {
-        results,
-      });
+      const git = new AdtAbapGitClient<AbapGitValuesOf<typeof results>>(
+        new ScriptedConnection(thrownFailure),
+        {
+          results,
+        },
+      );
 
       const answer = (await call(git, analyse)) as {
         ok: boolean;
@@ -326,7 +329,7 @@ describe('the facts exchange, per new form', () => {
     '%s: a success reaches the reader as its facts, nothing of the document else',
     async (slot, document, call) => {
       const { read, analysed, results, analyse } = recorded();
-      const git = new AdtAbapGitClient(
+      const git = new AdtAbapGitClient<AbapGitValuesOf<typeof results>>(
         new ScriptedConnection(() => ok(document)),
         { results },
       );

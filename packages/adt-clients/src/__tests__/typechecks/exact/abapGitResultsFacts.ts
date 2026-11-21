@@ -97,3 +97,34 @@ export const constructOmitted: Equal<
   ValueOf<ReturnType<typeof newOmitted.listReposQuiet>>,
   Default
 > = true;
+
+// The reader's own `undefined` is its value, apart from whether the slot is
+// there: a reader of `number | undefined` keeps it, required or optional, and
+// a reader of `number` gains no `undefined` from an optional slot.
+const maybe = (answer: IAbapGitFactsResponse<IAbapGitReposFacts>) =>
+  answer.facts.repos.length > 0 ? answer.facts.repos.length : undefined;
+const requiredMaybe = { ...abapGitDocuments, reposFacts: maybe };
+const optionalMaybe: typeof abapGitDocuments & {
+  readonly reposFacts?: typeof maybe;
+} = abapGitDocuments;
+const createdRequiredMaybe = AdtAbapGitClient.create(connection, {
+  results: requiredMaybe,
+});
+const createdOptionalMaybe = AdtAbapGitClient.create(connection, {
+  results: optionalMaybe,
+});
+const newOptionalMaybe = new AdtAbapGitClient<
+  AbapGitValuesOf<typeof optionalMaybe>
+>(connection, { results: optionalMaybe });
+export const requiredKeepsUndefined: Equal<
+  ValueOf<ReturnType<typeof createdRequiredMaybe.listReposQuiet>>,
+  number | undefined
+> = true;
+export const optionalKeepsUndefined: Equal<
+  ValueOf<ReturnType<typeof createdOptionalMaybe.listReposQuiet>>,
+  number | undefined | Default
+> = true;
+export const constructOptionalKeepsUndefined: Equal<
+  ValueOf<ReturnType<typeof newOptionalMaybe.listReposQuiet>>,
+  number | undefined | Default
+> = true;
