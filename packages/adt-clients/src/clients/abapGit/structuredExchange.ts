@@ -11,7 +11,7 @@
  * | answered, any other status | `abapGitErrorFacts` | `refused` / `refusedWithMessage` / `gitHostRefused` |
  * | threw, with SAP's answer | `abapGitErrorFacts` | the same three |
  * | threw, no answer | — | `noResponse`, status `0` |
- * | the SAP credential refused before SAP was asked | — | rejects with the refusal as it came, as every member does |
+ * | the SAP credential refused before SAP was asked | — | `noResponse`, status `0`: the thrown refusal never leaves |
  *
  * The error is built fresh: its message is one of `ABAPGIT_ERROR_MESSAGES`,
  * its facts the status and the T100 key, its request the method and the path
@@ -46,6 +46,7 @@ import {
   isUnansweredCredentialRefusal,
   succeeded,
 } from '../../utils/adtResponse';
+import type { AbapGitFactsSlot } from './types';
 
 /** The request an error describes: the method, and the path without its query. */
 export interface IAbapGitSentRequest {
@@ -117,8 +118,10 @@ function structuredError(
 function refusal(
   answer: IAdtWireResponse,
   request: IAbapGitSentRequest,
+  route: AbapGitFactsSlot,
 ): IAbapGitStructuredError {
-  const facts = abapGitErrorFacts(answer);
+  // `http_status` — and with it `gitHostRefused` — is R11's alone.
+  const facts = abapGitErrorFacts(answer, route);
   return structuredError(messageFor(facts), facts, request);
 }
 
@@ -138,6 +141,7 @@ export async function answeringFactsExchange<
   read: IAbapGitFactsResultStrategy<T, F>,
   analyse: IAbapGitFactsAnalyse<F, E> | undefined,
   request: IAbapGitSentRequest,
+  route: AbapGitFactsSlot,
 ): Promise<IAdtResponse<T, E>> {
   let verdict: IAbapGitStructuredError | AdtNoFailure = ADT_NO_FAILURE;
   let answer: IAbapGitFactsResponse<F> | undefined;
@@ -147,7 +151,7 @@ export async function answeringFactsExchange<
     const wire = await run();
     lost = wire.sessionLost;
     if (wire.status < 200 || wire.status >= 300) {
-      verdict = refusal(wire, request);
+      verdict = refusal(wire, request, route);
     } else {
       try {
         answer = reduce(wire);
@@ -162,10 +166,13 @@ export async function answeringFactsExchange<
       }
     }
   } catch (error: unknown) {
-    // As every member: a refusal of the SAP credential SAP never saw is the
-    // caller's signal to stop, and rejects as it came.
-    if (isUnansweredCredentialRefusal(error)) throw error;
-    const wire = answerOf(error);
+    // A refusal of the SAP credential SAP never saw carries no answer of
+    // SAP's — its cause may hold an identity provider's headers and body —
+    // so it leaves as `noResponse`, like anything else without one: no error
+    // a new form answers with is the object that was thrown (review of #326).
+    const wire = isUnansweredCredentialRefusal(error)
+      ? undefined
+      : answerOf(error);
     verdict =
       wire === undefined
         ? structuredError(
@@ -173,7 +180,7 @@ export async function answeringFactsExchange<
             { status: 0 },
             request,
           )
-        : refusal(wire, request);
+        : refusal(wire, request, route);
   }
 
   // `E` gets a value only from `analyse`; without one the verdict is the
