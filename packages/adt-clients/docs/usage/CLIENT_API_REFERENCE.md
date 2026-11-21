@@ -644,15 +644,25 @@ if (!started.ok) throw new Error(started.getError().message);
 // finish. Until 19.0.0 `pull` ran this loop, and an AbortSignal passed to it
 // stopped only this loop — never the server's job. Written here, that is
 // visible instead of explained.
-// Read once before testing the condition: `linked` was fetched before the POST,
-// so its status says nothing about this pull.
+// A run is this pull's only once the repository shows a log link other than
+// the one it had before the POST (`linked`, read before it) AND a terminal
+// status: blank (initial) and `R` mean waiting, and a terminal status under the
+// old log link is the previous run's (onprem reports neither, and its pull has
+// already run when `pull` answers).
+const before = linked.logLink;
+const terminal = (status: string) => ['S', 'W', 'E', 'A'].includes(status);
 const deadline = Date.now() + 600_000;
 let repo = await findRepo();
-while (repo.status === 'R' && Date.now() < deadline) {
+while (
+  !(repo.logLink !== before && terminal(repo.status)) &&
+  Date.now() < deadline
+) {
   await new Promise((resolve) => setTimeout(resolve, 2000));
   repo = await findRepo();
   console.log(`status: ${repo.status} — ${repo.statusText}`);
 }
+const finished = repo.logLink !== before && terminal(repo.status);
+if (!finished) throw new Error('the pull has not finished: nothing is unlinked');
 
 // The error log is read from the link the repository reports — on a failed
 // pull, or any time.
@@ -661,8 +671,9 @@ if ((repo.status === 'E' || repo.status === 'A') && repo.logLink) {
   console.error('pull failed:', log.ok ? log.getResult().value : log.getError());
 }
 
-// Remove the binding: DELETE /sap/bc/adt/abapgit/repos/{repositoryId}, by the
-// key `listRepos` reported.
+// Remove the binding — only after the run is terminal under its own log link:
+// DELETE /sap/bc/adt/abapgit/repos/{repositoryId}, by the key `listRepos`
+// reported.
 if (repo.repositoryId) {
   await abapGit.unlink({ repositoryId: repo.repositoryId });
 }
@@ -670,7 +681,7 @@ if (repo.repositoryId) {
 
 **Availability.** ADT-integrated abapGit ships with SAP BTP ABAP Environment (Steampunk) and modern on-prem from ABAP Platform 2022+. SAP_BASIS 7.40 SP04 does not advertise `/sap/bc/adt/abapgit/*`. This is **not** the community abapGit that installs via SE38 — that one is a separate ABAP program with its own UI and does not go through ADT.
 
-**Async pull contract.** `pull` starts the server-side job and answers. The job then runs on its own, and nothing you do on this side stops it — which is why the wait above is written in your code rather than hidden in a member with a timeout option. Poll `listRepos()` until the repository's `status !== 'R'` before re-issuing `pull` or `unlink`: starting a second pull while the first is still `R` is unsupported and fails fast.
+**Async pull contract.** `pull` starts the server-side job and answers. The job then runs on its own, and nothing you do on this side stops it — which is why the wait above is written in your code rather than hidden in a member with a timeout option. Poll `listRepos()` until the repository shows a new log link and a terminal status (`S`, `W`, `E`, `A`) before re-issuing `pull` or `unlink`: starting a second pull while the first is still `R` is unsupported and fails fast.
 
 **No `getRepo`, since 23.0.0.** It listed every repository and picked one for a package — a filter over a document, which is a reading, and a "not found" the library composed from its own search. `listRepos` and your own `find` are the same request. For the same reason `unlink` takes the `repositoryId` and `getErrorLog` the `logLink` that `listRepos` reports, instead of a package name each looked up on its own. `abapGitRepos` reads the key verbatim: the reading it replaces turned `000001` into `1`, which is not the key `unlink` is addressed by.
 
