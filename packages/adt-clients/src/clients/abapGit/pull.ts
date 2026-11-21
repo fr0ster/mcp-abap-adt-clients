@@ -23,14 +23,17 @@ import { buildPullBody } from './xmlBuilder';
  * stopped this client's own `sleep` and never the server's job; leaving their
  * own loop says so in their own code.
  */
-export async function pullRepo(
+export async function postPullLink(
   connection: IAbapConnection,
   headers: IAdtHeaders,
   args: IAbapGitPullArgs,
+  // `args.pullLink` rebuilt by `pullLinkPath` (since 46.2.0): only the path a
+  // key would build is sent.
+  url: string,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
     method: 'POST',
-    url: args.pullLink,
+    url,
     timeout: 0,
     headers: requestHeaders(headers),
     data: buildPullBody(args, args.branchName),

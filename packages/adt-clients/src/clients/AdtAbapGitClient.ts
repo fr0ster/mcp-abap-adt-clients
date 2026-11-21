@@ -41,7 +41,8 @@ import { checkExternalRepo } from './abapGit/checkExternalRepo';
 import { getErrorLog } from './abapGit/getErrorLog';
 import { linkRepo } from './abapGit/link';
 import { listRepos } from './abapGit/listRepos';
-import { pullRepo } from './abapGit/pull';
+import { logLinkPath, pullLinkPath } from './abapGit/paths';
+import { postPullLink } from './abapGit/pull';
 import { abapGitDocuments, type IAbapGitResults } from './abapGit/types';
 import { unlinkRepo } from './abapGit/unlink';
 
@@ -131,8 +132,11 @@ export class AdtAbapGitClient<
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['pulled'], E>> {
     this.logger?.debug?.(`AdtAbapGitClient.pull: package=${args.package}`);
+    // Refused before anything is built: a link that is not the path a key
+    // would build throws here, outside the exchange, with nothing sent.
+    const url = pullLinkPath(args.pullLink);
     return answering(
-      () => pullRepo(this.connection, options.headers, args),
+      () => postPullLink(this.connection, options.headers, args, url),
       this.results.pulled,
       options?.analyse as IAnalyse<E> | undefined,
     );
@@ -169,8 +173,9 @@ export class AdtAbapGitClient<
     logLink: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['errorLog'], E>> {
+    const url = logLinkPath(logLink);
     return answering(
-      () => getErrorLog(this.connection, logLink),
+      () => getErrorLog(this.connection, url),
       this.results.errorLog,
       options?.analyse as IAnalyse<E> | undefined,
     );
