@@ -322,6 +322,16 @@ export const CT_ABAPGIT_EXTERNAL_REPO_INFO_REQUEST_V2 =
 export const ACCEPT_ABAPGIT_EXTERNAL_REPO_INFO_RESPONSE_V2 =
   'application/abapgit.adt.repo.info.ext.response.v2+xml';
 
+// The key-addressed routes of the new forms (46.2.0); spec §2.2, Code.
+// R6 answers 400 to any other Accept (cloud `RES_PULL_MOD_OBJS` L66).
+export const ACCEPT_ABAPGIT_PULL_MODIFIED_OBJECTS_V1 =
+  'application/abapgit.adt.repo.pull.modified.objs.v1+xml';
+// R9's answer and R10's request: the staging document.
+export const CT_ABAPGIT_REPO_STAGE_V1 =
+  'application/abapgit.adt.repo.stage.v1+xml';
+// R12: the file as text.
+export const ACCEPT_ABAPGIT_FILE = 'text/plain';
+
 // ATC (ABAP Test Cockpit) — captured against one system, not taken from
 // documentation. Two of these are the resource rather than a detail: the
 // worklist is created and its id read as text/plain where everything around it
