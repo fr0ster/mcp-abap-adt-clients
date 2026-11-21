@@ -24,11 +24,12 @@ type Equal<A, B> =
     ? true
     : false;
 
-type ValueOf<P> = P extends Promise<infer A>
-  ? A extends { ok: true; getResult(): { value: infer V } }
-    ? V
-    : never
-  : never;
+type ValueOf<P> =
+  P extends Promise<infer A>
+    ? A extends { ok: true; getResult(): { value: infer V } }
+      ? V
+      : never
+    : never;
 
 declare const connection: IAbapConnection;
 

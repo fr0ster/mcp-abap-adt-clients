@@ -6,10 +6,7 @@
  * Nothing here runs.
  */
 
-import {
-  type ResultValuesOf,
-  rawDocument,
-} from '@mcp-abap-adt/adt-clients';
+import { type ResultValuesOf, rawDocument } from '@mcp-abap-adt/adt-clients';
 import {
   AdtAbapGitClient,
   abapGitDocuments,
@@ -46,7 +43,11 @@ export async function legacyCalls(): Promise<void> {
   const listed = await constructed.listRepos();
   const repos: IAbapGitRepo[] = listed.ok ? listed.getResult().value : [];
   const info = await created.checkExternalRepo(
-    { url: 'https://git.example.invalid/r', remoteUser: 'u', remotePassword: 'p' },
+    {
+      url: 'https://git.example.invalid/r',
+      remoteUser: 'u',
+      remotePassword: 'p',
+    },
     { headers },
   );
   const external: IAbapGitExternalRepoInfo | undefined = info.ok
@@ -72,6 +73,9 @@ export async function legacyCalls(): Promise<void> {
     { package: 'ZPKG', url: 'u', remoteUser: 'u' },
     { headers, credentials: null },
   );
-  // @ts-expect-error -- the legacy form's options carry credentials?: never
-  await shipped.pull({ package: 'P', pullLink: 'l' }, { headers, credentials: null });
+  await shipped.pull(
+    { package: 'P', pullLink: 'l' },
+    // @ts-expect-error -- the legacy form's options carry credentials?: never
+    { headers, credentials: null },
+  );
 }
