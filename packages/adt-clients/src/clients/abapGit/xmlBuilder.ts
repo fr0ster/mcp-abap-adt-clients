@@ -84,13 +84,16 @@ export function buildExternalRepoInfoBody(
 
 const NS_ABAPGIT_STAGING = 'http://www.sap.com/adt/abapgit/staging';
 const NS_ADTCORE = 'http://www.sap.com/adt/core';
-// Inference, not read: the namespace and element names of the selective pull
-// (`ABAPGIT_ST_REPO_SELECTIVE_PULL`, cloud) were not read. `user` and
-// `password` are the spec's (§3.1); the entries mirror R6's document
-// (`ABAPGIT_ST_PULL_MODIFIED_OBJS`), which the selection hands back. The live
-// run (T5.6) is what settles it; the server never sends a selection (§4.3).
+// The selective pull (`ABAPGIT_ST_REPO_SELECTIVE_PULL`, cloud; Code): the root,
+// `branchName`, `transportRequest`, `user` and `password` in its own namespace
+// (L4, L14–38), the two lists, their entries and `action` in R6's
+// (`agitpullmodifiedobjects`, L5, L42, L55; `ABAPGIT_ST_PULL_MODIFIED_OBJS`
+// L46, L52). The root is `extensible="deep"`: a list in another namespace is
+// skipped silently, and the pull selects nothing.
 const NS_ABAPGIT_PULL_REQUEST =
   'http://www.sap.com/adt/abapgit/abapgitpullrequest';
+const NS_ABAPGIT_MODIFIED_OBJECTS =
+  'http://www.sap.com/adt/abapgit/agitpullmodifiedobjects';
 
 function child(prefix: string, tag: string, value: string | undefined): string {
   if (value === undefined) return '';
@@ -115,8 +118,9 @@ export function buildLinkBodyNew(
     child('abapgitrepo', 'remoteUser', credentials?.user) +
     child('abapgitrepo', 'remotePassword', credentials?.password) +
     child('abapgitrepo', 'transportRequest', args.transportRequest) +
-    // Cloud only. Its place after `transportRequest` is Inference: the
-    // transformation `ABAPGIT_ST_REPO_POST_V3` was not read.
+    // Cloud only (`ABAPGIT_ST_REPO_POST_V3` L20–24; Code). Its members sit in
+    // a `tt:group` (L9), so the order is free. Onprem's `ZABAPGIT_ST_REPO_POST`
+    // has no such field and skips it silently (`extensible="deep"`, L8).
     child('abapgitrepo', 'folderLogic', args.folderLogic) +
     `</abapgitrepo:repository>`
   );
@@ -145,16 +149,16 @@ function selectedObjects(
   const entries = objects
     .map(
       (object) =>
-        '<abapgitpullrequest:abapgitobjects' +
+        '<agitpullmodifiedobjects:abapgitobjects' +
         attribute('adtcore:uri', object.uri) +
         attribute('adtcore:type', object.type) +
         attribute('adtcore:name', object.name) +
         attribute('adtcore:packageName', object.packageName) +
-        attribute('abapgitpullrequest:action', String(object.action)) +
+        attribute('agitpullmodifiedobjects:action', String(object.action)) +
         '/>',
     )
     .join('');
-  return `<abapgitpullrequest:${tag}>${entries}</abapgitpullrequest:${tag}>`;
+  return `<agitpullmodifiedobjects:${tag}>${entries}</agitpullmodifiedobjects:${tag}>`;
 }
 
 /**
@@ -167,7 +171,7 @@ export function buildSelectivePullBody(
 ): string {
   return (
     `<?xml version="1.0" encoding="UTF-8"?>` +
-    `<abapgitpullrequest:abapgitpullrequest xmlns:abapgitpullrequest="${NS_ABAPGIT_PULL_REQUEST}" xmlns:adtcore="${NS_ADTCORE}">` +
+    `<abapgitpullrequest:abapgitpullrequest xmlns:abapgitpullrequest="${NS_ABAPGIT_PULL_REQUEST}" xmlns:agitpullmodifiedobjects="${NS_ABAPGIT_MODIFIED_OBJECTS}" xmlns:adtcore="${NS_ADTCORE}">` +
     child('abapgitpullrequest', 'branchName', args.branchName) +
     child('abapgitpullrequest', 'transportRequest', args.transportRequest) +
     child('abapgitpullrequest', 'user', credentials?.user) +
@@ -184,8 +188,8 @@ export function buildSelectivePullBody(
 /**
  * R13, the new form, and R14: `user` / `password` — the fields SAP reads
  * (`…INFO_EXT_REQ`, `…RQ_V2`), not 46.1.0's `remoteUser`, which it ignores.
- * R14 adds the branch and the package; their place after the credential is
- * Inference (the transformation was not read).
+ * R14 adds the branch and the package (`ABAPGIT_ST_REPO_INFO_EXT_RQ_V2`
+ * L23–32; Code), members of a `tt:group` (L7), so the order is free.
  */
 export function buildExternalRepoRequestBody(
   args: {
@@ -221,8 +225,14 @@ function stagedObject(object: IAbapGitStagedObject): string {
     .join('');
   return (
     '<abapgitstaging:abapgitobject' +
-    attribute('abapgitstaging:wbkey', object.wbkey) +
-    attribute('abapgitstaging:version', object.version) +
+    // Both `not-initial` in `ABAPGIT_ST_REPO_STAGE_OBJECT` (cloud L23–30):
+    // written only when there is a value, as SAP's own answer does.
+    (object.wbkey === ''
+      ? ''
+      : attribute('abapgitstaging:wbkey', object.wbkey)) +
+    (object.version === ''
+      ? ''
+      : attribute('abapgitstaging:version', object.version)) +
     attribute('adtcore:uri', object.uri) +
     attribute('adtcore:type', object.type) +
     attribute('adtcore:name', object.name) +
@@ -240,7 +250,12 @@ export function buildPushBody(args: IAbapGitPushArgs): string {
   return (
     `<?xml version="1.0" encoding="UTF-8"?>` +
     `<abapgitstaging:abapgitstaging xmlns:abapgitstaging="${NS_ABAPGIT_STAGING}" xmlns:adtcore="${NS_ADTCORE}">` +
+    // The three lists are literal elements of `ABAPGIT_ST_REPO_STAGE`, in this
+    // order (cloud L14, L25, L36; onprem `ZABAPGIT_ST_REPO_STAGE` the same):
+    // a push sends its objects as `staged_objects` and the other two empty.
+    '<abapgitstaging:unstaged_objects></abapgitstaging:unstaged_objects>' +
     `<abapgitstaging:staged_objects>${args.staged.map(stagedObject).join('')}</abapgitstaging:staged_objects>` +
+    '<abapgitstaging:ignored_objects></abapgitstaging:ignored_objects>' +
     `<abapgitstaging:abapgit_comment${attribute('abapgitstaging:comment', comment.text)}>` +
     `<abapgitstaging:author${attribute('abapgitstaging:name', comment.author.name)}${attribute('abapgitstaging:email', comment.author.email)}/>` +
     `<abapgitstaging:committer${attribute('abapgitstaging:name', comment.committer.name)}${attribute('abapgitstaging:email', comment.committer.email)}/>` +
