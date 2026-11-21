@@ -3,7 +3,7 @@ import {
   type IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
-import { XMLParser } from 'fast-xml-parser';
+import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { field, isElement, listOf } from '../parsed';
 import { rawOf } from '../result';
 
@@ -247,8 +247,15 @@ export function unreadableAnswer(): Error {
  * own message quotes the document, so it is dropped here.
  */
 export function parsedDocument(answer: IAdtWireResponse): unknown {
+  // A document is a string, and well-formed: the parser does not validate,
+  // and a mismatched closing tag would still yield usable-looking fields
+  // (review of #326). `XMLValidator` is the parser's own check, as the
+  // refusal readers use it; its message (which quotes the text) is not read.
+  const body = answer.data;
+  if (typeof body !== 'string') return undefined;
   try {
-    return documentParser.parse(rawOf(answer));
+    if (XMLValidator.validate(body) !== true) return undefined;
+    return documentParser.parse(body);
   } catch {
     return undefined;
   }
@@ -318,9 +325,18 @@ function appLogKeyOf(links: IAbapGitLink[]): string | undefined {
   const segments = href.slice(REPOS_PATH.length).split('/');
   if (segments.length !== 3) return undefined;
   const [key, log, id] = segments;
-  if (!key || log !== 'log' || !id) return undefined;
+  if (!key || log !== 'log' || id === undefined) return undefined;
   if (id.includes('?') || id.includes('#')) return undefined;
-  return id;
+  // The href carries the segment encoded; the key is the decoded value, so a
+  // path built from it encodes it once (`A%2FB` is `A/B`, sent as `A%2FB`).
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(id);
+  } catch {
+    return undefined;
+  }
+  if (decoded === '' || decoded === '.' || decoded === '..') return undefined;
+  return decoded;
 }
 
 /** R1's entries, read from `abapgitrepo:repositories`; internal to the facts. */

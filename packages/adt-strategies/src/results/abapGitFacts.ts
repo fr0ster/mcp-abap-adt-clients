@@ -8,7 +8,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { at, field, listOf } from '../parsed';
-import { rawOf } from '../result';
 import {
   abapGitBranchInfo,
   abapGitModifiedObjects,
@@ -22,6 +21,7 @@ import {
   parsedDocument,
   repoEntries,
   textOf,
+  unreadableAnswer,
 } from './abapGit';
 
 /**
@@ -224,6 +224,38 @@ function branchFacts(branch: IAbapGitBranchReading): IAbapGitBranchFacts {
 
 const NO_PERSON: IAbapGitPerson = { name: '', email: '' };
 
+/** The one text R7 answers. */
+const R7_TEXT = 'DEMO STATUS';
+
+/** The header's value, whatever its letter case; `undefined` when absent. */
+function headerOf(answer: IAdtWireResponse, name: string): string | undefined {
+  const headers = (answer.headers ?? {}) as Record<string, unknown>;
+  for (const [key, value] of Object.entries(headers))
+    if (key.toLowerCase() === name && typeof value === 'string') return value;
+  return undefined;
+}
+
+/**
+ * R12's body: text, as SAP serves it (`text/plain`). A body that is not a
+ * string, or one served as another media type (a sign-in page), is not the
+ * file. An absent `Content-Type` is not refused: the text is the file.
+ */
+function fileText(answer: IAdtWireResponse): string {
+  const body = answer.data;
+  if (typeof body !== 'string') throw unreadableAnswer();
+  const type = headerOf(answer, 'content-type');
+  if (type !== undefined && !type.toLowerCase().startsWith('text/plain'))
+    throw unreadableAnswer();
+  return body;
+}
+
+/** `T100KEY-NO`: exactly three digits, as SAP writes it; else not a fact. */
+function messageNumberOf(value: string | undefined): string | undefined {
+  if (value === undefined || value.length !== 3) return undefined;
+  for (const char of value) if (char < '0' || char > '9') return undefined;
+  return value;
+}
+
 const noFacts: Reducer<IAbapGitNoFacts> = (answer) => respond(answer, {});
 
 /** The facts reducers, one per new-form result slot. */
@@ -250,8 +282,12 @@ export const abapGitFacts: IAbapGitFactsReducers = Object.freeze({
       packageWarningObjects: modifiedFacts(read.packageWarningObjects),
     });
   },
-  status: (answer: IAdtWireResponse) =>
-    respond(answer, { text: rawOf(answer) }),
+  // R7 answers one fixed text (cloud `RES_REPO_PULL->get` L139); anything
+  // else — a sign-in page, an object, another text — is not its answer.
+  status: (answer: IAdtWireResponse) => {
+    if (answer.data !== R7_TEXT) throw unreadableAnswer();
+    return respond(answer, { text: R7_TEXT });
+  },
   runLog: objectsFacts,
   staging: (answer: IAdtWireResponse) => {
     const read = abapGitStaging(answer);
@@ -272,7 +308,7 @@ export const abapGitFacts: IAbapGitFactsReducers = Object.freeze({
     respond(answer, {
       filename: args.filename,
       version: args.version,
-      content: rawOf(answer),
+      content: fileText(answer),
     }),
   externalRepoFacts: (answer: IAdtWireResponse) => {
     const read = abapGitBranchInfo(answer);
@@ -302,6 +338,11 @@ export const abapGitFacts: IAbapGitFactsReducers = Object.freeze({
  */
 export function abapGitErrorFacts(
   answer: IAdtWireResponse,
+  /**
+   * The route's slot. `http_status` is read for R11 (`checked`) alone: only
+   * `CL_ABAPGIT_REPOSITORY_AUTH` on the checks route writes it.
+   */
+  route?: keyof IAbapGitFactsReducers,
 ): IAbapGitErrorFacts {
   const properties = new Map<string, string>();
   for (const entry of listOf(
@@ -315,8 +356,10 @@ export function abapGitErrorFacts(
   return {
     status: answer.status,
     messageClass: properties.get('T100KEY-ID') || undefined,
-    messageNumber: properties.get('T100KEY-NO') || undefined,
+    messageNumber: messageNumberOf(properties.get('T100KEY-NO')),
     gitHttpStatus:
-      gitHttpStatus === undefined ? undefined : integerOf(gitHttpStatus),
+      route !== 'checked' || gitHttpStatus === undefined
+        ? undefined
+        : integerOf(gitHttpStatus),
   };
 }
