@@ -329,6 +329,7 @@ describe('abapGitErrorFacts', () => {
   it('R11 auth failure: also the git host’s status, as an integer', () => {
     const facts = abapGitErrorFacts(
       answer(exception({ httpStatus: '401' }), 500),
+      'checked',
     );
     expect(facts.gitHttpStatus).toBe(401);
     expect(facts.messageNumber).toBe('017');
@@ -337,8 +338,10 @@ describe('abapGitErrorFacts', () => {
 
   it('a non-integer `http_status` is not a fact', () => {
     expect(
-      abapGitErrorFacts(answer(exception({ httpStatus: '40x' }), 500))
-        .gitHttpStatus,
+      abapGitErrorFacts(
+        answer(exception({ httpStatus: '40x' }), 500),
+        'checked',
+      ).gitHttpStatus,
     ).toBeUndefined();
   });
 
