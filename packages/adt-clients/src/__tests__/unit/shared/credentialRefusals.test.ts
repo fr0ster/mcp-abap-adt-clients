@@ -109,8 +109,10 @@ describe('answering a refused credential', () => {
     const error = answer.getError();
     expect(error.origin).toBe('connection');
     expect(error.response?.status).toBe(401);
-    expect(error.response).toBe(unauthorized);
-    expect(error.request).toBe(cause.request);
+    // connection 25 keeps a copy of the cause (`failureCopy`): SAP's answer
+    // field by field, and nothing of the request the wire threw with.
+    expect(error.response).toEqual(unauthorized);
+    expect(error.request).toBeUndefined();
     expect(error.message).toBe(thrown.message);
   });
 
