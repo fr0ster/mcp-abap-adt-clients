@@ -38,3 +38,25 @@ export const externalReturn: Mutual<
   ReturnType<Client['checkExternalRepo']>,
   Promise<IAdtResponse<string, IAdtError>>
 > = true;
+
+/** `true` only when `A` and `B` are the same type. */
+type Equal<A, B> =
+  (<X>() => X extends A ? 1 : 2) extends <X>() => X extends B ? 1 : 2
+    ? true
+    : false;
+
+// The one stated change: the deprecated forms' options name `credentials`
+// (`credentials?: never`), so an extracted options type has one key more than
+// 46.1.0's (`headers`, `analyse`) — the edge case of an undeclared
+// `credentials` the CHANGELOG states. Pinned, so the change stays deliberate.
+export const linkOptionKeys: Equal<
+  keyof Parameters<Client['link']>[1],
+  'headers' | 'analyse' | 'credentials'
+> = true;
+export const externalOptionKeys: Equal<
+  keyof Parameters<Client['checkExternalRepo']>[1],
+  'headers' | 'analyse' | 'credentials'
+> = true;
+export const options46Keys: Equal<keyof Options46, 'headers' | 'analyse'> =
+  true;
+
