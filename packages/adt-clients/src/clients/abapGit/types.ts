@@ -120,6 +120,21 @@ type IsOptional<R, K extends keyof R> =
 type FactsReaderValue<S> =
   S extends IAbapGitFactsResultStrategy<infer X, never> ? X : never;
 
+declare const factsValue: unique symbol;
+
+/**
+ * A new-form slot's value in a values map: the reader's value `X`, boxed, so
+ * the `undefined` an optional key adds (with `exactOptionalPropertyTypes` off)
+ * never mixes with an `undefined` the reader itself answers. A type only:
+ * nothing of this shape is ever built.
+ */
+export interface AbapGitFactsSlotValue<X> {
+  readonly [factsValue]: X;
+}
+
+/** The reader's value a slot's box holds; an absent slot's `undefined` is none. */
+type Unboxed<V> = V extends AbapGitFactsSlotValue<infer X> ? X : never;
+
 /**
  * The values a result set answers, slot by slot — `ResultValuesOf` for the
  * legacy slots, and for a new-form slot its reader's value. Homomorphic, so a
@@ -128,7 +143,7 @@ type FactsReaderValue<S> =
  */
 export type AbapGitValuesOf<R> = {
   readonly [K in keyof R]: K extends AbapGitFactsSlot
-    ? FactsReaderValue<Exclude<R[K], undefined>>
+    ? AbapGitFactsSlotValue<FactsReaderValue<Exclude<R[K], undefined>>>
     : R[K] extends IResultStrategy<infer X>
       ? X
       : never;
@@ -141,7 +156,7 @@ export type AbapGitValuesOf<R> = {
  */
 export type AbapGitStrategiesOf<T> = {
   readonly [K in keyof T]: K extends AbapGitFactsSlot
-    ? IAbapGitFactsResultStrategy<T[K], IAbapGitFactsOf[K]>
+    ? IAbapGitFactsResultStrategy<Unboxed<T[K]>, IAbapGitFactsOf[K]>
     : IResultStrategy<T[K]>;
 };
 
@@ -149,11 +164,12 @@ export type AbapGitStrategiesOf<T> = {
  * What a new member answers for the values `T`: the slot's value when `T`
  * names it (with the default facts too when the slot is optional — it may be
  * absent at run time), else the default facts. Decided by the key's
- * optionality, so the answer is the same with `exactOptionalPropertyTypes` on
- * and off.
+ * optionality, and the reader's value is read out of its box, so the answer is
+ * the same with `exactOptionalPropertyTypes` on and off and keeps a reader's
+ * own `undefined`.
  */
 export type FactsValue<T, K extends AbapGitFactsSlot> = K extends keyof T
   ? IsOptional<T, K> extends true
-    ? Exclude<T[K], undefined> | AbapGitDefaultFacts<K>
-    : T[K]
+    ? Unboxed<T[K]> | AbapGitDefaultFacts<K>
+    : Unboxed<T[K]>
   : AbapGitDefaultFacts<K>;

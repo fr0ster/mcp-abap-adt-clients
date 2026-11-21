@@ -10,6 +10,7 @@ export { AdtAbapGitClient } from './clients/AdtAbapGitClient';
 export {
   type AbapGitDefaultFacts,
   type AbapGitFactsSlot,
+  type AbapGitFactsSlotValue,
   type AbapGitStrategiesOf,
   type AbapGitValues,
   type AbapGitValuesOf,

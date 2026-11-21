@@ -193,8 +193,8 @@ export class AdtAbapGitClient<
   static create(
     connection: IAbapConnection,
     options: Partial<AdtHandlerOptions<IAbapGitResults, 'logger'>> = {},
-  ): AdtAbapGitClient<AbapGitValues> {
-    return new AdtAbapGitClient<AbapGitValues>(connection, {
+  ): AdtAbapGitClient<AbapGitValuesOf<IAbapGitResults>> {
+    return new AdtAbapGitClient<AbapGitValuesOf<IAbapGitResults>>(connection, {
       ...options,
       results: options.results ?? abapGitDocuments,
     });
@@ -253,6 +253,12 @@ export class AdtAbapGitClient<
     );
   }
 
+  /** Link a package to a repository — the new form, answered by its facts. */
+  link<E extends IAbapGitStructuredError = IAbapGitStructuredError>(
+    args: IAbapGitLinkNewArgs,
+    options: IAbapGitHeaderOptions &
+      IAbapGitNewFormOptions<Facts<'linkedFacts'>, E>,
+  ): FactsAnswer<T, 'linkedFacts', E>;
   /**
    * Link a package to a repository.
    *
@@ -263,12 +269,6 @@ export class AdtAbapGitClient<
     args: IAbapGitLinkArgs,
     options: DeprecatedOptions<E>,
   ): Promise<IAdtResponse<void, E>>;
-  /** Link a package to a repository — the new form, answered by its facts. */
-  link<E extends IAbapGitStructuredError = IAbapGitStructuredError>(
-    args: IAbapGitLinkNewArgs,
-    options: IAbapGitHeaderOptions &
-      IAbapGitNewFormOptions<Facts<'linkedFacts'>, E>,
-  ): FactsAnswer<T, 'linkedFacts', E>;
   async link(
     args: IAbapGitLinkArgs | IAbapGitLinkNewArgs,
     options:
@@ -375,6 +375,14 @@ export class AdtAbapGitClient<
     );
   }
 
+  /** What an external repository offers — the new form, answered by its facts. */
+  checkExternalRepo<
+    E extends IAbapGitStructuredError = IAbapGitStructuredError,
+  >(
+    args: IAbapGitExternalRepoArgs,
+    options: IAbapGitHeaderOptions &
+      IAbapGitNewFormOptions<Facts<'externalRepoFacts'>, E>,
+  ): FactsAnswer<T, 'externalRepoFacts', E>;
   /**
    * What an external repository offers, before linking anything to it.
    *
@@ -385,14 +393,6 @@ export class AdtAbapGitClient<
     args: IAbapGitExternalRepoCredentials,
     options: DeprecatedOptions<E>,
   ): Promise<IAdtResponse<T['externalRepo'], E>>;
-  /** What an external repository offers — the new form, answered by its facts. */
-  checkExternalRepo<
-    E extends IAbapGitStructuredError = IAbapGitStructuredError,
-  >(
-    args: IAbapGitExternalRepoArgs,
-    options: IAbapGitHeaderOptions &
-      IAbapGitNewFormOptions<Facts<'externalRepoFacts'>, E>,
-  ): FactsAnswer<T, 'externalRepoFacts', E>;
   async checkExternalRepo(
     args: IAbapGitExternalRepoCredentials | IAbapGitExternalRepoArgs,
     options:
