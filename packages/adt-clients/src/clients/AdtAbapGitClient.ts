@@ -114,8 +114,8 @@ import { unlinkRepo } from './abapGit/unlink';
 
 export type { AbapGitValues } from './abapGit/types';
 
-/** A legacy form's options: `credentials` never, so the forms never mix. */
-type LegacyOptions<E extends IAdtError> = {
+/** A deprecated form's options: `credentials` never, so the forms never mix. */
+type DeprecatedOptions<E extends IAdtError> = {
   headers: IAdtHeaders;
 } & IAdtAnalyseOptions<E> & {
     readonly credentials?: never;
@@ -260,7 +260,7 @@ export class AdtAbapGitClient<
    */
   link<E extends IAdtError = IAdtError>(
     args: IAbapGitLinkArgs,
-    options: LegacyOptions<E>,
+    options: DeprecatedOptions<E>,
   ): Promise<IAdtResponse<void, E>>;
   /** Link a package to a repository — the new form, answered by its facts. */
   link<E extends IAbapGitStructuredError = IAbapGitStructuredError>(
@@ -271,7 +271,7 @@ export class AdtAbapGitClient<
   async link(
     args: IAbapGitLinkArgs | IAbapGitLinkNewArgs,
     options:
-      | LegacyOptions<IAdtError>
+      | DeprecatedOptions<IAdtError>
       | (IAbapGitHeaderOptions &
           IAbapGitNewFormOptions<
             Facts<'linkedFacts'>,
@@ -291,14 +291,14 @@ export class AdtAbapGitClient<
         (options as IAbapGitNewFormOptions<Facts<'linkedFacts'>>).analyse,
       );
     }
-    const legacy = args as IAbapGitLinkArgs;
+    const given = args as IAbapGitLinkArgs;
     this.logger?.debug?.(
-      `AdtAbapGitClient.link: package=${legacy.package} url=${legacy.url}`,
+      `AdtAbapGitClient.link: package=${given.package} url=${given.url}`,
     );
     return answering<void, IAdtError>(
-      () => linkRepo(this.connection, options.headers, legacy),
+      () => linkRepo(this.connection, options.headers, given),
       this.results.linked,
-      (options as LegacyOptions<IAdtError>).analyse as
+      (options as DeprecatedOptions<IAdtError>).analyse as
         | IAnalyse<IAdtError>
         | undefined,
     );
@@ -316,7 +316,7 @@ export class AdtAbapGitClient<
    */
   async pull<E extends IAdtError = IAdtError>(
     args: IAbapGitPullArgs,
-    options: LegacyOptions<E>,
+    options: DeprecatedOptions<E>,
   ): Promise<IAdtResponse<T['pulled'], E>> {
     this.logger?.debug?.(`AdtAbapGitClient.pull: package=${args.package}`);
     // Refused before anything is built: a link that is not the path a key
@@ -382,7 +382,7 @@ export class AdtAbapGitClient<
    */
   checkExternalRepo<E extends IAdtError = IAdtError>(
     args: IAbapGitExternalRepoCredentials,
-    options: LegacyOptions<E>,
+    options: DeprecatedOptions<E>,
   ): Promise<IAdtResponse<T['externalRepo'], E>>;
   /** What an external repository offers — the new form, answered by its facts. */
   checkExternalRepo<
@@ -395,7 +395,7 @@ export class AdtAbapGitClient<
   async checkExternalRepo(
     args: IAbapGitExternalRepoCredentials | IAbapGitExternalRepoArgs,
     options:
-      | LegacyOptions<IAdtError>
+      | DeprecatedOptions<IAdtError>
       | (IAbapGitHeaderOptions &
           IAbapGitNewFormOptions<
             Facts<'externalRepoFacts'>,
@@ -423,7 +423,7 @@ export class AdtAbapGitClient<
           args as IAbapGitExternalRepoCredentials,
         ),
       this.results.externalRepo,
-      (options as LegacyOptions<IAdtError>).analyse as
+      (options as DeprecatedOptions<IAdtError>).analyse as
         | IAnalyse<IAdtError>
         | undefined,
     );
