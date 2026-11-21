@@ -24,9 +24,16 @@ describe('the published surface', () => {
   it('exports every strategy and every reading, callable', () => {
     const expected = [
       'ACTIVATION_RUNS_COLLECTION',
+      'abapGitBranchInfo',
+      'abapGitErrorFacts',
       'abapGitErrorLog',
       'abapGitExternalRepo',
+      'abapGitFacts',
+      'abapGitModifiedObjects',
+      'abapGitObjectResults',
+      'abapGitRepoRunStates',
       'abapGitRepos',
+      'abapGitStaging',
       'analyseActivation',
       'analyseAny',
       'analyseCdsTestDoubles',
@@ -116,10 +123,30 @@ describe('the published surface', () => {
     ];
     expect(Object.keys(api).sort()).toEqual(expected);
     for (const name of expected.filter(
-      (name) => name !== 'ACTIVATION_RUNS_COLLECTION',
+      (name) =>
+        name !== 'ACTIVATION_RUNS_COLLECTION' && name !== 'abapGitFacts',
     )) {
       expect(typeof (api as Record<string, unknown>)[name]).toBe('function');
     }
+    // The facts reducer is a table of reducers, one per new-form slot.
+    expect(Object.keys(api.abapGitFacts).sort()).toEqual([
+      'branchInfo',
+      'checked',
+      'externalRepoFacts',
+      'file',
+      'linkedFacts',
+      'modifiedObjects',
+      'pushed',
+      'repoPulled',
+      'repoPulledInDialog',
+      'reposFacts',
+      'runLog',
+      'staging',
+      'status',
+      'switched',
+    ]);
+    for (const reducer of Object.values(api.abapGitFacts))
+      expect(typeof reducer).toBe('function');
     expect(api.ACTIVATION_RUNS_COLLECTION).toBe('/sap/bc/adt/activation/runs');
   });
 
