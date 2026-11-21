@@ -126,3 +126,71 @@ describe('pull (deprecated): the pull link', () => {
     expect(connection.sent).toHaveLength(0);
   });
 });
+
+describe('the key-addressed members: a key or segment no path may hold', () => {
+  const COMMIT = {
+    text: 't',
+    author: { name: 'a', email: 'a@x.invalid' },
+    committer: { name: 'c', email: 'c@x.invalid' },
+  };
+  const calls: Array<
+    [
+      string,
+      (git: ReturnType<typeof gitClient>, bad: string) => Promise<unknown>,
+    ]
+  > = [
+    [
+      'pullRepo',
+      (g, bad) =>
+        g.pullRepo({ key: bad, branchName: 'main' }, { headers: HEADERS }),
+    ],
+    [
+      'pullRepoInDialog',
+      (g, bad) =>
+        g.pullRepoInDialog(
+          { key: bad, branchName: 'main' },
+          { headers: HEADERS },
+        ),
+    ],
+    ['getModifiedObjects', (g, bad) => g.getModifiedObjects({ key: bad })],
+    ['getStatus', (g, bad) => g.getStatus({ key: bad })],
+    ['getRunLog (key)', (g, bad) => g.getRunLog({ key: bad, appLogKey: 'L1' })],
+    [
+      'getRunLog (appLogKey)',
+      (g, bad) => g.getRunLog({ key: 'K', appLogKey: bad }),
+    ],
+    ['getStaging', (g, bad) => g.getStaging({ key: bad })],
+    ['push', (g, bad) => g.push({ key: bad, staged: [], comment: COMMIT })],
+    ['checkRepo', (g, bad) => g.checkRepo({ key: bad })],
+    [
+      'getFile',
+      (g, bad) => g.getFile({ key: bad, filename: 'f', version: 'local' }),
+    ],
+    [
+      'switchBranch (key)',
+      (g, bad) => g.switchBranch({ key: bad, branch: 'dev', create: false }),
+    ],
+    [
+      'switchBranch (branch)',
+      (g, bad) => g.switchBranch({ key: 'K', branch: bad, create: true }),
+    ],
+  ];
+
+  it.each(
+    calls.flatMap(([name, call]) =>
+      ['', '.', '..'].map(
+        (bad) => [name, JSON.stringify(bad), bad, call] as const,
+      ),
+    ),
+  )(
+    '%s with %s is refused with nothing sent',
+    async (_name, _shown, bad, call) => {
+      const connection = new ScriptedConnection();
+
+      await expect(call(gitClient(connection), bad)).rejects.toThrow(
+        'abapGit: a repository key or path segment is empty, "." or ".."; nothing was sent',
+      );
+      expect(connection.sent).toHaveLength(0);
+    },
+  );
+});
