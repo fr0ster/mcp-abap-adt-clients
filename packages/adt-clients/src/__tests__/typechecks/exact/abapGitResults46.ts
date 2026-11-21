@@ -39,7 +39,7 @@ export const handles = [constructed, created, inferred, shipped, rawDocument];
 
 const headers = { accept: 'a', contentType: 'c' };
 
-export async function legacyCalls(): Promise<void> {
+export async function deprecatedCalls(): Promise<void> {
   const listed = await constructed.listRepos();
   const repos: IAbapGitRepo[] = listed.ok ? listed.getResult().value : [];
   const info = await created.checkExternalRepo(

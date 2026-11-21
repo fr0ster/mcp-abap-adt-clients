@@ -20,7 +20,7 @@ const PAIR = {
 const NS = 'xmlns:abapgitrepo="http://www.sap.com/adt/abapgit/repositories"';
 const XML = '<?xml version="1.0" encoding="UTF-8"?>';
 
-describe('the legacy abapGit forms, as 46.1.0 sent and answered them', () => {
+describe('the deprecated abapGit forms, as 46.1.0 sent and answered them', () => {
   it('link with remoteUser/remotePassword', async () => {
     const connection = new ScriptedConnection(() => ok('<linked/>'));
 
@@ -170,7 +170,7 @@ describe('the legacy abapGit forms, as 46.1.0 sent and answered them', () => {
     expect(answer.ok && answer.getResult()).toEqual({ value: '<log/>' });
   });
 
-  it('a legacy failure is SAP’s answer with its text, as before', async () => {
+  it('a deprecated form’s failure is SAP’s answer with its text, as before', async () => {
     const connection = new ScriptedConnection(() => ok('<exc/>', 500));
 
     const answer = await gitClient(connection).listRepos();

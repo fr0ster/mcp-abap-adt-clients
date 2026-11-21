@@ -4,7 +4,7 @@
  * `remotePassword`; the selective pull in `abapgitpullrequest:user` /
  * `password`; R13 and R14 in `abapgitexternalrepo:user` / `password` (the new
  * form only — the deprecated `checkExternalRepo` keeps 46.1.0's ignored
- * `remoteUser`, `legacyForms46.test.ts`); the key-addressed routes in the
+ * `remoteUser`, `deprecatedForms46.test.ts`); the key-addressed routes in the
  * headers `Username` and `Password` (base64). R7, R8 and R1 carry none.
  */
 
