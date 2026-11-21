@@ -6,6 +6,7 @@
  * text, the thrown message and the document stay behind.
  */
 
+import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import {
   ABAPGIT_ERROR_MESSAGES,
   ADT_NO_FAILURE,
@@ -250,7 +251,7 @@ function recorded() {
 describe('the facts exchange, per new form', () => {
   it.each(NEW_FORMS.map(([slot, , call]) => [slot, call] as const))(
     '%s: an answered failure reaches the analyser as facts alone',
-    async (_slot, call) => {
+    async (slot, call) => {
       const { read, analysed, results, analyse } = recorded();
       const git = new AdtAbapGitClient(
         new ScriptedConnection(answeredFailure),
@@ -273,9 +274,15 @@ describe('the facts exchange, per new form', () => {
         status: 500,
         messageClass: 'ABAPGIT_MSG',
         messageNumber: '017',
-        gitHttpStatus: 401,
+        // The git host's status is R11's alone; on any other route it is
+        // not read, and the verdict is SAP's own refusal.
+        gitHttpStatus: slot === 'checked' ? 401 : undefined,
       });
-      expect(error.message).toBe(ABAPGIT_ERROR_MESSAGES.gitHostRefused);
+      expect(error.message).toBe(
+        slot === 'checked'
+          ? ABAPGIT_ERROR_MESSAGES.gitHostRefused
+          : ABAPGIT_ERROR_MESSAGES.refusedWithMessage,
+      );
       expect(error.request?.path).not.toContain('?');
     },
   );
@@ -452,4 +459,47 @@ describe('the facts exchange, per new form', () => {
     expect(connection.sent[0]).not.toHaveProperty('noResend');
     expect(connection.sent[0]).not.toHaveProperty('stateless');
   });
+
+  it.each(NEW_FORMS.map(([slot, , call]) => [slot, call] as const))(
+    '%s: a refused SAP credential (connection 25’s AuthRefusedError) leaves as facts alone',
+    async (_slot, call) => {
+      // A provider's 400 as the cause: SAP was never asked, and the cause's
+      // response holds the identity provider's headers and body.
+      const providerAnswer = {
+        status: 400,
+        statusText: `Bad Request ${CANARIES.user}`,
+        headers: { 'x-echo': CANARIES.token },
+        data: `invalid_grant ${CANARIES.password} ${CANARIES.base64Password}`,
+      };
+      const cause = Object.assign(
+        new Error(`invalid_grant ${CANARIES.token}`),
+        {
+          response: providerAnswer,
+        },
+      );
+      const git = gitClient(
+        new ScriptedConnection(() => {
+          throw new AuthRefusedError({} as never, 'request', cause);
+        }),
+      );
+
+      const answer = (await call(git)) as {
+        ok: boolean;
+        getError(): IAbapGitStructuredError;
+      };
+
+      expect(answer.ok).toBe(false);
+      const error = answer.getError();
+      expect(Object.keys(error).sort()).toEqual([
+        'facts',
+        'message',
+        'origin',
+        'request',
+      ]);
+      expect(error.message).toBe(ABAPGIT_ERROR_MESSAGES.noResponse);
+      expect(error.facts).toEqual({ status: 0 });
+      expect(holdsCanary(error)).toEqual([]);
+      expect(JSON.stringify(error)).not.toContain(CANARIES.password);
+    },
+  );
 });

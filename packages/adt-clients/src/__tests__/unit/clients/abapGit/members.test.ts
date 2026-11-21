@@ -479,3 +479,52 @@ describe('the answers of the new members', () => {
     expect(answer.ok).toBe(false);
   });
 });
+
+describe('review of #326: the run log key, the pull media types', () => {
+  it('an appLogKey read from the log link is encoded once: A%2FB', async () => {
+    const encoded = repos.replace(
+      '/sap/bc/adt/abapgit/repos/000001/log/L1',
+      '/sap/bc/adt/abapgit/repos/000001/log/A%2FB',
+    );
+    const listing = new ScriptedConnection(() => ok(encoded));
+    const listed = await gitClient(listing).listReposQuiet();
+    if (!listed.ok) throw new Error('expected the list');
+    const entry = listed.getResult().value.facts.repos[0];
+    if (entry?.appLogKey === undefined) throw new Error('no appLogKey');
+    const connection = new ScriptedConnection(() => ok(objectResults));
+
+    await gitClient(connection).getRunLog({
+      key: entry.key,
+      appLogKey: entry.appLogKey,
+    });
+
+    expect(connection.sent[0]?.url).toBe(
+      '/sap/bc/adt/abapgit/repos/000001/log/A%2FB',
+    );
+  });
+
+  it.each([
+    ['repo.v3', 'application/abapgit.adt.repo.v3+xml'],
+    ['pull.req.v1', 'application/abapgit.adt.repo.pull.req.v1+xml'],
+  ])(
+    'both pulls send the %s Content-Type exactly, with no charset suffix',
+    async (_name, contentType) => {
+      // SAP picks the pull document by the exact Content-Type string; a
+      // `; charset=…` suffix answers 400 (cloud `RES_REPO_PULL` L167–182).
+      const connection = new ScriptedConnection();
+      const git = gitClient(connection);
+      const headers = {
+        accept: 'application/abapgit.adt.repo.object.v2+xml',
+        contentType,
+      };
+
+      await git.pullRepo({ key: 'K', branchName: 'main' }, { headers });
+      await git.pullRepoInDialog({ key: 'K', branchName: 'main' }, { headers });
+
+      for (const request of connection.sent)
+        expect(
+          (request.headers as Record<string, string>)['Content-Type'],
+        ).toBe(contentType);
+    },
+  );
+});
