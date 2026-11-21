@@ -24,6 +24,105 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [46.2.0] - 2026-11-22
+
+Released with `@mcp-abap-adt/adt-strategies` 0.27.0 (published first, its
+facts reducer `abapGitFacts` is now a runtime dependency), on
+`@mcp-abap-adt/interfaces-adt` `^30.2.0` (the abapGit facts contracts and
+`ABAPGIT_ERROR_MESSAGES`) and `@mcp-abap-adt/interfaces-adt-connection`
+`^5.2.0` (the request flags `noLog`, `noResend`, `stateless`); tested with
+`@mcp-abap-adt/connection` `^25.1.0`, which implements them.
+
+### Added
+
+- **The new abapGit forms**, addressed by the repository's key, each one
+  request: `listReposQuiet` (R1, no credential), `pullRepo` (R4, by key;
+  `selection` writes the `pull.req.v1` document), `pullRepoInDialog` (R5),
+  `getModifiedObjects` (R6), `getStatus` (R7), `getRunLog` (R8, by key and
+  `appLogKey`), `getStaging` (R9), `push` (R10, the library builds the
+  `abapgitstaging` document), `checkRepo` (R11), `getFile` (R12),
+  `getBranchInfo` (R14), `switchBranch` (R15, `?create=true` only when
+  `create` is true), and the new forms of `link` (R2) and `checkExternalRepo`
+  (R13): `options.credentials` given — an `IAbapGitCredentials`, or `null` for
+  an anonymous call. Every path is built from the key, one encoded segment at
+  a time; an empty, `.` or `..` key or segment is refused with nothing sent.
+- **Credentials exactly where each route reads them:** R2 and the `repo.v3`
+  pulls in `remoteUser` / `remotePassword`, the selective pull in
+  `abapgitpullrequest:user` / `password`, R13 and R14 in
+  `abapgitexternalrepo:user` / `password`, the key-addressed routes in the
+  headers `Username` and `Password` (base64). R7 and R8 read none and get
+  none. No credential is part of a result, an error or the request an error
+  describes.
+- **Fourteen result slots of their own**, each optional: `reposFacts`,
+  `linkedFacts`, `externalRepoFacts`, `repoPulled`, `repoPulledInDialog`,
+  `runLog`, `modifiedObjects`, `status`, `staging`, `pushed`, `checked`,
+  `file`, `branchInfo`, `switched`. Each takes a facts reader
+  (`IAbapGitFactsResultStrategy`); left out, the member answers
+  `IAbapGitFactsResponse<F>` as `abapGitFacts` reduced it. `AbapGitValuesOf`
+  and `AbapGitStrategiesOf` (exported with `FactsValue`,
+  `AbapGitDefaultFacts`, `AbapGitFactsSlot`, `IAbapGitFactsOf`,
+  `IAbapGitFactsResults`) tell a required, an optional and an omitted slot
+  apart by the key, so a required reader types its member's result as its
+  own, an optional one as its own or the default facts, an omitted one as the
+  default facts — the same with `exactOptionalPropertyTypes` on and off.
+  `create<R>` returns `AdtAbapGitClient<AbapGitValuesOf<R>>`.
+- **The facts exchange** every new form goes through: SAP's answer reduced by
+  `abapGitFacts[route]`, a failure — answered or thrown — by
+  `abapGitErrorFacts` into a fresh `IAbapGitStructuredError` (one of
+  `ABAPGIT_ERROR_MESSAGES`, the status, the T100 key, R11's `gitHttpStatus`,
+  the method and the path without the query), before the caller's reader or
+  analyser or the client's logger sees anything. Strict by default: every
+  non-2xx is the error; an analyser clears a failure only where there are
+  facts to read. The new members log fixed words only.
+- **Every new form sends `timeout: 0`, `noLog`, `noResend` and
+  `stateless`.** The legacy forms and `unlink` send none of them, as before.
+- **`AdtBatchConnection` refuses a request carrying `noLog` or `noResend`**
+  with a synchronous throw ("this request cannot be recorded into a batch"),
+  before anything is queued — never as a rejected promise, since a recorder
+  above it numbers and keeps an entry before it sees a rejection.
+- `ERRATA.md`: what each abapGit answer says (a cloud `202` from R4/R10 is
+  an accepted job, from R5 a finished pull; onprem R4 ignores `branchName`;
+  R15 without `create` on a missing branch changes nothing; R9's cloud `409`;
+  R3's unread `corrNr`; R7's fixed text; R11/R15 success statuses not yet
+  measured).
+
+### Changed
+
+- **The legacy forms are deprecated and otherwise unchanged:**
+  `getErrorLog(logLink)`, `pull({ pullLink })`, and the `remoteUser` /
+  `remotePassword` forms of `link`, `pull` and `checkExternalRepo` keep
+  46.1.0's wire fields, callbacks, behaviour and answers. `unlink` is
+  unchanged and not deprecated.
+- **`pull` and `getErrorLog` send only the link a key would build:**
+  exactly `/sap/bc/adt/abapgit/repos/{key}/pull` and `…/repos/{key}/log/{id}`,
+  taken apart, decoded and rebuilt; an absolute URL, another host, a query, a
+  fragment, an empty, `.` or `..` segment, or another path is refused in fixed
+  words with nothing sent. An accepted link keeps today's request.
+- **The legacy forms' options carry `credentials?: never`**, so a legacy and
+  a new form never mix. Every call that compiled against 46.1.0 still
+  compiles, with **one edge case**: an options *variable* (not a literal)
+  that carried an extra, undeclared `credentials` property compiled against
+  the legacy form before and is now rejected — or, when its value is a
+  credential or `null` and the arguments fit, selects the new form. It stays a
+  minor because `credentials` was never a declared field.
+
+### Fixed
+
+- **The `checkExternalRepo` defect, in the new form:** the legacy form writes
+  `remoteUser` / `remotePassword` into R13, which SAP's transformation does
+  not read (`extensible="deep"`, optional fields), so a private repository
+  was checked anonymously (Code; the effect unmeasured). The new form writes
+  `abapgitexternalrepo:user` / `password`. The legacy form keeps its 46.1.0
+  fields exactly.
+
+### Not verified
+
+- The selective pull document (`pull.req.v1`): its namespace and element
+  names beyond `user` / `password` mirror R6's document (Inference; the
+  transformation `ABAPGIT_ST_REPO_SELECTIVE_PULL` was not read). The place of
+  `folderLogic` in R2 and of `branch` / `package` in R14 is Inference too.
+  The live run settles them.
+
 ## [46.1.0] - 2026-11-19
 
 Released with `@mcp-abap-adt/adt-strategies` 0.26.0 and
