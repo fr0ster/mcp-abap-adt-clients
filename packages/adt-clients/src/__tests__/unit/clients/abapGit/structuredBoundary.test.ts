@@ -463,13 +463,18 @@ describe('the facts exchange, per new form', () => {
     expect(connection.sent[0]).not.toHaveProperty('stateless');
   });
 
-  it.each(NEW_FORMS.map(([slot, , call]) => [slot, call] as const))(
-    '%s: a refused SAP credential (connection 25’s AuthRefusedError) leaves as facts alone',
-    async (_slot, call) => {
-      // A provider's 400 as the cause: SAP was never asked, and the cause's
-      // response holds the identity provider's headers and body.
+  it.each(
+    NEW_FORMS.flatMap(([slot, , call]) =>
+      [400, 401].map((status) => [slot, status, call] as const),
+    ),
+  )(
+    '%s: a refused SAP credential (connection 25’s AuthRefusedError, a provider %s) leaves as facts alone',
+    async (_slot, status, call) => {
+      // A provider's answer as the cause — a 400, or a 401 its own identity
+      // provider sent: nothing in connection 25.1.0's refusal tells SAP's
+      // answer apart from a provider's, so no status of the cause is SAP's.
       const providerAnswer = {
-        status: 400,
+        status,
         statusText: `Bad Request ${CANARIES.user}`,
         headers: { 'x-echo': CANARIES.token },
         data: `invalid_grant ${CANARIES.password} ${CANARIES.base64Password}`,
