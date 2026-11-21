@@ -144,3 +144,42 @@ S/4HANA 2025 and ABAP cloud list it. `utilDiscoveryCollections` reads the
 discovery's collections, and the caller picks `activateObjectsGroup`
 (`/activation/runs`) or `activateObjects` (`/activation`) by
 `has(ACTIVATION_RUNS_COLLECTION)`.
+
+## abapGit: what an answer says
+
+Read from SAP's handler code (onprem `ZCL_ABAPGIT_RES_*`, cloud
+`CL_ABAPGIT_RES_*`, 2026-11-21), not measured, unless a line says so. The
+library judges none of them: each is an answer the caller reads.
+
+- **A cloud `202` from `pullRepo` (R4) or `push` (R10) is accepted, not
+  finished.** The handler schedules a background job and answers `202`
+  (`RES_REPO_PULL->post` L253, `RES_REPO_PUSH->post` L100); a `409` means an
+  action already runs. The run's state is in the repository list (`runStatus`,
+  `appLogKey` of `listReposQuiet`).
+- **A `202` from `pullRepoInDialog` (R5, `…/pull/v2`) is finished.** The
+  handler runs the pull in the request and answers `202` after it
+  (`RES_REPO_PULL_V1->post` L270–274).
+- **An onprem `200` from `pullRepo` says nothing about objects.** The handler
+  runs the pull synchronously and never fills the result table it answers
+  (`ZCL_ABAPGIT_RES_REPO_PULL->post` L60–171).
+- **Onprem `pullRepo` ignores `branchName`.** The handler parses it and reads
+  only the user, the password and the request; the pull runs on the branch
+  already linked.
+- **`switchBranch` with `create: false` on a branch that does not exist changes
+  nothing and answers success** (R15, `ZCL_ABAPGIT_RES_REPO_SWITCH->post` L58).
+  With `create: true` and no such branch it creates the branch in the remote.
+- **A cloud `getStaging` answers `409` in plain text** while a pull or a push
+  runs or waits (R9, `RES_REPO_STAGE->get` L164, L178).
+- **`unlink`'s `transportRequest` sends a `corrNr` neither handler reads**
+  (R3); it is kept as it was.
+- **`getStatus` (R7) answers a fixed text**, `DEMO STATUS`
+  (`RES_REPO_PULL->get` L139).
+- **The success status of `checkRepo` (R11) and `switchBranch` (R15)** is the
+  framework's default, set inside the handler's `CATCH` (Inference); it is not
+  asserted until a live run measures it.
+- **A key-addressed failure carries a T100 key.** `CL_ADT_EXCEPTION_UTILITY`
+  writes `T100KEY-ID` / `T100KEY-NO` for every exception that is a T100
+  message (L94–97), and the abapGit exceptions are (Code, both systems); the new
+  forms keep exactly those, and R11's `http_status`, as facts. Not measured on
+  these routes yet.
+
