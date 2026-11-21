@@ -227,25 +227,36 @@ const NO_PERSON: IAbapGitPerson = { name: '', email: '' };
 /** The one text R7 answers. */
 const R7_TEXT = 'DEMO STATUS';
 
-/** The header's value, whatever its letter case; `undefined` when absent. */
-function headerOf(answer: IAdtWireResponse, name: string): string | undefined {
+/**
+ * The header as it arrived, whatever its letter case: `undefined` when absent;
+ * a value that is not one string (an array) is present and returned as it is.
+ */
+function headerOf(answer: IAdtWireResponse, name: string): unknown {
   const headers = (answer.headers ?? {}) as Record<string, unknown>;
   for (const [key, value] of Object.entries(headers))
-    if (key.toLowerCase() === name && typeof value === 'string') return value;
+    if (key.toLowerCase() === name) return value;
   return undefined;
+}
+
+/** `text/plain` exactly, optionally followed by `;` parameters. */
+function isTextPlain(type: unknown): boolean {
+  if (typeof type !== 'string') return false;
+  const at = type.indexOf(';');
+  const media = (at < 0 ? type : type.slice(0, at)).trim().toLowerCase();
+  return media === 'text/plain';
 }
 
 /**
  * R12's body: text, as SAP serves it (`text/plain`). A body that is not a
- * string, or one served as another media type (a sign-in page), is not the
- * file. An absent `Content-Type` is not refused: the text is the file.
+ * string, or one served as another media type (a sign-in page,
+ * `text/plain+xml`, an array of types), is not the file. An absent
+ * `Content-Type` is not refused: the text is the file.
  */
 function fileText(answer: IAdtWireResponse): string {
   const body = answer.data;
   if (typeof body !== 'string') throw unreadableAnswer();
   const type = headerOf(answer, 'content-type');
-  if (type !== undefined && !type.toLowerCase().startsWith('text/plain'))
-    throw unreadableAnswer();
+  if (type !== undefined && !isTextPlain(type)) throw unreadableAnswer();
   return body;
 }
 
