@@ -74,9 +74,11 @@ facts reducer `abapGitFacts` is now a runtime dependency), on
   analyser or the client's logger sees anything. Strict by default: every
   non-2xx is the error; an analyser clears a failure only where there are
   facts to read. The new members log fixed words only.
-- **No thrown value leaves a new form:** a refused SAP credential
-  (`AuthRefusedError`) SAP never saw is `noResponse`, status `0`, its cause —
-  an identity provider's headers and body — left behind. The git host's
+- **No thrown value leaves a new form:** every refused SAP credential
+  (`AuthRefusedError`) is `noResponse`, status `0`, its cause — an identity
+  provider's headers and body — left behind; a `401` cause too, since
+  connection 25.1.0 names no field that tells SAP's answer from a
+  provider's. The git host's
   status (`gitHttpStatus`, `gitHostRefused`) is R11's alone.
 - **Request documents read against SAP's transformations (Code):** the
   selective pull writes `overwriteObjects`, `packageWarningObjects`, their
@@ -122,7 +124,11 @@ facts reducer `abapGitFacts` is now a runtime dependency), on
   that carried an extra, undeclared `credentials` property compiled against
   the legacy form before and is now rejected — or, when its value is a
   credential or `null` and the arguments fit, selects the new form. It stays a
-  minor because `credentials` was never a declared field.
+  minor because `credentials` was never a declared field. The same edge case
+  shows in an extracted options type: `keyof Parameters<AdtAbapGitClient['link']>[1]`
+  (and `checkExternalRepo`'s) is now `'headers' | 'analyse' | 'credentials'`,
+  where 46.1.0's was `'headers' | 'analyse'`; the parameter and return types
+  themselves are 46.1.0's (the deprecated overload is the last one).
 
 ### Fixed
 
@@ -134,6 +140,13 @@ facts reducer `abapGitFacts` is now a runtime dependency), on
   fields exactly.
 
 ### Not verified
+
+- **`getFile` over connection 25.1.0's HTTP transport:** Axios parses a JSON
+  body even when SAP serves it as `text/plain`, so a file holding a JSON object
+  answers `unreadableAnswer` and one holding a JSON string loses its quotes and
+  a trailing newline. `IAbapRequestOptions` has no option to keep the text
+  (`responseType` or `transformResponse` are not passed through), so this needs
+  a connection release.
 
 - That SAP accepts the corrected selective pull and push documents: read from
   the transformations (Code), not yet sent; the live run settles them.

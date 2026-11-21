@@ -30,7 +30,8 @@ tree holds one copy).
   only when it is a string and well-formed XML (the parser's `XMLValidator`;
   a mismatched closing tag no longer yields usable fields); R7's fact is SAP's
   fixed `DEMO STATUS` and nothing else; R12's content is a text body
-  (`text/plain`, or no `Content-Type`); `messageNumber` is exactly three
+  (exactly `text/plain`, optionally with `;` parameters, or no
+  `Content-Type`; `text/plain+xml` or an array value is refused); `messageNumber` is exactly three
   digits, else absent; `abapGitErrorFacts(answer, route?)` reads
   `http_status` for `checked` (R11) alone; `appLogKey` is the decoded segment
   of the `log_link` (`A%2FB` is `A/B`), an empty, `.` or `..` one none.
