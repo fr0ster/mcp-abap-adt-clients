@@ -209,11 +209,15 @@ describe('the requests of the new members', () => {
         },
         data:
           `${XML}<abapgitstaging:abapgitstaging xmlns:abapgitstaging="http://www.sap.com/adt/abapgit/staging" xmlns:adtcore="http://www.sap.com/adt/core">` +
+          // `ABAPGIT_ST_REPO_STAGE` cloud L14, L25, L36 (and onprem's twin):
+          // the three lists are required, in this order.
+          '<abapgitstaging:unstaged_objects></abapgitstaging:unstaged_objects>' +
           '<abapgitstaging:staged_objects>' +
           '<abapgitstaging:abapgitobject abapgitstaging:wbkey="CLASZCL_DEMO" abapgitstaging:version="active" adtcore:uri="/sap/bc/adt/oo/classes/zcl_demo" adtcore:type="CLAS/OC" adtcore:name="ZCL_DEMO" adtcore:packageName="ZPKG">' +
           '<abapgitstaging:abapgitfile abapgitstaging:name="zcl_demo.clas.abap" abapgitstaging:path="/src/" abapgitstaging:localState="M" abapgitstaging:remoteState=""/>' +
           '</abapgitstaging:abapgitobject>' +
           '</abapgitstaging:staged_objects>' +
+          '<abapgitstaging:ignored_objects></abapgitstaging:ignored_objects>' +
           '<abapgitstaging:abapgit_comment abapgitstaging:comment="Fix &quot;quotes&quot; &amp; &lt;tags&gt;">' +
           '<abapgitstaging:author abapgitstaging:name="Ada" abapgitstaging:email="ada@example.invalid"/>' +
           '<abapgitstaging:committer abapgitstaging:name="Carl" abapgitstaging:email="carl@example.invalid"/>' +
@@ -344,20 +348,27 @@ describe('the selection R6 answers, fed back to a pull', () => {
       );
 
       const data = String(connection.sent[0]?.data);
+      // `ABAPGIT_ST_REPO_SELECTIVE_PULL` L5, L42, L55 and
+      // `ABAPGIT_ST_PULL_MODIFIED_OBJS` L46, L52 (Code, cloud): the lists,
+      // their entries and `action` are in R6's namespace, not the request's.
       expect(
-        data.startsWith(`${XML}<abapgitpullrequest:abapgitpullrequest `),
+        data.startsWith(
+          `${XML}<abapgitpullrequest:abapgitpullrequest xmlns:abapgitpullrequest="http://www.sap.com/adt/abapgit/abapgitpullrequest" xmlns:agitpullmodifiedobjects="http://www.sap.com/adt/abapgit/agitpullmodifiedobjects" xmlns:adtcore="http://www.sap.com/adt/core">`,
+        ),
       ).toBe(true);
+      expect(data).not.toContain('abapgitpullrequest:overwriteObjects');
+      expect(data).not.toContain('abapgitpullrequest:abapgitobjects');
       const overwrite = data
-        .split('<abapgitpullrequest:overwriteObjects>')[1]
-        ?.split('</abapgitpullrequest:overwriteObjects>')[0];
+        .split('<agitpullmodifiedobjects:overwriteObjects>')[1]
+        ?.split('</agitpullmodifiedobjects:overwriteObjects>')[0];
       const warning = data
-        .split('<abapgitpullrequest:packageWarningObjects>')[1]
-        ?.split('</abapgitpullrequest:packageWarningObjects>')[0];
+        .split('<agitpullmodifiedobjects:packageWarningObjects>')[1]
+        ?.split('</agitpullmodifiedobjects:packageWarningObjects>')[0];
       expect(overwrite).toBe(
-        '<abapgitpullrequest:abapgitobjects adtcore:uri="/sap/bc/adt/oo/classes/zcl_demo" adtcore:type="CLAS/OC" adtcore:name="ZCL_DEMO" adtcore:packageName="ZPKG" abapgitpullrequest:action="2"/>',
+        '<agitpullmodifiedobjects:abapgitobjects adtcore:uri="/sap/bc/adt/oo/classes/zcl_demo" adtcore:type="CLAS/OC" adtcore:name="ZCL_DEMO" adtcore:packageName="ZPKG" agitpullmodifiedobjects:action="2"/>',
       );
       expect(warning).toBe(
-        '<abapgitpullrequest:abapgitobjects adtcore:uri="/sap/bc/adt/programs/programs/zdemo" adtcore:type="PROG/P" adtcore:name="ZDEMO" adtcore:packageName="ZOTHER" abapgitpullrequest:action="3"/>',
+        '<agitpullmodifiedobjects:abapgitobjects adtcore:uri="/sap/bc/adt/programs/programs/zdemo" adtcore:type="PROG/P" adtcore:name="ZDEMO" adtcore:packageName="ZOTHER" agitpullmodifiedobjects:action="3"/>',
       );
       expect(data).toContain(
         '<abapgitpullrequest:branchName>refs/heads/main</abapgitpullrequest:branchName>',
@@ -527,4 +538,36 @@ describe('review of #326: the run log key, the pull media types', () => {
         ).toBe(contentType);
     },
   );
+});
+
+describe('push: wbkey and version only when they are not empty', () => {
+  it('omits an empty wbkey and an empty version, as SAP’s own answer does', async () => {
+    // `ABAPGIT_ST_REPO_STAGE_OBJECT` cloud L23–30: both `not-initial`.
+    const connection = new ScriptedConnection();
+    await gitClient(connection).push({
+      key: 'K',
+      staged: [
+        {
+          wbkey: '',
+          version: '',
+          uri: '/sap/bc/adt/oo/classes/zcl_demo',
+          type: 'CLAS/OC',
+          name: 'ZCL_DEMO',
+          packageName: 'ZPKG',
+          files: [],
+        },
+      ],
+      comment: {
+        text: 't',
+        author: { name: 'a', email: 'a@x.invalid' },
+        committer: { name: 'c', email: 'c@x.invalid' },
+      },
+    });
+    const data = String(connection.sent[0]?.data);
+    expect(data).toContain(
+      '<abapgitstaging:abapgitobject adtcore:uri="/sap/bc/adt/oo/classes/zcl_demo"',
+    );
+    expect(data).not.toContain('wbkey');
+    expect(data).not.toContain('abapgitstaging:version');
+  });
 });
