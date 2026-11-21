@@ -415,7 +415,8 @@ describe('the answers of the new members', () => {
   it.each([404, 500])(
     'a %s without an analyser is the error',
     async (status) => {
-      const connection = new ScriptedConnection(() => ok('', status));
+      // A readable staging document: the status alone makes it a failure.
+      const connection = new ScriptedConnection(() => ok(staging, status));
       const answer = await gitClient(connection).getStaging({ key: '000001' });
       expect(answer.ok).toBe(false);
       if (answer.ok) throw new Error('expected a failure');
