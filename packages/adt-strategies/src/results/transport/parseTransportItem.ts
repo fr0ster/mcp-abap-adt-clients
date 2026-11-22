@@ -16,14 +16,16 @@ import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { rawOf } from '../../result';
 import {
   type ITmElement,
-  tmAttribute,
-  tmChildren,
+  tmAttributeIn,
   tmElements,
   tmRootElement,
   tmTrimmedAttribute,
   transportRoot,
 } from './document';
-import { type ITransportObjectEntry, taskEntries } from './parseObjectEntries';
+import {
+  type ITransportObjectEntry,
+  taskEntriesIn,
+} from './parseObjectEntries';
 
 /**
  * A request's or a task's header, each field the attribute as written (an
@@ -89,28 +91,33 @@ const refuse = (): never => {
   throw new Error(TRANSPORT_ITEM_REFUSAL);
 };
 
-function headerOf(element: unknown, number: string): ITransportItemHeader {
+/** Every header field of an element, read by the tm namespace whatever the prefix. */
+function headerOf(tm: ITmElement, number: string): ITransportItemHeader {
+  const field = (local: string): string | undefined => tmAttributeIn(tm, local);
   return {
     number,
-    parent: tmAttribute(element, 'parent'),
-    description: tmAttribute(element, 'desc'),
-    type: tmAttribute(element, 'type'),
-    status: tmAttribute(element, 'status'),
-    statusText: tmAttribute(element, 'status_text'),
-    owner: tmAttribute(element, 'owner'),
-    target: tmAttribute(element, 'target'),
-    client: tmAttribute(element, 'source_client'),
-    ctsProject: tmAttribute(element, 'cts_project'),
-    lastChanged: tmAttribute(element, 'lastchanged_timestamp'),
+    parent: field('parent'),
+    description: field('desc'),
+    type: field('type'),
+    status: field('status'),
+    statusText: field('status_text'),
+    owner: field('owner'),
+    target: field('target'),
+    client: field('source_client'),
+    ctsProject: field('cts_project'),
+    lastChanged: field('lastchanged_timestamp'),
   };
 }
 
 /** A header of an element whose number is not checked against the request: a parent's, a task's. */
-function ownHeader(element: unknown): ITransportItemHeader | undefined {
-  const number = tmAttribute(element, 'number');
+function ownHeader(
+  tm: ITmElement | undefined,
+): ITransportItemHeader | undefined {
+  if (tm === undefined) return undefined;
+  const number = tmAttributeIn(tm, 'number');
   return number === undefined || number === ''
     ? undefined
-    : headerOf(element, number);
+    : headerOf(tm, number);
 }
 
 /** The elements among `elements` whose own `tm:number`, trimmed, is `asked`. */
@@ -161,23 +168,23 @@ export function readTransportItem(
     const [request] = requests;
     return {
       kind: 'task',
-      header: headerOf(task.element, asked),
-      parent: ownHeader(request?.element),
-      objects: taskEntries(task.element),
+      header: headerOf(task, asked),
+      parent: ownHeader(request),
+      objects: taskEntriesIn(task),
     };
   }
 
   const [request] = requestsNamed;
-  if (marker === 'T') refuse();
+  if (request === undefined || marker === 'T') return refuse();
   if (marker === undefined && rootTasks.length > 0) refuse();
   return {
     kind: 'request',
-    header: headerOf(request?.element, asked),
-    tasks: tmChildren(request?.element, 'task').flatMap((child) => {
+    header: headerOf(request, asked),
+    tasks: tmElements(request, 'task').flatMap((child) => {
       const header = ownHeader(child);
       return header === undefined
         ? []
-        : [{ header, objectCount: tmChildren(child, 'abap_object').length }];
+        : [{ header, objectCount: tmElements(child, 'abap_object').length }];
     }),
   };
 }

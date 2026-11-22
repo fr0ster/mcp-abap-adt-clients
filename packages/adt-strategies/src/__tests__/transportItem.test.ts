@@ -299,3 +299,35 @@ describe('transportItem trims a number or marker after decoding it', () => {
     },
   );
 });
+
+describe('transportItem reads every field of the item by namespace, whatever the prefix', () => {
+  /** The document with `xmlns:t2` bound to tm and every element from `open` through `close` written with `t2:`. */
+  const underT2 = (document: string, open: string, close: string): string => {
+    const start = document.indexOf(open);
+    const end = document.indexOf(close, start) + close.length;
+    const block = document.slice(start, end).split('tm:').join('t2:');
+    return document
+      .slice(0, start)
+      .concat(block, document.slice(end))
+      .replace(
+        '<tm:root ',
+        document.includes('xmlns:t2=')
+          ? '<tm:root '
+          : `<tm:root xmlns:t2="${TM}" `,
+      );
+  };
+
+  it('a task, its parent and its entries under t2 read as under tm', () => {
+    const asTm = readTransportItem(TASK_WITH_OBJECTS, TASK);
+    const t2Task = underT2(TASK_WITH_OBJECTS, '<tm:task ', '</tm:task>');
+    const both = underT2(t2Task, '<tm:request ', '</tm:request>');
+    expect(readTransportItem(t2Task, TASK)).toEqual(asTm);
+    expect(readTransportItem(both, TASK)).toEqual(asTm);
+  });
+
+  it('a request and its tasks under t2 read as under tm', () => {
+    const asTm = readTransportItem(REQUEST, PARENT);
+    const t2 = underT2(REQUEST, '<tm:request ', '</tm:request>');
+    expect(readTransportItem(t2, PARENT)).toEqual(asTm);
+  });
+});

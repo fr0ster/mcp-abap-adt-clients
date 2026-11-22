@@ -130,11 +130,10 @@ export function tmElements(parent: ITmElement, local: string): ITmElement[] {
 }
 
 /**
- * A `tm:<local>` attribute of an element by namespace (a prefix bound to tm,
- * or the bare name), decoded and trimmed: literal padding and padding written
- * as a reference (`&#32;`) read the same. `undefined` when absent.
+ * A `tm:<local>` attribute of an element by namespace — a prefix bound to
+ * tm, or the bare name — as written; `undefined` when absent.
  */
-export function tmTrimmedAttribute(
+export function tmAttributeIn(
   tm: ITmElement,
   local: string,
 ): string | undefined {
@@ -149,7 +148,18 @@ export function tmTrimmedAttribute(
         ? name === local
         : name.slice(colon + 1) === local &&
           scope.get(name.slice(0, colon)) === TM_NAMESPACE;
-    if (matches) return leafText(value)?.trim();
+    if (matches) return leafText(value);
   }
   return undefined;
+}
+
+/**
+ * The same, decoded and trimmed: literal padding and padding written as a
+ * reference (`&#32;`) read the same.
+ */
+export function tmTrimmedAttribute(
+  tm: ITmElement,
+  local: string,
+): string | undefined {
+  return tmAttributeIn(tm, local)?.trim();
 }
