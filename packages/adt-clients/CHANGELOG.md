@@ -84,9 +84,15 @@ tested with `@mcp-abap-adt/connection` `^25.2.0`, which implements them.
   selective pull writes `overwriteObjects`, `packageWarningObjects`, their
   entries and `action` in `agitpullmodifiedobjects`
   (`ABAPGIT_ST_REPO_SELECTIVE_PULL` L5, L42, L55); a push writes all three
-  stage lists in order (`ABAPGIT_ST_REPO_STAGE` L14, L25, L36) and `wbkey` /
-  `version` only when not empty; the pulls send the caller's `Content-Type`
-  exactly (SAP refuses a `; charset=…` suffix).
+  stage lists in order (`ABAPGIT_ST_REPO_STAGE` L14, L25, L36); a push and
+  a selective pull write every attribute SAP reads under a `not-initial`
+  check — `wbkey`, `version`, a file's `name` / `path` / `localState` /
+  `remoteState`, the comment and the people, the object reference's `uri` /
+  `type` / `packageName` — only when it has a value, because a present, empty
+  one fails the whole document: 400, T100 `00`/`001` "Check of condition
+  failed" (measured on premise: staging answers `remoteState` empty for every
+  new file, so the first push of an object was refused); the pulls send the
+  caller's `Content-Type` exactly (SAP refuses a `; charset=…` suffix).
 - **Signatures and result types:** `link` and `checkExternalRepo` declare the
   deprecated overload last, so `Parameters<…>` and `ReturnType<…>` are
   46.1.0's. A new-form slot's value in a values map is boxed
@@ -147,8 +153,9 @@ tested with `@mcp-abap-adt/connection` `^25.2.0`, which implements them.
 
 ### Not verified live yet
 
-- SAP's acceptance of the corrected selective-pull and push documents is so
-  far grounded in the transformations only (Code).
+- SAP's acceptance of the corrected selective-pull document is so far
+  grounded in the transformations only (Code). The push document is measured:
+  `200` on premise, `202` on cloud with its job ended `S` (2026-11-22).
 
 ## [46.1.0] - 2026-11-19
 

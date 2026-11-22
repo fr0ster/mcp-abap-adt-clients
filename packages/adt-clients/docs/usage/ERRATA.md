@@ -188,6 +188,38 @@ library judges none of them: each is an answer the caller reads.
   `unstaged_objects`, `staged_objects` and `ignored_objects` as literal
   elements, in that order (cloud L14, L25, L36; onprem the same); the library
   writes the first and the last empty.
+- **A present, empty attribute fails a push or a selective pull** (measured on
+  premise, 2026-11-22: 400, T100 `00`/`001` "Check of condition failed",
+  `CX_ST_COND_CHECK_FAIL`). The transformations read every file attribute
+  (`…ST_REPO_STAGE_OBJECT` onprem L41–54, cloud L76–90), the comment and the
+  people (`…ST_REPO_STAGE` onprem L44–72, cloud L52–83) and the object
+  reference's `uri`, `type` and `packageName` (`SADT_OBJECT_REFERENCE`
+  L38–56) under `tt:cond check="not-initial(…)"`, and deserialization checks
+  the value it read (Code). Staging answers such values — `remoteState` is
+  empty for a file the remote does not hold, `packageName` may be empty
+  (measured, both systems) — so the library writes an attribute only when it
+  has a value. With that, a push answered `200` on premise and `202` on cloud,
+  whose job ended `S` "Pushed successfully" (measured 2026-11-22).
+- **`getFile` of a file the repository does not hold answers `200` with an
+  empty text** (R12): the handler reads the file table without checking that
+  the file was found (onprem `ZCL_ABAPGIT_RES_REPO_FILES->get` L69, cloud
+  L80; Code; measured on premise 2026-11-22).
+- **`getFile` of the remote without a credential, on a private remote, is
+  refused with a T100 key:** SAP reads the remote anonymously, the git host
+  refuses, and the abapGit exception is answered `500` (onprem L84–87, cloud
+  L97–100; Code). Measured 2026-11-22 on both systems: `500`, `00`/`001`.
+- **Onprem `pullRepo` with a request that does not exist is refused before
+  anything is pulled**, for a package that records changes
+  (`ZCL_ABAPGIT_RES_REPO_PULL->validate_request_data` L210–219; Code; measured
+  on premise 2026-11-22: `500`, `00`/`001`).
+- **On the on-premise test system `checkRepo` (R11) cannot succeed.** Every
+  call ends in the runtime error `SYNTAX_ERROR` in
+  `ZCL_ABAPGIT_RES_REPO_CHECKS`, answered `500` as an HTML page with no T100
+  key (measured 2026-11-22); the class's syntax check reports "No value was
+  passed to the mandatory parameter IV_SERVICE" at L53, col. 22 — its
+  `zcl_abapgit_http=>create_by_url( … )` call (Code). The installed abapGit
+  and its ADT handler disagree; the request the library sends is not the
+  cause.
 - **`getStatus` (R7) answers a fixed text**, `DEMO STATUS`
   (`RES_REPO_PULL->get` L139).
 - **The success status of `checkRepo` (R11) and `switchBranch` (R15)** is the
@@ -196,6 +228,6 @@ library judges none of them: each is an answer the caller reads.
 - **A key-addressed failure carries a T100 key.** `CL_ADT_EXCEPTION_UTILITY`
   writes `T100KEY-ID` / `T100KEY-NO` for every exception that is a T100
   message (L94–97), and the abapGit exceptions are (Code, both systems); the new
-  forms keep exactly those, and R11's `http_status`, as facts. Not measured on
-  these routes yet.
+  forms keep exactly those, and R11's `http_status`, as facts. Measured
+  2026-11-22: `getFile` (both systems), `push` and `pullRepo` (on premise).
 
