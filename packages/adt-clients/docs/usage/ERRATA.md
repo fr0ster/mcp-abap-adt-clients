@@ -191,7 +191,8 @@ the package walks).
 **Why the library has a strategy for it.** `utilNodeContents` from
 `@mcp-abap-adt/adt-strategies` (0.28.1) answers an entry with no
 `OBJECT_TYPE` as `notLoaded`, with none of SAP's text, and keeps every
-other node SAP lists, a field it lacks absent.
+other node SAP lists — one without its name, technical name or URI in
+`incompleteObjects`, the field it lacks absent.
 
 ## abapGit: what an answer says
 

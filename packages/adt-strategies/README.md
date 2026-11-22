@@ -306,9 +306,9 @@ tag or attribute is coerced to a number (`007` stays `007`, a position
 (`&#x26;` is `&`). Readings keep what the document holds: `transportObjectEntries`
 one entry per task entry, with `task`; `utilWhereUsedReferences` every
 reference, packages included, with `kind`; `utilNodeContents` each object's
-`description` and, since 0.28.1, every object SAP lists, a field it lacks
-absent (`objectName`, `techName`, `objectUri` are optional), and each node SAP
-could not load as `notLoaded` (none of SAP's text); `utilNamedItems` an absent
+`description` and, since 0.28.1, every node SAP lists: one without its name,
+technical name or URI in `incompleteObjects`, the field it lacks absent, and
+each node SAP could not load as `notLoaded` (none of SAP's text); `utilNamedItems` an absent
 description absent.
 
 ## How the defaults are justified
