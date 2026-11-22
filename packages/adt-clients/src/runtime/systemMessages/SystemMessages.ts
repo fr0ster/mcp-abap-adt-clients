@@ -1,7 +1,10 @@
 /**
  * SystemMessages - Domain object for SM02 system messages
  *
- * Provides list and detail access to system messages.
+ * Provides the list of system messages. SAP routes no single message
+ * (`CL_STSK_ADT_RES_APP->register_resources`, l. 31-48), so there is no
+ * `getById` (removed in 47.0.0): `ISystemMessages` declares one, which this
+ * class leaves out rather than ask a route that does not exist.
  */
 
 import type {
@@ -21,12 +24,11 @@ import {
   type ResultValuesOf,
   rawDocument,
 } from '../../utils/resultStrategy';
-import { getSystemMessage, listSystemMessages } from './read';
+import { listSystemMessages } from './read';
 
 /** One strategy per member of the system messages. */
 export interface ISystemMessagesResults {
   readonly list: IResultStrategy<unknown>;
-  readonly message: IResultStrategy<unknown>;
 }
 
 /**
@@ -36,7 +38,6 @@ export interface ISystemMessagesResults {
  */
 export const systemMessagesDocuments = {
   list: rawDocument,
-  message: rawDocument,
 } satisfies ISystemMessagesResults;
 
 /** What each slot of the result set answers. */
@@ -49,7 +50,7 @@ export class SystemMessages<
   T extends SystemMessagesValues = ResultValuesOf<
     typeof systemMessagesDocuments
   >,
-> implements ISystemMessages<T['list'], T['message']>
+> implements Omit<ISystemMessages<T['list'], never>, 'getById'>
 {
   readonly kind = 'systemMessages' as const;
   private readonly results: ResultStrategiesOf<T>;
@@ -69,17 +70,6 @@ export class SystemMessages<
     return answering(
       () => listSystemMessages(this.connection, options),
       this.results.list,
-      options?.analyse,
-    );
-  }
-
-  async getById<E extends IAdtError = IAdtError>(
-    messageId: string,
-    options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['message'], E>> {
-    return answering(
-      () => getSystemMessage(this.connection, messageId),
-      this.results.message,
       options?.analyse,
     );
   }

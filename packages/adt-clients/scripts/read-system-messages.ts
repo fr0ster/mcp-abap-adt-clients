@@ -3,7 +3,9 @@
  *
  * Usage:
  *   ../../node_modules/.bin/ts-node scripts/read-system-messages.ts              # list messages
- *   ../../node_modules/.bin/ts-node scripts/read-system-messages.ts <messageId>  # read specific message
+ *
+ * SAP routes no single message (`CL_STSK_ADT_RES_APP->register_resources`),
+ * so there is no read by id (removed in adt-clients 47.0.0).
  *
  * Options (env vars):
  *   SM_USER=DEVELOPER       — filter by user
@@ -36,7 +38,6 @@ const { getConfig } = require(sessionConfigPath);
 
 async function main() {
   const config = getConfig();
-  const messageId = process.argv[2];
 
   console.log(`Connecting to ${config.url}...`);
   const connection = await createTestConnection(createConnectionLogger());
@@ -45,30 +46,20 @@ async function main() {
     const runtime = new AdtRuntimeClient(connection);
     const sm = runtime.getSystemMessages();
 
-    if (!messageId) {
-      const options = {
-        user: process.env.SM_USER || undefined,
-        maxResults: process.env.SM_MAX
-          ? Number.parseInt(process.env.SM_MAX, 10)
-          : 10,
-      };
+    const options = {
+      user: process.env.SM_USER || undefined,
+      maxResults: process.env.SM_MAX
+        ? Number.parseInt(process.env.SM_MAX, 10)
+        : 10,
+    };
 
-      console.log(
-        `\n=== System Messages (user=${options.user || 'all'}, max=${options.maxResults}) ===\n`,
-      );
-      const response = resultOf(await sm.list(options));
-      const xml = response;
-      console.log(xml.slice(0, 5000));
-      if (xml.length > 5000) {
-        console.log('\n... (truncated)');
-      }
-      return;
-    }
-
-    console.log(`\n=== System Message: ${messageId} ===\n`);
-    const response = resultOf(await sm.getById(messageId));
-    console.log(response.slice(0, 5000));
-    if (response.length > 5000) {
+    console.log(
+      `\n=== System Messages (user=${options.user || 'all'}, max=${options.maxResults}) ===\n`,
+    );
+    const response = resultOf(await sm.list(options));
+    const xml = response;
+    console.log(xml.slice(0, 5000));
+    if (xml.length > 5000) {
       console.log('\n... (truncated)');
     }
   } finally {

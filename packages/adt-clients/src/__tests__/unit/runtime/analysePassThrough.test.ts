@@ -134,14 +134,6 @@ const members: [string, (c: IAbapConnection) => Member][] = [
       ),
   ],
   [
-    'SystemMessages.getById',
-    (c) => (o) =>
-      new SystemMessages(c, {
-        logger,
-        results: systemMessagesDocuments,
-      }).getById('M', o),
-  ],
-  [
     'GatewayErrorLog.list',
     (c) => (o) =>
       new GatewayErrorLog(c, {

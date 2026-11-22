@@ -112,11 +112,9 @@ async function main() {
       const entries = resultOf(await feeds.systemMessages(options));
       console.log(`Found ${entries.length} entries:\n`);
       for (const entry of entries) {
-        console.log(`  [${entry.id}] ${entry.title}`);
-        console.log(`    severity: ${entry.severity}`);
+        console.log(`  [${entry.messageId ?? entry.id}] ${entry.title}`);
         console.log(`    text: ${entry.text}`);
-        console.log(`    created by: ${entry.createdBy}`);
-        console.log(`    valid: ${entry.validFrom} — ${entry.validTo}`);
+        console.log(`    created: ${entry.createdOn} by ${entry.createdBy}`);
         console.log();
       }
       return;
