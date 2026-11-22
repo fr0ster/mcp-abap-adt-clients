@@ -3195,6 +3195,11 @@ abapgit:
   # (software component LOCAL, no request), so it deletes completely; cloud
   # ZAGL_<run>, a child of create_package[adt_package].package_name in that
   # case's software component.
+  # The system whose checkRepo handler fault was measured (its
+  # environment.default_master_system): there check_repo asserts the fault
+  # exactly as measured; everywhere else it must succeed. Set in that
+  # system's overlay; empty: checkRepo succeeds everywhere.
+  check_repo_fault_system: ""
   test_cases:
     - name: "list_repos"
       enabled: true

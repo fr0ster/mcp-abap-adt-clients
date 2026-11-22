@@ -45,18 +45,20 @@ import type {
   IAbapGitReposFacts,
   IAbapGitStagingFacts,
 } from '@mcp-abap-adt/adt-strategies';
-import type {
-  IAbapGitCredentials,
-  IAbapGitPullSelection,
-  IAbapGitStagedObject,
-  IAbapGitStructuredError,
-  IAdtHeaders,
-  IAdtResponse,
+import {
+  ABAPGIT_ERROR_MESSAGES,
+  type IAbapGitCredentials,
+  type IAbapGitPullSelection,
+  type IAbapGitStagedObject,
+  type IAbapGitStructuredError,
+  type IAdtHeaders,
+  type IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
 import { analyseAbapGitFacts } from '../../../helpers/abapGitFacts';
 import {
   type AbapGitBackend,
   AbapGitLedger,
+  acquireRunLock,
   cleanUpEntry,
   type ICleanupSteps,
   type ILedgerEntry,
@@ -133,12 +135,15 @@ const RUN = randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase();
 /** The run's package: `$ZAGL_<run>` on premise, `ZAGL_<run>` on cloud (set in `beforeAll`). */
 let PACKAGE = `ZAGL_${RUN}`;
 const INTERFACE = `ZIF_AGL_${RUN}`;
+/** A second run-owned interface: changed with the first, left out of the selective pull. */
+const INTERFACE_B = `ZIF_AGL_${RUN}_B`;
 const BRANCH = `abapgit-live-${RUN.toLowerCase()}`;
 const SECOND_BRANCH = `${BRANCH}-b`;
 const ref = (branch: string) => `refs/heads/${branch}`;
-const marker = (version: string) => `run-${RUN.toLowerCase()}-${version}`;
-const interfaceSource = (version: string) =>
-  `INTERFACE ${INTERFACE.toLowerCase()}\n  PUBLIC.\n  CONSTANTS c_marker TYPE string VALUE '${marker(version)}'.\nENDINTERFACE.\n`;
+const marker = (version: string, name: string = INTERFACE) =>
+  `run-${RUN.toLowerCase()}${name === INTERFACE_B ? '-b' : ''}-${version}`;
+const interfaceSource = (name: string, version: string) =>
+  `INTERFACE ${name.toLowerCase()}\n  PUBLIC.\n  CONSTANTS c_marker TYPE string VALUE '${marker(version, name)}'.\nENDINTERFACE.\n`;
 
 // --- Gates. ---
 const GATE_CASE_T100 = 't100_refusal';
@@ -266,7 +271,13 @@ describeLive(
     let repoKey: string | undefined;
     let staged: readonly IAbapGitStagedObject[] = [];
     let sourceFile: { name: string; path: string } | undefined;
+    let sourceFileB: { name: string; path: string } | undefined;
+    /** The run lock's release; set once this run holds the lock. */
+    let releaseLock: (() => void) | undefined;
+    /** The system id (onprem: `environment.default_master_system`). */
+    let systemId: string | undefined;
     let currentVersion = 'v1';
+    let currentVersionB = 'v1';
     /** The selective pull's log key (`recovery`): its log names the objects. */
     let pullLogKey: string | undefined;
     let selection: IAbapGitPullSelection | undefined;
@@ -360,14 +371,28 @@ describeLive(
      * schedules it as its last step and rolls back on any exception before
      * (`CL_ABAPGIT_RES_REPO_PUSH->post` L100, L110–114;
      * `CL_ABAPGIT_RES_REPO_PULL->post` L253, L262–267; Code). Its pending
-     * entry goes, or the next run waits for a log key that never comes. A
-     * failure without SAP's answer (status 0) keeps it: the job may exist.
+     * entry goes, or the next run waits for a log key that never comes.
+     *
+     * Only a positively identified handler refusal clears it: an abapGit
+     * route answered a failing status with a T100 key — what
+     * `cx_adt_rest_abapgit=>raise_with_error` writes. A bare status (a
+     * gateway's 502, a 500 page), an unreadable answer or no answer at all
+     * keeps it: the job may exist, and the wait or the next run's recovery
+     * finds its terminal log key.
      */
     function settleRefusedSubmit(
       answer: IAdtResponse<unknown, IAbapGitStructuredError>,
     ): void {
       if (answer.ok) return;
-      if (answer.getError().facts.status !== 0)
+      const failure = answer.getError();
+      const { status, messageClass, messageNumber } = failure.facts;
+      const handlerRefusal =
+        failure.message === ABAPGIT_ERROR_MESSAGES.refusedWithMessage &&
+        status >= 400 &&
+        !!messageClass &&
+        !!messageNumber &&
+        (failure.request?.path ?? '').startsWith('/sap/bc/adt/abapgit/repos/');
+      if (handlerRefusal)
         ledger.amend(RUN, (entry) => ({ ...entry, pending: undefined }));
     }
 
@@ -413,19 +438,33 @@ describeLive(
 
     async function readSource(
       version: 'active' | 'inactive' = 'active',
+      name: string = INTERFACE,
     ): Promise<string> {
       const intf = client.getInterface();
       return String(
         expectResult(
-          await intf.read({ interfaceName: INTERFACE }, version, {
+          await intf.read({ interfaceName: name }, version, {
             analyse: loaded().strategies.analyseException,
           }),
-          `read ${INTERFACE} (${version})`,
+          `read ${name} (${version})`,
         ),
       );
     }
 
     const readActiveSource = () => readSource('active');
+
+    /** Whether `name` is on the system's inactive-objects list. */
+    async function isInactive(name: string): Promise<boolean> {
+      const list = String(
+        expectResult(
+          await client.getUtils().getInactiveObjects({
+            analyse: loaded().strategies.analyseException,
+          }),
+          'inactive objects',
+        ),
+      );
+      return list.includes(`adtcore:name="${name}"`);
+    }
 
     /**
      * A cloud pull imports inactive: on SAP Cloud Platform the deserializer
@@ -433,11 +472,18 @@ describeLive(
      * rejected in SAP Cloud Platform, ABAP Environment -> import inactive
      * version(!)", `CL_ABAPGIT_OBJECTS` L1127–1133; Code; measured
      * 2026-11-22: the job ends `S`, the inactive version holds the pulled
-     * source, the active one the previous). So the pull's change is read in
-     * the inactive version, then the interface is activated, as a user would,
-     * and the active version holds it.
+     * source, the active one the previous). So the active version is read
+     * still holding the previous source, the pull's change in the inactive
+     * one, then the interface is activated, as a user would, and the active
+     * version holds it.
      */
-    async function activatePulled(version: string): Promise<void> {
+    async function activatePulled(
+      previous: string,
+      version: string,
+    ): Promise<void> {
+      expect(await readActiveSource()).toContain(marker(previous));
+      expect(await readActiveSource()).not.toContain(marker(version));
+      expect(await isInactive(INTERFACE)).toBe(true);
       expect(await readSource('inactive')).toContain(marker(version));
       const intf = client.getInterface();
       expectResult(
@@ -453,23 +499,29 @@ describeLive(
       expect(await readActiveSource()).toContain(marker(version));
     }
 
-    /** Change the interface's file in the remote to `version`. */
-    async function changeRemote(version: string): Promise<void> {
-      const file = requireFile();
+    /** Change an interface's file in the remote to `version`. */
+    async function changeRemote(
+      version: string,
+      name: string = INTERFACE,
+    ): Promise<void> {
+      const file = name === INTERFACE_B ? sourceFileB : requireFile();
+      if (!file) throw new Error(`staging found no source file of ${name}`);
       const path = `${file.path.replace(/^\/+/, '')}${file.name}`;
       const current = await github.readFile(BRANCH, path);
       if (!current) throw new Error(`the remote branch holds no ${path}`);
-      const from = `'${marker(currentVersion)}'`;
+      const was = name === INTERFACE_B ? currentVersionB : currentVersion;
+      const from = `'${marker(was, name)}'`;
       if (!current.text.includes(from))
         throw new Error(`${path} in the remote does not hold ${from}`);
       await github.writeFile(
         BRANCH,
         path,
-        current.text.replace(from, `'${marker(version)}'`),
+        current.text.replace(from, `'${marker(version, name)}'`),
         current.sha,
-        `abapGit live test ${RUN}: ${version}`,
+        `abapGit live test ${RUN}: ${name} ${version}`,
       );
-      currentVersion = version;
+      if (name === INTERFACE_B) currentVersionB = version;
+      else currentVersion = version;
     }
 
     const cleanupSteps = (): ICleanupSteps => ({
@@ -535,13 +587,18 @@ describeLive(
           await fresh.logOff();
         }
       },
-      deleteBranch: async (name) => {
-        await github.deleteBranch(name);
+      deleteBranch: async (name, remoteUrl) => {
+        // In the remote the entry recorded; resolves only once the branch is
+        // confirmed absent there, so the ledger retires nothing unconfirmed.
+        await github.forUrl(remoteUrl).deleteBranch(name);
       },
     });
 
     beforeAll(async () => {
       if (!sapIsConfigured()) return;
+      // Before anything: recovery and every ledger write below hold only
+      // while this run is the one run. A live holder refuses this run.
+      releaseLock = acquireRunLock();
       backend = getTargetSystem();
       modules = loadAbapGitModules();
       opened = await openConnectionUnderTest(modules, createConnectionLogger());
@@ -549,6 +606,7 @@ describeLive(
         opened.connection,
         backend === 'cloud',
       );
+      systemId = context.masterSystem;
       client = makeAdtClient(context, opened.connection);
       abapGit = makeAbapGit(opened.connection);
       systemKey = `${targetOf(getConfig())} client=${process.env.SAP_CLIENT?.split('#')[0]?.trim() ?? ''}`;
@@ -679,6 +737,12 @@ describeLive(
         ? originLabel(modules.origin)
         : originLabelFromEnv();
       const logger = createRunIntegrityLogger();
+      if (!releaseLock) {
+        // Not this run's ledger: it touched nothing, and cleans up nothing.
+        await opened?.logOff().catch(() => undefined);
+        printSummary(skipReason, origin, backendOrUndefined());
+        return;
+      }
       if (opened && !cleanedUp && ledger.find(RUN)) {
         if (uncorrelated) {
           logger.warn?.(
@@ -706,6 +770,7 @@ describeLive(
           `abapGit: log off failed: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
+      releaseLock();
       printSummary(skipReason, origin, backendOrUndefined());
     }, STEP_TIMEOUT_MS * 2);
 
@@ -811,70 +876,73 @@ describeLive(
       },
     );
 
+    /** Create, write and activate one run-owned interface at `v1`. */
+    async function createInterface(name: string): Promise<void> {
+      const intf = client.getInterface();
+      const analyseException = loaded().strategies.analyseException;
+      // Recorded before it is created: the name is the run's.
+      ledger.amend(RUN, (e) => ({
+        ...e,
+        interfaces: [...e.interfaces, name],
+      }));
+      expectResult(
+        await intf.create(
+          {
+            interfaceName: name,
+            packageName: PACKAGE,
+            description: `abapGit live test ${RUN}`,
+            transportRequest,
+          },
+          {
+            headers: integrationHeadersOf(intf, 'create'),
+            analyse: analyseException,
+          },
+        ),
+        `create ${name}`,
+      );
+      const handle = expectResult(
+        await intf.lock({ interfaceName: name }, { analyse: analyseException }),
+        `lock ${name}`,
+      );
+      // Released with its own handle, whatever the write did.
+      await releasing(
+        async () =>
+          expectResult(
+            await intf.update(
+              { interfaceName: name, transportRequest },
+              {
+                headers: integrationHeadersOf(intf, 'update'),
+                source: interfaceSource(name, 'v1'),
+                lockHandle: handle,
+                analyse: analyseException,
+              },
+            ),
+            `write ${name}`,
+          ),
+        () =>
+          intf.unlock({ interfaceName: name }, handle, {
+            analyse: analyseException,
+          }),
+        `unlock ${name}`,
+      );
+      expectResult(
+        await intf.activate(
+          { interfaceName: name },
+          {
+            headers: integrationHeadersOf(intf, 'activate'),
+            analyse: judged(loaded().strategies.analyseActivation),
+          },
+        ),
+        `activate ${name}`,
+      );
+    }
+
     memberCase(
       'staging',
-      'getStaging shows the run-owned interface unstaged',
+      'getStaging shows the two run-owned interfaces unstaged',
       async () => {
-        const intf = client.getInterface();
-        const analyseException = loaded().strategies.analyseException;
-        // Recorded before it is created: the name is the run's.
-        ledger.amend(RUN, (e) => ({
-          ...e,
-          interfaces: [...e.interfaces, INTERFACE],
-        }));
-        expectResult(
-          await intf.create(
-            {
-              interfaceName: INTERFACE,
-              packageName: PACKAGE,
-              description: `abapGit live test ${RUN}`,
-              transportRequest,
-            },
-            {
-              headers: integrationHeadersOf(intf, 'create'),
-              analyse: analyseException,
-            },
-          ),
-          `create ${INTERFACE}`,
-        );
-        const handle = expectResult(
-          await intf.lock(
-            { interfaceName: INTERFACE },
-            { analyse: analyseException },
-          ),
-          `lock ${INTERFACE}`,
-        );
-        // Released with its own handle, whatever the write did.
-        await releasing(
-          async () =>
-            expectResult(
-              await intf.update(
-                { interfaceName: INTERFACE, transportRequest },
-                {
-                  headers: integrationHeadersOf(intf, 'update'),
-                  source: interfaceSource('v1'),
-                  lockHandle: handle,
-                  analyse: analyseException,
-                },
-              ),
-              `write ${INTERFACE}`,
-            ),
-          () =>
-            intf.unlock({ interfaceName: INTERFACE }, handle, {
-              analyse: analyseException,
-            }),
-          `unlock ${INTERFACE}`,
-        );
-        expectResult(
-          await intf.activate(
-            { interfaceName: INTERFACE },
-            {
-              headers: integrationHeadersOf(intf, 'activate'),
-              analyse: judged(loaded().strategies.analyseActivation),
-            },
-          ),
-          `activate ${INTERFACE}`,
-        );
+        await createInterface(INTERFACE);
+        await createInterface(INTERFACE_B);
 
         const facts: IAbapGitStagingFacts = expectResult(
           await abapGit.getStaging(
@@ -883,12 +951,15 @@ describeLive(
           ),
           'staging',
         ).facts;
-        const mine = facts.unstaged.find((o) => o.name === INTERFACE);
-        expect(mine).toBeDefined();
-        const file = mine?.files.find((f) => f.name.endsWith('.intf.abap'));
-        if (!file)
-          throw new Error(`staging lists no .intf.abap file for ${INTERFACE}`);
-        sourceFile = { name: file.name, path: file.path };
+        const sourceOf = (name: string) => {
+          const object = facts.unstaged.find((o) => o.name === name);
+          const file = object?.files.find((f) => f.name.endsWith('.intf.abap'));
+          if (!file)
+            throw new Error(`staging lists no .intf.abap file for ${name}`);
+          return { name: file.name, path: file.path };
+        };
+        sourceFile = sourceOf(INTERFACE);
+        sourceFileB = sourceOf(INTERFACE_B);
         // Everything unstaged is the run's package's: all of it is pushed.
         staged = facts.unstaged;
       },
@@ -946,29 +1017,49 @@ describeLive(
 
     memberCase(
       'check_repo',
-      'checkRepo answers (cloud: its success status is logged; onprem: the measured SAP handler fault, asserted as it is)',
+      'checkRepo answers; on the system where its handler fault was measured, the fault exactly as measured',
       async () => {
-        if (backend === 'onprem') {
-          // A measured SAP handler fault, not a pass of ours: on the onprem
-          // test system every call ends in the runtime error SYNTAX_ERROR in
-          // ZCL_ABAPGIT_RES_REPO_CHECKS, answered 500 as an HTML page with no
-          // T100 key (measured 2026-11-22); its syntax check reports "No
-          // value was passed to the mandatory parameter IV_SERVICE" at L53,
-          // col. 22 (Code; ERRATA). The member returns SAP's answer as it is.
+        // `abapgit.check_repo_fault_system` names the system the fault was
+        // measured on (the onprem overlay); this system's id is
+        // `environment.default_master_system`. Anywhere else checkRepo must
+        // succeed.
+        const faultSystem = String(
+          loadTestConfig()?.abapgit?.check_repo_fault_system ?? '',
+        ).trim();
+        if (
+          backend === 'onprem' &&
+          faultSystem !== '' &&
+          systemId === faultSystem
+        ) {
+          // A measured SAP handler fault, not a pass of ours: every call ends
+          // in the runtime error SYNTAX_ERROR in ZCL_ABAPGIT_RES_REPO_CHECKS,
+          // answered 500 as an HTML page with no T100 key (measured
+          // 2026-11-22); its syntax check reports "No value was passed to the
+          // mandatory parameter IV_SERVICE" at L53, col. 22 (Code; ERRATA).
+          // The member returns SAP's answer as it is. What our facts can tell
+          // of it is exactly this: the fixed `refused` words, status 500, no
+          // T100 key, no git host status — asserted whole, so a 500 that
+          // carries anything more fails.
+          const key = requireKey();
           const failure = expectFailure(
             await abapGit.checkRepo(
-              { key: requireKey() },
+              { key },
               { credentials, analyse: analyseAbapGitFacts },
             ),
-            'check repository (onprem: SAP handler fault)',
+            'check repository (the measured SAP handler fault)',
           );
-          expect(failure.facts.status).toBe(500);
-          expect(failure.facts.messageClass).toBeUndefined();
-          expect(failure.facts.messageNumber).toBeUndefined();
+          expect(failure.message).toBe(ABAPGIT_ERROR_MESSAGES.refused);
+          expect(
+            Object.entries(failure.facts).filter(([, v]) => v !== undefined),
+          ).toEqual([['status', 500]]);
+          expect(failure.request).toEqual({
+            method: 'POST',
+            path: `/sap/bc/adt/abapgit/repos/${key}/checks`,
+          });
           gates
             .get(backend)
             ?.faults.add(
-              'check_repo: the measured SAP handler fault — 500, no T100, SYNTAX_ERROR in ZCL_ABAPGIT_RES_REPO_CHECKS L53 (IV_SERVICE)',
+              `check_repo: the measured SAP handler fault on ${faultSystem} — 500, no T100, SYNTAX_ERROR in ZCL_ABAPGIT_RES_REPO_CHECKS L53 (IV_SERVICE)`,
             );
           return;
         }
@@ -987,9 +1078,10 @@ describeLive(
 
     memberCase(
       'modified_objects',
-      'getModifiedObjects lists the interface once the remote changed',
+      'getModifiedObjects lists both interfaces once the remote changed; the selection keeps the first alone',
       async () => {
         await changeRemote('v2');
+        await changeRemote('v2', INTERFACE_B);
         const answer = expectResult(
           await abapGit.getModifiedObjects(
             { key: requireKey() },
@@ -1002,7 +1094,16 @@ describeLive(
           ...answer.facts.packageWarningObjects,
         ];
         expect(listed.map((o) => o.name)).toContain(INTERFACE);
-        selection = answer.facts;
+        expect(listed.map((o) => o.name)).toContain(INTERFACE_B);
+        // R6's entries handed back unchanged, the second interface left out:
+        // the job sets every entry it is not given to 'N'
+        // (`CL_ABAPGIT_BG_ACTION_PULL->execute` L123–152; Code).
+        const only = (o: { readonly name: string }) => o.name === INTERFACE;
+        selection = {
+          overwriteObjects: answer.facts.overwriteObjects.filter(only),
+          packageWarningObjects:
+            answer.facts.packageWarningObjects.filter(only),
+        };
       },
     );
 
@@ -1077,7 +1178,13 @@ describeLive(
         expect(l1).not.toBe(pending.l0);
         pullLogKey = l1;
         expect(new AbapGitLedger().find(RUN)?.pending).toBeUndefined();
-        await activatePulled('v2');
+        // Only the selected interface was imported: the second one, changed
+        // in the remote too, keeps its source and gets no inactive version.
+        expect(await isInactive(INTERFACE_B)).toBe(false);
+        expect(await readSource('active', INTERFACE_B)).toContain(
+          marker('v1', INTERFACE_B),
+        );
+        await activatePulled('v1', 'v2');
       },
     );
 
@@ -1100,6 +1207,10 @@ describeLive(
         const mine = answer.facts.objects.find((o) => o.name === INTERFACE);
         expect(mine).toBeDefined();
         expect(['S', 'W']).toContain(mine?.status);
+        // The interface the selection left out was not imported.
+        expect(
+          answer.facts.objects.find((o) => o.name === INTERFACE_B),
+        ).toBeUndefined();
       },
     );
 
@@ -1120,7 +1231,7 @@ describeLive(
         expect(answer.status).toBe(202);
         // Finished, not accepted (R5 runs the pull in the request), and
         // imported inactive as every cloud pull.
-        await activatePulled('v3');
+        await activatePulled('v2', 'v3');
       },
     );
 
