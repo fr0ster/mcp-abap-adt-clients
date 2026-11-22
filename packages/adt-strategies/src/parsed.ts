@@ -109,22 +109,46 @@ function referenced(name: string): string | undefined {
  * written. Plain code: one scan, no regular expression.
  */
 export function decodeXmlText(text: string): string {
+  return decodeReferences(text, referenced);
+}
+
+/** Whether a character may stand in a reference's name: `#`, a letter, a digit. */
+function isReferenceCharacter(character: string): boolean {
+  return (
+    character === '#' ||
+    (character >= '0' && character <= '9') ||
+    (character >= 'a' && character <= 'z') ||
+    (character >= 'A' && character <= 'Z')
+  );
+}
+
+/**
+ * Every `&name;` of a text replaced by what `lookup` says it names, one pass
+ * from left to right. From each `&` the name is read only while its
+ * characters can belong to one, so no character is looked at twice: a text
+ * of a million `& ` and one `;` is read once, not once per `&`. A reference
+ * `lookup` does not know stays as written.
+ */
+export function decodeReferences(
+  text: string,
+  lookup: (name: string) => string | undefined,
+): string {
   if (!text.includes('&')) return text;
   let decoded = '';
   let from = 0;
-  for (;;) {
-    const start = text.indexOf('&', from);
-    if (start < 0) break;
-    const end = text.indexOf(';', start + 1);
-    if (end < 0) break;
-    const character = referenced(text.slice(start + 1, end));
-    if (character === undefined) {
-      decoded += text.slice(from, start + 1);
-      from = start + 1;
-      continue;
+  let at = text.indexOf('&');
+  while (at >= 0) {
+    let end = at + 1;
+    while (end < text.length && isReferenceCharacter(text.charAt(end))) {
+      end += 1;
     }
-    decoded += text.slice(from, start) + character;
-    from = end + 1;
+    const character =
+      text.charAt(end) === ';' ? lookup(text.slice(at + 1, end)) : undefined;
+    if (character !== undefined) {
+      decoded += text.slice(from, at) + character;
+      from = end + 1;
+    }
+    at = text.indexOf('&', character === undefined ? at + 1 : end + 1);
   }
   return decoded + text.slice(from);
 }

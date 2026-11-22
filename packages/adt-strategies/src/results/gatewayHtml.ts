@@ -14,6 +14,8 @@
  * fragments are SAP's fixed rendering, read by the tags it writes.
  */
 
+import { decodeReferences } from '../parsed';
+
 const NAMED_ENTITIES: ReadonlyMap<string, string> = new Map([
   ['amp', '&'],
   ['lt', '<'],
@@ -51,23 +53,7 @@ function entity(name: string): string | undefined {
  * character reference. An entity not known stays as written.
  */
 export function decodeHtml(text: string): string {
-  let decoded = '';
-  let from = 0;
-  for (;;) {
-    const start = text.indexOf('&', from);
-    if (start < 0) break;
-    const end = text.indexOf(';', start + 1);
-    if (end < 0) break;
-    const character = entity(text.slice(start + 1, end));
-    if (character === undefined) {
-      decoded += text.slice(from, start + 1);
-      from = start + 1;
-      continue;
-    }
-    decoded += text.slice(from, start) + character;
-    from = end + 1;
-  }
-  return decoded + text.slice(from);
+  return decodeReferences(text, entity);
 }
 
 /** A fragment's text: every tag removed, entities decoded, nothing trimmed. */
