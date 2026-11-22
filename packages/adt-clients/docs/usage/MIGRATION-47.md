@@ -175,7 +175,4 @@ A type written over `SystemMessagesValues['message']` drops it with the slot.
 
 ## `ISystemMessages` upstream
 
-47.0.0 is on `@mcp-abap-adt/interfaces-adt` `^31.0.0`, which drops
-`ISystemMessages.getById` and the `TMessage` parameter: `ISystemMessages<TList>`.
-A consumer that types its value as `ISystemMessages<TList, TMessage>` writes
-`ISystemMessages<TList>`, and calls no `getById`.
+adt-clients 47.0.0 requires interfaces-adt 31.0.0, where `ISystemMessages<TList>` has no `getById`; type the client as `ISystemMessages<TList>`.
