@@ -83,6 +83,24 @@ describe('transportObjectEntries reads entries per task, each once', () => {
     ]);
   });
 
+  // The `removeobject` echo as adt-clients' objectActions.test.ts holds it
+  // ("the one document of this media type that was captured whole"): its
+  // entry sits directly under tm:request, on no task.
+  it("an echo's entry under tm:request is read, on no task", () => {
+    const echo =
+      '<?xml version="1.0" encoding="UTF-8"?>' +
+      '<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:useraction="removeobject" tm:number="DEVK905942">' +
+      '<tm:request tm:parent="" tm:desc="" tm:target="" tm:target_desc="">' +
+      '<tm:long_desc/>' +
+      '<tm:abap_object tm:pgmid="R3TR" tm:type="FUGR" tm:name="ZMCP_BLD_FGR_H1" ' +
+      'tm:obj_desc="Function Group" tm:position="000025" tm:lock_status="" tm:img_activity=""/>' +
+      '</tm:request></tm:root>';
+    const entries = parseObjectEntries(echo);
+    expect(entries.map((e) => [e.task, e.name, e.position])).toEqual([
+      [undefined, 'ZMCP_BLD_FGR_H1', '000025'],
+    ]);
+  });
+
   it('a task holding nothing yields nothing', () => {
     expect(parseObjectEntries(EMPTY_TASK)).toEqual([]);
   });

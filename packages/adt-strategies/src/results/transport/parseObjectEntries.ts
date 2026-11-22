@@ -53,7 +53,8 @@ export interface ITransportObjectEntry extends IAbapObjectEntry {
   imageActivity?: string;
   /**
    * Since 0.28.0: the number of the task the entry is on
-   * (`tm:task/@tm:number`); absent only when that task names none.
+   * (`tm:task/@tm:number`); absent when the entry is on no task (an echo's
+   * entry under `tm:request`) or its task names none.
    */
   task?: string;
   /** Since 0.28.0: `tm:obj_info` — the entry's kind in words, where the server sends it. */
@@ -66,62 +67,85 @@ const text = (node: unknown, name: string): string | undefined => {
   return value === '' ? undefined : value;
 };
 
+/** One entry, read; `undefined` for one without a name or a type. */
+function entryOf(
+  entry: unknown,
+  task: string | undefined,
+): ITransportObjectEntry | undefined {
+  const name = text(entry, 'name');
+  const type = text(entry, 'type');
+  if (name === undefined || type === undefined) return undefined;
+  return {
+    ...(task === undefined ? {} : { task }),
+    name,
+    type,
+    pgmid: text(entry, 'pgmid'),
+    description: text(entry, 'obj_desc'),
+    // No `?? ''`: see the field's own note. An absent position is absent.
+    position: text(entry, 'position'),
+    lockStatus: text(entry, 'lock_status'),
+    imageActivity: text(entry, 'img_activity'),
+    info: text(entry, 'obj_info'),
+  };
+}
+
+/** The entries `element` holds as its own children, each with `task`. */
+function childEntries(
+  element: unknown,
+  task: string | undefined,
+): ITransportObjectEntry[] {
+  return tmChildren(element, 'abap_object').flatMap((entry) => {
+    const read = entryOf(entry, task);
+    return read === undefined ? [] : [read];
+  });
+}
+
+/** One `tm:task` element's entries, each with the task's number. */
+export function taskEntries(task: unknown): ITransportObjectEntry[] {
+  return childEntries(task, text(task, 'number'));
+}
+
 /**
- * The tasks whose entries a document lists: a task document's own task
- * (`tm:root/tm:task`, beside its parent's header in `tm:request`), a request
- * document's tasks (`tm:root/tm:request/tm:task`), and an echo's tasks
- * wherever it puts them — every `tm:task` reached from the root. The
- * `tm:abap_object` entries of `tm:all_objects`, a request's aggregate of the
- * same entries, sit on no task and are not read.
+ * The entries of a document, in document order: every `tm:task` reached from
+ * the root gives its own, with its number — a task document's
+ * (`tm:root/tm:task`), a request document's (`tm:root/tm:request/tm:task`);
+ * a `tm:request` gives the entries it holds as its own children, on no task
+ * (the `removeobject` echo, recorded, puts its entry there). The entries of
+ * `tm:all_objects`, a request's aggregate of its tasks' entries, sit on no
+ * task and no request, so none is read twice.
  */
-function tasksOf(root: ParsedElement): unknown[] {
+function documentEntries(root: ParsedElement): ITransportObjectEntry[] {
   if (tmAttribute(root, 'object_type') === 'T') {
-    return tmChildren(root, 'task');
+    return tmChildren(root, 'task').flatMap(taskEntries);
   }
-  const tasks: unknown[] = [];
+  const entries: ITransportObjectEntry[] = [];
   const walk = (node: unknown): void => {
     for (const element of listOf(node)) {
       if (!isElement(element)) continue;
       for (const [key, value] of Object.entries(element)) {
         if (key.startsWith('@_')) continue;
-        if (key === 'tm:task' || key === 'task') tasks.push(...listOf(value));
-        else walk(value);
+        if (key === 'tm:task' || key === 'task') {
+          entries.push(...listOf(value).flatMap(taskEntries));
+        } else if (key === 'tm:request' || key === 'request') {
+          for (const request of listOf(value)) {
+            entries.push(...childEntries(request, undefined));
+            walk(request);
+          }
+        } else if (key !== 'tm:abap_object' && key !== 'abap_object') {
+          walk(value);
+        }
       }
     }
   };
   walk(root);
-  return tasks;
-}
-
-/** One `tm:task` element's entries, each with the task's number. */
-export function taskEntries(task: unknown): ITransportObjectEntry[] {
-  const number = text(task, 'number');
-  const entries: ITransportObjectEntry[] = [];
-  for (const entry of tmChildren(task, 'abap_object')) {
-    const name = text(entry, 'name');
-    const type = text(entry, 'type');
-    if (name === undefined || type === undefined) continue;
-    entries.push({
-      ...(number === undefined ? {} : { task: number }),
-      name,
-      type,
-      pgmid: text(entry, 'pgmid'),
-      description: text(entry, 'obj_desc'),
-      // No `?? ''`: see the field's own note. An absent position is absent.
-      position: text(entry, 'position'),
-      lockStatus: text(entry, 'lock_status'),
-      imageActivity: text(entry, 'img_activity'),
-      info: text(entry, 'obj_info'),
-    });
-  }
   return entries;
 }
 
 /**
  * Read a transport document into its object entries: per task, in document
- * order, each with the number of the task it is on. A request's
- * `tm:all_objects` repeats its tasks' entries and is not read, so every entry
- * comes once.
+ * order, each with the number of the task it is on (an echo's entry directly
+ * under `tm:request` has none). A request's `tm:all_objects` repeats its
+ * tasks' entries and is not read, so every entry comes once.
  *
  * Answers an empty list for a request that holds nothing, and for a document
  * that is not a transport one — there is no entry to report either way, and a
@@ -130,5 +154,5 @@ export function taskEntries(task: unknown): ITransportObjectEntry[] {
 export function parseObjectEntries(document: unknown): ITransportObjectEntry[] {
   const root = transportRoot(document);
   if (root === undefined) return [];
-  return tasksOf(root).flatMap(taskEntries);
+  return documentEntries(root);
 }
