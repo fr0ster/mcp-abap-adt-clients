@@ -171,3 +171,131 @@ describe('transportItem reads a request or a task document', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// By namespace, not prefix; numbers and markers trimmed after decoding
+// (0.28.1, Codex's review). Variants of the recorded documents, each built
+// in the test.
+// ---------------------------------------------------------------------------
+
+const TM = 'http://www.sap.com/cts/adt/tm';
+const REFUSAL =
+  'readTransportItem: the answer is not the transport request or task asked for';
+
+/** The document with `element` added as the root's last child. */
+const withRootChild = (document: string, element: string): string =>
+  document.replace('</tm:root>', `${element}</tm:root>`);
+
+/** The document with `xmlns="…tm"` on its root: bare names are in the tm namespace. */
+const withDefaultTm = (document: string): string =>
+  document.replace('<tm:root ', `<tm:root xmlns="${TM}" `);
+
+describe('transportItem counts elements by namespace, whatever the prefix', () => {
+  it.each([
+    [
+      'a bare task in the default tm namespace',
+      () =>
+        readTransportItem(
+          withRootChild(
+            withDefaultTm(TASK_WITH_OBJECTS),
+            `<task tm:number="${TASK}"/>`,
+          ),
+          TASK,
+        ),
+    ],
+    [
+      'a task under a second prefix bound to tm',
+      () =>
+        readTransportItem(
+          withRootChild(
+            TASK_WITH_OBJECTS,
+            `<t2:task xmlns:t2="${TM}" t2:number="${TASK}"/>`,
+          ),
+          TASK,
+        ),
+    ],
+    [
+      'a request under a second prefix bound to tm',
+      () =>
+        readTransportItem(
+          withRootChild(
+            REQUEST,
+            `<t2:request xmlns:t2="${TM}" t2:number="${PARENT}"/>`,
+          ),
+          PARENT,
+        ),
+    ],
+    [
+      'a second request in the default tm namespace',
+      () =>
+        readTransportItem(
+          withRootChild(
+            withDefaultTm(REQUEST),
+            `<request number="${PARENT}"/>`,
+          ),
+          PARENT,
+        ),
+    ],
+  ])('refuses a duplicate across prefixes: %s', (_what, read) => {
+    expect(read).toThrow(REFUSAL);
+  });
+
+  it('reads a task written under another prefix bound to tm', () => {
+    const renamed = TASK_WITH_OBJECTS.replace(
+      '<tm:root ',
+      `<tm:root xmlns:t2="${TM}" `,
+    )
+      .replace('<tm:task tm:number=', '<t2:task t2:number=')
+      .replace('</tm:task>', '</t2:task>');
+    const item = readTransportItem(renamed, TASK);
+    expect(item.kind).toBe('task');
+    expect(item.header.number).toBe(TASK);
+  });
+
+  it('does not count an element of another namespace', () => {
+    const item = readTransportItem(
+      withRootChild(
+        TASK_WITH_OBJECTS,
+        `<x:task xmlns:x="urn:other" x:number="${TASK}"/>`,
+      ),
+      TASK,
+    );
+    expect(item.kind).toBe('task');
+  });
+});
+
+describe('transportItem trims a number or marker after decoding it', () => {
+  it('reads the number asked for trimmed', () => {
+    expect(
+      readTransportItem(TASK_WITH_OBJECTS, ` ${TASK} `).header.number,
+    ).toBe(TASK);
+  });
+
+  it.each([
+    ['literal', ` ${TASK} `, ' T '],
+    ['entity-encoded', `&#32;${TASK}&#32;`, '&#32;T&#32;'],
+  ])('reads %s padding as the value', (_what, number, marker) => {
+    const padded = TASK_WITH_OBJECTS.replace(
+      `<tm:task tm:number="${TASK}"`,
+      `<tm:task tm:number="${number}"`,
+    ).replace('tm:object_type="T"', `tm:object_type="${marker}"`);
+    const item = readTransportItem(padded, TASK);
+    expect(item.kind).toBe('task');
+    expect(item.header.number).toBe(TASK);
+  });
+
+  it.each([
+    ['literal', '   '],
+    ['entity-encoded', '&#32;'],
+  ])(
+    'refuses a %s whitespace-only number, asked for as written',
+    (_what, blank) => {
+      const document = TASK_WITH_OBJECTS.replace(
+        `<tm:task tm:number="${TASK}"`,
+        `<tm:task tm:number="${blank}"`,
+      );
+      expect(() => readTransportItem(document, ' ')).toThrow(REFUSAL);
+      expect(() => readTransportItem(document, '   ')).toThrow(REFUSAL);
+    },
+  );
+});

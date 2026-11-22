@@ -14,7 +14,15 @@
 
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { rawOf } from '../../result';
-import { tmAttribute, tmChildren, transportRoot } from './document';
+import {
+  type ITmElement,
+  tmAttribute,
+  tmChildren,
+  tmElements,
+  tmRootElement,
+  tmTrimmedAttribute,
+  transportRoot,
+} from './document';
 import { type ITransportObjectEntry, taskEntries } from './parseObjectEntries';
 
 /**
@@ -105,9 +113,9 @@ function ownHeader(element: unknown): ITransportItemHeader | undefined {
     : headerOf(element, number);
 }
 
-/** The elements among `elements` whose own `tm:number` is `asked`. */
-const naming = (elements: unknown[], asked: string): unknown[] =>
-  elements.filter((element) => tmAttribute(element, 'number') === asked);
+/** The elements among `elements` whose own `tm:number`, trimmed, is `asked`. */
+const naming = (elements: ITmElement[], asked: string): ITmElement[] =>
+  elements.filter((tm) => tmTrimmedAttribute(tm, 'number') === asked);
 
 /**
  * Read a transport request or task document, asked for by `number`.
@@ -135,15 +143,16 @@ export function readTransportItem(
   document: unknown,
   number: string,
 ): ITransportItem {
-  const root = transportRoot(document) ?? refuse();
-  const marker = tmAttribute(root, 'object_type');
+  const root = tmRootElement(transportRoot(document) ?? refuse());
+  const marker = tmTrimmedAttribute(root, 'object_type');
   if (marker !== undefined && marker !== 'T' && marker !== 'R') refuse();
-  if (number === '') refuse();
+  const asked = number.trim();
+  if (asked === '') refuse();
 
-  const rootTasks = tmChildren(root, 'task');
-  const requests = tmChildren(root, 'request');
-  const tasksNamed = naming(rootTasks, number);
-  const requestsNamed = naming(requests, number);
+  const rootTasks = tmElements(root, 'task');
+  const requests = tmElements(root, 'request');
+  const tasksNamed = naming(rootTasks, asked);
+  const requestsNamed = naming(requests, asked);
   if (tasksNamed.length + requestsNamed.length !== 1) refuse();
 
   const [task] = tasksNamed;
@@ -152,9 +161,9 @@ export function readTransportItem(
     const [request] = requests;
     return {
       kind: 'task',
-      header: headerOf(task, number),
-      parent: ownHeader(request),
-      objects: taskEntries(task),
+      header: headerOf(task.element, asked),
+      parent: ownHeader(request?.element),
+      objects: taskEntries(task.element),
     };
   }
 
@@ -163,8 +172,8 @@ export function readTransportItem(
   if (marker === undefined && rootTasks.length > 0) refuse();
   return {
     kind: 'request',
-    header: headerOf(request, number),
-    tasks: tmChildren(request, 'task').flatMap((child) => {
+    header: headerOf(request?.element, asked),
+    tasks: tmChildren(request?.element, 'task').flatMap((child) => {
       const header = ownHeader(child);
       return header === undefined
         ? []
