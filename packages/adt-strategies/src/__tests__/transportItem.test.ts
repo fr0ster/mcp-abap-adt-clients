@@ -96,8 +96,63 @@ describe('transportItem reads a request or a task document', () => {
     expect(readTransportItem(request, PARENT).kind).toBe('request');
   });
 
+  // Since 0.28.1. SAP marks a task's document (`prepare_tm_root_for_task`,
+  // on premise and on the cloud), so these documents are built from the
+  // recordings by removing the marker: the case is defensive.
+  it.each([
+    ['the recorded on-premise task', TASK_WITH_OBJECTS],
+    ['the recorded cloud task', EMPTY_TASK],
+  ])(
+    'without tm:object_type, %s asked by its parent’s number is not the parent',
+    (_what, document) => {
+      const unmarked = document.replace('tm:object_type="T" ', '');
+      expect(() => readTransportItem(unmarked, PARENT)).toThrow(
+        'readTransportItem: the answer is not the transport request or task asked for',
+      );
+      expect(readTransportItem(unmarked, TASK).kind).toBe('task');
+    },
+  );
+
   it.each([
     ['another number', () => readTransportItem(TASK_WITH_OBJECTS, PARENT)],
+    [
+      'a task and its request both naming the number, marked',
+      () =>
+        readTransportItem(
+          TASK_WITH_OBJECTS.replace(
+            `tm:number="${PARENT}"`,
+            `tm:number="${TASK}"`,
+          ),
+          TASK,
+        ),
+    ],
+    [
+      'a task and its request both naming the number, unmarked',
+      () =>
+        readTransportItem(
+          TASK_WITH_OBJECTS.replace('tm:object_type="T" ', '').replace(
+            `tm:number="${PARENT}"`,
+            `tm:number="${TASK}"`,
+          ),
+          TASK,
+        ),
+    ],
+    [
+      'a task document marked as a request',
+      () =>
+        readTransportItem(
+          TASK_WITH_OBJECTS.replace('tm:object_type="T"', 'tm:object_type="R"'),
+          TASK,
+        ),
+    ],
+    [
+      'a request document marked as a task',
+      () =>
+        readTransportItem(
+          REQUEST.replace('tm:object_type="R"', 'tm:object_type="T"'),
+          PARENT,
+        ),
+    ],
     ['a request asked as a task', () => readTransportItem(REQUEST, TASK)],
     [
       'a task element without a number',

@@ -97,14 +97,6 @@ function headerOf(element: unknown, number: string): ITransportItemHeader {
   };
 }
 
-/** The element's number, which must be the one asked for. */
-function numberOf(element: unknown, asked: string): string {
-  const number = tmAttribute(element, 'number');
-  return number !== undefined && number !== '' && number === asked
-    ? number
-    : refuse();
-}
-
 /** A header of an element whose number is not checked against the request: a parent's, a task's. */
 function ownHeader(element: unknown): ITransportItemHeader | undefined {
   const number = tmAttribute(element, 'number');
@@ -113,17 +105,31 @@ function ownHeader(element: unknown): ITransportItemHeader | undefined {
     : headerOf(element, number);
 }
 
+/** The elements among `elements` whose own `tm:number` is `asked`. */
+const naming = (elements: unknown[], asked: string): unknown[] =>
+  elements.filter((element) => tmAttribute(element, 'number') === asked);
+
 /**
  * Read a transport request or task document, asked for by `number`.
  *
- * `kind` is the root's `tm:object_type` (`R` a request, `T` a task); without
- * it, a `tm:task` of the root naming `number` makes it a task, and anything
- * else a request. The element selected — the root's `tm:task` for a task,
- * its `tm:request` for a request — must name `number`.
+ * **The number asked decides the item** (since 0.28.1): the root's `tm:task`
+ * whose own number is `number` makes it a task, the root's `tm:request` whose
+ * own number is `number` a request; exactly one element may name it. The
+ * root's `tm:object_type` (`R` a request, `T` a task) must confirm what the
+ * number found.
+ *
+ * Without the marker the number decides alone, with one rule of the
+ * document's shape: a root that holds a `tm:task` of its own is a task's
+ * document, whose `tm:request` is only the parent's header, so it is not the
+ * request asked for. SAP marks every task document
+ * (`CL_CTS_ADT_TM_RES_REQUEST_CONT->prepare_tm_root_for_task`, on premise and
+ * on the cloud), so the markerless case is defensive: until 0.28.1 a task's
+ * unmarked document asked for by its parent's number was read as the parent.
  *
  * Throws `TRANSPORT_ITEM_REFUSAL`, and nothing of the document, for an answer
- * that is no `tm:root` document, whose marker is neither, or whose selected
- * element is missing, names no number or another one.
+ * that is no `tm:root` document, whose marker is neither or contradicts the
+ * element found, where no element or more than one names `number`, or where
+ * the number is blank.
  */
 export function readTransportItem(
   document: unknown,
@@ -131,40 +137,38 @@ export function readTransportItem(
 ): ITransportItem {
   const root = transportRoot(document) ?? refuse();
   const marker = tmAttribute(root, 'object_type');
-  const tasks = tmChildren(root, 'task');
-  const isTask =
-    marker === 'T' ||
-    (marker === undefined &&
-      tasks.some((task) => tmAttribute(task, 'number') === number));
   if (marker !== undefined && marker !== 'T' && marker !== 'R') refuse();
+  if (number === '') refuse();
 
-  if (isTask) {
-    const task =
-      tasks.length === 1
-        ? tasks[0]
-        : tasks.find(
-            (candidate) => tmAttribute(candidate, 'number') === number,
-          );
-    const header = headerOf(task, numberOf(task, number));
-    const [request] = tmChildren(root, 'request');
+  const rootTasks = tmChildren(root, 'task');
+  const requests = tmChildren(root, 'request');
+  const tasksNamed = naming(rootTasks, number);
+  const requestsNamed = naming(requests, number);
+  if (tasksNamed.length + requestsNamed.length !== 1) refuse();
+
+  const [task] = tasksNamed;
+  if (task !== undefined) {
+    if (marker === 'R') refuse();
+    const [request] = requests;
     return {
       kind: 'task',
-      header,
+      header: headerOf(task, number),
       parent: ownHeader(request),
       objects: taskEntries(task),
     };
   }
 
-  const requests = tmChildren(root, 'request');
-  const request = requests.length === 1 ? requests[0] : refuse();
+  const [request] = requestsNamed;
+  if (marker === 'T') refuse();
+  if (marker === undefined && rootTasks.length > 0) refuse();
   return {
     kind: 'request',
-    header: headerOf(request, numberOf(request, number)),
-    tasks: tmChildren(request, 'task').flatMap((task) => {
-      const header = ownHeader(task);
+    header: headerOf(request, number),
+    tasks: tmChildren(request, 'task').flatMap((child) => {
+      const header = ownHeader(child);
       return header === undefined
         ? []
-        : [{ header, objectCount: tmChildren(task, 'abap_object').length }];
+        : [{ header, objectCount: tmChildren(child, 'abap_object').length }];
     }),
   };
 }
