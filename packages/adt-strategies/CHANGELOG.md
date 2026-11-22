@@ -32,31 +32,36 @@ with a nameless entry added, and an entry with no attribute at all.
 
 ### Fixed
 
-- **`transportObjectEntries` / `parseObjectEntries` and `transportItem` /
-  `readTransportItem` drop no entry SAP lists.** A `tm:abap_object` without
-  `tm:name` or `tm:type` was skipped; one without `tm:position` was already
-  kept. It is now answered in `incompleteEntries`
-  (`ITransportIncompleteEntry`: every field of an entry, each present only
-  when the entry carries it, the task's number included), in document
-  order, present only when the document holds one:
-  - `transportObjectEntries` answers `ITransportObjectEntries`, still an
-    `ITransportObjectEntry[]` holding the same entries, with
-    `incompleteEntries` on the array itself (a `map`, a spread or JSON of
-    the array does not carry it: read it off the answer). A strategy typed
-    `IResultStrategy<ITransportObjectEntry[]>` still accepts it.
-  - `ITransportTaskItem` (a task's document) gains `incompleteEntries`.
+- **No entry SAP lists is dropped silently any more.** A `tm:abap_object`
+  without `tm:name` or `tm:type` was skipped by every transport entry
+  reading; one without `tm:position` was already kept. It is now answered
+  in `incompleteEntries` (`ITransportIncompleteEntry`: every field of an
+  entry, each present only when the entry carries it, the task's number
+  included), in document order, present only when the document holds one:
+  - **`transportObjectEntryList` / `parseObjectEntryList`, new: the
+    complete entry reading.** It answers `ITransportObjectEntryList`,
+    `{ entries, incompleteEntries? }` — `entries` the same entries
+    `transportObjectEntries` answers. A plain object, so a copy or JSON of
+    it keeps both lists.
+  - **`transportObjectEntries` / `parseObjectEntries` are unchanged and
+    leave out an entry without a name or a type**, as they always did: the
+    answer is still the plain `ITransportObjectEntry[]`. A caller who must
+    see every entry SAP lists moves to `transportObjectEntryList`.
+  - **`transportItem` / `readTransportItem`: `ITransportTaskItem` (a task's
+    document) gains `incompleteEntries`.**
 
   `ITransportObjectEntry` is unchanged: `name` and `type` stay required,
-  and `objects` holds the same entries with the same values.
+  and `objects` / `entries` hold the same entries with the same values.
 
   **The count includes them.** A task holds `objects.length +
-  (incompleteEntries?.length ?? 0)` entries — the number its request's
-  document gives as the task's `objectCount`, which has counted every
-  `tm:abap_object`, complete or not, since 0.28.0 (now stated on the field
-  and pinned).
+  (incompleteEntries?.length ?? 0)` entries (`entries.length + …` in the
+  list reading) — the number its request's document gives as the task's
+  `objectCount`, which has counted every `tm:abap_object`, complete or not,
+  since 0.28.0 (now stated on the field and pinned).
 
-  The new names, both exported: `ITransportIncompleteEntry`,
-  `ITransportObjectEntries`. Nothing existing changes type; the one
+  The new names, all exported: `transportObjectEntryList`,
+  `parseObjectEntryList`, `ITransportObjectEntryList`,
+  `ITransportIncompleteEntry`. Nothing existing changes type; the one
   consumer an added key reaches is an exhaustive mapping over
   `ITransportTaskItem`'s keys, which now needs `incompleteEntries`.
 

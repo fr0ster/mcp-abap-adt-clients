@@ -184,7 +184,7 @@ after this one):
 | export | slot it fills | answers |
 |---|---|---|
 | `asItCame`, `rawOf` | any | the answer unchanged; `answer.data` as text |
-| `transportTree`, `transportCreated`, `transportSearchConfigurations`, `transportObjectEntries` | `getRequest`: `list`; `created`/`createdTask`; `searchConfigurations`; `objects` | `ITransportTree`, `ICreatedTransport`, `ITransportSearchConfiguration[]`, `ITransportObjectEntries` (an `ITransportObjectEntry[]`; since 0.28.2 an entry without a name or a type in its `incompleteEntries`) |
+| `transportTree`, `transportCreated`, `transportSearchConfigurations`, `transportObjectEntries`, `transportObjectEntryList` | `getRequest`: `list`; `created`/`createdTask`; `searchConfigurations`; `objects` | `ITransportTree`, `ICreatedTransport`, `ITransportSearchConfiguration[]`, `ITransportObjectEntry[]` (leaves out an entry without a name or a type), `ITransportObjectEntryList` (0.28.2, the complete reading: `{ entries, incompleteEntries? }`) |
 | `transportItem(number)`, `readTransportItem` | `getRequest`: `objects` (the request or task document) | `ITransportItem`: `{ kind: 'request', header, tasks }` or `{ kind: 'task', header, parent, objects, incompleteEntries? }` (0.28.2: a task entry without a name or a type; `objectCount` counts every entry); the item is the root's `tm:task` or `tm:request` naming `number`, the marker confirming it; refused when none or both name it (0.28.1) |
 | `objectVersions` | any versionable type: `versions` | `IObjectVersion[]` |
 | `unitTestRunId` | `AdtExecutor.getClassTestRunner`: `run` | the run id, from the header ADT puts it in |
@@ -304,8 +304,9 @@ off it). `adt-clients` lets a reading's exception surface as itself.
 tag or attribute is coerced to a number (`007` stays `007`, a position
 `000025` keeps its width), and references decode as an XML parser decodes them
 (`&#x26;` is `&`). Readings keep what the document holds: `transportObjectEntries`
-one entry per task entry, with `task`, and since 0.28.2 an entry without a
-name or a type in `incompleteEntries` (as `transportItem`'s task does); `utilWhereUsedReferences` every
+one entry per task entry, with `task` (an entry without a name or a type
+left out; since 0.28.2 `transportObjectEntryList` answers it in
+`incompleteEntries`, as `transportItem`'s task does); `utilWhereUsedReferences` every
 reference, packages included, with `kind`; `utilNodeContents` each object's
 `description` and, since 0.28.1, every node SAP lists: one without its name,
 technical name or URI in `incompleteObjects`, the field it lacks absent, and
