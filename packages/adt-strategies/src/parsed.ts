@@ -11,6 +11,8 @@
  * carry it.
  */
 
+import type { X2jOptions } from 'fast-xml-parser';
+
 /** A parsed element: what the parser makes of an element with children. */
 export type ParsedElement = Record<string, unknown>;
 
@@ -53,3 +55,102 @@ export function leafText(value: unknown): string | undefined {
     return String(value);
   return undefined;
 }
+
+const PREDEFINED_ENTITIES: ReadonlyMap<string, string> = new Map([
+  ['amp', '&'],
+  ['lt', '<'],
+  ['gt', '>'],
+  ['quot', '"'],
+  ['apos', "'"],
+]);
+
+const DECIMAL_DIGITS = '0123456789';
+const HEX_DIGITS = '0123456789abcdefABCDEF';
+
+/** Whether a code point is a `Char` of XML 1.0 (§2.2). */
+function isXmlChar(code: number): boolean {
+  return (
+    code === 0x9 ||
+    code === 0xa ||
+    code === 0xd ||
+    (code >= 0x20 && code <= 0xd7ff) ||
+    (code >= 0xe000 && code <= 0xfffd) ||
+    (code >= 0x10000 && code <= 0x10ffff)
+  );
+}
+
+/** Whether every character of `text` is one of `digits`, and there is one. */
+function allOf(text: string, digits: string): boolean {
+  if (text === '') return false;
+  for (const character of text) if (!digits.includes(character)) return false;
+  return true;
+}
+
+/**
+ * The text a reference names — `amp`, `#38`, `#x26` (what stands between `&`
+ * and `;`) — or `undefined` when it names nothing XML defines.
+ */
+function referenced(name: string): string | undefined {
+  const predefined = PREDEFINED_ENTITIES.get(name);
+  if (predefined !== undefined) return predefined;
+  if (!name.startsWith('#')) return undefined;
+  const hex = name.startsWith('#x');
+  const digits = name.slice(hex ? 2 : 1);
+  if (!allOf(digits, hex ? HEX_DIGITS : DECIMAL_DIGITS)) return undefined;
+  const code = Number.parseInt(digits, hex ? 16 : 10);
+  return isXmlChar(code) ? String.fromCodePoint(code) : undefined;
+}
+
+/**
+ * Text as an XML parser hands it over: the five predefined entities and every
+ * character reference (`&#38;`, `&#x26;`) replaced by the character it names,
+ * in one pass, so `&amp;#x26;` is the text `&#x26;` and not `&`. A reference
+ * XML does not define (`&nbsp;`, a code point outside `Char`) stays as it is
+ * written. Plain code: one scan, no regular expression.
+ */
+export function decodeXmlText(text: string): string {
+  if (!text.includes('&')) return text;
+  let decoded = '';
+  let from = 0;
+  for (;;) {
+    const start = text.indexOf('&', from);
+    if (start < 0) break;
+    const end = text.indexOf(';', start + 1);
+    if (end < 0) break;
+    const character = referenced(text.slice(start + 1, end));
+    if (character === undefined) {
+      decoded += text.slice(from, start + 1);
+      from = start + 1;
+      continue;
+    }
+    decoded += text.slice(from, start) + character;
+    from = end + 1;
+  }
+  return decoded + text.slice(from);
+}
+
+/**
+ * The parser options every reading of an ADT document shares: values are
+ * text as written — no number, boolean or date is made of a tag or an
+ * attribute (`007` stays `007`) — and references are decoded as an XML
+ * parser decodes them (`decodeXmlText`), not by the parser's own entity
+ * handling, which leaves character references as written.
+ */
+export const XML_TEXT_OPTIONS: Readonly<
+  Pick<
+    X2jOptions,
+    | 'parseTagValue'
+    | 'parseAttributeValue'
+    | 'processEntities'
+    | 'tagValueProcessor'
+    | 'attributeValueProcessor'
+  >
+> = {
+  parseTagValue: false,
+  parseAttributeValue: false,
+  processEntities: false,
+  tagValueProcessor: (_name: string, value: string): string =>
+    decodeXmlText(value),
+  attributeValueProcessor: (_name: string, value: string): string =>
+    decodeXmlText(value),
+};
