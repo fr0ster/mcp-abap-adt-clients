@@ -18,7 +18,7 @@ The tags made before the packages moved under `packages/` are
 
 Released with `@mcp-abap-adt/adt-clients` 47.0.0, on
 `@mcp-abap-adt/interfaces-adt` `^31.0.0` (was `^30.2.0`; no type this package
-uses changed — the range follows adt-clients', so the tree holds one copy).
+uses changed — the range follows adt-clients', so the tree holds one version).
 The readings the server
 team found reading something other than what the document holds, fixed on
 the documents they were found with, and one new reading.
