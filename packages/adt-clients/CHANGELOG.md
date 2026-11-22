@@ -24,6 +24,21 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [47.0.2] - 2026-11-23
+
+Documentation only, released with `@mcp-abap-adt/adt-strategies` 0.28.2 (published
+first; the range is now `^0.28.2`, so the behaviour documented is the one
+installed). No code or type change.
+
+### Fixed
+
+- **`docs/usage/ERRATA.md`** (shipped in the package) matches adt-strategies
+  0.28.2: the transport entry says a `tm:abap_object` without a name or a
+  type is answered in `incompleteEntries` and counted, not dropped.
+- **`docs/usage/CLIENT_API_REFERENCE.md`** (shipped) says the same for
+  `readObjects()` with `transportObjectEntries` and with
+  `transportItem(number)`.
+
 ## [47.0.1] - 2026-11-23
 
 Documentation only, released with `@mcp-abap-adt/adt-strategies` 0.28.1 (published
