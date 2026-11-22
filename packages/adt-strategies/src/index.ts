@@ -221,13 +221,20 @@ export {
 } from './results/traces';
 export {
   type ICreatedTransport,
+  type ITransportItem,
+  type ITransportItemHeader,
   type ITransportObjectEntry,
+  type ITransportRequestItem,
+  type ITransportTaskItem,
+  type ITransportTaskSummary,
   type ITransportTree,
   type ITransportTreeLink,
   type ITransportTreeNode,
   type ITransportTreeRequest,
   type ITransportTreeTask,
+  readTransportItem,
   transportCreated,
+  transportItem,
   transportObjectEntries,
   transportSearchConfigurations,
   transportTree,
@@ -257,6 +264,7 @@ export {
   utilNodeContents,
   utilSearchHits,
   utilWhereUsedReferences,
+  type WhereUsedReferenceKind,
 } from './results/utils';
 export { type IObjectVersion, objectVersions } from './results/versions';
 // Where a message stands in its source (`AdtMessage.position`).

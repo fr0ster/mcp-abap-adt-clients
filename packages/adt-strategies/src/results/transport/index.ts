@@ -13,6 +13,16 @@ import {
 } from './parseObjectEntries';
 import { parseSearchConfigurations } from './parseSearchConfigurations';
 import {
+  type ITransportItem,
+  type ITransportItemHeader,
+  type ITransportRequestItem,
+  type ITransportTaskItem,
+  type ITransportTaskSummary,
+  readTransportItem,
+  TRANSPORT_ITEM_REFUSAL,
+  transportItem,
+} from './parseTransportItem';
+import {
   parseTransportTree,
   TRANSPORT_TREE_REFUSAL,
 } from './parseTransportTree';
@@ -60,10 +70,18 @@ export type * from './types';
 export {
   CREATED_TRANSPORT_REFUSAL,
   type ICreatedTransport,
+  type ITransportItem,
+  type ITransportItemHeader,
   type ITransportObjectEntry,
+  type ITransportRequestItem,
+  type ITransportTaskItem,
+  type ITransportTaskSummary,
   parseCreatedTransport,
   parseObjectEntries,
   parseSearchConfigurations,
   parseTransportTree,
+  readTransportItem,
+  TRANSPORT_ITEM_REFUSAL,
   TRANSPORT_TREE_REFUSAL,
+  transportItem,
 };
