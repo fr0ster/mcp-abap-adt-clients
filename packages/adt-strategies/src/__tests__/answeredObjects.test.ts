@@ -138,16 +138,17 @@ describe('readSearchHits (written answer: no search is recorded)', () => {
   });
 });
 
+// Every reference carries an address since 0.28.0, as every recorded one does.
 describe('utilInactiveObjects (written answer: no listing is recorded)', () => {
   it('answers a code of the tables as a type, and keeps the other as unknownType', () => {
     const xml = `<ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects" xmlns:adtcore="http://www.sap.com/adt/core">
-      <ioc:entry><ioc:object><ioc:ref adtcore:name="ZCL_A" adtcore:type="CLAS/OC"/></ioc:object></ioc:entry>
-      <ioc:entry><ioc:object><ioc:ref adtcore:name="ZREP_S" adtcore:type="${UNKNOWN}"/></ioc:object></ioc:entry>
+      <ioc:entry><ioc:object><ioc:ref adtcore:uri="/sap/bc/adt/oo/classes/zcl_a" adtcore:name="ZCL_A" adtcore:type="CLAS/OC"/></ioc:object></ioc:entry>
+      <ioc:entry><ioc:object><ioc:ref adtcore:uri="/sap/bc/adt/x/zrep_s" adtcore:name="ZREP_S" adtcore:type="${UNKNOWN}"/></ioc:object></ioc:entry>
     </ioc:inactiveObjects>`;
     expect(utilInactiveObjects(wire(xml))).toEqual({
       objects: [
-        { type: 'CLAS/OC', name: 'ZCL_A' },
-        { unknownType: UNKNOWN, name: 'ZREP_S' },
+        { type: 'CLAS/OC', name: 'ZCL_A', uri: '/sap/bc/adt/oo/classes/zcl_a' },
+        { unknownType: UNKNOWN, name: 'ZREP_S', uri: '/sap/bc/adt/x/zrep_s' },
       ],
     });
   });
