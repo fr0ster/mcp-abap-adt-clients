@@ -1,9 +1,11 @@
 /**
  * SystemMessages - Low-level read functions
  *
- * Provides access to system messages (SM02):
- * - List system messages with optional filtering
- * - Get individual system message by ID
+ * Provides access to system messages (SM02): the collection, with optional
+ * filtering. There is no read of one message by id: `CL_STSK_ADT_RES_APP->
+ * register_resources` (l. 31-48, the same on premise and on the cloud)
+ * registers `/runtime/systemmessages` alone, so `/{id}` has no handler; the
+ * read that asked for it left in 47.0.0.
  */
 
 import type { IFeedQueryOptions } from '@mcp-abap-adt/interfaces-adt';
@@ -32,29 +34,6 @@ export async function listSystemMessages(
     timeout: 0,
     headers: {
       Accept: 'application/atom+xml;type=feed',
-    },
-  });
-}
-
-/**
- * Get a single system message by ID
- *
- * @param connection - ABAP connection
- * @param messageId - System message ID
- * @returns Axios response with system message details
- */
-export async function getSystemMessage(
-  connection: IAbapConnection,
-  messageId: string,
-): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/runtime/systemmessages/${messageId}`;
-
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: 0,
-    headers: {
-      Accept: 'application/xml',
     },
   });
 }

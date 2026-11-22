@@ -187,11 +187,15 @@ const TYPES_XML =
   '</nameditem:namedItemList>';
 
 describe('utilNamedItems', () => {
-  it('keeps the name verbatim and defaults a missing description', () => {
+  // Since 0.28.0 an absent description stays absent (it was `''`).
+  it('keeps the name verbatim and a missing description absent', () => {
     expect(utilNamedItems(wire(TYPES_XML))).toEqual([
       { name: 'CLAS/OC', description: 'Class' },
-      { name: 'PROG/P', description: '' },
+      { name: 'PROG/P' },
     ]);
+    const second = utilNamedItems(wire(TYPES_XML))[1];
+    // A present `description: undefined` is refused too.
+    expect(second !== undefined && 'description' in second).toBe(false);
   });
 
   it('reads a single entry the parser does not wrap in an array', () => {
@@ -234,9 +238,22 @@ describe('utilInactiveObjects', () => {
     });
   });
 
-  it('answers no objects for an empty listing and for a document that is not one', () => {
-    expect(utilInactiveObjects(wire(''))).toEqual({ objects: [] });
-    expect(utilInactiveObjects(wire(EXCEPTION))).toEqual({ objects: [] });
+  // Since 0.28.0 a document that is no listing is refused, not read as empty:
+  // an activation is confirmed off this list.
+  it('answers no objects for an empty listing, and refuses a document that is not one', () => {
+    expect(
+      utilInactiveObjects(
+        wire(
+          '<ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects"/>',
+        ),
+      ),
+    ).toEqual({ objects: [] });
+    expect(() => utilInactiveObjects(wire(''))).toThrow(
+      'utilInactiveObjects: the answer is no inactive-objects list',
+    );
+    expect(() => utilInactiveObjects(wire(EXCEPTION))).toThrow(
+      'utilInactiveObjects: the answer is no inactive-objects list',
+    );
   });
 });
 
@@ -271,16 +288,20 @@ describe('utilWhereUsedReferences', () => {
     });
   }
 
-  it('skips packages, which are container nodes and not uses', () => {
+  // Since 0.28.0 a package is kept, its kind `package`: which to show is the caller's.
+  it('keeps packages, of kind package', () => {
     const withPackage =
       `<?xml version="1.0" encoding="utf-8"?>` +
       `<u:usageReferenceResult xmlns:u="http://www.sap.com/adt/ris/usageReferences" numberOfResults="1">` +
       `<u:referencedObjects><u:referencedObject uri="/p">` +
       `<u:adtObject adtcore:name="ZPKG" adtcore:type="DEVC/K" xmlns:adtcore="http://www.sap.com/adt/core"/>` +
       `</u:referencedObject></u:referencedObjects></u:usageReferenceResult>`;
-    expect(utilWhereUsedReferences(wire(withPackage)).references).toHaveLength(
-      0,
-    );
+    expect(
+      utilWhereUsedReferences(wire(withPackage)).references.map((r) => [
+        r.kind,
+        r.name,
+      ]),
+    ).toEqual([['package', 'ZPKG']]);
   });
 
   it('answers an empty reading for a document it does not recognise', () => {

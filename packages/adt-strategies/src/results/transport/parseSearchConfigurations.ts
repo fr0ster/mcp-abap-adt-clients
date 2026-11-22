@@ -8,11 +8,14 @@
 
 import type { ITransportSearchConfiguration } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
+import { isElement, parsedText, XML_TEXT_OPTIONS } from '../../parsed';
 
+// Values as written (`XML_TEXT_OPTIONS`, since 0.28.0): its tag values were
+// coerced by the parser's default, though no reading took one.
 const xmlParser = new XMLParser({
+  ...XML_TEXT_OPTIONS,
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
-  parseAttributeValue: false,
 });
 
 const asArray = (value: unknown): Record<string, unknown>[] => {
@@ -63,7 +66,8 @@ export function parseSearchConfigurations(
     return [];
   }
 
-  const parsed = xmlParser.parse(xml) as Record<string, unknown>;
+  const parsed = parsedText(xmlParser, xml);
+  if (!isElement(parsed)) return [];
   const root = (parsed['configurations:configurations'] ??
     parsed.configurations) as Record<string, unknown> | undefined;
   if (!root) {

@@ -35,7 +35,7 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
-import { field, isElement, leafText, listOf } from '../parsed';
+import { field, isElement, leafText, listOf, parsedOrNothing } from '../parsed';
 import { rawOf } from '../result';
 import { answeredObject } from './answeredObject';
 
@@ -199,7 +199,9 @@ function readRoot(xml: string): {
   children: IChild[];
   package: IElementInfoPackage | undefined;
 } {
-  const root: unknown = xml.trim() ? field(parser.parse(xml), ELEMENT) : {};
+  const root: unknown = xml.trim()
+    ? field(parsedOrNothing(parser, xml), ELEMENT)
+    : {};
   const type = attr(root, 'adtcore:type');
   const object: IElementInfoObject = {
     ...(type === undefined ? {} : answeredObject(type)),

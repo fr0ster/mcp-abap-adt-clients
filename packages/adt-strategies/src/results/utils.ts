@@ -9,10 +9,16 @@
  * shapes passes it in the reading set, and one who wants a refusal named passes
  * an `analyse` (`analyseException`, `analyseAny`).
  *
- * **None of these throws on a document it does not recognise.** An exception
- * document, a logon page, or an empty body reads as the empty shape: that is
- * what the reading can honestly say it found. Whether the answer was a refusal
- * is the error strategy's question, and it runs before this one is asked.
+ * **Of these, only `utilInactiveObjects` throws on a document it does not
+ * recognise** (since 0.28.0): an activation is confirmed off the inactive
+ * list, and an empty one read off the wrong document would confirm one that
+ * did not happen. The others read an exception document, a logon page, or an
+ * empty body as the empty shape: that is what the reading can honestly say it
+ * found. Whether the answer was a refusal is the error strategy's question,
+ * and it runs before this one is asked.
+ *
+ * **Values are text as written** (`XML_TEXT_OPTIONS`): nothing is coerced to a
+ * number, and references decode as an XML parser decodes them.
  */
 
 import type {
@@ -20,16 +26,26 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
-import { at, field, isElement, leafText, listOf } from '../parsed';
+import { readInactiveList } from '../inactiveList';
+import {
+  at,
+  field,
+  isElement,
+  leafText,
+  listOf,
+  ownText,
+  parsedOrNothing,
+  parsedText,
+  XML_TEXT_OPTIONS,
+} from '../parsed';
 import { rawOf } from '../result';
 import { answeredObject } from './answeredObject';
 
 type XmlRecord = Record<string, unknown>;
 
-const asArray = (value: unknown): XmlRecord[] =>
-  value === undefined || value === null || value === ''
-    ? []
-    : ((Array.isArray(value) ? value : [value]) as XmlRecord[]);
+/** A parsed element that is one element, not a list of them. */
+const isRecord = (value: unknown): value is XmlRecord =>
+  isElement(value) && !Array.isArray(value);
 
 // ---------------------------------------------------------------------------
 // Shapes
@@ -57,8 +73,16 @@ export type ISearchResult = IAdtObjectHit & {
   description: string;
 };
 
-/** One object that uses the object asked about. */
+/**
+ * What a where-used reference is: `package` for a `DEVC/K` node — the
+ * containers SAP lists the places of use under —, `object` for anything else.
+ */
+export type WhereUsedReferenceKind = 'package' | 'object';
+
+/** One reference of a where-used answer: a place of use, or a package above one. */
 export type IWhereUsedReference = IAdtObjectHit & {
+  /** Since 0.28.0: whether this is a package node or an object. */
+  kind: WhereUsedReferenceKind;
   /** ADT URI of the referencing object — always known for a where-used hit. */
   uri: string;
   /** Parent URI (for hierarchical display). */
@@ -84,7 +108,11 @@ export interface IWhereUsedListResult {
   totalReferences: number;
   /** Result description from SAP. */
   resultDescription: string;
-  /** Referencing objects, packages excluded. */
+  /**
+   * Every reference the document holds, in document order — package nodes
+   * included since 0.28.0 (`kind` says which is which); which of them to show
+   * is the caller's decision.
+   */
   references: IWhereUsedReference[];
 }
 
@@ -121,7 +149,11 @@ export interface IInactiveObjectsResponse {
 export interface INamedItem {
   /** A URI, as the server writes it — not a short code. */
   name: string;
-  description: string;
+  /**
+   * `nameditem:description` as written; absent when the entry carries none
+   * (until 0.28.0 an absent one read as `''`).
+   */
+  description?: string;
 }
 
 /**
@@ -133,6 +165,8 @@ export type IRepositoryObjectNode = IAdtAnsweredObject & {
   objectName: string;
   techName: string;
   objectUri: string;
+  /** Since 0.28.0: `DESCRIPTION` as written, when the node carries one. */
+  description?: string;
 };
 
 /**
@@ -157,40 +191,70 @@ export interface IParsedNodeStructure {
 }
 
 // ---------------------------------------------------------------------------
-// Search
+// Shared
 // ---------------------------------------------------------------------------
 
-const searchParser = new XMLParser({
+/**
+ * One parser options set for every reading below: values as written
+ * (`XML_TEXT_OPTIONS` — `007` stays `007`, `&#x26;` is `&`), with the
+ * parser's attribute marker the readings address them by.
+ */
+const textParser = new XMLParser({
+  ...XML_TEXT_OPTIONS,
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
-  parseAttributeValue: false,
 });
+
+/** The same, namespace prefixes stripped, for documents whose prefix varies. */
+const bareParser = new XMLParser({
+  ...XML_TEXT_OPTIONS,
+  ignoreAttributes: false,
+  attributeNamePrefix: '@_',
+  removeNSPrefix: true,
+});
+
+/** A document parsed — `undefined` for an empty body or text that is not well-formed XML. */
+function parsedWith(parser: XMLParser, xml: string): unknown {
+  if (xml.trim() === '' || XMLValidator.validate(xml) !== true) {
+    return undefined;
+  }
+  return parsedText(parser, xml);
+}
+
+/** A non-empty attribute or leaf, trimmed; `undefined` otherwise. */
+const trimmedText = (value: unknown): string | undefined => {
+  const text = leafText(value)?.trim();
+  return text === undefined || text === '' ? undefined : text;
+};
+
+/** A leaf, or an element's text, as written; `undefined` when neither. */
+const textOf = (value: unknown): string | undefined => ownText(value);
+
+// ---------------------------------------------------------------------------
+// Search
+// ---------------------------------------------------------------------------
 
 /**
  * An attribute ADT may or may not namespace-qualify. The quickSearch payload is
  * not consistent across releases about the `adtcore:` prefix, so both are read.
  */
-const searchAttr = (node: XmlRecord, name: string): string | undefined => {
-  const value = node[`@_adtcore:${name}`] ?? node[`@_${name}`];
-  if (value === undefined || value === null) return undefined;
-  const text = String(value).trim();
-  return text.length > 0 ? text : undefined;
-};
+const searchAttr = (node: unknown, name: string): string | undefined =>
+  trimmedText(field(node, `@_adtcore:${name}`)) ??
+  trimmedText(field(node, `@_${name}`));
 
 /**
  * A quickSearch document, read into hits. A hit without a name or a type is
  * dropped — a caller cannot act on it and the repository does not produce one.
+ * References are decoded as an XML parser decodes them (`&#x26;` is `&`).
  */
 export function readSearchHits(xml: string): ISearchResult[] {
-  if (!xml.trim()) return [];
-  const parsed = searchParser.parse(xml) as XmlRecord;
-  const root = (parsed['adtcore:objectReferences'] ??
-    parsed.objectReferences) as XmlRecord | undefined;
-  if (!root || typeof root !== 'object') return [];
-
+  const parsed = parsedWith(textParser, xml);
+  const root =
+    field(parsed, 'adtcore:objectReferences') ??
+    field(parsed, 'objectReferences');
   const results: ISearchResult[] = [];
-  for (const ref of asArray(
-    root['adtcore:objectReference'] ?? root.objectReference,
+  for (const ref of listOf(
+    field(root, 'adtcore:objectReference') ?? field(root, 'objectReference'),
   )) {
     const name = searchAttr(ref, 'name');
     const type = searchAttr(ref, 'type');
@@ -214,31 +278,20 @@ export const utilSearchHits: IResultStrategy<ISearchResult[]> = (answer) =>
 // Named items — the type catalogue
 // ---------------------------------------------------------------------------
 
-const namedItemParser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: '',
-  trimValues: true,
-});
-
 /**
- * `nameditem:namedItemList`, read. `name` is kept exactly as the server writes
- * it; an entry without one is dropped. A document that is not this one reads
- * as no items.
+ * `nameditem:namedItemList`, read. `name` and `description` are kept exactly
+ * as the server writes them — `007` is `007`, never the number 7 — and a
+ * description the entry does not carry stays absent; an entry without a name
+ * is dropped. A document that is not this one reads as no items.
  */
 export function readNamedItems(xml: string): INamedItem[] {
-  if (!xml.trim()) return [];
-  const parsed = namedItemParser.parse(xml) as XmlRecord;
-  const list = parsed['nameditem:namedItemList'] as XmlRecord | undefined;
-  if (!list || typeof list !== 'object') return [];
-
+  const list = field(parsedWith(textParser, xml), 'nameditem:namedItemList');
   const result: INamedItem[] = [];
-  for (const item of asArray(list['nameditem:namedItem'])) {
-    const name = item?.['nameditem:name'];
-    if (name === undefined || name === null || name === '') continue;
-    result.push({
-      name: String(name),
-      description: String(item?.['nameditem:description'] ?? ''),
-    });
+  for (const item of listOf(field(list, 'nameditem:namedItem'))) {
+    const name = textOf(field(item, 'nameditem:name'));
+    if (name === undefined || name === '') continue;
+    const description = textOf(field(item, 'nameditem:description'));
+    result.push(description === undefined ? { name } : { name, description });
   }
   return result;
 }
@@ -251,35 +304,23 @@ export const utilNamedItems: IResultStrategy<INamedItem[]> = (answer) =>
 // Node structure
 // ---------------------------------------------------------------------------
 
-// `parseTagValue: false` because a NODE_ID is a code, not a count: left on its
-// default, `<NODE_ID>000010</NODE_ID>` arrives as the number 10, and that id
-// goes straight back to the server as `node_id`.
+// Values as written because a NODE_ID is a code, not a count: coerced,
+// `<NODE_ID>000010</NODE_ID>` arrives as the number 10, and that id goes
+// straight back to the server as `node_id`.
 const nodeParser = new XMLParser({
+  ...XML_TEXT_OPTIONS,
   ignoreAttributes: false,
   attributeNamePrefix: '',
-  parseTagValue: false,
-  parseAttributeValue: false,
-  trimValues: true,
 });
 
-const nodeValue = (value: unknown): string | undefined => {
-  if (value === undefined || value === null) return undefined;
-  if (typeof value === 'string' || typeof value === 'number') {
-    return String(value);
-  }
-  if (typeof value === 'boolean') return value ? 'true' : 'false';
-  if (typeof value === 'object') {
-    const record = value as XmlRecord;
-    const text = record['#text'] ?? record._text;
-    if (
-      typeof text === 'string' ||
-      typeof text === 'number' ||
-      typeof text === 'boolean'
-    ) {
-      return String(text);
-    }
-  }
-  return undefined;
+/** A node's field as text; an empty element is `''`, an absent one `undefined`. */
+const nodeValue = (node: unknown, key: string): string | undefined =>
+  textOf(field(node, key));
+
+/** A node's field when it holds text; `undefined` when absent or empty. */
+const nodeText = (node: unknown, key: string): string | undefined => {
+  const value = nodeValue(node, key);
+  return value === '' ? undefined : value;
 };
 
 /**
@@ -287,23 +328,21 @@ const nodeValue = (value: unknown): string | undefined => {
  * not this one — an exception, a logon page, nothing — reads as an empty level.
  */
 export function readNodeStructure(xml: string): IParsedNodeStructure {
-  if (!xml.trim()) return { nodes: [], objectTypes: [] };
-  const parsed = nodeParser.parse(xml) as XmlRecord;
-  const abap = parsed?.['asx:abap'] as XmlRecord | undefined;
-  const data = (abap?.['asx:values'] as XmlRecord | undefined)?.DATA as
-    | XmlRecord
-    | undefined;
-  if (!data || typeof data !== 'object') return { nodes: [], objectTypes: [] };
-
-  const nodes = asArray(
-    (data.TREE_CONTENT as XmlRecord | undefined)?.SEU_ADT_REPOSITORY_OBJ_NODE,
+  const data = at(
+    parsedWith(nodeParser, xml),
+    'asx:abap',
+    'asx:values',
+    'DATA',
   );
+  const nodes = listOf(
+    at(data, 'TREE_CONTENT', 'SEU_ADT_REPOSITORY_OBJ_NODE'),
+  ).filter(isRecord);
   const objectTypes: IRepositoryNodeChild[] = [];
-  for (const info of asArray(
-    (data.OBJECT_TYPES as XmlRecord | undefined)?.SEU_ADT_OBJECT_TYPE_INFO,
+  for (const info of listOf(
+    at(data, 'OBJECT_TYPES', 'SEU_ADT_OBJECT_TYPE_INFO'),
   )) {
-    const objectType = nodeValue(info?.OBJECT_TYPE);
-    const nodeId = nodeValue(info?.NODE_ID);
+    const objectType = nodeText(info, 'OBJECT_TYPE');
+    const nodeId = nodeText(info, 'NODE_ID');
     if (objectType && nodeId) {
       objectTypes.push({ ...answeredObject(objectType), nodeId });
     }
@@ -313,8 +352,9 @@ export function readNodeStructure(xml: string): IParsedNodeStructure {
 
 /**
  * One level of the repository tree — `/repository/nodestructure`: the objects
- * here, and the typed child nodes to ask for next. A node missing any of the
- * four identity fields is dropped.
+ * here, each with its description where the node carries one, and the typed
+ * child nodes to ask for next. A node missing any of the four identity fields
+ * is dropped.
  */
 export const utilNodeContents: IResultStrategy<IRepositoryNodeContents> = (
   answer,
@@ -322,16 +362,18 @@ export const utilNodeContents: IResultStrategy<IRepositoryNodeContents> = (
   const { nodes, objectTypes } = readNodeStructure(rawOf(answer));
   const objects: IRepositoryObjectNode[] = [];
   for (const node of nodes) {
-    const objectType = nodeValue(node?.OBJECT_TYPE);
-    const objectName = nodeValue(node?.OBJECT_NAME);
-    const techName = nodeValue(node?.TECH_NAME);
-    const objectUri = nodeValue(node?.OBJECT_URI);
+    const objectType = nodeText(node, 'OBJECT_TYPE');
+    const objectName = nodeText(node, 'OBJECT_NAME');
+    const techName = nodeText(node, 'TECH_NAME');
+    const objectUri = nodeText(node, 'OBJECT_URI');
     if (objectType && objectName && techName && objectUri) {
+      const description = nodeValue(node, 'DESCRIPTION');
       objects.push({
         ...answeredObject(objectType),
         objectName,
         techName,
         objectUri,
+        ...(description === undefined ? {} : { description }),
       });
     }
   }
@@ -342,99 +384,96 @@ export const utilNodeContents: IResultStrategy<IRepositoryNodeContents> = (
 // Inactive objects
 // ---------------------------------------------------------------------------
 
-const inactiveParser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: '@_',
-  parseAttributeValue: false,
-});
+/** The words `utilInactiveObjects` refuses an answer with; nothing of the document. */
+export const INACTIVE_OBJECTS_REFUSAL =
+  'utilInactiveObjects: the answer is no inactive-objects list';
 
 /**
  * What `/activation/inactiveobjects` answers, read into references a caller can
- * hand straight to `activateObjectsGroup`.
+ * hand straight to `activateObjectsGroup`, in either form SAP answers it:
+ *
+ * - `ioc:inactiveObjects` — every `ioc:ref` of every `ioc:object` of every
+ *   `ioc:entry`; a transport's `ioc:ref` is not an object and is not read;
+ * - `adtcore:objectReferences`, the flat list of SAP_BASIS 7.40 (recorded
+ *   `activation-class-basis-740`) — every `adtcore:objectReference`.
+ *
+ * Read by `readInactiveList`, the one reader the activation verdict
+ * (`stillInactiveAmong`) shares: names by namespace URI, not prefix, and
+ * an entry, object or reference of another name refuses the whole list.
+ *
+ * **Any other answer is refused** (`INACTIVE_OBJECTS_REFUSAL`) — an empty
+ * body, an exception, a logon page, text that is not XML. An activation is
+ * confirmed off this list, and an empty one read off the wrong document would
+ * confirm one that did not happen. Until 0.28.0 such an answer read as no
+ * objects, and so did the 7.40 form.
  */
 export const utilInactiveObjects: IResultStrategy<IInactiveObjectsResponse> = (
   answer,
 ) => {
-  const xml = rawOf(answer);
-  const objects: IInactiveObject[] = [];
-  if (!xml.trim()) return { objects };
-  const parsed = inactiveParser.parse(xml) as XmlRecord;
-  const root = parsed['ioc:inactiveObjects'] as XmlRecord | undefined;
-  if (!root || typeof root !== 'object') return { objects };
-
-  for (const entry of asArray(root['ioc:entry'])) {
-    const ref = (entry['ioc:object'] as XmlRecord | undefined)?.['ioc:ref'] as
-      | XmlRecord
-      | undefined;
-    if (!ref) continue;
-    const uri = ref['@_adtcore:uri'];
-    const parentUri = ref['@_adtcore:parentUri'];
-    objects.push({
-      ...answeredObject(String(ref['@_adtcore:type'] ?? '')),
-      name: String(ref['@_adtcore:name'] ?? ''),
-      ...(typeof uri === 'string' && uri !== '' ? { uri } : {}),
-      ...(typeof parentUri === 'string' && parentUri !== ''
-        ? { parentUri }
-        : {}),
-    });
-  }
-  return { objects };
+  const listed = readInactiveList(rawOf(answer));
+  if (listed === null) throw new Error(INACTIVE_OBJECTS_REFUSAL);
+  return {
+    objects: listed.map(({ name, type, uri, parentUri }) => ({
+      ...answeredObject(type ?? ''),
+      name,
+      ...(uri === undefined ? {} : { uri }),
+      ...(parentUri === undefined ? {} : { parentUri }),
+    })),
+  };
 };
 
 // ---------------------------------------------------------------------------
 // Where-used
 // ---------------------------------------------------------------------------
 
-// The prefix SAP binds to the usageReferences namespace is system-dependent
-// (`usagereferences:` or `usageReferences:`), so prefixes are stripped.
-const whereUsedParser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: '@_',
-  removeNSPrefix: true,
-});
-
 /**
- * A where-used answer — `/usageReferences` — read into references. Packages are
- * skipped: `DEVC/K` entries are container nodes here, not places of use.
+ * A where-used answer — `/usageReferences` — read into references: every
+ * `referencedObject` the document holds, in document order, each with its
+ * `kind`. A `DEVC/K` entry is a `package` — the container nodes SAP lists the
+ * places of use under —, anything else an `object`; until 0.28.0 the packages
+ * were dropped. The prefix SAP binds to the namespace is system-dependent
+ * (`usagereferences:` or `usageReferences:`), so prefixes are stripped.
  */
 export const utilWhereUsedReferences: IResultStrategy<IWhereUsedListResult> = (
   answer,
 ) => {
-  const xml = rawOf(answer);
-  const empty = { totalReferences: 0, resultDescription: '', references: [] };
-  if (!xml.trim()) return empty;
-  const root = (whereUsedParser.parse(xml) as XmlRecord)
-    ?.usageReferenceResult as XmlRecord | undefined;
-  if (!root || typeof root !== 'object') return empty;
+  const root = field(
+    parsedWith(bareParser, rawOf(answer)),
+    'usageReferenceResult',
+  );
+  if (!isElement(root)) {
+    return { totalReferences: 0, resultDescription: '', references: [] };
+  }
 
   const references: IWhereUsedReference[] = [];
-  for (const entry of asArray(
-    (root.referencedObjects as XmlRecord | undefined)?.referencedObject,
+  for (const entry of listOf(
+    at(root, 'referencedObjects', 'referencedObject'),
   )) {
-    const adtObject = entry.adtObject as XmlRecord | undefined;
-    if (!adtObject) continue;
-    const code = answeredObject(String(adtObject['@_type'] ?? ''));
-    if (code.type === 'DEVC/K') continue;
-    const packageRef = adtObject.packageRef as XmlRecord | undefined;
+    const adtObject = field(entry, 'adtObject');
+    if (!isElement(adtObject)) continue;
+    const code = answeredObject(leafText(field(adtObject, '@_type')) ?? '');
+    const description = leafText(field(adtObject, '@_description'));
     references.push({
-      uri: String(entry['@_uri'] ?? ''),
-      name: String(adtObject['@_name'] ?? ''),
+      kind: code.type === 'DEVC/K' ? 'package' : 'object',
+      uri: leafText(field(entry, '@_uri')) ?? '',
+      name: leafText(field(adtObject, '@_name')) ?? '',
       ...code,
-      parentUri: entry['@_parentUri'] as string | undefined,
-      packageName: packageRef?.['@_name'] as string | undefined,
-      responsible: adtObject['@_responsible'] as string | undefined,
-      isResult: entry['@_isResult'] === 'true',
-      usageInformation: entry['@_usageInformation'] as string | undefined,
-      objectIdentifier: entry.objectIdentifier as string | undefined,
+      ...(description === undefined ? {} : { description }),
+      parentUri: leafText(field(entry, '@_parentUri')),
+      packageName: leafText(at(adtObject, 'packageRef', '@_name')),
+      responsible: leafText(field(adtObject, '@_responsible')),
+      isResult: leafText(field(entry, '@_isResult')) === 'true',
+      usageInformation: leafText(field(entry, '@_usageInformation')),
+      objectIdentifier: textOf(field(entry, 'objectIdentifier')),
     });
   }
 
   return {
     totalReferences: Number.parseInt(
-      String(root['@_numberOfResults'] ?? '0'),
+      leafText(field(root, '@_numberOfResults')) ?? '0',
       10,
     ),
-    resultDescription: String(root['@_resultDescription'] ?? ''),
+    resultDescription: leafText(field(root, '@_resultDescription')) ?? '',
     references,
   };
 };
@@ -521,7 +560,7 @@ export const utilDiscoveryCollections: IResultStrategy<ReadonlySet<string>> = (
   if (xml.trim() === '' || XMLValidator.validate(xml) !== true) {
     return collections;
   }
-  const parsed: unknown = discoveryParser.parse(xml);
+  const parsed: unknown = parsedOrNothing(discoveryParser, xml);
   const service = field(parsed, 'service');
   if (!isElement(service)) return collections;
   for (const workspace of listOf(field(service, 'workspace'))) {

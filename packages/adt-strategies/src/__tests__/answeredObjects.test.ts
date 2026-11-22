@@ -95,11 +95,16 @@ describe('utilNodeContents (recorded: read-package-contents-structure, read-obje
 describe('utilWhereUsedReferences (recorded: read-where-used-list-structure)', () => {
   const recorded = answerFor('read-where-used-list-structure');
 
-  it('answers the recorded code as a type, and still skips packages', () => {
+  // Since 0.28.0 the package nodes are references too, of kind `package`.
+  it('answers the recorded codes as types, packages included', () => {
     const { references } = utilWhereUsedReferences(recorded);
-    expect(references.length).toBeGreaterThan(0);
+    expect(references.map((r) => [r.kind, r.type])).toEqual([
+      ['object', 'BDEF/BDO'],
+      ['package', 'DEVC/K'],
+      ['package', 'DEVC/K'],
+      ['package', 'DEVC/K'],
+    ]);
     for (const reference of references) {
-      expect(reference.type).toBe('BDEF/BDO');
       expect(reference.unknownType).toBeUndefined();
     }
   });
@@ -108,8 +113,9 @@ describe('utilWhereUsedReferences (recorded: read-where-used-list-structure)', (
     const { references } = utilWhereUsedReferences(
       withCode(recorded, 'BDEF/BDO', UNKNOWN),
     );
-    expect(references.length).toBeGreaterThan(0);
-    for (const reference of references) {
+    const objects = references.filter((r) => r.kind === 'object');
+    expect(objects).toHaveLength(1);
+    for (const reference of objects) {
       expect(reference.unknownType).toBe(UNKNOWN);
       expect(reference.type).toBeUndefined();
     }
@@ -132,16 +138,17 @@ describe('readSearchHits (written answer: no search is recorded)', () => {
   });
 });
 
+// Every reference carries an address since 0.28.0, as every recorded one does.
 describe('utilInactiveObjects (written answer: no listing is recorded)', () => {
   it('answers a code of the tables as a type, and keeps the other as unknownType', () => {
     const xml = `<ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects" xmlns:adtcore="http://www.sap.com/adt/core">
-      <ioc:entry><ioc:object><ioc:ref adtcore:name="ZCL_A" adtcore:type="CLAS/OC"/></ioc:object></ioc:entry>
-      <ioc:entry><ioc:object><ioc:ref adtcore:name="ZREP_S" adtcore:type="${UNKNOWN}"/></ioc:object></ioc:entry>
+      <ioc:entry><ioc:object><ioc:ref adtcore:uri="/sap/bc/adt/oo/classes/zcl_a" adtcore:name="ZCL_A" adtcore:type="CLAS/OC"/></ioc:object></ioc:entry>
+      <ioc:entry><ioc:object><ioc:ref adtcore:uri="/sap/bc/adt/x/zrep_s" adtcore:name="ZREP_S" adtcore:type="${UNKNOWN}"/></ioc:object></ioc:entry>
     </ioc:inactiveObjects>`;
     expect(utilInactiveObjects(wire(xml))).toEqual({
       objects: [
-        { type: 'CLAS/OC', name: 'ZCL_A' },
-        { unknownType: UNKNOWN, name: 'ZREP_S' },
+        { type: 'CLAS/OC', name: 'ZCL_A', uri: '/sap/bc/adt/oo/classes/zcl_a' },
+        { unknownType: UNKNOWN, name: 'ZREP_S', uri: '/sap/bc/adt/x/zrep_s' },
       ],
     });
   });

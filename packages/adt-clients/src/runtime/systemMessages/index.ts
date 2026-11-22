@@ -2,7 +2,7 @@
  * SystemMessages Module - Exports
  */
 
-export { getSystemMessage, listSystemMessages } from './read';
+export { listSystemMessages } from './read';
 export {
   type ISystemMessagesResults,
   SystemMessages,

@@ -15,5 +15,9 @@
 export interface INamedItem {
   /** A URI, as the server writes it — not a short code. */
   name: string;
-  description: string;
+  /**
+   * The entry's description as written; absent when it carries none
+   * (47.0.0, as adt-strategies' `INamedItem` since 0.28.0 — it was required).
+   */
+  description?: string;
 }

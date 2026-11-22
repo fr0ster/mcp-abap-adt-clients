@@ -1,6 +1,6 @@
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
-import { field } from '../parsed';
+import { field, parsedOrNothing } from '../parsed';
 import { rawOf } from '../result';
 
 /** One entry of an object's version history. */
@@ -51,7 +51,7 @@ function transportOf(entry: unknown): {
 export const objectVersions: IResultStrategy<IObjectVersion[]> = (answer) => {
   const text = rawOf(answer);
   if (!text.trim()) return [];
-  const root: unknown = parser.parse(text);
+  const root: unknown = parsedOrNothing(parser, text);
   const feed = field(root, 'atom:feed') ?? field(root, 'feed');
   if (!feed) return [];
   const title = field(feed, 'atom:title') ?? field(feed, 'title');

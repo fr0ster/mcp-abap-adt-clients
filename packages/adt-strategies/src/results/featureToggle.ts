@@ -58,9 +58,18 @@ function json(data: unknown): unknown {
   if (typeof data !== 'string') return data;
   if (data.trim() === '') return {};
   // Our own reading failing on a document is ours, and it throws — the
-  // library runs a result strategy outside its catch for that reason.
-  return JSON.parse(data);
+  // library runs a result strategy outside its catch for that reason. In
+  // fixed words: `JSON.parse`'s message quotes the body (0.28.0).
+  try {
+    return JSON.parse(data);
+  } catch {
+    throw new Error(FEATURE_TOGGLE_REFUSAL);
+  }
 }
+
+/** The words a body that is no JSON is refused with; nothing of the body. */
+export const FEATURE_TOGGLE_REFUSAL =
+  'featureToggle: the answer is no JSON document';
 
 /** A text field, or `undefined` when it is empty or no text. */
 function optionalText(node: unknown, key: string): string | undefined {

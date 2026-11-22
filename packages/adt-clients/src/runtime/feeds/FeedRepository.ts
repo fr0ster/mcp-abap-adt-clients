@@ -177,13 +177,24 @@ export class FeedRepository<
     );
   }
 
-  /** One gateway error, in full. */
+  /**
+   * One gateway error, in full — at its address (an entry's `detailUri`).
+   * The answer is HTML, asked for as `text/html`, the one type SAP's viewer
+   * negotiates (`/IWBEP/CL_ERROR_LOG_VIEWER->get`, onprem l. 89-93, cloud
+   * l. 93-97); it was asked for as an Atom feed until 47.0.0.
+   */
   async gatewayErrorDetail<E extends IAdtError = IAdtError>(
     feedUrl: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['gatewayErrorDetail'], E>> {
     return answering(
-      () => fetchFeed(this.connection, feedUrl),
+      () =>
+        this.connection.makeAdtRequest({
+          url: feedUrl,
+          method: 'GET',
+          timeout: 0,
+          headers: { Accept: 'text/html' },
+        }),
       this.results.gatewayErrorDetail,
       options?.analyse,
     );

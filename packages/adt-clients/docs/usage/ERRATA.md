@@ -145,6 +145,32 @@ discovery's collections, and the caller picks `activateObjectsGroup`
 (`/activation/runs`) or `activateObjects` (`/activation`) by
 `has(ACTIVATION_RUNS_COLLECTION)`.
 
+## A task's number answers the task's own document
+
+**Symptom.** `GET /sap/bc/adt/cts/transportrequests/{number}` for a task's
+number answers a `tm:root` that holds a `tm:request` element — and that
+element is the task's parent request, not the task. Read as a request
+document, the answer names the parent's number, description, type and
+status, and the task looks like its own request.
+
+**What actually happened.** SAP answered the task. The root is marked
+`tm:object_type="T"`; `tm:task` holds the task's header and its
+`tm:abap_object` entries; `tm:request` holds only the parent's header, no
+task and no `tm:all_objects`. A request's number answers
+`tm:object_type="R"`, the request in `tm:request` with its tasks under it
+and the aggregate `tm:all_objects`. SAP code:
+`CL_CTS_ADT_TM_RES_REQUEST_CONT->fetch_request_data` →
+`prepare_tm_root_for_task`, the same on premise and on the cloud. Recorded
+on premise and on the cloud (a task each), 2026-11-22,
+by the server team (fr0ster/mcp-abap-adt, GetTransport's fixtures).
+
+**Why the library has a strategy for it.** `transportItem(number)` from
+`@mcp-abap-adt/adt-strategies` (0.28.0) reads the document as the request or
+the task it describes — `kind` from the marker, or from a `tm:task` naming
+the number when the marker is absent — and refuses a document whose
+selected element names no number or another one. `transportObjectEntries`
+reads either document's entries per task, each once.
+
 ## abapGit: what an answer says
 
 Read from SAP's handler code (onprem `ZCL_ABAPGIT_RES_*`, cloud

@@ -22,7 +22,7 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
-import { field, isElement, leafText, listOf } from '../parsed';
+import { field, isElement, leafText, listOf, parsedOrNothing } from '../parsed';
 import { rawOf } from '../result';
 import { fragmentPairs, sourcePoint } from '../sourcePosition';
 import { answeredObject } from './answeredObject';
@@ -150,7 +150,7 @@ function readElement(node: unknown): IOutlineElement | undefined {
 /** An outline document, read into its tree. */
 export function readObjectOutline(xml: string): IObjectOutline {
   if (!xml.trim()) return { base: undefined, root: undefined };
-  const parsed: unknown = parser.parse(xml);
+  const parsed: unknown = parsedOrNothing(parser, xml);
   const root = field(parsed, ELEMENT);
   return {
     base: attr(root, 'xml:base'),

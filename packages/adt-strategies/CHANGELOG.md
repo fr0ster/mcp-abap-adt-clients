@@ -14,6 +14,185 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.28.0] - 2026-11-22
+
+Released with `@mcp-abap-adt/adt-clients` 47.0.0, on
+`@mcp-abap-adt/interfaces-adt` `^31.0.0` (was `^30.2.0`; no type this package
+uses changed — the range follows adt-clients', so the tree holds one version).
+The readings the server
+team found reading something other than what the document holds, fixed on
+the documents they were found with, and one new reading.
+
+**Which test documents are recorded, which written.** Recorded: the
+adt-clients corpus cases each test names (where-used, the 7.40 and S/4HANA
+2025 inactive lists, the node structure, the transport lists), the 7.40
+empty transport list (a probe over RFC), the server's task documents
+(`EMPTY_TASK` recorded on the cloud; `TASK_WITH_OBJECTS` cut from an
+on-premise recording) and the feed list cut, and the gateway-error and
+system-message feeds and an error's document (`fixtures/feeds/`, the cloud
+and on premise, 2026-11-22). Written: the server's `REQUEST` (shaped after a
+measured request), the created-task documents — `TASK_CREATED`, the
+nested-parent `TASK_UNDER_PARENT`, `TRANSPORT_CREATED` —, the numeric
+character reference in a search hit (`SEARCH_ENTITY`), the named items with
+an omitted description (`NAMED_ITEMS`), and every variant a test builds from
+a recording (each says so); `src/__tests__/serverDocuments.ts` names each
+server document's source. Every recorded document is scrubbed: users, hosts,
+clients (the task documents' `tm:source_client` is `CLIENT1`), application
+servers and other users' object names replaced.
+
+### Added
+
+- **`transportItem(number)` / `readTransportItem(document, number)`** — the
+  document `GET /cts/transportrequests/{n}` answers, read as `ITransportItem`:
+  `{ kind: 'request', header, tasks }` (each task's `header` and
+  `objectCount`) or `{ kind: 'task', header, parent, objects }` (the parent's
+  header from `tm:request`, the task's entries as `ITransportObjectEntry`).
+  SAP answers a task's number with the task's own document
+  (`CL_CTS_ADT_TM_RES_REQUEST_CONT->fetch_request_data` →
+  `prepare_tm_root_for_task`, on premise and on the cloud). `kind` is read
+  from `tm:root/@tm:object_type` (`R`, `T`), or — without it — from a
+  `tm:task` naming the number. A header (`ITransportItemHeader`) is
+  `number`, `parent`, `description`, `type`, `status`, `statusText`,
+  `owner`, `target`, `client`, `ctsProject`, `lastChanged`, each attribute as
+  written. A document whose selected element is missing, names no number or
+  another one, or that is no `tm:root` document is refused in fixed words.
+  The strategy is made per number, since the document does not say what was
+  asked.
+- `ITransportObjectEntry.task` (the entry's `tm:task/@tm:number`) and `.info`
+  (`tm:obj_info`); `IWhereUsedReference.kind` (`'package' | 'object'`,
+  `WhereUsedReferenceKind`) and `.description`; `IRepositoryObjectNode.description`.
+
+### Fixed — what an existing caller now sees differently
+
+- **`transportObjectEntries`** answers entries per task, each once, each with
+  its task number. It read every `tm:abap_object` wherever it sat, so a
+  request's entries came twice (its tasks' and `tm:all_objects`') and none
+  named its task. A task document yields that task's entries.
+- **`utilWhereUsedReferences`** keeps every reference the document holds,
+  package nodes (`DEVC/K`) included, with `kind`: the recorded
+  `read-where-used-list-structure` answer reads 4 references, not 1. A caller
+  that wants the places of use alone filters `kind === 'object'`.
+- **`utilInactiveObjects`** reads the SAP_BASIS 7.40 form
+  (`adtcore:objectReferences`, which answered no objects) and every
+  `ioc:object` / `ioc:ref` of an entry, and **throws** for any other answer —
+  an empty body, an exception, a logon page, text that is not XML — instead
+  of answering no objects: an activation is confirmed off this list.
+- **`transportCreated`** (`parseCreatedTransport`) answers the root's own
+  number as the created item and a `tm:request` beside it as `parent`; it
+  preferred the nested `tm:request`, so a created task under a named parent
+  read as the parent (`SIDK907073` under `SIDK907071` read `SIDK907071`). A
+  document naming no number now throws instead of answering
+  `transportNumber: ''`. Its values are no longer coerced: a numeric
+  attribute (a description `007`) keeps its text.
+- **`utilSearchHits`** / `readSearchHits` decode character references:
+  `&#x26;` reads `&` (it read `&#x26;`), as do decimal references and the
+  five predefined entities — in one pass, so `&amp;#x26;` is `&#x26;`. A
+  reference XML does not define (`&nbsp;`) stays as written.
+- **`utilNamedItems`** / `readNamedItems` coerce nothing (`007` stayed `7`)
+  and leave an absent description absent (`description` is optional now; it
+  was `''`) — adt-clients' own `INamedItem` follows in 47.0.0.
+- **`transportTree`** (`parseTransportTree`) refuses in fixed words —
+  `parseTransportTree: the answer is no transport list` — with nothing of the
+  body (it quoted up to 200 characters and the root it found), and refuses a
+  root that carries nothing (`<tm:root/>`, a bare root with only its
+  namespace), which it read as an empty list. A list that names its search
+  (`adtcore:name` on the root, the recorded empty list) reads as before.
+  `tm:long_desc` text is no longer coerced.
+- **`utilNodeContents`** keeps each object's `DESCRIPTION`.
+- **One reader of the inactive list for both readings** (`utilInactiveObjects`
+  and the activation verdict): names by namespace URI, not prefix, the same
+  reference decoding, and **fail closed** — an entry, object or reference of
+  another name, a reference without `adtcore:name` or without both
+  `adtcore:uri` and `adtcore:parentUri` (what an activation is matched by),
+  or text where the list
+  has elements refuses the whole list (`utilInactiveObjects` throws,
+  `stillInactiveAmong` answers `null`, which the verdict reads as not
+  decided), never an empty one.
+- **`stillInactiveAmong`** (the activation verdict's reading of the inactive
+  list) reads every `ioc:ref` of every `ioc:object` of an entry, as
+  `utilInactiveObjects` does; it read one, and none when either repeated —
+  an object listed that way was not found still inactive.
+- **The feed readings** (`feedEntries`, `feedDescriptors`, `feedVariants`,
+  `feedSystemMessages`, `feedGatewayErrors`, `feedGatewayErrorDetail`) coerce
+  nothing: element text that looked numeric read as the number's text
+  (`0042` read `42`, in a title, content, id, client or source line) and now
+  reads as written. References decode (an `href` holding `&amp;` read
+  `&amp;`, it reads `&`). The fields typed as numbers — a call-stack entry's
+  `number` and `line`, a source line's `number`, `errorLine` — are converted
+  from their text, as before. An entry with several `link`, `author` or
+  `category` elements (Atom allows them) read `''` / `undefined`; it now
+  reads the entry's own link (`rel` absent or `alternate`, else the first),
+  and the first author and category.
+- **`feedGatewayErrors`** and **`feedGatewayErrorDetail`** read what SAP
+  answers. Grounded in SAP's code, read on premise and on the cloud
+  (`/IWBEP/CL_ERROR_LOG_FEED_PROV->build_feed`,
+  `/IWBEP/CL_ERROR_LOG_FORMATTER->build_html` / `build_for_header`,
+  `/IWBEP/CL_ERROR_LOG_VIEWER->get`), and measured on the cloud (2026-11-22,
+  115 entries): an entry holds `atom:id`, `title`, `updated`, `author/name`
+  and an HTML `summary`; every other field is a cell of the summary's
+  `Header Information` table; the error's own document is HTML on both
+  systems, not the XML `errorEntry` the detail reading parsed. Pinned on the
+  scrubbed recordings (`fixtures/feeds/`) and on variants written from the
+  code. What a caller sees:
+  - `type`, `package`, `applicationComponent`, `client`, `requestKind` read
+    `''`; they carry the cells now.
+  - `transactionId` was the `atom:id`; it is the `Transaction ID` cell, without
+    the `(Replay in GW Client)` link or `(Not replayable in GW Client)` note
+    SAP may append. The `atom:id` is the new `id`.
+  - `shortText` kept the title's `Frontend Error: ` prefix; it is the
+    `Short Text` cell (the title's remainder when there is none), and the
+    prefix is the new `kind`.
+  - `username` was `name (id)`; it is the name, the id the new `userId`.
+  - New: `opid` (the id's second segment; the id is `Kind/opid` on premise,
+    `Kind/opid/timestamp` on the cloud, the kind's spaces removed) and
+    `detailUri`, built from the entry's own id: the viewer looks an error up
+    by its OPID, not its transaction id, and reads the Backend log for
+    `BackendError` on premise and `Backend Error` on the cloud.
+  - Every field of `IGatewayErrorEntry` is optional now and absent when the
+    entry does not carry it, never `''` (a Backend entry measured with no
+    short text). A caller that read them as `string` checks for absence.
+  - `feedGatewayErrorDetail` read every field empty; it reads the header, the
+    service information (its fields optional now), the error context
+    (`errorInfo`, `resolution`, each exception with `text`, `raiseLocation`,
+    `attributes` — `text` optional now — and, new, the whole `tree`), the
+    source extract (the highlighted line numbered after the one before it,
+    or before the one after it when it comes first; `errorLine` optional
+    now) and the call stack, numbers converted from their text. Its
+    `dateTime` is the `Date/Time` cell as written. It **refuses** an answer
+    that names no error — the empty skeleton SAP renders for an unknown id
+    (no 404 path), an empty body.
+  - The on-premise feed answered no entry, so its entry shape is from the
+    code alone.
+- **`feedSystemMessages`** reads what SAP writes
+  (`CL_STSK_ADT_RES_SYSTEM_MESSAGE->get_feed`, `lcl_atom_service->
+  map_feed_entry`, the same on both systems): a plain Atom entry with an HTML
+  summary — no `sm:` element. `ISystemMessageEntry` is now `id`, `messageId`,
+  `title`, `text` (every line as SAP writes it, blank lines and leading
+  spaces kept, the `</BR>` breaks as `\n` — built from SAP's code,
+  `map_feed_entry` / `convert_textlines_to_html`, not measured; it read
+  `content`, which SAP never writes),
+  `createdOn`, `updated`, `createdBy` and `author`, each optional;
+  **`severity`, `validFrom` and `validTo` are removed** — SAP writes none of
+  them (the expiry only filters the rows). Not measured: both systems held no
+  message; the test entry is built from the code.
+- `parseSearchConfigurations`' parser no longer coerces (no field it reads
+  was affected).
+- **A CDATA section is kept as written** (`XML_TEXT_OPTIONS` parses it apart
+  with the parser's own `cdataPropName`; references decode in text and
+  attribute values only).
+- **Reference decoding is one linear pass** (the XML and the HTML decoder
+  alike): a text of many `&` and one late `;` was read once per `&`.
+- **A parser's own error never reaches a reading's caller**: every parse is
+  caught, and the reading answers its empty shape or its fixed-word refusal
+  (an entity name the parser refuses in a DTD, nesting past its limit).
+- **`featureToggleRuntimeState` / `featureToggleCheckState`** refuse a body
+  that is no JSON in fixed words (`featureToggle: the answer is no JSON
+  document`); `JSON.parse`'s message quoted the body.
+- Every parser in the package now shares one set of options
+  (`XML_TEXT_OPTIONS`, internal) or turns both coercions off, pinned by a
+  source check: no tag or attribute value is coerced, and in the readings
+  named above references decode as an XML parser decodes them.
+
 ## [0.27.0] - 2026-11-22
 
 Released with `@mcp-abap-adt/adt-clients` 46.2.0, on

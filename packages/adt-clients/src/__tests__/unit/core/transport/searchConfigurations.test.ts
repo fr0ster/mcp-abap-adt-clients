@@ -141,7 +141,10 @@ describe('AdtRequest.searchConfigurations', () => {
           '/sap/bc/adt/cts/transportrequests/searchconfiguration',
         )
           ? CONFIGURATIONS
-          : '<tm:root/>',
+          : // A list naming the search it ran, as the recorded empty list
+            // does; a bare `<tm:root/>` is refused by transportTree since
+            // adt-strategies 0.28.0.
+            '<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="SAPUSER01"/>',
       ),
     );
     const request = new AdtRequest(connection, { results: transportParsing });

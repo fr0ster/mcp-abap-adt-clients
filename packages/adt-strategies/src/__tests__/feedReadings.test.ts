@@ -78,36 +78,10 @@ describe('the other feed readings', () => {
     ]);
   });
 
-  it('feedSystemMessages reads the content as the text and the category as severity', () => {
-    expect(feedSystemMessages(answer(ENTRY))).toEqual([
-      {
-        id: 'entry1',
-        title: 'Test Entry',
-        text: 'Some content',
-        severity: 'dump',
-        validFrom: '2026-04-10T10:00:00Z',
-        validTo: '',
-        createdBy: 'TESTUSER',
-      },
-    ]);
-  });
-
-  it('feedGatewayErrors reads the category as the type and the id as the transaction', () => {
-    expect(feedGatewayErrors(answer(ENTRY))).toMatchObject([
-      {
-        type: 'dump',
-        shortText: 'Test Entry',
-        transactionId: 'entry1',
-        dateTime: '2026-04-10T10:00:00Z',
-        username: 'TESTUSER',
-      },
-    ]);
-  });
-
-  it('feedGatewayErrorDetail reads an empty document as empty fields', () => {
-    const detail = feedGatewayErrorDetail(answer(''));
-    expect(detail.shortText).toBe('');
-    expect(detail.callStack).toEqual([]);
+  it('feedGatewayErrorDetail refuses an empty document, which names no error', () => {
+    expect(() => feedGatewayErrorDetail(answer(''))).toThrow(
+      'feedGatewayErrorDetail: the answer names no gateway error',
+    );
   });
 
   it('reads a body that is not XML, or none, as nothing — never a throw', () => {

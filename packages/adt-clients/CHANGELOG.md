@@ -24,6 +24,118 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [47.0.0] - 2026-11-22
+
+Released with `@mcp-abap-adt/adt-strategies` 0.28.0 (published first; the
+range is now `^0.28.0`), on `@mcp-abap-adt/interfaces-adt` `^31.0.0`. A major:
+the breaking changes below. Migration:
+[`docs/usage/MIGRATION-47.md`](docs/usage/MIGRATION-47.md).
+
+### Breaking
+
+- **`INamedItem.description` is optional** (it was `string`), as in
+  adt-strategies 0.28.0, whose `utilNamedItems` fills the `types` slot and
+  leaves an absent description absent. With the two disagreeing, the
+  documented pairing `getUtils({ ...utilDocuments, types: utilNamedItems })`
+  failed to compile against this package's `INamedItem` (TS2322); pinned by
+  `unit/shared/namedItemPairing.test.ts`. A strict consumer that reads
+  `item.description` as a `string`, or forwards the item where a required
+  `description` is declared, no longer compiles. No other type is declared
+  both here and in adt-strategies.
+- **`SystemMessages.getById`, `getSystemMessage` and the `message` slot of
+  `ISystemMessagesResults` / `systemMessagesDocuments` are removed.** They
+  asked for `/runtime/systemmessages/{id}`, a route SAP does not register:
+  `CL_STSK_ADT_RES_APP->register_resources` (l. 31-48, the same on premise
+  and on the cloud) registers the collection alone. `SystemMessages`
+  implements `ISystemMessages` without `getById`. Each listed message
+  carries its text, id, creation and author.
+- **The system-message readings lose `severity`, `validFrom` and `validTo`**
+  (adt-strategies `ISystemMessageEntry`): SAP writes none of them
+  (`CL_STSK_ADT_RES_SYSTEM_MESSAGE`, `lcl_atom_service->map_feed_entry`); the
+  entry carries `messageId`, `text` (every line), `createdOn`, `createdBy`,
+  `author`, `updated`.
+- **The gateway error readings' entries changed shape** (adt-strategies
+  `IGatewayErrorEntry`, every field optional): `transactionId` is the
+  `Transaction ID` cell (it was the `atom:id`), `username` the name alone
+  (`userId` beside it), the title's prefix is `kind`; new `opid` and
+  `detailUri`. `feedGatewayErrorDetail` refuses an answer that names no
+  error (an unknown OPID's empty skeleton, an empty body).
+
+- **The types a constructing or exhaustive caller writes against changed**
+  (adt-strategies 0.28.0, the shapes these readings answer):
+  - `IGatewayErrorDetail`: `serviceInfo`'s six fields, `errorContext.errorInfo`
+    and `sourceCode.errorLine` are optional; `errorContext.tree`
+    (`IGatewayContextNode[]`) is **required** — a caller that builds detail
+    values (a test double, a fixture) adds it.
+  - `IGatewayException.text` is optional.
+  - `IWhereUsedReference.kind` (`'package' | 'object'`) is **required** — a
+    caller that builds references adds it; `description` is new and optional.
+  - `ISystemMessageEntry`'s fields are all optional (see above).
+  - `SystemMessagesValues` loses its `message` key with the slot.
+  - Additions only, not breaking: `ITransportObjectEntry.task` / `.info`,
+    `IRepositoryObjectNode.description` (optional), and the new
+    `ITransportItem`, `ITransportItemHeader`, `ITransportRequestItem`,
+    `ITransportTaskItem`, `ITransportTaskSummary`, `IGatewayContextNode`,
+    `WhereUsedReferenceKind`.
+- **On `@mcp-abap-adt/interfaces-adt` `^31.0.0`** (was `^30.2.0`), which drops
+  `ISystemMessages.getById` and its `TMessage` parameter
+  (`ISystemMessages<TList>`); `SystemMessages` implements it whole. A consumer
+  that types a value as `ISystemMessages<TList, TMessage>` writes
+  `ISystemMessages<TList>`.
+
+### Changed
+
+- **The gateway error document is asked for as `text/html`**
+  (`GatewayErrorLog.getById`, `FeedRepository.gatewayErrorDetail`; it was
+  `application/xml` and the Atom feed type): `/IWBEP/CL_ERROR_LOG_VIEWER->get`
+  negotiates against `text/html` alone (onprem l. 89-93, cloud l. 93-97).
+  `getGatewayError`'s `errorId` is documented as what the viewer takes — the
+  OPID (l. 59/73), not the transaction id — and its kind as the system's
+  viewer spells it (`BackendError` on premise, `Backend Error` on the cloud,
+  l. 57); an entry's `detailUri` carries both.
+
+### What the readings now answer
+
+No member of adt-clients changed: every default is still the document, and no
+default set ships one of the readings 0.28.0 fixes. What changed is what those
+readings answer when a caller passes them:
+
+- `transportObjectEntries` (`objects`): each entry once, with the number of
+  the task it is on (`task`) and `info`; a request's entries no longer come
+  twice.
+- `transportCreated` (`created`, `createdTask`): a created task under a named
+  parent answers the task's number, the parent as `parent`; a document naming
+  no number throws instead of answering `transportNumber: ''`.
+- `transportTree` (`list`): its error is fixed words with nothing of the body,
+  and a root that carries nothing (`<tm:root/>`) is refused, not read as an
+  empty list.
+- `utilWhereUsedReferences` (`whereUsed`): package nodes are kept, with `kind`.
+- `utilInactiveObjects` (`inactive`): reads the SAP_BASIS 7.40 form and
+  refuses an answer that is no inactive list.
+- `utilSearchHits`, `utilNamedItems`, `utilNodeContents`: references decoded,
+  nothing coerced, descriptions kept.
+- `stillInactiveAmong` — what `analyseActivation` / `analyseAny` decide a
+  silent checklist by, after the inactive list the activation members read —
+  reads every object and reference of an entry; one listed beside another in
+  the same entry was missed.
+- The feed readings (`FeedRepository`'s slots): text as written (`0042` no
+  longer `42`), references decoded (`&amp;` in an `href` is `&`), and an
+  entry with several links, authors or categories read.
+- `feedGatewayErrors` / `feedGatewayErrorDetail` and `feedSystemMessages`:
+  read what SAP writes — see Breaking above and adt-strategies' changelog.
+- The inactive list, read by `utilInactiveObjects` and the activation
+  verdict through one reader, fails closed: a list it cannot read whole is
+  refused, never read as nothing inactive.
+- New: `transportItem(number)`, a request or task document read as what it
+  is.
+
+The details, and the old values, are in
+[adt-strategies' changelog](../adt-strategies/CHANGELOG.md); the transport
+and where-used sections of `docs/usage/CLIENT_API_REFERENCE.md` describe the
+new readings. The unit tests that pass these readings
+(`objectActions.test.ts`, `searchConfigurations.test.ts`) pin the new
+answers.
+
 ## [46.2.0] - 2026-11-22
 
 Released with `@mcp-abap-adt/adt-strategies` 0.27.0 (published first, its

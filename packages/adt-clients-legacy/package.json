@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/adt-clients-legacy",
-  "version": "0.11.1",
+  "version": "0.11.2",
   "description": "Clients for legacy SAP ABAP systems (7.40), built on @mcp-abap-adt/adt-clients",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -59,16 +59,16 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@mcp-abap-adt/interfaces-adt": "^30.1.0",
+    "@mcp-abap-adt/interfaces-adt": "^31.0.0",
     "@mcp-abap-adt/interfaces-adt-connection": "^5.0.0",
     "@mcp-abap-adt/interfaces-utils": "^1.1.1"
   },
   "peerDependencies": {
-    "@mcp-abap-adt/adt-clients": "^46.1.0"
+    "@mcp-abap-adt/adt-clients": "^46.1.0 || ^47.0.0"
   },
   "devDependencies": {
-    "@mcp-abap-adt/adt-clients": "^46.1.0",
-    "@mcp-abap-adt/adt-strategies": "^0.27.0",
+    "@mcp-abap-adt/adt-clients": "^47.0.0",
+    "@mcp-abap-adt/adt-strategies": "^0.28.0",
     "@mcp-abap-adt/interfaces-auth": "^7.5.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.3.3",

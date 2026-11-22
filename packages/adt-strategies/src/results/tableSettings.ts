@@ -4,7 +4,7 @@ import type {
   ITableSettingsReadOf,
 } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
-import { field, isElement, leafText } from '../parsed';
+import { field, isElement, leafText, parsedOrNothing } from '../parsed';
 
 /**
  * A table's technical settings (`TABL/DTT`), read from the document
@@ -121,7 +121,7 @@ function count(value: string, where: string): number {
 
 /** The settings document's text, read. */
 export function readTableSettings(xml: string): ITableSettingsDocument {
-  const root = field(parser.parse(xml), 'tableSettings');
+  const root = field(parsedOrNothing(parser, xml), 'tableSettings');
   if (!isElement(root)) {
     throw new Error('the answer is no ts:tableSettings document');
   }

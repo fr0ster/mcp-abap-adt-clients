@@ -33,7 +33,10 @@ const recordingConnection = () => {
     makeAdtRequest: async (options: IAbapRequestOptions) => {
       calls.push(options);
       return {
-        data: '<tm:root/>',
+        // The empty list 7.40 SP04 answered (the 2026-10-23 probe over RFC,
+        // 319 bytes): a root naming whose list it is. A bare `<tm:root/>` is
+        // refused by transportTree since adt-strategies 0.28.0.
+        data: '<?xml version="1.0" encoding="utf-8"?><tm:root adtcore:name="SAPUSER01" adtcore:type="" adtcore:changedAt="2026-10-23T15:31:49Z" adtcore:createdAt="2026-10-23T15:31:49Z" adtcore:changedBy="SAPUSER01" adtcore:createdBy="SAPUSER01" xmlns:tm="http://www.sap.com/cts/adt/tm" xmlns:adtcore="http://www.sap.com/adt/core"/>',
         status: 200,
         statusText: 'OK',
         headers: {},
@@ -56,7 +59,7 @@ describe('legacy transport list', () => {
 
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toBe('/sap/bc/cts/transportrequests');
-    // `<tm:root/>` is an empty list, and an empty list is an answer.
+    // An empty list is an answer.
     expect(tree.requests).toEqual([]);
   });
 

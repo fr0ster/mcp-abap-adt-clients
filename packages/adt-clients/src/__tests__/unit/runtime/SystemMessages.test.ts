@@ -63,21 +63,4 @@ describe('SystemMessages', () => {
     expect(call.url).toMatch(/%24query|\$query/);
     expect(call.url).toContain('ADMIN');
   });
-
-  it('getById() delegates to /sap/bc/adt/runtime/systemmessages/MSG001', async () => {
-    const connection = createConnectionMock();
-    const sm = new SystemMessages(connection, {
-      logger: createLogger(),
-      results: systemMessagesDocuments,
-    });
-
-    await sm.getById('MSG001');
-
-    expect(connection.makeAdtRequest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        url: '/sap/bc/adt/runtime/systemmessages/MSG001',
-        method: 'GET',
-      }),
-    );
-  });
 });
