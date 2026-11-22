@@ -900,6 +900,13 @@ describeLive(
         ),
         `create ${name}`,
       );
+      await writeSource(name, 'v1');
+    }
+
+    /** Write `name`'s source at `version` under its own lock, and activate it. */
+    async function writeSource(name: string, version: string): Promise<void> {
+      const intf = client.getInterface();
+      const analyseException = loaded().strategies.analyseException;
       const handle = expectResult(
         await intf.lock({ interfaceName: name }, { analyse: analyseException }),
         `lock ${name}`,
@@ -912,7 +919,7 @@ describeLive(
               { interfaceName: name, transportRequest },
               {
                 headers: integrationHeadersOf(intf, 'update'),
-                source: interfaceSource(name, 'v1'),
+                source: interfaceSource(name, version),
                 lockHandle: handle,
                 analyse: analyseException,
               },
@@ -1078,8 +1085,15 @@ describeLive(
 
     memberCase(
       'modified_objects',
-      'getModifiedObjects lists both interfaces once the remote changed; the selection keeps the first alone',
+      'getModifiedObjects lists both interfaces, changed on both sides; the selection keeps the first alone',
       async () => {
+        // Changed locally too: a selection decides only for an object
+        // modified locally — `warning_overwrite_find` lists those alone and
+        // `warning_overwrite_adjust` drops only their 'N' entries
+        // (`CL_ABAPGIT_OBJECTS` L1791–1855; Code); a remote-only change is
+        // imported whatever the selection (measured 2026-11-22).
+        await writeSource(INTERFACE, 'l1');
+        await writeSource(INTERFACE_B, 'l1');
         await changeRemote('v2');
         await changeRemote('v2', INTERFACE_B);
         const answer = expectResult(
@@ -1179,12 +1193,12 @@ describeLive(
         pullLogKey = l1;
         expect(new AbapGitLedger().find(RUN)?.pending).toBeUndefined();
         // Only the selected interface was imported: the second one, changed
-        // in the remote too, keeps its source and gets no inactive version.
+        // on both sides, keeps its local source and gets no inactive version.
         expect(await isInactive(INTERFACE_B)).toBe(false);
         expect(await readSource('active', INTERFACE_B)).toContain(
-          marker('v1', INTERFACE_B),
+          marker('l1', INTERFACE_B),
         );
-        await activatePulled('v1', 'v2');
+        await activatePulled('l1', 'v2');
       },
     );
 
@@ -1207,10 +1221,10 @@ describeLive(
         const mine = answer.facts.objects.find((o) => o.name === INTERFACE);
         expect(mine).toBeDefined();
         expect(['S', 'W']).toContain(mine?.status);
-        // The interface the selection left out was not imported.
-        expect(
-          answer.facts.objects.find((o) => o.name === INTERFACE_B),
-        ).toBeUndefined();
+        // The interface left out is listed too, status S, with "not imported;
+        // no import requested" (`CL_ABAPGIT_OBJECTS` L308–313; Code): the
+        // facts keep no message text, so `recovery` proves it from the
+        // sources instead.
       },
     );
 
