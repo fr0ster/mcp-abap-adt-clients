@@ -151,7 +151,10 @@ interface IGateRecord {
   readonly faults: Set<string>;
 }
 const gates = new Map<AbapGitBackend, IGateRecord>(
-  BACKENDS.map((backend) => [backend, { passed: new Set<string>(), faults: new Set<string>() }]),
+  BACKENDS.map((backend) => [
+    backend,
+    { passed: new Set<string>(), faults: new Set<string>() },
+  ]),
 );
 
 /** The member cases the template makes available on `backend`. */
