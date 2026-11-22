@@ -407,7 +407,8 @@ function stillInactiveOf(ref: unknown): IAdtStillInactive[] {
 
 /**
  * The objects an inactive-objects list names, in either shape it is answered
- * in: `ioc:inactiveObjects` (an entry's `ioc:object/ioc:ref`; a transport's
+ * in: `ioc:inactiveObjects` (every `ioc:ref` of every `ioc:object` of an
+ * entry — since 0.28.0; it read one, and none when either repeated; a transport's
  * `ioc:ref` is never read, so the transport-only entry contributes nothing)
  * and the flat `adtcore:objectReferences` of SAP_BASIS 7.40. `null` for a
  * document that is neither.
@@ -418,7 +419,9 @@ function listedObjects(
   if (parsed === null) return null;
   if (rootIs(parsed, 'inactiveObjects')) {
     return listOf(at(parsed, 'inactiveObjects', 'entry')).flatMap((entry) =>
-      stillInactiveOf(at(entry, 'object', 'ref')),
+      listOf(field(entry, 'object')).flatMap((object) =>
+        listOf(field(object, 'ref')).flatMap(stillInactiveOf),
+      ),
     );
   }
   if (rootIs(parsed, 'objectReferences')) {
