@@ -33,6 +33,7 @@ import {
   isElement,
   leafText,
   listOf,
+  ownText,
   parsedOrNothing,
   parsedText,
   XML_TEXT_OPTIONS,
@@ -227,8 +228,7 @@ const trimmedText = (value: unknown): string | undefined => {
 };
 
 /** A leaf, or an element's text, as written; `undefined` when neither. */
-const textOf = (value: unknown): string | undefined =>
-  leafText(value) ?? leafText(field(value, '#text'));
+const textOf = (value: unknown): string | undefined => ownText(value);
 
 // ---------------------------------------------------------------------------
 // Search

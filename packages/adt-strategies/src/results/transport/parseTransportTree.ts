@@ -11,7 +11,13 @@
  * on the other.
  */
 
-import { isElement, leafText, listOf, type ParsedElement } from '../../parsed';
+import {
+  isElement,
+  leafText,
+  listOf,
+  ownText,
+  type ParsedElement,
+} from '../../parsed';
 import { hasContent, transportRoot } from './document';
 import type {
   ITransportTree,
@@ -68,7 +74,7 @@ const ownAttributes = (node: ParsedElement): Record<string, string> => {
 const readLongDesc = (node: ParsedElement): string | undefined => {
   const value = findChild(node, 'long_desc');
   if (value === undefined) return undefined;
-  return leafText(value) ?? '';
+  return ownText(value) ?? '';
 };
 
 const buildLink = (node: ParsedElement): ITransportTreeLink => ({

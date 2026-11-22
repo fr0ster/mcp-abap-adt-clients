@@ -28,6 +28,7 @@ import {
   isElement,
   leafText,
   listOf,
+  ownText,
   parsedText,
   XML_TEXT_OPTIONS,
 } from '../parsed';
@@ -230,12 +231,12 @@ function parseOrEmpty(xml: string): unknown {
  * the text is as written; every field below is declared a string.
  */
 function str(value: unknown): string {
-  return leafText(value) ?? '';
+  return ownText(value) ?? '';
 }
 
 /** An element's text: its `#text` when it has attributes, else its value. */
 function elementText(value: unknown): string {
-  return isElement(value) ? str(field(value, '#text')) : String(value ?? '');
+  return ownText(value) ?? '';
 }
 
 /** The entries of an Atom feed, or none. */

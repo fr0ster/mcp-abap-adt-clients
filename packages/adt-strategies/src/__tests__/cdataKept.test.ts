@@ -31,3 +31,14 @@ describe('CDATA is kept as written', () => {
     expect(item?.description).toBe('x &&amp;&#x26;');
   });
 });
+
+describe('a comment that looks like a CDATA opener is a comment', () => {
+  // The review's case: `<!-- <![CDATA[ -->` is no CDATA section, and the
+  // text after it is decoded as text.
+  it('decodes the text after it, and keeps a later CDATA section as written', () => {
+    const [item] = readNamedItems(
+      '<nameditem:namedItemList xmlns:nameditem="http://www.sap.com/adt/nameditem"><!-- <![CDATA[ --><nameditem:namedItem><nameditem:name>A&amp;B</nameditem:name><nameditem:description><![CDATA[&amp;]]></nameditem:description></nameditem:namedItem></nameditem:namedItemList>',
+    );
+    expect(item).toEqual({ name: 'A&B', description: '&amp;' });
+  });
+});

@@ -144,63 +144,47 @@ export const XML_TEXT_OPTIONS: Readonly<
     | 'processEntities'
     | 'tagValueProcessor'
     | 'attributeValueProcessor'
+    | 'cdataPropName'
   >
 > = {
+  // A CDATA section is kept apart, as written: the parser calls neither
+  // processor on it, so no reference in it is decoded (`ownText` reads it).
+  cdataPropName: '#cdata',
   parseTagValue: false,
   parseAttributeValue: false,
   processEntities: false,
   tagValueProcessor: (_name: string, value: string): string =>
-    restoreCdata(decodeXmlText(value)),
+    decodeXmlText(value),
   attributeValueProcessor: (_name: string, value: string): string =>
     decodeXmlText(value),
 };
 
 /**
- * What stands in for `&` inside a CDATA section while the document is
- * parsed: U+FFFF, which XML 1.0 does not allow in a document (§2.2 `Char`),
- * so no text of a well-formed one holds it.
- */
-const CDATA_AMPERSAND = '\uffff';
-
-/**
- * The document with every `&` inside a CDATA section replaced by
- * `CDATA_AMPERSAND`. The parser hands a CDATA section's text to
- * `tagValueProcessor` exactly as it hands element text, with nothing to tell
- * them apart; replaced, no `&` of a CDATA section is decoded, and the
- * processor puts each back (`<![CDATA[&amp;]]>` stays `&amp;`).
- */
-function protectCdata(document: string): string {
-  if (!document.includes('<![CDATA[')) return document;
-  let protectedText = '';
-  let from = 0;
-  for (;;) {
-    const open = document.indexOf('<![CDATA[', from);
-    if (open < 0) break;
-    const start = open + '<![CDATA['.length;
-    const end = document.indexOf(']]>', start);
-    if (end < 0) break;
-    protectedText +=
-      document.slice(from, start) +
-      document.slice(start, end).split('&').join(CDATA_AMPERSAND);
-    from = end;
-  }
-  return protectedText + document.slice(from);
-}
-
-/** A CDATA section's `&`, put back. */
-function restoreCdata(text: string): string {
-  return text.includes(CDATA_AMPERSAND)
-    ? text.split(CDATA_AMPERSAND).join('&')
-    : text;
-}
-
-/**
  * A document parsed by a parser built on `XML_TEXT_OPTIONS`, or `undefined`
- * when the parser throws: its CDATA sections kept as written
- * (`protectCdata`), and nothing the parser says read (`parsedOrNothing`).
+ * when the parser throws (`parsedOrNothing`).
  */
 export function parsedText(parser: XMLParser, text: string): unknown {
-  return parsedOrNothing(parser, protectCdata(text));
+  return parsedOrNothing(parser, text);
+}
+
+/**
+ * An element's own text, as `XML_TEXT_OPTIONS` parses it: a leaf as text
+ * (`leafText`), or an element's `#text` followed by its CDATA sections
+ * (`#cdata`, kept as written). Where text and CDATA alternate inside one
+ * element their order is not kept: the parser stores them apart. `undefined`
+ * for an element with neither.
+ */
+export function ownText(value: unknown): string | undefined {
+  const leaf = leafText(value);
+  if (leaf !== undefined) return leaf;
+  if (!isElement(value) || Array.isArray(value)) return undefined;
+  const text = leafText(value['#text']);
+  const sections = listOf(value['#cdata']).flatMap((section) => {
+    const content = leafText(section);
+    return content === undefined ? [] : [content];
+  });
+  if (text === undefined && sections.length === 0) return undefined;
+  return (text ?? '') + sections.join('');
 }
 
 /**
