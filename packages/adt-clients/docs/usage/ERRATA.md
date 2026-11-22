@@ -231,7 +231,28 @@ library judges none of them: each is an answer the caller reads.
   passed to the mandatory parameter IV_SERVICE" at L53, col. 22 — its
   `zcl_abapgit_http=>create_by_url( … )` call (Code). The installed abapGit
   and its ADT handler disagree; the request the library sends is not the
-  cause.
+  cause. The member returns that answer as it is (a failure, `facts.status`
+  `500`, no T100 key), and the live suite asserts exactly that on premise,
+  labelled a measured SAP handler fault.
+- **On premise a local `$` package works with abapGit end to end** (measured
+  2026-11-22, `$ZAGL_…` in software component LOCAL, no request): `link`
+  answered `200`, `push` `200` with the file in the remote, `pullRepo` `200`
+  with the active source changed, `getFile` without a credential `500`
+  `00`/`001`; after `unlink` the interface and the package were deleted
+  (`isDeleted="true"`) and the package reads `404`. A Z package cannot take
+  its place: LOCAL accepts only `TEST…` and `$…` packages (TR462), a Z
+  package in HOME must record changes ("Change recording must be activated"),
+  and an object deleted from a package that records changes keeps its
+  directory entry until its request is released — the package then refuses
+  its own delete, "Package contains 1 object", also after the entry is
+  removed from the task (all measured 2026-11-22). The live suite's onprem
+  run package is therefore `$ZAGL_<run>`.
+- **Known leftover: package `ZAGL_756211AB`** on the on-premise test system,
+  of the first live run (2026-11-22), transportable. Its interface was
+  deleted, its repository unlinked and its branches removed; the deleted
+  interface's directory entry keeps the package undeletable until request
+  `E19K907111` is released. The owner decides about it; the suite's ledger
+  no longer names it.
 - **`getStatus` (R7) answers a fixed text**, `DEMO STATUS`
   (`RES_REPO_PULL->get` L139).
 - **The success status of `checkRepo` (R11) and `switchBranch` (R15)** is the
