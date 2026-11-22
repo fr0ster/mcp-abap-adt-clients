@@ -13,9 +13,12 @@
  * collected wherever it sat, so a request's entries came twice and none said
  * which task it was on; each now comes once, with its task's number.
  *
- * An entry whose name or type is missing is skipped rather than answered with
- * an empty string: nothing can be done with it, and a caller counting entries
- * should not count a hole.
+ * **An entry whose name or type is missing is kept apart** (since 0.28.2;
+ * until then it was skipped). It is not answered among the entries, whose
+ * `name` and `type` stay required — an empty string would let it pass for an
+ * object — but in `incompleteEntries` (`ITransportIncompleteEntry`), with
+ * every field it carries and the ones it lacks absent. SAP listed it, so a
+ * caller counting what a task holds counts it too.
  *
  * An entry whose *position* is missing is kept, because it still says the
  * request holds that object — which is a true and useful thing to report — and
@@ -68,6 +71,51 @@ export interface ITransportObjectEntry extends IAbapObjectEntry {
   info?: string;
 }
 
+/**
+ * An entry SAP lists without its `tm:name` or `tm:type` (since 0.28.2): every
+ * field `ITransportObjectEntry` has, each present only when the entry carries
+ * it. Until 0.28.2 such an entry was dropped.
+ */
+export type ITransportIncompleteEntry = Omit<
+  ITransportObjectEntry,
+  'name' | 'type'
+> & {
+  name?: string;
+  type?: string;
+};
+
+/**
+ * What `parseObjectEntries` answers: the entries, as an array, as before; and
+ * since 0.28.2, on the array itself, `incompleteEntries` — each entry SAP
+ * lists without a name or a type, in document order, present only when the
+ * document holds one. A copy of the array (`map`, a spread, JSON) does not
+ * carry it: read it off the answer.
+ */
+export interface ITransportObjectEntries extends Array<ITransportObjectEntry> {
+  incompleteEntries?: ITransportIncompleteEntry[];
+}
+
+/** One `tm:abap_object` read: an entry, or an entry missing a required field. */
+type ReadEntry =
+  | { complete: ITransportObjectEntry }
+  | { incomplete: ITransportIncompleteEntry };
+
+/** The entries read, split into the complete and the incomplete, each in document order. */
+export interface ISplitEntries {
+  entries: ITransportObjectEntry[];
+  incompleteEntries: ITransportIncompleteEntry[];
+}
+
+const split = (read: ReadEntry[]): ISplitEntries => {
+  const entries: ITransportObjectEntry[] = [];
+  const incompleteEntries: ITransportIncompleteEntry[] = [];
+  for (const entry of read) {
+    if ('complete' in entry) entries.push(entry.complete);
+    else incompleteEntries.push(entry.incomplete);
+  }
+  return { entries, incompleteEntries };
+};
+
 /** Reads an element's attribute by its local name, as written. */
 type AttributeOf = (name: string) => string | undefined;
 
@@ -78,19 +126,15 @@ const nonEmpty = (value: string | undefined): string | undefined =>
 const text = (node: unknown, name: string): string | undefined =>
   nonEmpty(tmAttribute(node, name));
 
-/** One entry, read through `attribute`; `undefined` for one without a name or a type. */
-function entryOf(
-  attribute: AttributeOf,
-  task: string | undefined,
-): ITransportObjectEntry | undefined {
+/**
+ * One entry, read through `attribute`: complete when it carries a name and a
+ * type, else incomplete, with only the fields it carries.
+ */
+function entryOf(attribute: AttributeOf, task: string | undefined): ReadEntry {
   const read = (name: string): string | undefined => nonEmpty(attribute(name));
   const name = read('name');
   const type = read('type');
-  if (name === undefined || type === undefined) return undefined;
-  return {
-    ...(task === undefined ? {} : { task }),
-    name,
-    type,
+  const fields = {
     pgmid: read('pgmid'),
     description: read('obj_desc'),
     // No `?? ''`: see the field's own note. An absent position is absent.
@@ -99,34 +143,60 @@ function entryOf(
     imageActivity: read('img_activity'),
     info: read('obj_info'),
   };
+  if (name !== undefined && type !== undefined) {
+    return {
+      complete: {
+        ...(task === undefined ? {} : { task }),
+        name,
+        type,
+        ...fields,
+      },
+    };
+  }
+  // Only the fields the entry carries: an absent one is no key at all.
+  const present = (
+    key: keyof ITransportIncompleteEntry,
+    value: string | undefined,
+  ): Partial<Record<keyof ITransportIncompleteEntry, string>> =>
+    value === undefined ? {} : { [key]: value };
+  const incomplete: ITransportIncompleteEntry = {
+    ...present('task', task),
+    ...present('name', name),
+    ...present('type', type),
+    ...present('pgmid', fields.pgmid),
+    ...present('description', fields.description),
+    ...present('position', fields.position),
+    ...present('lockStatus', fields.lockStatus),
+    ...present('imageActivity', fields.imageActivity),
+    ...present('info', fields.info),
+  };
+  return { incomplete };
 }
 
 /** The entries `element` holds as its own children, each with `task`. */
-function childEntries(
-  element: unknown,
-  task: string | undefined,
-): ITransportObjectEntry[] {
-  return tmChildren(element, 'abap_object').flatMap((entry) => {
-    const read = entryOf((name) => tmAttribute(entry, name), task);
-    return read === undefined ? [] : [read];
-  });
+function childEntries(element: unknown, task: string | undefined): ReadEntry[] {
+  return tmChildren(element, 'abap_object').map((entry) =>
+    entryOf((name) => tmAttribute(entry, name), task),
+  );
 }
 
 /**
  * A task's entries read by namespace (`readTransportItem`, since 0.28.1):
  * every `abap_object` child and its attributes by the tm namespace URI and
- * local name, whatever the prefix.
+ * local name, whatever the prefix. Since 0.28.2 an entry without a name or a
+ * type is in `incompleteEntries`, not dropped.
  */
-export function taskEntriesIn(task: ITmElement): ITransportObjectEntry[] {
+export function taskEntriesIn(task: ITmElement): ISplitEntries {
   const number = nonEmpty(tmAttributeIn(task, 'number'));
-  return tmElements(task, 'abap_object').flatMap((entry) => {
-    const read = entryOf((name) => tmAttributeIn(entry, name), number);
-    return read === undefined ? [] : [read];
-  });
+  return split(
+    tmElements(task, 'abap_object').map((entry) =>
+      entryOf((name) => tmAttributeIn(entry, name), number),
+    ),
+  );
 }
 
 /** One `tm:task` element's entries, each with the task's number. */
-export function taskEntries(task: unknown): ITransportObjectEntry[] {
+function taskEntries(task: unknown): ReadEntry[] {
   return childEntries(task, text(task, 'number'));
 }
 
@@ -139,11 +209,11 @@ export function taskEntries(task: unknown): ITransportObjectEntry[] {
  * `tm:all_objects`, a request's aggregate of its tasks' entries, sit on no
  * task and no request, so none is read twice.
  */
-function documentEntries(root: ParsedElement): ITransportObjectEntry[] {
+function documentEntries(root: ParsedElement): ReadEntry[] {
   if (tmAttribute(root, 'object_type') === 'T') {
     return tmChildren(root, 'task').flatMap(taskEntries);
   }
-  const entries: ITransportObjectEntry[] = [];
+  const entries: ReadEntry[] = [];
   const walk = (node: unknown): void => {
     for (const element of listOf(node)) {
       if (!isElement(element)) continue;
@@ -172,12 +242,19 @@ function documentEntries(root: ParsedElement): ITransportObjectEntry[] {
  * under `tm:request` has none). A request's `tm:all_objects` repeats its
  * tasks' entries and is not read, so every entry comes once.
  *
+ * An entry without a name or a type is answered in the array's
+ * `incompleteEntries` (since 0.28.2; dropped before), present only when the
+ * document holds one.
+ *
  * Answers an empty list for a request that holds nothing, and for a document
  * that is not a transport one — there is no entry to report either way, and a
  * reading is not where a wire error is decided.
  */
-export function parseObjectEntries(document: unknown): ITransportObjectEntry[] {
+export function parseObjectEntries(document: unknown): ITransportObjectEntries {
   const root = transportRoot(document);
   if (root === undefined) return [];
-  return documentEntries(root);
+  const { entries, incompleteEntries } = split(documentEntries(root));
+  return incompleteEntries.length === 0
+    ? entries
+    : Object.assign(entries, { incompleteEntries });
 }

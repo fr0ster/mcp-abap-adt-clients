@@ -222,8 +222,10 @@ export {
 } from './results/traces';
 export {
   type ICreatedTransport,
+  type ITransportIncompleteEntry,
   type ITransportItem,
   type ITransportItemHeader,
+  type ITransportObjectEntries,
   type ITransportObjectEntry,
   type ITransportRequestItem,
   type ITransportTaskItem,
