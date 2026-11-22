@@ -9,9 +9,10 @@ import {
 } from './parseCreatedTransport';
 import {
   type ITransportIncompleteEntry,
-  type ITransportObjectEntries,
   type ITransportObjectEntry,
+  type ITransportObjectEntryList,
   parseObjectEntries,
+  parseObjectEntryList,
 } from './parseObjectEntries';
 import { parseSearchConfigurations } from './parseSearchConfigurations';
 import {
@@ -62,12 +63,21 @@ export const transportSearchConfigurations: IResultStrategy<
 
 /**
  * A request's object list: its tasks' entries, each once, with its position
- * and the number of the task it is on; since 0.28.2 an entry without a name
- * or a type in the answer's `incompleteEntries`.
+ * and the number of the task it is on. It leaves out an entry without a name
+ * or a type; `transportObjectEntryList` is the complete reading.
  */
 export const transportObjectEntries: IResultStrategy<
-  ITransportObjectEntries
+  ITransportObjectEntry[]
 > = (answer) => parseObjectEntries(answer.data);
+
+/**
+ * The complete object list (since 0.28.2): `{ entries, incompleteEntries? }`,
+ * each entry without a name or a type in `incompleteEntries`, present only
+ * when the document holds one.
+ */
+export const transportObjectEntryList: IResultStrategy<
+  ITransportObjectEntryList
+> = (answer) => parseObjectEntryList(answer.data);
 
 export type * from './types';
 export {
@@ -76,13 +86,14 @@ export {
   type ITransportIncompleteEntry,
   type ITransportItem,
   type ITransportItemHeader,
-  type ITransportObjectEntries,
   type ITransportObjectEntry,
+  type ITransportObjectEntryList,
   type ITransportRequestItem,
   type ITransportTaskItem,
   type ITransportTaskSummary,
   parseCreatedTransport,
   parseObjectEntries,
+  parseObjectEntryList,
   parseSearchConfigurations,
   parseTransportTree,
   readTransportItem,

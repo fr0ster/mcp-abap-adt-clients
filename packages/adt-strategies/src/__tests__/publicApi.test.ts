@@ -112,6 +112,7 @@ describe('the published surface', () => {
       'transportCreated',
       'transportItem',
       'transportObjectEntries',
+      'transportObjectEntryList',
       'transportSearchConfigurations',
       'transportTree',
       'unitTestRunId',

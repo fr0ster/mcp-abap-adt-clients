@@ -85,13 +85,13 @@ export type ITransportIncompleteEntry = Omit<
 };
 
 /**
- * What `parseObjectEntries` answers: the entries, as an array, as before; and
- * since 0.28.2, on the array itself, `incompleteEntries` — each entry SAP
- * lists without a name or a type, in document order, present only when the
- * document holds one. A copy of the array (`map`, a spread, JSON) does not
- * carry it: read it off the answer.
+ * What `parseObjectEntryList` answers (since 0.28.2): the entries, and each
+ * entry SAP lists without a name or a type in `incompleteEntries`, in
+ * document order, present only when the document holds one. A plain object,
+ * so a copy or JSON of it keeps both.
  */
-export interface ITransportObjectEntries extends Array<ITransportObjectEntry> {
+export interface ITransportObjectEntryList {
+  entries: ITransportObjectEntry[];
   incompleteEntries?: ITransportIncompleteEntry[];
 }
 
@@ -101,7 +101,7 @@ type ReadEntry =
   | { incomplete: ITransportIncompleteEntry };
 
 /** The entries read, split into the complete and the incomplete, each in document order. */
-export interface ISplitEntries {
+interface ISplitEntries {
   entries: ITransportObjectEntry[];
   incompleteEntries: ITransportIncompleteEntry[];
 }
@@ -242,19 +242,32 @@ function documentEntries(root: ParsedElement): ReadEntry[] {
  * under `tm:request` has none). A request's `tm:all_objects` repeats its
  * tasks' entries and is not read, so every entry comes once.
  *
- * An entry without a name or a type is answered in the array's
- * `incompleteEntries` (since 0.28.2; dropped before), present only when the
- * document holds one.
+ * **This array leaves out an entry without a name or a type**, as it always
+ * has; `parseObjectEntryList` (since 0.28.2) is the complete reading, which
+ * answers such an entry in `incompleteEntries`.
  *
  * Answers an empty list for a request that holds nothing, and for a document
  * that is not a transport one — there is no entry to report either way, and a
  * reading is not where a wire error is decided.
  */
-export function parseObjectEntries(document: unknown): ITransportObjectEntries {
+export function parseObjectEntries(document: unknown): ITransportObjectEntry[] {
+  return parseObjectEntryList(document).entries;
+}
+
+/**
+ * The complete reading of a transport document's entries (since 0.28.2):
+ * `entries` as `parseObjectEntries` answers them, and each entry SAP lists
+ * without a name or a type in `incompleteEntries`, present only when the
+ * document holds one. A task holds `entries.length +
+ * (incompleteEntries?.length ?? 0)` entries.
+ */
+export function parseObjectEntryList(
+  document: unknown,
+): ITransportObjectEntryList {
   const root = transportRoot(document);
-  if (root === undefined) return [];
+  if (root === undefined) return { entries: [] };
   const { entries, incompleteEntries } = split(documentEntries(root));
   return incompleteEntries.length === 0
-    ? entries
-    : Object.assign(entries, { incompleteEntries });
+    ? { entries }
+    : { entries, incompleteEntries };
 }

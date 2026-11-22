@@ -225,8 +225,8 @@ export {
   type ITransportIncompleteEntry,
   type ITransportItem,
   type ITransportItemHeader,
-  type ITransportObjectEntries,
   type ITransportObjectEntry,
+  type ITransportObjectEntryList,
   type ITransportRequestItem,
   type ITransportTaskItem,
   type ITransportTaskSummary,
@@ -239,6 +239,7 @@ export {
   transportCreated,
   transportItem,
   transportObjectEntries,
+  transportObjectEntryList,
   transportSearchConfigurations,
   transportTree,
 } from './results/transport';
