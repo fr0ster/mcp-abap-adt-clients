@@ -72,18 +72,32 @@ describe('deleteBranch, in the recorded remote', () => {
     ]);
   });
 
-  it('a 404 from that remote is absence', async () => {
-    stubFetch([404]);
+  it('a 404 is absence once the token is shown to see the repository', async () => {
+    const sent = stubFetch([404, 200]);
     await expect(recorded.deleteBranch('b')).resolves.toBe('absent');
+    expect(sent[1]?.url).toBe('https://api.github.com/repos/owner/then');
   });
 
-  it('a 422 is absence only once the exact ref reads 404', async () => {
-    const sent = stubFetch([422, 404]);
+  it('a 404 while the repository is not visible throws, so the ledger keeps the ref', async () => {
+    stubFetch([404, 404]);
+    await expect(recorded.deleteBranch('b')).rejects.toThrow(
+      /cannot see owner\/then .*stays in the ledger/,
+    );
+  });
+
+  it('a 422 is absence only once the exact ref reads 404 and the repository is visible', async () => {
+    const sent = stubFetch([422, 404, 200]);
     await expect(recorded.deleteBranch('b')).resolves.toBe('absent');
     expect(sent[1]).toEqual({
       method: 'GET',
       url: 'https://api.github.com/repos/owner/then/git/ref/heads/b',
     });
+    expect(sent[2]?.url).toBe('https://api.github.com/repos/owner/then');
+  });
+
+  it('a 422 whose ref reads 404 in a repository not visible throws', async () => {
+    stubFetch([422, 404, 403]);
+    await expect(recorded.deleteBranch('b')).rejects.toThrow(/cannot see/);
   });
 
   it('a 422 with the ref still there throws, so the ledger keeps it', async () => {

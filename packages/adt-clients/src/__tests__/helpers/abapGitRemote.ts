@@ -211,10 +211,13 @@ export class GitHubFixtures {
   }
 
   /**
-   * Delete a branch. Resolves once its absence is confirmed: `204` deleted,
-   * `404` from this remote absent. A `422` proves nothing ("Reference does
-   * not exist" and other refusals share it): the exact ref is read, and only
-   * its `404` confirms; a ref still there throws. Anything else throws.
+   * Delete a branch. Resolves once its absence is confirmed: `204` deleted;
+   * a `404` for the ref — from the DELETE, or from reading the exact ref
+   * after a `422`, which proves nothing by itself — counts only once the
+   * token is shown to see the repository (`GET /repos/{owner}/{repo}`,
+   * `200`): GitHub answers `404` for a repository the token cannot see too.
+   * A ref still there, a repository not visible, or any other answer throws,
+   * and the ledger keeps the ref.
    */
   async deleteBranch(name: string): Promise<'deleted' | 'absent'> {
     const answer = await this.call(
@@ -223,12 +226,21 @@ export class GitHubFixtures {
       [204, 404, 422],
     );
     if (answer.status === 204) return 'deleted';
-    if (answer.status === 404) return 'absent';
-    if (await this.branchExists(name))
+    if (answer.status === 422 && (await this.branchExists(name)))
       throw new Error(
         `branch ${name} was refused deletion (422) and still exists in ${this.remote.owner}/${this.remote.repo}`,
       );
+    await this.confirmRepositoryVisible(name);
     return 'absent';
+  }
+
+  /** The `404` of a ref means absence only if the token sees the repository. */
+  private async confirmRepositoryVisible(name: string): Promise<void> {
+    const answer = await this.call('GET', '', [200, 401, 403, 404]);
+    if (answer.status !== 200)
+      throw new Error(
+        `branch ${name}: the token cannot see ${this.remote.owner}/${this.remote.repo} (GET /repos answered ${answer.status}), so a 404 for the ref proves nothing; the ref stays in the ledger`,
+      );
   }
 
   /** Whether a branch exists. */
