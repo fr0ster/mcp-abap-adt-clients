@@ -4,6 +4,10 @@
  *
  * Every name is read prefixed (`tm:number`) and, failing that, bare
  * (`number`): a release that writes the attributes unqualified reads the same.
+ *
+ * Readings parse SAP's answers, which use the `tm:` prefix (recorded, both
+ * systems); documents that rebind or alias the prefix are out of scope
+ * (controller ruling 2026-11-23).
  */
 
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
@@ -60,4 +64,102 @@ export function hasContent(node: ParsedElement): boolean {
     return true;
   }
   return false;
+}
+
+/** The namespace of `tm:` (recorded, every system). */
+export const TM_NAMESPACE = 'http://www.sap.com/cts/adt/tm';
+
+/** Prefixes in scope on an element (`''` the default namespace) and their URIs. */
+export type TmScope = ReadonlyMap<string, string>;
+
+/** An element and the namespaces in scope on it. */
+export interface ITmElement {
+  element: unknown;
+  scope: TmScope;
+}
+
+/** The namespaces in scope on an element: its parent's, and its own `xmlns` declarations. */
+function scopeOn(element: unknown, parent: TmScope): TmScope {
+  if (!isElement(element) || Array.isArray(element)) return parent;
+  let scope: Map<string, string> | undefined;
+  for (const [key, value] of Object.entries(element)) {
+    if (key !== '@_xmlns' && !key.startsWith('@_xmlns:')) continue;
+    const uri = leafText(value);
+    if (uri === undefined) continue;
+    scope ??= new Map(parent);
+    scope.set(key === '@_xmlns' ? '' : key.slice('@_xmlns:'.length), uri);
+  }
+  return scope ?? parent;
+}
+
+/** The document's root as an element with its scope. */
+export function tmRootElement(root: ParsedElement): ITmElement {
+  return { element: root, scope: scopeOn(root, new Map()) };
+}
+
+/**
+ * Whether an element name is `tm:<local>` by namespace: a prefix bound to
+ * the tm namespace, or no prefix where the default namespace is tm or none
+ * (the bare names `tmChildren` reads too).
+ */
+function namesTm(qname: string, scope: TmScope, local: string): boolean {
+  const colon = qname.indexOf(':');
+  if (colon < 0) {
+    const uri = scope.get('');
+    return qname === local && (uri === undefined || uri === TM_NAMESPACE);
+  }
+  return (
+    qname.slice(colon + 1) === local &&
+    scope.get(qname.slice(0, colon)) === TM_NAMESPACE
+  );
+}
+
+/**
+ * Every child element `tm:<local>` of a parent, by namespace URI and local
+ * name whatever its prefix — so `<tm:task>` beside `<task>` in the tm default
+ * namespace, or beside `<t2:task>` with `t2` bound to tm, is two tasks.
+ */
+export function tmElements(parent: ITmElement, local: string): ITmElement[] {
+  const { element } = parent;
+  if (!isElement(element) || Array.isArray(element)) return [];
+  const found: ITmElement[] = [];
+  for (const [key, value] of Object.entries(element)) {
+    if (key.startsWith('@_') || key === '#text') continue;
+    for (const item of listOf(value)) {
+      const scope = scopeOn(item, parent.scope);
+      if (namesTm(key, scope, local)) found.push({ element: item, scope });
+    }
+  }
+  return found;
+}
+
+/**
+ * A `tm:<local>` attribute of an element by namespace, decoded and trimmed:
+ * literal padding and padding written as a reference (`&#32;`) read the
+ * same. A qualified attribute (a prefix bound to tm) wins over a bare one of
+ * the same local name, whatever their order. `undefined` when absent.
+ */
+export function tmAttributeIn(
+  tm: ITmElement,
+  local: string,
+): string | undefined {
+  const { element, scope } = tm;
+  if (!isElement(element) || Array.isArray(element)) return undefined;
+  let bare: string | undefined;
+  for (const [key, value] of Object.entries(element)) {
+    if (!key.startsWith('@_') || key.startsWith('@_xmlns')) continue;
+    const name = key.slice(2);
+    const colon = name.indexOf(':');
+    if (colon < 0) {
+      if (name === local) bare = leafText(value);
+      continue;
+    }
+    if (
+      name.slice(colon + 1) === local &&
+      scope.get(name.slice(0, colon)) === TM_NAMESPACE
+    ) {
+      return leafText(value)?.trim();
+    }
+  }
+  return bare?.trim();
 }

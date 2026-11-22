@@ -14,12 +14,22 @@
 
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { rawOf } from '../../result';
-import { tmAttribute, tmChildren, transportRoot } from './document';
-import { type ITransportObjectEntry, taskEntries } from './parseObjectEntries';
+import {
+  type ITmElement,
+  tmAttributeIn,
+  tmElements,
+  tmRootElement,
+  transportRoot,
+} from './document';
+import {
+  type ITransportObjectEntry,
+  taskEntriesIn,
+} from './parseObjectEntries';
 
 /**
- * A request's or a task's header, each field the attribute as written (an
- * empty one `''`), `undefined` when the element does not carry it.
+ * A request's or a task's header, each field the attribute decoded and
+ * trimmed (since 0.28.1; an empty one `''`), `undefined` when the element
+ * does not carry it. A `tm:`-qualified attribute wins over a bare one.
  */
 export interface ITransportItemHeader {
   /** `tm:number`. */
@@ -81,90 +91,100 @@ const refuse = (): never => {
   throw new Error(TRANSPORT_ITEM_REFUSAL);
 };
 
-function headerOf(element: unknown, number: string): ITransportItemHeader {
+/** Every header field of an element, by the tm namespace, each decoded and trimmed. */
+function headerOf(tm: ITmElement, number: string): ITransportItemHeader {
+  const field = (local: string): string | undefined => tmAttributeIn(tm, local);
   return {
     number,
-    parent: tmAttribute(element, 'parent'),
-    description: tmAttribute(element, 'desc'),
-    type: tmAttribute(element, 'type'),
-    status: tmAttribute(element, 'status'),
-    statusText: tmAttribute(element, 'status_text'),
-    owner: tmAttribute(element, 'owner'),
-    target: tmAttribute(element, 'target'),
-    client: tmAttribute(element, 'source_client'),
-    ctsProject: tmAttribute(element, 'cts_project'),
-    lastChanged: tmAttribute(element, 'lastchanged_timestamp'),
+    parent: field('parent'),
+    description: field('desc'),
+    type: field('type'),
+    status: field('status'),
+    statusText: field('status_text'),
+    owner: field('owner'),
+    target: field('target'),
+    client: field('source_client'),
+    ctsProject: field('cts_project'),
+    lastChanged: field('lastchanged_timestamp'),
   };
 }
 
-/** The element's number, which must be the one asked for. */
-function numberOf(element: unknown, asked: string): string {
-  const number = tmAttribute(element, 'number');
-  return number !== undefined && number !== '' && number === asked
-    ? number
-    : refuse();
-}
-
 /** A header of an element whose number is not checked against the request: a parent's, a task's. */
-function ownHeader(element: unknown): ITransportItemHeader | undefined {
-  const number = tmAttribute(element, 'number');
+function ownHeader(
+  tm: ITmElement | undefined,
+): ITransportItemHeader | undefined {
+  if (tm === undefined) return undefined;
+  const number = tmAttributeIn(tm, 'number');
   return number === undefined || number === ''
     ? undefined
-    : headerOf(element, number);
+    : headerOf(tm, number);
 }
+
+/** The elements among `elements` whose own `tm:number`, trimmed, is `asked`. */
+const naming = (elements: ITmElement[], asked: string): ITmElement[] =>
+  elements.filter((tm) => tmAttributeIn(tm, 'number') === asked);
 
 /**
  * Read a transport request or task document, asked for by `number`.
  *
- * `kind` is the root's `tm:object_type` (`R` a request, `T` a task); without
- * it, a `tm:task` of the root naming `number` makes it a task, and anything
- * else a request. The element selected — the root's `tm:task` for a task,
- * its `tm:request` for a request — must name `number`.
+ * **The number asked decides the item** (since 0.28.1): the root's `tm:task`
+ * whose own number is `number` makes it a task, the root's `tm:request` whose
+ * own number is `number` a request; exactly one element may name it. The
+ * root's `tm:object_type` (`R` a request, `T` a task) must confirm what the
+ * number found.
+ *
+ * Without the marker the number decides alone, with one rule of the
+ * document's shape: a root that holds a `tm:task` of its own is a task's
+ * document, whose `tm:request` is only the parent's header, so it is not the
+ * request asked for. SAP marks every task document
+ * (`CL_CTS_ADT_TM_RES_REQUEST_CONT->prepare_tm_root_for_task`, on premise and
+ * on the cloud), so the markerless case is defensive: until 0.28.1 a task's
+ * unmarked document asked for by its parent's number was read as the parent.
  *
  * Throws `TRANSPORT_ITEM_REFUSAL`, and nothing of the document, for an answer
- * that is no `tm:root` document, whose marker is neither, or whose selected
- * element is missing, names no number or another one.
+ * that is no `tm:root` document, whose marker is neither or contradicts the
+ * element found, where no element or more than one names `number`, or where
+ * the number is blank.
  */
 export function readTransportItem(
   document: unknown,
   number: string,
 ): ITransportItem {
-  const root = transportRoot(document) ?? refuse();
-  const marker = tmAttribute(root, 'object_type');
-  const tasks = tmChildren(root, 'task');
-  const isTask =
-    marker === 'T' ||
-    (marker === undefined &&
-      tasks.some((task) => tmAttribute(task, 'number') === number));
+  const root = tmRootElement(transportRoot(document) ?? refuse());
+  const marker = tmAttributeIn(root, 'object_type');
   if (marker !== undefined && marker !== 'T' && marker !== 'R') refuse();
+  const asked = number.trim();
+  if (asked === '') refuse();
 
-  if (isTask) {
-    const task =
-      tasks.length === 1
-        ? tasks[0]
-        : tasks.find(
-            (candidate) => tmAttribute(candidate, 'number') === number,
-          );
-    const header = headerOf(task, numberOf(task, number));
-    const [request] = tmChildren(root, 'request');
+  const rootTasks = tmElements(root, 'task');
+  const requests = tmElements(root, 'request');
+  const tasksNamed = naming(rootTasks, asked);
+  const requestsNamed = naming(requests, asked);
+  if (tasksNamed.length + requestsNamed.length !== 1) refuse();
+
+  const [task] = tasksNamed;
+  if (task !== undefined) {
+    if (marker === 'R') refuse();
+    const [request] = requests;
     return {
       kind: 'task',
-      header,
+      header: headerOf(task, asked),
       parent: ownHeader(request),
-      objects: taskEntries(task),
+      objects: taskEntriesIn(task),
     };
   }
 
-  const requests = tmChildren(root, 'request');
-  const request = requests.length === 1 ? requests[0] : refuse();
+  const [request] = requestsNamed;
+  if (request === undefined || marker === 'T') return refuse();
+  if (marker === undefined && rootTasks.length > 0) refuse();
   return {
     kind: 'request',
-    header: headerOf(request, numberOf(request, number)),
-    tasks: tmChildren(request, 'task').flatMap((task) => {
-      const header = ownHeader(task);
+    header: headerOf(request, asked),
+    tasks: tmElements(request, 'task').flatMap((child) => {
+      const header = ownHeader(child);
       return header === undefined
         ? []
-        : [{ header, objectCount: tmChildren(task, 'abap_object').length }];
+        : [{ header, objectCount: tmElements(child, 'abap_object').length }];
     }),
   };
 }

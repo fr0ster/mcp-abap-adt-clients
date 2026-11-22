@@ -108,7 +108,7 @@ const NODE_XML =
   '<TECH_NAME>ZMY_PROGRAM</TECH_NAME>' +
   '<OBJECT_URI>/sap/bc/adt/programs/programs/zmy_program</OBJECT_URI>' +
   '</SEU_ADT_REPOSITORY_OBJ_NODE>' +
-  // Missing OBJECT_URI — cannot be fetched, so it is not a node.
+  // Missing OBJECT_URI — in incompleteObjects since 0.28.1 (dropped before).
   '<SEU_ADT_REPOSITORY_OBJ_NODE>' +
   '<OBJECT_TYPE>PROG/I</OBJECT_TYPE><OBJECT_NAME>ZBROKEN</OBJECT_NAME>' +
   '<TECH_NAME>ZBROKEN</TECH_NAME>' +
@@ -134,14 +134,18 @@ describe('utilNodeContents', () => {
     ]);
   });
 
-  it('drops a node that cannot be identified or fetched', () => {
-    expect(utilNodeContents(wire(NODE_XML)).objects).toEqual([
+  it('answers a node without OBJECT_URI in incompleteObjects (since 0.28.1)', () => {
+    const contents = utilNodeContents(wire(NODE_XML));
+    expect(contents.objects).toEqual([
       {
         type: 'PROG/P',
         objectName: 'ZMY_PROGRAM',
         techName: 'ZMY_PROGRAM',
         objectUri: '/sap/bc/adt/programs/programs/zmy_program',
       },
+    ]);
+    expect(contents.incompleteObjects).toEqual([
+      { type: 'PROG/I', objectName: 'ZBROKEN', techName: 'ZBROKEN' },
     ]);
   });
 

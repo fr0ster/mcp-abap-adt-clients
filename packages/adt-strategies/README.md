@@ -185,7 +185,7 @@ after this one):
 |---|---|---|
 | `asItCame`, `rawOf` | any | the answer unchanged; `answer.data` as text |
 | `transportTree`, `transportCreated`, `transportSearchConfigurations`, `transportObjectEntries` | `getRequest`: `list`; `created`/`createdTask`; `searchConfigurations`; `objects` | `ITransportTree`, `ICreatedTransport`, `ITransportSearchConfiguration[]`, `ITransportObjectEntry[]` |
-| `transportItem(number)`, `readTransportItem` | `getRequest`: `objects` (the request or task document) | `ITransportItem`: `{ kind: 'request', header, tasks }` or `{ kind: 'task', header, parent, objects }`; refused when the element read does not name `number` |
+| `transportItem(number)`, `readTransportItem` | `getRequest`: `objects` (the request or task document) | `ITransportItem`: `{ kind: 'request', header, tasks }` or `{ kind: 'task', header, parent, objects }`; the item is the root's `tm:task` or `tm:request` naming `number`, the marker confirming it; refused when none or both name it (0.28.1) |
 | `objectVersions` | any versionable type: `versions` | `IObjectVersion[]` |
 | `unitTestRunId` | `AdtExecutor.getClassTestRunner`: `run` | the run id, from the header ADT puts it in |
 | `featureToggleRuntimeState`, `featureToggleCheckState` | `getFeatureToggle`: `runtimeState`, `checkState` | the two states |
@@ -306,7 +306,10 @@ tag or attribute is coerced to a number (`007` stays `007`, a position
 (`&#x26;` is `&`). Readings keep what the document holds: `transportObjectEntries`
 one entry per task entry, with `task`; `utilWhereUsedReferences` every
 reference, packages included, with `kind`; `utilNodeContents` each object's
-`description`; `utilNamedItems` an absent description absent.
+`description` and, since 0.28.1, every node SAP lists: one without its name,
+technical name or URI in `incompleteObjects`, the field it lacks absent, and
+each node SAP could not load as `notLoaded` (none of SAP's text); `utilNamedItems` an absent
+description absent.
 
 ## How the defaults are justified
 

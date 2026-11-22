@@ -158,8 +158,8 @@ export interface INamedItem {
 
 /**
  * One object under a repository node. The four fields are the ones a caller
- * needs to identify and fetch it; a node the server sends without all four is
- * not one.
+ * needs to identify and fetch it; a node SAP lists without one of them is
+ * answered in `incompleteObjects` instead (since 0.28.1; dropped before).
  */
 export type IRepositoryObjectNode = IAdtAnsweredObject & {
   objectName: string;
@@ -168,6 +168,31 @@ export type IRepositoryObjectNode = IAdtAnsweredObject & {
   /** Since 0.28.0: `DESCRIPTION` as written, when the node carries one. */
   description?: string;
 };
+
+/**
+ * An object node SAP lists without its `OBJECT_NAME`, `TECH_NAME` or
+ * `OBJECT_URI` (since 0.28.1): every field it carries, the ones it lacks
+ * absent. Until 0.28.1 such a node was dropped, and the walks list them.
+ */
+export type IRepositoryIncompleteNode = IAdtAnsweredObject & {
+  objectName?: string;
+  techName?: string;
+  objectUri?: string;
+  description?: string;
+};
+
+/**
+ * A node SAP listed but could not load (since 0.28.1). SAP answers such a
+ * line of its tree with an entry of no `OBJECT_TYPE`, its message `SEU_ADT
+ * 101` "Error loading node:" in `OBJECT_NAME` and its explanation in
+ * `TECH_NAME` (`CL_SEU_ADT_RES_REPO_STRUCTURE->create_tree_content`;
+ * measured on premise, 2026-11-22, for a package's `VIEW/DV` node). None of
+ * SAP's text is kept, and there is no type to keep: the entry has none. The
+ * node's type is the child node the level was asked for by.
+ */
+export interface IRepositoryNotLoadedNode {
+  notLoaded: true;
+}
 
 /**
  * One child level: an object type, and the node id holding objects of it.
@@ -182,6 +207,16 @@ export type IRepositoryNodeChild = IAdtAnsweredObject & {
 export interface IRepositoryNodeContents {
   objects: IRepositoryObjectNode[];
   childNodes: IRepositoryNodeChild[];
+  /**
+   * Since 0.28.1: each node SAP could not load, in document order; present
+   * only when the level lists one.
+   */
+  notLoaded?: IRepositoryNotLoadedNode[];
+  /**
+   * Since 0.28.1: each object node SAP lists without one of the identity
+   * fields, in document order; present only when the level lists one.
+   */
+  incompleteObjects?: IRepositoryIncompleteNode[];
 }
 
 /** The node-structure document's two halves, the nodes still as parsed XML. */
@@ -326,6 +361,7 @@ const nodeText = (node: unknown, key: string): string | undefined => {
 /**
  * The node-structure document, parsed into its two halves. A document that is
  * not this one — an exception, a logon page, nothing — reads as an empty level.
+ * Since 0.28.1 every row is a node, an empty one an empty record.
  */
 export function readNodeStructure(xml: string): IParsedNodeStructure {
   const data = at(
@@ -334,9 +370,12 @@ export function readNodeStructure(xml: string): IParsedNodeStructure {
     'asx:values',
     'DATA',
   );
+  // Every row is kept: an empty one (`<SEU_ADT_REPOSITORY_OBJ_NODE/>`, which
+  // the parser makes `''`) or one holding only text reads as a node with no
+  // fields, so the readings above it account for it instead of losing it.
   const nodes = listOf(
     at(data, 'TREE_CONTENT', 'SEU_ADT_REPOSITORY_OBJ_NODE'),
-  ).filter(isRecord);
+  ).map((node): XmlRecord => (isRecord(node) ? node : {}));
   const objectTypes: IRepositoryNodeChild[] = [];
   for (const info of listOf(
     at(data, 'OBJECT_TYPES', 'SEU_ADT_OBJECT_TYPE_INFO'),
@@ -353,31 +392,57 @@ export function readNodeStructure(xml: string): IParsedNodeStructure {
 /**
  * One level of the repository tree — `/repository/nodestructure`: the objects
  * here, each with its description where the node carries one, and the typed
- * child nodes to ask for next. A node missing any of the four identity fields
- * is dropped.
+ * child nodes to ask for next. Since 0.28.1 nothing SAP lists is dropped: a
+ * node without one of the four identity fields is in `incompleteObjects`,
+ * and an entry with no `OBJECT_TYPE` — SAP's message for a node it could not
+ * load — is in `notLoaded`, without its text.
  */
 export const utilNodeContents: IResultStrategy<IRepositoryNodeContents> = (
   answer,
 ) => {
   const { nodes, objectTypes } = readNodeStructure(rawOf(answer));
   const objects: IRepositoryObjectNode[] = [];
+  const incompleteObjects: IRepositoryIncompleteNode[] = [];
+  const notLoaded: IRepositoryNotLoadedNode[] = [];
   for (const node of nodes) {
     const objectType = nodeText(node, 'OBJECT_TYPE');
+    if (objectType === undefined) {
+      notLoaded.push({ notLoaded: true });
+      continue;
+    }
     const objectName = nodeText(node, 'OBJECT_NAME');
     const techName = nodeText(node, 'TECH_NAME');
     const objectUri = nodeText(node, 'OBJECT_URI');
-    if (objectType && objectName && techName && objectUri) {
-      const description = nodeValue(node, 'DESCRIPTION');
+    const description = nodeValue(node, 'DESCRIPTION');
+    const described = description === undefined ? {} : { description };
+    if (
+      objectName !== undefined &&
+      techName !== undefined &&
+      objectUri !== undefined
+    ) {
       objects.push({
         ...answeredObject(objectType),
         objectName,
         techName,
         objectUri,
-        ...(description === undefined ? {} : { description }),
+        ...described,
       });
+      continue;
     }
+    incompleteObjects.push({
+      ...answeredObject(objectType),
+      ...(objectName === undefined ? {} : { objectName }),
+      ...(techName === undefined ? {} : { techName }),
+      ...(objectUri === undefined ? {} : { objectUri }),
+      ...described,
+    });
   }
-  return { objects, childNodes: objectTypes };
+  return {
+    objects,
+    childNodes: objectTypes,
+    ...(notLoaded.length === 0 ? {} : { notLoaded }),
+    ...(incompleteObjects.length === 0 ? {} : { incompleteObjects }),
+  };
 };
 
 // ---------------------------------------------------------------------------

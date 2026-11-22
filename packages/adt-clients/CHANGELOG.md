@@ -24,6 +24,23 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [47.0.1] - 2026-11-23
+
+Documentation only, released with `@mcp-abap-adt/adt-strategies` 0.28.1 (published
+first; the range is now `^0.28.1`, so the behaviour documented is the one
+installed). No code or type change.
+
+### Changed
+
+- **`docs/usage/ERRATA.md`** (shipped in the package) matches adt-strategies
+  0.28.1: a new entry, "A node SAP cannot load is answered as a tree line"
+  (`SEU_ADT 101`, answered by `utilNodeContents` as `notLoaded`; a node
+  without its name, technical name or URI in `incompleteObjects`), and the
+  transport entry now says `transportItem(number)` picks the item by the
+  number asked.
+- **`docs/usage/CLIENT_API_REFERENCE.md`** (shipped) states the same
+  selection rule for `transportItem(number)`.
+
 ## [47.0.0] - 2026-11-22
 
 Released with `@mcp-abap-adt/adt-strategies` 0.28.0 (published first; the

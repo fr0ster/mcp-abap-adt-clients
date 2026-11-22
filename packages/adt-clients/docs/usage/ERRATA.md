@@ -166,10 +166,33 @@ by the server team (fr0ster/mcp-abap-adt, GetTransport's fixtures).
 
 **Why the library has a strategy for it.** `transportItem(number)` from
 `@mcp-abap-adt/adt-strategies` (0.28.0) reads the document as the request or
-the task it describes — `kind` from the marker, or from a `tm:task` naming
-the number when the marker is absent — and refuses a document whose
-selected element names no number or another one. `transportObjectEntries`
+the task it describes. Since 0.28.1 the number asked decides: the root's
+`tm:task` or `tm:request` whose own number it is, the marker confirming
+it; a document where none or both name it is refused, and so is an
+unmarked task document asked for by its parent's number (SAP marks every
+task document, so that case is defensive; until 0.28.1 it read as the
+parent). `transportObjectEntries`
 reads either document's entries per task, each once.
+
+## A node SAP cannot load is answered as a tree line
+
+**Symptom.** `POST /sap/bc/adt/repository/nodestructure` for a node answers
+`200` and a `SEU_ADT_REPOSITORY_OBJ_NODE` with an empty `OBJECT_TYPE`,
+`OBJECT_NAME` "Error loading node:" and an explanation in `TECH_NAME` — read
+as an object, it is a nameless-typed row whose name is a message.
+
+**What actually happened.** SAP could not load the node and put its message
+`SEU_ADT 101` where the node's lines would be
+(`CL_SEU_ADT_RES_REPO_STRUCTURE->create_tree_content`). Measured on premise,
+2026-11-22, for a package's Views node (`VIEW/DV`), which comes from SAP's
+stored package tree (`DWTREE`), by the server team (fr0ster/mcp-abap-adt,
+the package walks).
+
+**Why the library has a strategy for it.** `utilNodeContents` from
+`@mcp-abap-adt/adt-strategies` (0.28.1) answers an entry with no
+`OBJECT_TYPE` as `notLoaded`, with none of SAP's text, and keeps every
+other node SAP lists — one without its name, technical name or URI in
+`incompleteObjects`, the field it lacks absent.
 
 ## abapGit: what an answer says
 

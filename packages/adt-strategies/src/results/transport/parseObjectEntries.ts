@@ -27,7 +27,14 @@
 
 import type { IAbapObjectEntry } from '@mcp-abap-adt/interfaces-adt';
 import { isElement, listOf, type ParsedElement } from '../../parsed';
-import { tmAttribute, tmChildren, transportRoot } from './document';
+import {
+  type ITmElement,
+  tmAttribute,
+  tmAttributeIn,
+  tmChildren,
+  tmElements,
+  transportRoot,
+} from './document';
 
 /** What the objects reading answers by default. */
 export interface ITransportObjectEntry extends IAbapObjectEntry {
@@ -61,31 +68,36 @@ export interface ITransportObjectEntry extends IAbapObjectEntry {
   info?: string;
 }
 
-/** An attribute as written; `undefined` when absent or empty. */
-const text = (node: unknown, name: string): string | undefined => {
-  const value = tmAttribute(node, name);
-  return value === '' ? undefined : value;
-};
+/** Reads an element's attribute by its local name, as written. */
+type AttributeOf = (name: string) => string | undefined;
 
-/** One entry, read; `undefined` for one without a name or a type. */
+/** An attribute as written; `undefined` when absent or empty. */
+const nonEmpty = (value: string | undefined): string | undefined =>
+  value === '' ? undefined : value;
+
+const text = (node: unknown, name: string): string | undefined =>
+  nonEmpty(tmAttribute(node, name));
+
+/** One entry, read through `attribute`; `undefined` for one without a name or a type. */
 function entryOf(
-  entry: unknown,
+  attribute: AttributeOf,
   task: string | undefined,
 ): ITransportObjectEntry | undefined {
-  const name = text(entry, 'name');
-  const type = text(entry, 'type');
+  const read = (name: string): string | undefined => nonEmpty(attribute(name));
+  const name = read('name');
+  const type = read('type');
   if (name === undefined || type === undefined) return undefined;
   return {
     ...(task === undefined ? {} : { task }),
     name,
     type,
-    pgmid: text(entry, 'pgmid'),
-    description: text(entry, 'obj_desc'),
+    pgmid: read('pgmid'),
+    description: read('obj_desc'),
     // No `?? ''`: see the field's own note. An absent position is absent.
-    position: text(entry, 'position'),
-    lockStatus: text(entry, 'lock_status'),
-    imageActivity: text(entry, 'img_activity'),
-    info: text(entry, 'obj_info'),
+    position: read('position'),
+    lockStatus: read('lock_status'),
+    imageActivity: read('img_activity'),
+    info: read('obj_info'),
   };
 }
 
@@ -95,7 +107,20 @@ function childEntries(
   task: string | undefined,
 ): ITransportObjectEntry[] {
   return tmChildren(element, 'abap_object').flatMap((entry) => {
-    const read = entryOf(entry, task);
+    const read = entryOf((name) => tmAttribute(entry, name), task);
+    return read === undefined ? [] : [read];
+  });
+}
+
+/**
+ * A task's entries read by namespace (`readTransportItem`, since 0.28.1):
+ * every `abap_object` child and its attributes by the tm namespace URI and
+ * local name, whatever the prefix.
+ */
+export function taskEntriesIn(task: ITmElement): ITransportObjectEntry[] {
+  const number = nonEmpty(tmAttributeIn(task, 'number'));
+  return tmElements(task, 'abap_object').flatMap((entry) => {
+    const read = entryOf((name) => tmAttributeIn(entry, name), number);
     return read === undefined ? [] : [read];
   });
 }
