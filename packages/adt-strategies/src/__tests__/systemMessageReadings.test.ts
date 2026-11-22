@@ -51,6 +51,18 @@ describe('feedSystemMessages', () => {
     ]);
   });
 
+  // Built from SAP's code (`convert_textlines_to_html`): an indented first
+  // line, a blank line between two, each followed by `</BR>`.
+  it('keeps every line as written: leading spaces and a blank line', () => {
+    const summary =
+      '<P>&nbsp;&nbsp;Indented&nbsp;first</BR></BR>Third&nbsp;&nbsp;line</BR></P> ' +
+      '<table><tr><td>Message ID</td><td>0000000043</td></tr></table> ';
+    const entry = ENTRY.replace(escapedOnce(SUMMARY), escapedOnce(summary));
+    expect(entry).not.toBe(ENTRY);
+    const [message] = feedSystemMessages(answer(entry));
+    expect(message?.text).toBe('  Indented first\n\nThird  line');
+  });
+
   it('answers no severity or validity, which SAP never writes', () => {
     const [entry] = feedSystemMessages(answer(ENTRY));
     for (const gone of ['severity', 'validFrom', 'validTo']) {

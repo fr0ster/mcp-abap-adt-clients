@@ -92,7 +92,10 @@ export interface ISystemMessageEntry {
   messageId?: string;
   /** `atom:title` — the first text line. */
   title?: string;
-  /** Every text line of the summary, joined by `\n`. */
+  /**
+   * Every text line of the summary, as SAP writes it — blank lines and
+   * leading spaces kept — joined by `\n`.
+   */
   text?: string;
   /** The `Created on (System Timestamp)` cell, as SAP renders it (system time). */
   createdOn?: string;
@@ -371,12 +374,17 @@ function parseSystemMessages(xml: string): ISystemMessageEntry[] {
     const tableAt = summary.indexOf('<table');
     const textPart = tableAt < 0 ? summary : summary.slice(0, tableAt);
     const rows = labelledRows(tableAt < 0 ? undefined : summary.slice(tableAt));
-    // `<P>line</BR>line</BR></P>`, each space written `&nbsp;`
-    // (`make_html_conform`, l. 537-544).
-    const lines = textPart
-      .split('</BR>')
-      .map((line) => htmlText(line).split('\u00a0').join(' ').trim())
-      .filter((line) => line !== '');
+    // `<P>line</BR>line</BR></P>` — every line followed by `</BR>`
+    // (`convert_textlines_to_html`, l. 454-474), each space written `&nbsp;`
+    // (`make_html_conform`, l. 537-544). Each line is kept as written, blank
+    // ones and leading spaces included: only the breaks become `\n`.
+    const open = textPart.indexOf('<P>');
+    const close = textPart.lastIndexOf('</P>');
+    const inner =
+      open < 0 || close < open ? undefined : textPart.slice(open + 3, close);
+    const parts = inner === undefined ? [] : inner.split('</BR>');
+    if (parts.length > 0 && parts[parts.length - 1] === '') parts.pop();
+    const lines = parts.map((line) => htmlText(line).split('\u00a0').join(' '));
     return present({
       id: leafText(field(entry, 'id')),
       messageId: cell(rows, 'Message ID'),
