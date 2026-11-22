@@ -3233,7 +3233,7 @@ abapgit:
     - name: "run_log"
       enabled: true
       available_in: ["cloud"]
-      description: "R8 getRunLog by the key and the push's new log key: this run's objects"
+      description: "R8 getRunLog by the key and the selective pull's new log key: the run's interface, imported (a push's log names no object)"
       params: {}
     - name: "check_repo"
       enabled: true
@@ -3258,12 +3258,12 @@ abapgit:
     - name: "recovery"
       enabled: true
       available_in: ["cloud"]
-      description: "The ledger read afresh: the wait ends only on a new log key and a terminal status; the source changed"
+      description: "The ledger read afresh: the wait ends only on a new log key and a terminal status; the pull imported inactive, activated"
       params: {}
     - name: "pull_repo_in_dialog"
       enabled: true
       available_in: ["cloud"]
-      description: "R5 pullRepoInDialog: 202 when it ran; the source changed again"
+      description: "R5 pullRepoInDialog: 202 when it ran; imported inactive, activated"
       params: {}
     - name: "status"
       enabled: true

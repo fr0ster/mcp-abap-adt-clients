@@ -260,7 +260,8 @@ describeLive(
     let staged: readonly IAbapGitStagedObject[] = [];
     let sourceFile: { name: string; path: string } | undefined;
     let currentVersion = 'v1';
-    let pushLogKey: string | undefined;
+    /** The selective pull's log key (`recovery`): its log names the objects. */
+    let pullLogKey: string | undefined;
     let selection: IAbapGitPullSelection | undefined;
 
     function loaded(): IAbapGitModules {
@@ -403,16 +404,46 @@ describeLive(
       return row.appLogKey;
     }
 
-    async function readActiveSource(): Promise<string> {
+    async function readSource(
+      version: 'active' | 'inactive' = 'active',
+    ): Promise<string> {
       const intf = client.getInterface();
       return String(
         expectResult(
-          await intf.read({ interfaceName: INTERFACE }, 'active', {
+          await intf.read({ interfaceName: INTERFACE }, version, {
             analyse: loaded().strategies.analyseException,
           }),
-          `read ${INTERFACE}`,
+          `read ${INTERFACE} (${version})`,
         ),
       );
+    }
+
+    const readActiveSource = () => readSource('active');
+
+    /**
+     * A cloud pull imports inactive: on SAP Cloud Platform the deserializer
+     * writes the inactive worklist instead of activating ("Object activation
+     * rejected in SAP Cloud Platform, ABAP Environment -> import inactive
+     * version(!)", `CL_ABAPGIT_OBJECTS` L1127–1133; Code; measured
+     * 2026-11-22: the job ends `S`, the inactive version holds the pulled
+     * source, the active one the previous). So the pull's change is read in
+     * the inactive version, then the interface is activated, as a user would,
+     * and the active version holds it.
+     */
+    async function activatePulled(version: string): Promise<void> {
+      expect(await readSource('inactive')).toContain(marker(version));
+      const intf = client.getInterface();
+      expectResult(
+        await intf.activate(
+          { interfaceName: INTERFACE },
+          {
+            headers: integrationHeadersOf(intf, 'activate'),
+            analyse: judged(loaded().strategies.analyseActivation),
+          },
+        ),
+        `activate ${INTERFACE} after the pull`,
+      );
+      expect(await readActiveSource()).toContain(marker(version));
     }
 
     /** Change the interface's file in the remote to `version`. */
@@ -880,7 +911,7 @@ describeLive(
         const answer = expectResult(pushed, 'push');
         if (pending) {
           expect(answer.status).toBe(202);
-          pushLogKey = await awaitCloudRun(pending);
+          await awaitCloudRun(pending);
         } else {
           expect(answer.status).toBe(200);
         }
@@ -899,26 +930,6 @@ describeLive(
             `${file.path.replace(/^\/+/, '')}${file.name}`,
           ),
         ).toBeDefined();
-      },
-    );
-
-    memberCase(
-      'run_log',
-      "getRunLog by the push's new log key answers this run's objects",
-      async () => {
-        if (!pushLogKey) throw new Error('the push left no log key');
-        const answer = expectResult(
-          await abapGit.getRunLog(
-            { key: requireKey(), appLogKey: pushLogKey },
-            { analyse: analyseAbapGitFacts },
-          ),
-          'run log',
-        );
-        expect(
-          answer.facts.objects.some(
-            (o) => o.name === INTERFACE || o.package.toUpperCase() === PACKAGE,
-          ),
-        ).toBe(true);
       },
     );
 
@@ -1029,8 +1040,31 @@ describeLive(
         if (!pending) throw new Error('the ledger holds no pending pull');
         const l1 = await awaitCloudRun(pending);
         expect(l1).not.toBe(pending.l0);
+        pullLogKey = l1;
         expect(new AbapGitLedger().find(RUN)?.pending).toBeUndefined();
-        expect(await readActiveSource()).toContain(marker('v2'));
+        await activatePulled('v2');
+      },
+    );
+
+    memberCase(
+      'run_log',
+      "getRunLog by the selective pull's new log key lists the run's interface, imported",
+      async () => {
+        // The pull's log, not the push's: a push's log holds one entry with
+        // no object (measured on cloud 2026-11-22: type and name empty,
+        // status S, message type I); a pull's names each object it imported
+        // (measured: the package and the interface, status S).
+        if (!pullLogKey) throw new Error('the selective pull left no log key');
+        const answer = expectResult(
+          await abapGit.getRunLog(
+            { key: requireKey(), appLogKey: pullLogKey },
+            { analyse: analyseAbapGitFacts },
+          ),
+          'run log',
+        );
+        const mine = answer.facts.objects.find((o) => o.name === INTERFACE);
+        expect(mine).toBeDefined();
+        expect(['S', 'W']).toContain(mine?.status);
       },
     );
 
@@ -1049,7 +1083,9 @@ describeLive(
           'pull in dialog',
         );
         expect(answer.status).toBe(202);
-        expect(await readActiveSource()).toContain(marker('v3'));
+        // Finished, not accepted (R5 runs the pull in the request), and
+        // imported inactive as every cloud pull.
+        await activatePulled('v3');
       },
     );
 
