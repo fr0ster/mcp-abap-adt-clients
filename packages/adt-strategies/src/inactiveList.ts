@@ -100,7 +100,14 @@ interface IChild {
 function childrenOf(element: ParsedElement, scope: Scope): IChild[] | null {
   const children: IChild[] = [];
   for (const [key, value] of Object.entries(element)) {
-    if (key.startsWith('@_') || key === '#text') continue;
+    if (key.startsWith('@_')) continue;
+    // Text where the form has only elements: not a list this reads.
+    if (key === '#text') {
+      if (listOf(value).some((text) => leafText(text)?.trim() !== '')) {
+        return null;
+      }
+      continue;
+    }
     for (const item of listOf(value)) {
       const child: ParsedElement | undefined =
         item === ''
@@ -118,20 +125,27 @@ function childrenOf(element: ParsedElement, scope: Scope): IChild[] | null {
   return children;
 }
 
-function listed(element: ParsedElement, scope: Scope): IListedInactiveObject[] {
+/**
+ * One reference, read whole, or `null`: a reference without `adtcore:name`
+ * cannot be matched against what an activation named, so the list holding
+ * it is refused rather than read without it (an object dropped would read as
+ * activated).
+ */
+function listed(
+  element: ParsedElement,
+  scope: Scope,
+): IListedInactiveObject | null {
   const name = adtcoreAttribute(element, scope, 'name');
-  if (name === undefined) return [];
+  if (name === undefined) return null;
   const type = adtcoreAttribute(element, scope, 'type');
   const uri = adtcoreAttribute(element, scope, 'uri');
   const parentUri = adtcoreAttribute(element, scope, 'parentUri');
-  return [
-    {
-      name,
-      ...(type === undefined ? {} : { type }),
-      ...(uri === undefined ? {} : { uri }),
-      ...(parentUri === undefined ? {} : { parentUri }),
-    },
-  ];
+  return {
+    name,
+    ...(type === undefined ? {} : { type }),
+    ...(uri === undefined ? {} : { uri }),
+    ...(parentUri === undefined ? {} : { parentUri }),
+  };
 }
 
 const is = (child: IChild, uri: string, local: string): boolean =>
@@ -154,7 +168,9 @@ function iocList(root: IChild): IListedInactiveObject[] | null {
       if (refs === null) return null;
       for (const ref of refs) {
         if (!is(ref, IOC, 'ref')) return null;
-        found.push(...listed(ref.element, ref.scope));
+        const object = listed(ref.element, ref.scope);
+        if (object === null) return null;
+        found.push(object);
       }
     }
   }
@@ -168,7 +184,9 @@ function flatList(root: IChild): IListedInactiveObject[] | null {
   const found: IListedInactiveObject[] = [];
   for (const reference of references) {
     if (!is(reference, ADTCORE, 'objectReference')) return null;
-    found.push(...listed(reference.element, reference.scope));
+    const object = listed(reference.element, reference.scope);
+    if (object === null) return null;
+    found.push(object);
   }
   return found;
 }

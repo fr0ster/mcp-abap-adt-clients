@@ -74,6 +74,29 @@ describe('the inactive list, read once for both readings', () => {
     ]);
   });
 
+  it('refuses the list with a reference stripped of its name, in both', () => {
+    const stripped = body.split('adtcore:name="SAPLZACT751P9325" ').join('');
+    expect(stripped).not.toBe(body);
+    expect(() => names(stripped)).toThrow(REFUSAL);
+    expect(stillNamed(stripped)).toBeNull();
+  });
+
+  it('refuses a namespaced list holding only text, in both', () => {
+    const textOnly =
+      '<?xml version="1.0" encoding="utf-8"?><ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects">nothing here</ioc:inactiveObjects>';
+    expect(() => names(textOnly)).toThrow(REFUSAL);
+    expect(stillNamed(textOnly)).toBeNull();
+  });
+
+  it('the activation verdict does not read an unreadable list as nothing inactive', () => {
+    const stripped = body.split('adtcore:name="SAPLZACT751P9325" ').join('');
+    const verdict = readActivationRefusal(
+      '<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties activationExecuted="false"/></chkl:messages>',
+      { named: [GROUP], inactiveObjects: withBody(stripped) },
+    );
+    expect(verdict).not.toBeNull();
+  });
+
   it('a renamed list in an activation answer is not activated, with nothing named', () => {
     const renamed = body.split('ioc:entry').join('ioc:item');
     const refusal = readActivationRefusal(renamed);
