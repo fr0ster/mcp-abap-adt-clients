@@ -14,6 +14,52 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.28.2] - 2026-11-23
+
+A transport entry SAP lists without a name was dropped from the readings,
+found by the server team's review (mcp-abap-adt #378): the entry vanished
+from a task's answer, and its count went down. Released with
+`@mcp-abap-adt/adt-clients` 47.0.2, a documentation patch (its shipped
+ERRATA and API reference describe these entries); none of its default sets
+uses either reading, so its behaviour does not change.
+
+**Which test documents are recorded, which written.** Recorded: the
+server's cloud task document `EMPTY_TASK`. Reduced from a recording:
+`TASK_WITH_OBJECTS`, the server's reconstruction of the measured on-premise
+task document. Written: the server's `REQUEST`. Built in the tests from
+those: each with one entry's `tm:name` (or `tm:type`) removed, `EMPTY_TASK`
+with a nameless entry added, and an entry with no attribute at all.
+
+### Fixed
+
+- **`transportObjectEntries` / `parseObjectEntries` and `transportItem` /
+  `readTransportItem` drop no entry SAP lists.** A `tm:abap_object` without
+  `tm:name` or `tm:type` was skipped; one without `tm:position` was already
+  kept. It is now answered in `incompleteEntries`
+  (`ITransportIncompleteEntry`: every field of an entry, each present only
+  when the entry carries it, the task's number included), in document
+  order, present only when the document holds one:
+  - `transportObjectEntries` answers `ITransportObjectEntries`, still an
+    `ITransportObjectEntry[]` holding the same entries, with
+    `incompleteEntries` on the array itself (a `map`, a spread or JSON of
+    the array does not carry it: read it off the answer). A strategy typed
+    `IResultStrategy<ITransportObjectEntry[]>` still accepts it.
+  - `ITransportTaskItem` (a task's document) gains `incompleteEntries`.
+
+  `ITransportObjectEntry` is unchanged: `name` and `type` stay required,
+  and `objects` holds the same entries with the same values.
+
+  **The count includes them.** A task holds `objects.length +
+  (incompleteEntries?.length ?? 0)` entries — the number its request's
+  document gives as the task's `objectCount`, which has counted every
+  `tm:abap_object`, complete or not, since 0.28.0 (now stated on the field
+  and pinned).
+
+  The new names, both exported: `ITransportIncompleteEntry`,
+  `ITransportObjectEntries`. Nothing existing changes type; the one
+  consumer an added key reaches is an exhaustive mapping over
+  `ITransportTaskItem`'s keys, which now needs `incompleteEntries`.
+
 ## [0.28.1] - 2026-11-23
 
 Two readings the server team still worked around after 0.28.0 (mcp-abap-adt
