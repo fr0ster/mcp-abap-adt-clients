@@ -16,11 +16,24 @@ The tags made before the packages moved under `packages/` are
 
 ## [0.28.0] - 2026-11-22
 
-Released with `@mcp-abap-adt/adt-clients` 46.2.1. The readings the server
+Released with `@mcp-abap-adt/adt-clients` 46.3.0. The readings the server
 team found reading something other than what the document holds, fixed on
-the documents they were found with (the adt-clients corpus, and the server's
-test documents in `src/__tests__/serverDocuments.ts`, each with its source),
-and one new reading.
+the documents they were found with, and one new reading.
+
+**Which test documents are recorded, which written.** Recorded: the
+adt-clients corpus cases each test names (where-used, the 7.40 and S/4HANA
+2025 inactive lists, the node structure, the transport lists), the 7.40
+empty transport list (a probe over RFC), the server's task documents
+(`EMPTY_TASK` recorded on the cloud; `TASK_WITH_OBJECTS` cut from an
+on-premise recording) and the feed list cut, and the gateway-error and
+system-message feeds and an error's document (`fixtures/feeds/`, the cloud
+and on premise, 2026-11-22). Written: the server's `REQUEST` (shaped after a
+measured request), the created-task documents — `TASK_CREATED`, the
+nested-parent `TASK_UNDER_PARENT`, `TRANSPORT_CREATED` —, the numeric
+character reference in a search hit (`SEARCH_ENTITY`), the named items with
+an omitted description (`NAMED_ITEMS`), and every variant a test builds from
+a recording (each says so); `src/__tests__/serverDocuments.ts` names each
+server document's source.
 
 ### Added
 
@@ -72,7 +85,7 @@ and one new reading.
   reference XML does not define (`&nbsp;`) stays as written.
 - **`utilNamedItems`** / `readNamedItems` coerce nothing (`007` stayed `7`)
   and leave an absent description absent (`description` is optional now; it
-  was `''`).
+  was `''`) — adt-clients' own `INamedItem` follows in 46.3.0.
 - **`transportTree`** (`parseTransportTree`) refuses in fixed words —
   `parseTransportTree: the answer is no transport list` — with nothing of the
   body (it quoted up to 200 characters and the root it found), and refuses a

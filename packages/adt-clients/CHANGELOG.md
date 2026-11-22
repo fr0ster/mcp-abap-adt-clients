@@ -24,12 +24,29 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [46.2.1] - 2026-11-22
+## [46.3.0] - 2026-11-22
 
 Released with `@mcp-abap-adt/adt-strategies` 0.28.0 (published first; the
-range is now `^0.28.0`). No member of adt-clients changed: every default is
-still the document, and no default set ships one of the readings 0.28.0
-fixes. What changed is what those readings answer when a caller passes them:
+range is now `^0.28.0`). A minor release: one exported type changed.
+
+### Changed — incompatible for a caller that reads it
+
+- **`INamedItem.description` is optional** (it was `string`), as in
+  adt-strategies 0.28.0, whose `utilNamedItems` answers the type catalogue
+  for the `types` slot and leaves an absent description absent. With the two
+  disagreeing, the documented pairing
+  `getUtils({ ...utilDocuments, types: utilNamedItems })` failed to compile
+  against this package's `INamedItem` (TS2322); pinned by
+  `unit/shared/namedItemPairing.test.ts`. **Migration:** a caller that read
+  `item.description` as a `string` checks for absence —
+  `item.description ?? ''` keeps the 46.2.0 value. `docs/usage/MIGRATION-23.md`
+  says the same. No other type is declared both here and in adt-strategies.
+
+### What the readings now answer
+
+No member of adt-clients changed: every default is still the document, and no
+default set ships one of the readings 0.28.0 fixes. What changed is what those
+readings answer when a caller passes them:
 
 - `transportObjectEntries` (`objects`): each entry once, with the number of
   the task it is on (`task`) and `info`; a request's entries no longer come
@@ -63,7 +80,9 @@ fixes. What changed is what those readings answer when a caller passes them:
   carried.
 - `feedSystemMessages`: `severity`, `validTo` (and `validFrom`, which fell
   back to `updated`) came back `''`; they carry the entry's values (entry
-  shape not measured).
+  shape not measured). Where an entry carries both a category and
+  `sm:severity`, the category's `term` is the `severity`; whether SAP sends
+  both is unverified.
 - New: `transportItem(number)`, a request or task document read as what it
   is.
 
