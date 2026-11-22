@@ -1072,7 +1072,12 @@ document (`tm:object_type="T"`: the task and its entries in `tm:task`, the
 parent's header alone in `tm:request`). `transportItem(number)` from
 adt-strategies (0.28.0) reads either kind — the request's header and its tasks
 with their object counts, or the task's header, its parent's header and its
-entries — and refuses a document whose element does not name `number`:
+entries. Since 0.28.1 the number asked selects the item: the root's `task` or
+`request` element (by the tm namespace, whatever the prefix) whose own
+`tm:number`, trimmed, is `number`, the root's `tm:object_type` confirming it.
+A document where no element or more than one names `number`, whose marker
+contradicts the element found, or — unmarked — a task's document asked for by
+its parent's number, is refused:
 
 ```typescript
 import { transportItem } from '@mcp-abap-adt/adt-strategies';

@@ -18,16 +18,22 @@ The tags made before the packages moved under `packages/` are
 
 Two readings the server team still worked around after 0.28.0 (mcp-abap-adt
 `GetTransport` and its package walks), fixed on the documents they were found
-with. `@mcp-abap-adt/adt-clients` is unchanged: none of its default sets uses
-either reading (every slot is `rawDocument`), so it is not released.
+with. Released with `@mcp-abap-adt/adt-clients` 47.0.1, a documentation
+patch (its shipped ERRATA describes these readings); none of its default sets
+uses either reading (every slot is `rawDocument`), so its behaviour does not
+change.
 
 **Which test documents are recorded, which written.** Recorded: the
 adt-clients corpus case `read-object-tree-structure` (its step 02, and
-variants of it with one element left out, each test says which), and the
-server's task documents `EMPTY_TASK` and `TASK_WITH_OBJECTS` (variants
-without the marker, or with another number, built in the tests). Written:
-the server's two package-walk levels (`NODE_NOT_LOADED`, `NODE_NAME_ONLY`,
-`serverDocuments.ts`, shaped after the measured on-premise answer).
+variants of it with one element left out or an empty row added, each test
+says which), and the server's cloud task document `EMPTY_TASK`. Reduced
+from a recording: `TASK_WITH_OBJECTS`, the server's reconstruction of the
+measured on-premise response (its shape, two entries in place of 1647), not
+a recording itself. Built in the tests from those two: the variants without
+the marker, with another number, with padded numbers, and with a duplicate
+under another prefix. Written: the server's two package-walk levels
+(`NODE_NOT_LOADED`, `NODE_NAME_ONLY`, `serverDocuments.ts`, shaped after
+the measured on-premise answer).
 
 ### Fixed
 
@@ -46,6 +52,13 @@ the server's two package-walk levels (`NODE_NOT_LOADED`, `NODE_NAME_ONLY`,
   - a document in which a `tm:task` and a `tm:request` both name the number;
   - a document whose marker contradicts the element found (a task element
     under `R`, a request element under `T`).
+  - a document with two root `task` elements, or two root `request`
+    elements, naming the number — counted by the tm namespace URI and local
+    name, whatever the prefix (`<tm:task>` beside a bare `<task>` in the tm
+    default namespace, or beside `<t2:task>` with `t2` bound to tm);
+  - a number asked for, or written in `tm:number`, that is blank after
+    trimming — `tm:number`, `tm:object_type` and the number asked are trimmed
+    after decoding, so padding written `&#32;` reads as literal padding does.
 
   A caller who relied on reading such a document as the parent now gets the
   refusal. Every document SAP answers reads as before.
@@ -54,7 +67,10 @@ the server's two package-walk levels (`NODE_NOT_LOADED`, `NODE_NAME_ONLY`,
   in `incompleteObjects` (`IRepositoryIncompleteNode`: every field the node
   carries, the ones it lacks absent), present only when the level lists one.
   `objects` and `IRepositoryObjectNode` are unchanged: the same nodes, the
-  same required fields, the same values.
+  same required fields, the same values. An empty row
+  (`<SEU_ADT_REPOSITORY_OBJ_NODE/>`), which `readNodeStructure` dropped, is
+  now a node with no fields (in `readNodeStructure`'s `nodes` too), answered
+  in `notLoaded`, since it has no `OBJECT_TYPE`.
 - **A node SAP could not load is answered as such.** SAP answers a tree line
   it cannot resolve with an entry of no `OBJECT_TYPE`, its message `SEU_ADT
   101` "Error loading node:" in `OBJECT_NAME` and an explanation in
@@ -70,7 +86,10 @@ the server's two package-walk levels (`NODE_NOT_LOADED`, `NODE_NAME_ONLY`,
 
 - `IRepositoryIncompleteNode` and `IRepositoryNotLoadedNode`, and
   `IRepositoryNodeContents.incompleteObjects` and `.notLoaded`, each present
-  only when the level lists such a node. Nothing existing changes type.
+  only when the level lists such a node. Nothing existing changes type; the
+  one consumer an added key reaches is an exhaustive mapping over the
+  interface's keys (`Record<keyof IRepositoryNodeContents, …>`), which now
+  needs the two new keys.
 
 ## [0.28.0] - 2026-11-22
 
