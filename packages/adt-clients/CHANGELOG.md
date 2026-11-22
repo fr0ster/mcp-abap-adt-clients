@@ -30,8 +30,8 @@ Released with `@mcp-abap-adt/adt-strategies` 0.27.0 (published first, its
 facts reducer `abapGitFacts` is now a runtime dependency), on
 `@mcp-abap-adt/interfaces-adt` `^30.2.0` (the abapGit facts contracts and
 `ABAPGIT_ERROR_MESSAGES`) and `@mcp-abap-adt/interfaces-adt-connection`
-`^5.2.0` (the request flags `noLog`, `noResend`, `stateless`); tested with
-`@mcp-abap-adt/connection` `^25.1.0`, which implements them.
+`^5.3.0` (the request flags `noLog`, `noResend`, `stateless`, `rawText`);
+tested with `@mcp-abap-adt/connection` `^25.2.0`, which implements them.
 
 ### Added
 
@@ -94,6 +94,9 @@ facts reducer `abapGitFacts` is now a runtime dependency), on
   from an optional slot's; with facts slots, `new` takes its values map
   (`new AdtAbapGitClient<AbapGitValuesOf<typeof results>>(…)`), `create`
   infers it.
+- **`getFile` answers the file as SAP sent it:** it sends `rawText`, so the
+  HTTP wire neither parses a JSON-looking file nor strips its BOM (R12 answers
+  only `text/plain; charset=utf-8`).
 - **Every new form sends `timeout: 0`, `noLog`, `noResend` and
   `stateless`.** The legacy forms and `unlink` send none of them, as before.
 - **`AdtBatchConnection` refuses a request carrying `noLog` or `noResend`**
@@ -138,18 +141,6 @@ facts reducer `abapGitFacts` is now a runtime dependency), on
   was checked anonymously (Code; the effect unmeasured). The new form writes
   `abapgitexternalrepo:user` / `password`. The legacy form keeps its 46.1.0
   fields exactly.
-
-### Not verified
-
-- **`getFile` over connection 25.1.0's HTTP transport:** Axios parses a JSON
-  body even when SAP serves it as `text/plain`, so a file holding a JSON object
-  answers `unreadableAnswer` and one holding a JSON string loses its quotes and
-  a trailing newline. `IAbapRequestOptions` has no option to keep the text
-  (`responseType` or `transformResponse` are not passed through), so this needs
-  a connection release.
-
-- That SAP accepts the corrected selective pull and push documents: read from
-  the transformations (Code), not yet sent; the live run settles them.
 
 ## [46.1.0] - 2026-11-19
 
