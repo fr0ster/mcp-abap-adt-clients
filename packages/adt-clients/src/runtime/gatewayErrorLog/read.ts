@@ -37,12 +37,22 @@ export async function listGatewayErrors(
 }
 
 /**
- * Get a single gateway error by type and ID
+ * Get a single gateway error: `/gw/errorlog/{kind}/{opid}`.
+ *
+ * `/IWBEP/CL_ERROR_LOG_VIEWER->get` (l. 26, read on premise and on the
+ * cloud) looks the error up by its OPID (l. 59/73) — not by its transaction
+ * id — and reads the Backend log when the kind is `BackendError` on premise
+ * and `Backend Error` on the cloud (l. 57), the hub log for any other. The
+ * answer is HTML, its type negotiated against `text/html` alone (onprem
+ * l. 89-93, cloud l. 93-97), so that is what is asked for (it was
+ * `application/xml` until 47.0.0). An unknown OPID answers `200` with an
+ * empty error, not `404` (code).
  *
  * @param connection - ABAP connection
- * @param errorType - Error type (e.g. 'Frontend Error')
- * @param errorId - Error transaction ID
- * @returns Axios response with gateway error details
+ * @param errorType - The kind, as this system's viewer takes it: an entry's
+ *   `detailUri` (adt-strategies `feedGatewayErrors`) carries the right one
+ * @param errorId - The error's OPID (an entry's `opid`), not its transaction id
+ * @returns The error's HTML document
  */
 export async function getGatewayError(
   connection: IAbapConnection,
@@ -56,7 +66,7 @@ export async function getGatewayError(
     method: 'GET',
     timeout: 0,
     headers: {
-      Accept: 'application/xml',
+      Accept: 'text/html',
     },
   });
 }
