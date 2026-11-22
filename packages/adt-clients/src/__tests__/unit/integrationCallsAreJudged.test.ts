@@ -322,6 +322,24 @@ export async function judgedCalls(h: Domain, runner: IRunner) {
 }
 `,
     ),
+    fixture(
+      '__guardAbapGitFacts.ts',
+      `import type { AdtAbapGitClient } from '../../clients/AdtAbapGitClient';
+import { analyseAbapGitFacts } from './abapGitFacts';
+export async function f(g: AdtAbapGitClient) {
+  await g.getStaging({ key: 'K' }, { analyse: analyseAbapGitFacts });
+}
+`,
+    ),
+    fixture(
+      '__guardAbapGitFactsLookalike.ts',
+      `import type { AdtAbapGitClient } from '../../clients/AdtAbapGitClient';
+const analyseAbapGitFacts = <V>(verdict: V): V => verdict;
+export async function f(g: AdtAbapGitClient) {
+  await g.getStaging({ key: 'K' }, { analyse: analyseAbapGitFacts });
+}
+`,
+    ),
   ]);
   const findings = typedFindings([], fixtures);
   const of = (name: string) =>
@@ -348,6 +366,7 @@ export async function judgedCalls(h: Domain, runner: IRunner) {
     ['__guardAssigned.ts', 1, /escapes to a call/],
     ['__guardEscaped.ts', 1, /escapes to a call/],
     ['__guardExported.ts', 1, /is exported/],
+    ['__guardAbapGitFactsLookalike.ts', 1, /cannot resolve/],
   ])('refuses %s', (name, count, why) => {
     expect(of(name)).toHaveLength(count);
     for (const finding of of(name)) expect(finding).toMatch(why);
@@ -359,6 +378,10 @@ export async function judgedCalls(h: Domain, runner: IRunner) {
 
   it('passes a const options object nothing changes: read, copied, passed to the member', () => {
     expect(of('__guardCleanConst.ts')).toEqual([]);
+  });
+
+  it("passes an abapGit new form judged by helpers/abapGitFacts.ts's analyseAbapGitFacts, and no lookalike", () => {
+    expect(of('__guardAbapGitFacts.ts')).toEqual([]);
   });
 });
 

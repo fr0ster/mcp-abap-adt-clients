@@ -644,15 +644,25 @@ if (!started.ok) throw new Error(started.getError().message);
 // finish. Until 19.0.0 `pull` ran this loop, and an AbortSignal passed to it
 // stopped only this loop — never the server's job. Written here, that is
 // visible instead of explained.
-// Read once before testing the condition: `linked` was fetched before the POST,
-// so its status says nothing about this pull.
+// A run is this pull's only once the repository shows a log link — present,
+// and other than the one it had before the POST (`linked`, read before it) AND a terminal
+// status: blank (initial) and `R` mean waiting, and a terminal status under the
+// old log link is the previous run's (onprem reports neither, and its pull has
+// already run when `pull` answers).
+const before = linked.logLink;
+const terminal = (status: string) => ['S', 'W', 'E', 'A'].includes(status);
 const deadline = Date.now() + 600_000;
 let repo = await findRepo();
-while (repo.status === 'R' && Date.now() < deadline) {
+// A log link that is there AND not the one before, with a terminal status.
+const fresh = (r: typeof repo) =>
+  r.logLink !== undefined && r.logLink !== before && terminal(r.status);
+while (!fresh(repo) && Date.now() < deadline) {
   await new Promise((resolve) => setTimeout(resolve, 2000));
   repo = await findRepo();
   console.log(`status: ${repo.status} — ${repo.statusText}`);
 }
+const finished = fresh(repo);
+if (!finished) throw new Error('the pull has not finished: nothing is unlinked');
 
 // The error log is read from the link the repository reports — on a failed
 // pull, or any time.
@@ -661,8 +671,9 @@ if ((repo.status === 'E' || repo.status === 'A') && repo.logLink) {
   console.error('pull failed:', log.ok ? log.getResult().value : log.getError());
 }
 
-// Remove the binding: DELETE /sap/bc/adt/abapgit/repos/{repositoryId}, by the
-// key `listRepos` reported.
+// Remove the binding — only after the run is terminal under its own log link:
+// DELETE /sap/bc/adt/abapgit/repos/{repositoryId}, by the key `listRepos`
+// reported.
 if (repo.repositoryId) {
   await abapGit.unlink({ repositoryId: repo.repositoryId });
 }
@@ -670,11 +681,87 @@ if (repo.repositoryId) {
 
 **Availability.** ADT-integrated abapGit ships with SAP BTP ABAP Environment (Steampunk) and modern on-prem from ABAP Platform 2022+. SAP_BASIS 7.40 SP04 does not advertise `/sap/bc/adt/abapgit/*`. This is **not** the community abapGit that installs via SE38 — that one is a separate ABAP program with its own UI and does not go through ADT.
 
-**Async pull contract.** `pull` starts the server-side job and answers. The job then runs on its own, and nothing you do on this side stops it — which is why the wait above is written in your code rather than hidden in a member with a timeout option. Poll `listRepos()` until the repository's `status !== 'R'` before re-issuing `pull` or `unlink`: starting a second pull while the first is still `R` is unsupported and fails fast.
+**Async pull contract.** `pull` starts the server-side job and answers. The job then runs on its own, and nothing you do on this side stops it — which is why the wait above is written in your code rather than hidden in a member with a timeout option. Poll `listRepos()` until the repository shows a new log link and a terminal status (`S`, `W`, `E`, `A`) before re-issuing `pull` or `unlink`: starting a second pull while the first is still `R` is unsupported and fails fast.
 
 **No `getRepo`, since 23.0.0.** It listed every repository and picked one for a package — a filter over a document, which is a reading, and a "not found" the library composed from its own search. `listRepos` and your own `find` are the same request. For the same reason `unlink` takes the `repositoryId` and `getErrorLog` the `logLink` that `listRepos` reports, instead of a package name each looked up on its own. `abapGitRepos` reads the key verbatim: the reading it replaces turned `000001` into `1`, which is not the key `unlink` is addressed by.
 
 **Content-type version.** `link` and `pull` send the `headers` you pass (since 36.0.0). Until then the client chose `application/abapgit.adt.repo.v3+xml` (sapcli parity), or `v4` through a `contentTypeVersion` option that is gone; cloud MDD advertises `v4`.
+
+#### abapGit new forms (46.2.0)
+
+The members above are the legacy forms: they keep 46.1.0's requests, callbacks and answers, and are deprecated. `pull` and `getErrorLog` send their link only when it is exactly the path a key would build (`/sap/bc/adt/abapgit/repos/{key}/pull`, `…/log/{id}`); anything else — an absolute URL, another host, a query, a fragment, an empty, `.` or `..` segment — is refused in fixed words with nothing sent.
+
+The new forms are addressed by the repository's key, which `listRepos` / `listReposQuiet` report, and each builds its path from it, one encoded segment at a time (an empty, `.` or `..` key or segment is refused, nothing sent). No member takes a URL to send to.
+
+| Member | Route | Credential (`options.credentials`) | Facts slot |
+|---|---|---|---|
+| `listReposQuiet()` | `GET /repos` | none (refused by type) | `reposFacts` |
+| `link(args, { headers, credentials })` | `POST /repos` | body `remoteUser` / `remotePassword` | `linkedFacts` |
+| `checkExternalRepo({ url }, { headers, credentials })` | `POST /externalrepoinfo` | body `user` / `password` | `externalRepoFacts` |
+| `getBranchInfo({ url, branch, package }, { headers })` | `POST /externalrepoinfo/branchinfo` (cloud) | body `user` / `password` | `branchInfo` |
+| `pullRepo({ key, branchName, transportRequest?, selection? }, { headers })` | `POST /repos/{key}/pull` | body `remoteUser` / `remotePassword`; with a selection `user` / `password` | `repoPulled` |
+| `pullRepoInDialog(…)` | `POST /repos/{key}/pull/v2` (cloud) | as `pullRepo` | `repoPulledInDialog` |
+| `getModifiedObjects({ key })` | `GET /repos/{key}/pull/modifiedobjects` (cloud) | headers `Username` / `Password` (base64) | `modifiedObjects` |
+| `getStatus({ key })` | `GET /repos/{key}/status` (cloud) | none: SAP reads none | `status` |
+| `getRunLog({ key, appLogKey })` | `GET /repos/{key}/log/{appLogKey}` | none: SAP reads none | `runLog` |
+| `getStaging({ key })` | `GET /repos/{key}/stage` | headers | `staging` |
+| `push({ key, staged, comment })` | `POST /repos/{key}/push` | headers | `pushed` |
+| `checkRepo({ key })` | `POST /repos/{key}/checks` | headers | `checked` |
+| `getFile({ key, filename, version })` | `GET /repos/{key}/files?filename=…&version=…` | headers | `file` |
+| `switchBranch({ key, branch, create })` | `POST /repos/{key}/branches/{branch}[?create=true]` (onprem) | headers | `switched` |
+
+**What SAP does with them** — read from its handlers and measured on both systems — is in [ERRATA.md](ERRATA.md#abapgit-what-an-answer-says). Three things a caller meets first: before 46.2.0 a push with an attribute present and empty was refused (measured on premise: 400, T100 `00`/`001`; a selective pull falls under the same rule by its transformation, not measured); a cloud pull imports inactive, so activating is the caller's; and on the on-premise test system `checkRepo` cannot succeed — SAP's handler `ZCL_ABAPGIT_RES_REPO_CHECKS` does not compile (its syntax check: no value for the mandatory parameter `IV_SERVICE`, L53), every call ends in `SYNTAX_ERROR` and is answered `500` with no T100 key. The member returns that answer as it is: a failure with `facts.status` `500`.
+
+`link` and `checkExternalRepo` choose their form by `options.credentials`: given — a credential, or `null` for an anonymous call — it is the new form; absent, the legacy one, whose options carry `credentials?: never`, so the two never mix. The legacy `checkExternalRepo` writes `remoteUser` / `remotePassword`, which SAP does not read on R13: a private repository was checked anonymously. The new form writes `user` / `password`.
+
+**Facts, not documents.** Every new form goes through the facts exchange: SAP's answer is reduced by `abapGitFacts` (`@mcp-abap-adt/adt-strategies`) to the route's kept fields before the result strategy, the analyser or the client's logger sees it. A result slot is optional: left out, the member answers `IAbapGitFactsResponse<F>` (`{ status, facts }`); given, it is a facts reader `(answer: IAbapGitFactsResponse<F>) => T` — a wire reader (`IResultStrategy`) does not fit it. A failure is an `IAbapGitStructuredError`: `message` one of `ABAPGIT_ERROR_MESSAGES`, `facts` the status, `messageClass` / `messageNumber` (the T100 key) and R11's `gitHttpStatus`, `request` the method and the path without the query — no response, no SAP text, no thrown message. Strict by default: every non-2xx is the error; an analyser `(verdict, answer?)` may judge, and clears a failure only where there are facts to read. With no answer at all the message is `noResponse`, status `0`.
+
+**On the wire.** Each new form sends `timeout: 0`, `noLog`, `noResend` and `stateless` (interfaces-adt-connection 5.2.0, implemented by connection 25.1.0 and later): nothing of the request is logged by the connection, nothing is replayed (SAP may already have run a write), and the request goes stateless whatever the session mode, so no git credential stays in an ABAP session. The legacy forms and `unlink` send none of them. `getFile` also sends `rawText` (interfaces-adt-connection 5.3.0): its file is the exact text SAP sent only over a connection that honours it — `@mcp-abap-adt/connection` 25.2.0 or later; an older HTTP wire parses a JSON-looking file and strips a BOM. An `AdtBatchConnection` refuses any request carrying `noLog` or `noResend` with a synchronous throw ("this request cannot be recorded into a batch"), before anything is queued.
+
+```typescript
+import { AdtAbapGitClient, abapGitDocuments } from '@mcp-abap-adt/adt-clients';
+import type { IAbapGitReposFacts } from '@mcp-abap-adt/adt-strategies';
+import type { IAbapGitFactsResponse } from '@mcp-abap-adt/interfaces-adt';
+
+const git = AdtAbapGitClient.create(connection, {
+  results: {
+    ...abapGitDocuments,
+    // A facts reader: handed the facts, never the document.
+    reposFacts: (answer: IAbapGitFactsResponse<IAbapGitReposFacts>) =>
+      answer.facts.repos,
+  },
+});
+const credentials = { user: 'git-user', password: process.env.GIT_TOKEN! };
+
+const repos = await git.listReposQuiet();
+const repo = repos.ok
+  ? repos.getResult().value.find((r) => r.package === 'ZMY_PKG')
+  : undefined;
+if (repo) {
+  const staging = await git.getStaging({ key: repo.key }, { credentials });
+  if (staging.ok) {
+    const { facts } = staging.getResult().value;
+    await git.push(
+      {
+        key: repo.key,
+        staged: facts.unstaged,
+        comment: {
+          text: 'Change ZCL_DEMO',
+          author: { name: 'Ada', email: 'ada@example.com' },
+          committer: { name: 'Ada', email: 'ada@example.com' },
+        },
+      },
+      { credentials },
+    );
+  } else {
+    // Fixed words, the status and the T100 key — never SAP's text.
+    const { facts } = staging.getError();
+    console.error(facts.status, facts.messageClass, facts.messageNumber);
+  }
+}
+```
+
+What SAP's answers mean — a cloud `202` from `pullRepo` / `push` is an accepted job, from `pullRepoInDialog` a finished pull; a `switchBranch` without `create` on a missing branch changes nothing and answers success — is in [ERRATA.md](ERRATA.md#abapgit-what-an-answer-says). Waiting on a cloud run is the caller's: poll `listReposQuiet` until the entry shows a new `appLogKey` and a terminal `runStatus`.
 
 ### Transport Requests (getRequest())
 

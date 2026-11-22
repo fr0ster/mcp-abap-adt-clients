@@ -70,3 +70,8 @@ refusal-visibility-evidence.json
 .legacy-env/
 # The ABAP sources of the legacy 7.40 test environment and its fixtures
 !**/src/__tests__/integration/legacy/abap/*.abap
+
+# abapGit live suite: the recovery ledger (run-owned fixtures left by a cut-short run)
+**/src/__tests__/helpers/abapgit-live.ledger.json
+**/src/__tests__/helpers/abapgit-live.lock
+**/src/__tests__/helpers/abapgit-live.ledger.json.*.tmp

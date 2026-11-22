@@ -712,7 +712,7 @@ export async function recycleTestSession(
  * A test names neither the class nor the flow: `.env` says how we authenticate
  * and this turns that into the provider that does it.
  */
-function credentialFor(config: SapConfig): IAuthProvider {
+export function credentialFor(config: SapConfig): IAuthProvider {
   if (config.authType === 'jwt') {
     // A bare string, deliberately: the token in `.env` is what a test run has,
     // and there is nothing behind it to renew from. It is good for the length

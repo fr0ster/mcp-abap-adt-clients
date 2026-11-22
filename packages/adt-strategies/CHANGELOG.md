@@ -14,6 +14,64 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.27.0] - 2026-11-22
+
+Released with `@mcp-abap-adt/adt-clients` 46.2.0, on
+`@mcp-abap-adt/interfaces-adt` `^30.2.0` (was `^30.1.0`: the facts contracts
+`IAbapGitFactsResponse`, `IAbapGitErrorFacts`, `IAbapGitPullSelection` and
+`IAbapGitStagedObject` are its), and `@mcp-abap-adt/interfaces-adt-connection`
+`^5.3.0` (was `^5.0.0`; no new type of it is used: the range follows
+adt-clients', so the two declare the same range for what they share and the
+tree holds one copy).
+
+### Added
+
+- **The facts are strict** (review of adt-clients#326): a document is read
+  only when it is a string and well-formed XML (the parser's `XMLValidator`;
+  a mismatched closing tag no longer yields usable fields); R7's fact is SAP's
+  fixed `DEMO STATUS` and nothing else; R12's content is a text body
+  (exactly `text/plain`, optionally with `;` parameters, or no
+  `Content-Type`; `text/plain+xml` or an array value is refused); `messageNumber` is exactly three
+  digits, else absent; `abapGitErrorFacts(answer, route?)` reads
+  `http_status` for `checked` (R11) alone; `appLogKey` is the decoded segment
+  of the `log_link` (`A%2FB` is `A/B`), an empty, `.` or `..` one none.
+
+- **`abapGitFacts`**, the facts reducer of `AdtAbapGitClient`'s new forms: one
+  reducer per new-form slot (`reposFacts`, `linkedFacts`, `repoPulled`,
+  `repoPulledInDialog`, `modifiedObjects`, `status`, `runLog`, `staging`,
+  `pushed`, `checked`, `file`, `externalRepoFacts`, `branchInfo`, `switched`),
+  each answering `IAbapGitFactsResponse<F>`: the HTTP status and the fields its
+  route keeps, built field by field, and nothing else — no body, header, status
+  text, message text, exception text, message variable, property or link. No
+  redactor: names, paths, branches and people pass as data. `file` takes the
+  call's `filename` and `version`, which the answer does not name. A success
+  that is not the route's document throws
+  `ABAPGIT_ERROR_MESSAGES.unreadableAnswer`, never the parser's message (which
+  quotes the document). The README's table lists each slot's kept fields.
+- **`abapGitErrorFacts`**: a failed answer's status and, from an
+  `exc:exception` document, `T100KEY-ID` / `T100KEY-NO` and R11's
+  `http_status` as an integer (`IAbapGitErrorFacts`); `T100KEY-V1`…`V4`,
+  `LONGTEXT` and the texts are not read.
+- **`abapGitRepoRunStates`**: each repository's `runStatus`, `statusText` and
+  `appLogKey`, `undefined` when absent (onprem R1 writes no status; a blank
+  status is present and blank). `appLogKey` comes from the `log_link` path
+  `/sap/bc/adt/abapgit/repos/{key}/log/{appLogKey}` only; a `status_link`
+  alone, or a link of another shape, yields none.
+- **`abapGitStaging`**, **`abapGitModifiedObjects`**, **`abapGitBranchInfo`**,
+  **`abapGitObjectResults`**: every field SAP sends for R9, R6, R13/R14 and
+  R2/R4/R8 (Code: the simple transformations that write them). A branch's hash
+  is read from `sha1` or `sha` into `sha1`. Each reads its route's root element
+  and throws `ABAPGIT_ERROR_MESSAGES.unreadableAnswer` for any other answer.
+- **`abapGitRepos`** gains `folderLogic`, `createdEmail`, `deserializedBy`,
+  `deserializedEmail`, `deserializedAt` and `links` (every link with its
+  `rel`; onprem writes its pull link without a `type`, so `pullLink` misses it
+  there and `links` has it). `status` and `statusText` keep their contract:
+  `''` when SAP writes none. The six keys are optional, so an existing
+  value of `IAbapGitRepo` still fits; the one edge case is a type built from
+  its keys — a `Record<keyof IAbapGitRepo, …>` now needs the six new keys too.
+  Adding optional properties is a minor (the owner's ruling, as for
+  interfaces-adt-connection 5.2.0 and 5.3.0).
+
 ## [0.26.0] - 2026-11-19
 
 Released with `@mcp-abap-adt/adt-clients` 46.1.0, on

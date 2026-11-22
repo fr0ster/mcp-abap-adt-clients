@@ -72,14 +72,49 @@ export {
 export { asItCame, rawOf } from './result';
 // The result axis: the document as it came, and the readings a caller may ask for.
 export {
+  abapGitBranchInfo,
   abapGitErrorLog,
   abapGitExternalRepo,
+  abapGitModifiedObjects,
+  abapGitObjectResults,
+  abapGitRepoRunStates,
   abapGitRepos,
+  abapGitStaging,
+  type IAbapGitBranchInfoReading,
+  type IAbapGitBranchReading,
   type IAbapGitErrorLogEntry,
   type IAbapGitExternalRepoBranch,
   type IAbapGitExternalRepoInfo,
+  type IAbapGitLink,
+  type IAbapGitModifiedObjectReading,
+  type IAbapGitModifiedObjectsReading,
+  type IAbapGitObjectResult,
+  type IAbapGitPerson,
   type IAbapGitRepo,
+  type IAbapGitRepoRunState,
+  type IAbapGitStagingFileReading,
+  type IAbapGitStagingObjectReading,
+  type IAbapGitStagingReading,
 } from './results/abapGit';
+// The facts reducer of abapGit's new forms: structure and facts only.
+export {
+  abapGitErrorFacts,
+  abapGitFacts,
+  type IAbapGitBranchFacts,
+  type IAbapGitBranchInfoBranchFacts,
+  type IAbapGitBranchInfoFacts,
+  type IAbapGitExternalRepoFacts,
+  type IAbapGitFactsReducers,
+  type IAbapGitFileFacts,
+  type IAbapGitModifiedObjectsFacts,
+  type IAbapGitNoFacts,
+  type IAbapGitObjectFacts,
+  type IAbapGitObjectsFacts,
+  type IAbapGitRepoFacts,
+  type IAbapGitReposFacts,
+  type IAbapGitStagingFacts,
+  type IAbapGitStatusFacts,
+} from './results/abapGitFacts';
 // A code read from an answer, looked up once against the ADT type tables.
 export { answeredObject } from './results/answeredObject';
 export {

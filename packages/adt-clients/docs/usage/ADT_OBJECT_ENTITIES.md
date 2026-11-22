@@ -224,7 +224,7 @@ Top-level client classes instantiated directly (not via `AdtClient.getXxx()`). T
 
 ### AdtAbapGitClient
 - Source: `src/clients/AdtAbapGitClient.ts`
-- Public methods: `checkExternalRepo`, `create`, `getErrorLog`, `link`, `listRepos`, `pull`, `unlink`
+- Public methods: `checkExternalRepo`, `checkRepo`, `create`, `getBranchInfo`, `getErrorLog`, `getFile`, `getModifiedObjects`, `getRunLog`, `getStaging`, `getStatus`, `link`, `listRepos`, `listReposQuiet`, `pull`, `pullRepo`, `pullRepoInDialog`, `push`, `switchBranch`, `unlink`
 
 ### AdtClientCloud
 - Source: `src/clients/AdtClientVariants.ts`

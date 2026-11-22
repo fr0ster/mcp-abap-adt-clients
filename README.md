@@ -38,3 +38,19 @@ Releases are tagged `<package directory>-v<version>` (`adt-clients-v<version>`,
 `adt-strategies-v<version>`, `adt-clients-legacy-v<version>`). `release:publish` publishes in `publishOrder` (the root
 `package.json`), only from a clean tree whose tags name `HEAD`, and only after `npm run check`
 passed.
+
+**A release whose gate is a tested artifact** (adt-strategies 0.27.0 with adt-clients 46.2.0: their
+live gates run against the packed tarballs, not the workspace) is published from those tarballs,
+not by `release:publish`, which rebuilds:
+
+1. In a clean checkout whose release tags (`adt-strategies-v<version>`, `adt-clients-v<version>`)
+   both name `HEAD` on a clean tree, build each package from scratch (`rm -rf dist`, then the
+   package's `npm run build`), run the root `npm run check`, and `npm pack --json` in each package.
+   Record each tarball's `integrity` with the tags' commit. A `dist` built before the tag check is
+   never packed.
+2. Install both tarballs in a directory outside the workspace, with their other dependencies from
+   the registry, and run the live gates there, loading only from that install.
+3. The owner publishes the same files, in `publishOrder` (adt-strategies, then adt-clients):
+   `npm publish <tarball>`.
+4. After publishing, each `npm view <name>@<version> dist.integrity` equals the recorded value, and
+   a clean install from the registry, outside the repository, installs.

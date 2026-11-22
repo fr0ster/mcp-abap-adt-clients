@@ -46,7 +46,7 @@ function sessionAware(connected: boolean): IAbapConnection {
   return {
     ...baseConnection(),
     isConnected: () => connected,
-    disconnect: async () => ({ abandonedWindows: [], releasePending: false }),
+    disconnect: async () => {},
     getSessionIdentity: () => (connected ? 'SAP_SESSIONID_T_100=S1' : null),
   } as IAbapConnection;
 }

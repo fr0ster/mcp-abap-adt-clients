@@ -144,3 +144,146 @@ S/4HANA 2025 and ABAP cloud list it. `utilDiscoveryCollections` reads the
 discovery's collections, and the caller picks `activateObjectsGroup`
 (`/activation/runs`) or `activateObjects` (`/activation`) by
 `has(ACTIVATION_RUNS_COLLECTION)`.
+
+## abapGit: what an answer says
+
+Read from SAP's handler code (onprem `ZCL_ABAPGIT_RES_*`, cloud
+`CL_ABAPGIT_RES_*`, 2026-11-21), not measured, unless a line says so. The
+library judges none of them: each is an answer the caller reads.
+
+- **A cloud `202` from `pullRepo` (R4) or `push` (R10) is accepted, not
+  finished.** The handler schedules a background job and answers `202`
+  (`RES_REPO_PULL->post` L253, `RES_REPO_PUSH->post` L100); a `409` means an
+  action already runs. The run's state is in the repository list (`runStatus`,
+  `appLogKey` of `listReposQuiet`).
+- **A `202` from `pullRepoInDialog` (R5, `…/pull/v2`) is finished.** The
+  handler runs the pull in the request and answers `202` after it
+  (`RES_REPO_PULL_V1->post` L270–274).
+- **A cloud pull imports inactive.** On SAP Cloud Platform the deserializer
+  writes the inactive worklist instead of activating ("Object activation
+  rejected in SAP Cloud Platform, ABAP Environment -> import inactive
+  version(!)", `CL_ABAPGIT_OBJECTS` L1127–1133; Code). Measured 2026-11-22,
+  `pullRepoInDialog` and a selective `pullRepo`: the run ends `S` "Pulled
+  successfully", its log lists each object imported `S`, the inactive
+  version holds the pulled source, the active one the previous, and
+  `getFile` `local` answers the active one. Activating is the caller's. An
+  onprem pull activates (measured: the active source changed).
+- **A selection decides only for objects changed locally.** The pull job
+  sets each selected entry's decision `Y` and every other `N`, but
+  `warning_overwrite_find` lists only objects modified locally, and
+  `warning_overwrite_adjust` drops only those with `N`
+  (`CL_ABAPGIT_OBJECTS` L1791–1855; Code): a remote-only change is imported
+  whatever the selection (measured 2026-11-22: an interface left out of the
+  selection, changed only in the remote, was imported). An object left out
+  is logged `S`, "not imported; no import requested" (L308–313), so the run
+  log does not tell it from one imported.
+- **A push's run log names no object** (measured on cloud 2026-11-22: one
+  entry, type and name empty, status `S`, message type `I`); a pull's names
+  each object it imported.
+- **An onprem `200` from `pullRepo` says nothing about objects.** The handler
+  runs the pull synchronously and never fills the result table it answers
+  (`ZCL_ABAPGIT_RES_REPO_PULL->post` L60–171).
+- **Onprem `pullRepo` ignores `branchName`.** The handler parses it and reads
+  only the user, the password and the request; the pull runs on the branch
+  already linked.
+- **`switchBranch` with `create: false` on a branch that does not exist changes
+  nothing and answers success** (R15, `ZCL_ABAPGIT_RES_REPO_SWITCH->post` L58).
+  With `create: true` and no such branch it creates the branch in the remote.
+- **A cloud `getStaging` answers `409` in plain text** while a pull or a push
+  runs or waits (R9, `RES_REPO_STAGE->get` L164, L178).
+- **`unlink`'s `transportRequest` sends a `corrNr` neither handler reads**
+  (R3); it is kept as it was.
+- **Onprem ignores `link`'s `folderLogic` silently.** Its transformation
+  `ZABAPGIT_ST_REPO_POST` has no such field and skips unknown elements
+  (`extensible="deep"`, L8); cloud's `ABAPGIT_ST_REPO_POST_V3` reads it
+  (L20–24). The library sends it when given, on either system.
+- **A selective pull with its lists in the wrong namespace pulls nothing.**
+  `ABAPGIT_ST_REPO_SELECTIVE_PULL` (cloud) reads `overwriteObjects`,
+  `packageWarningObjects`, their `abapgitobjects` and `action` in R6's
+  namespace `agitpullmodifiedobjects` (L5, L42, L55;
+  `ABAPGIT_ST_PULL_MODIFIED_OBJS` L46, L52) and skips anything else silently:
+  the job then sets every entry to `'N'` and answers `202`. The library writes
+  them there; the two pull handlers pick the document by the exact
+  `Content-Type` (a `; charset=…` suffix answers 400, `RES_REPO_PULL` L167–182).
+- **A push needs all three stage lists.** `ABAPGIT_ST_REPO_STAGE` reads
+  `unstaged_objects`, `staged_objects` and `ignored_objects` as literal
+  elements, in that order (cloud L14, L25, L36; onprem the same); the library
+  writes the first and the last empty.
+- **A present, empty attribute fails a push** — measured on premise
+  2026-11-22: a push whose new file carried `remoteState=""` answered 400,
+  T100 `00`/`001` "Check of condition failed" (`CX_ST_COND_CHECK_FAIL`); the
+  cloud push of the first live run was refused with a T100 message for the
+  same document (key not recorded). **A selective pull's empty attribute is
+  refused by the same rule from Code alone** (`SADT_OBJECT_REFERENCE` under
+  `ABAPGIT_ST_PULL_MODIFIED_OBJS`), not measured. The transformations read every file attribute
+  (`…ST_REPO_STAGE_OBJECT` onprem L41–54, cloud L76–90), the comment and the
+  people (`…ST_REPO_STAGE` onprem L44–72, cloud L52–83) and the object
+  reference's `uri`, `type` and `packageName` (`SADT_OBJECT_REFERENCE`
+  L38–56) under `tt:cond check="not-initial(…)"`, and deserialization checks
+  the value it read (Code). Staging answers such values — `remoteState` is
+  empty for a file the remote does not hold, `packageName` may be empty
+  (measured, both systems) — so the library writes an attribute only when it
+  has a value. With that (measured 2026-11-22): `push` answered `200` on
+  premise and `202` on cloud, whose job ended `S` "Pushed successfully"; the
+  selective `pullRepo` (cloud only) answered `202`, its job ended `S` and
+  imported the one selected interface of two changed on both sides; `pullRepoInDialog`
+  (cloud) and `pullRepo` with `repo.v3` (on premise) answered `202` / `200`.
+- **`getFile` of a file the repository does not hold answers `200` with an
+  empty text** (R12): the handler reads the file table without checking that
+  the file was found (onprem `ZCL_ABAPGIT_RES_REPO_FILES->get` L69, cloud
+  L80; Code; measured on premise 2026-11-22).
+- **`getFile` of the remote without a credential, on a private remote, is
+  refused with a T100 key:** SAP reads the remote anonymously, the git host
+  refuses, and the abapGit exception is answered `500` (onprem L84–87, cloud
+  L97–100; Code). Measured 2026-11-22 on both systems: `500`, `00`/`001`.
+- **Onprem `pullRepo` with a request that does not exist is refused before
+  anything is pulled**, for a package that records changes
+  (`ZCL_ABAPGIT_RES_REPO_PULL->validate_request_data` L210–219; Code; measured
+  on premise 2026-11-22: `500`, `00`/`001`).
+- **On the on-premise test system `checkRepo` (R11) cannot succeed.** Every
+  call ends in the runtime error `SYNTAX_ERROR` in
+  `ZCL_ABAPGIT_RES_REPO_CHECKS`, answered `500` as an HTML page with no T100
+  key (measured 2026-11-22); the class's syntax check reports "No value was
+  passed to the mandatory parameter IV_SERVICE" at L53, col. 22 — its
+  `zcl_abapgit_http=>create_by_url( … )` call (Code). The installed abapGit
+  and its ADT handler disagree; the request the library sends is not the
+  cause. The member returns that answer as it is: a failure whose facts are
+  exactly `status` `500` — no T100 key, no git host status — with the fixed
+  `refused` words. Those facts carry nothing more; the dump's name and line
+  are not in them, so the live suite cannot tell this 500 from another 500
+  with no T100 key. It therefore asserts that exact shape only on the system
+  where the fault was measured (`abapgit.check_repo_fault_system`, matched
+  against `environment.default_master_system`), reported as observed —
+  refused, 500, no T100, consistent with the SYNTAX_ERROR measured at L53 —
+  and expects success everywhere else. The dump itself was observed only in
+  the system's runtime-error list during diagnosis, never by the suite.
+- **On premise a local `$` package works with abapGit end to end** (measured
+  2026-11-22, `$ZAGL_…` in software component LOCAL, no request): `link`
+  answered `200`, `push` `200` with the file in the remote, `pullRepo` `200`
+  with the active source changed, `getFile` without a credential `500`
+  `00`/`001`; after `unlink` the interface and the package were deleted
+  (`isDeleted="true"`) and the package reads `404`. A Z package cannot take
+  its place: LOCAL accepts only `TEST…` and `$…` packages (TR462), a Z
+  package in HOME must record changes ("Change recording must be activated"),
+  and an object deleted from a package that records changes keeps its
+  directory entry until its request is released — the package then refuses
+  its own delete, "Package contains 1 object", also after the entry is
+  removed from the task (all measured 2026-11-22). The live suite's onprem
+  run package is therefore `$ZAGL_<run>`.
+- **Known leftover: package `ZAGL_756211AB`** on the on-premise test system,
+  of the first live run (2026-11-22), transportable. Its interface was
+  deleted, its repository unlinked and its branches removed; the deleted
+  interface's directory entry keeps the package undeletable until request
+  `E19K907111` is released. The owner decides about it; the suite's ledger
+  no longer names it.
+- **`getStatus` (R7) answers a fixed text**, `DEMO STATUS`
+  (`RES_REPO_PULL->get` L139).
+- **The success status of `checkRepo` (R11) and `switchBranch` (R15)** is the
+  framework's default, set inside the handler's `CATCH` (Inference); it is not
+  asserted until a live run measures it.
+- **A key-addressed failure carries a T100 key.** `CL_ADT_EXCEPTION_UTILITY`
+  writes `T100KEY-ID` / `T100KEY-NO` for every exception that is a T100
+  message (L94–97), and the abapGit exceptions are (Code, both systems); the new
+  forms keep exactly those, and R11's `http_status`, as facts. Measured
+  2026-11-22: `getFile` (both systems), `push` and `pullRepo` (on premise).
+

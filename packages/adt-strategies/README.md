@@ -190,11 +190,40 @@ after this one):
 | `featureToggleRuntimeState`, `featureToggleCheckState` | `getFeatureToggle`: `runtimeState`, `checkState` | the two states |
 | `utilSearchHits`, `utilNamedItems`, `utilNodeContents`, `utilInactiveObjects`, `utilActivationRunId`, `utilWhereUsedReferences` | `getUtils`: `search`, `types`, `node`, `inactive`, `activation`, `whereUsed` | the parsed shapes; `readSearchHits`, `readNamedItems`, `readNodeStructure`, `extractRunId` are the pure functions underneath |
 | `utilDiscoveryCollections`, `ACTIVATION_RUNS_COLLECTION` | `getUtils`: `discovery` | the path of every collection (`app:collection/@href` that is a path) as a `ReadonlySet<string>`, empty for an answer that is no `app:service` document; `has(ACTIVATION_RUNS_COLLECTION)` says whether the system offers `/activation/runs` (exact, never a prefix) |
-| `abapGitRepos`, `abapGitErrorLog`, `abapGitExternalRepo` | `AdtAbapGitClient`: `repos`, `errorLog`, `externalRepo` | `IAbapGitRepo[]` (with `repositoryId`, `pullLink`, `logLink`), log entries, branches |
+| `abapGitRepos`, `abapGitErrorLog`, `abapGitExternalRepo` | `AdtAbapGitClient`: `repos`, `errorLog`, `externalRepo` | `IAbapGitRepo[]` (with `repositoryId`, `pullLink`, `logLink`; since 0.27.0 also `folderLogic`, `createdEmail`, `deserializedBy`, `deserializedEmail`, `deserializedAt` and `links`, every link with its `rel`; `status` and `statusText` stay `''` when SAP writes none), log entries, branches |
+| `abapGitRepoRunStates` | `AdtAbapGitClient`: `repos` | `IAbapGitRepoRunState[]`: `key`, `runStatus`, `statusText`, `appLogKey`, each `undefined` when absent (onprem R1 writes no status); `appLogKey` is the last segment of the `log_link` path `/sap/bc/adt/abapgit/repos/{key}/log/{appLogKey}` and comes from nowhere else |
+| `abapGitObjectResults`, `abapGitModifiedObjects`, `abapGitStaging`, `abapGitBranchInfo` | the wire answers of `link` / `pull` / the run log (R2, R4, R8), `getModifiedObjects` (R6), `getStaging` (R9), `checkExternalRepo` / `getBranchInfo` (R13, R14) | every field SAP sends: object results with `msgText`; both modified-object lists with `action` (an integer) and `actionDescription`; the staging's objects, files, transports, links and comment; branches with `sha1` (read from `sha1` or `sha`), `displayName`, `folderLogic` and links. Each reads its route's root element; any other answer throws `ABAPGIT_ERROR_MESSAGES.unreadableAnswer`, never the document's or the parser's text |
+| `abapGitFacts`, `abapGitErrorFacts` | the new-form slots of `AdtAbapGitClient` (`reposFacts`, `linkedFacts`, `repoPulled`, `repoPulledInDialog`, `modifiedObjects`, `status`, `runLog`, `staging`, `pushed`, `checked`, `file`, `externalRepoFacts`, `branchInfo`, `switched`): the reduction before the slot's strategy | `IAbapGitFactsResponse<F>` (`status`, `facts`); `abapGitErrorFacts` answers `IAbapGitErrorFacts` (below) |
 | `atcSystemCheckVariant`, `atcWorklistId`, `atcStartedRun`, `atcWaitingRun`, `atcRunStatus` | `getAtc`: `checkVariant`, `worklist`, `startedRun`, `waitingRun`, `runStatus` | the variant, the worklist id, the run |
 | `profilerTraceEntries`, `profilerHitList`, `profilerStatements`, `profilerDbAccesses`, `compareRecordedAt` | `getProfiler`: `list`, `hitlist`, `statements`, `dbAccesses` | trace entries and the three views; an ordering by recorded time |
 | `traceSchedulingTypes`, `traceSchedulingRequests`, `traceSchedulingProfilerId` | executors: `types`, `requests`, `scheduled` | the catalogue, the requests, the profiler id |
 | `feedDescriptors`, `feedVariants`, `feedEntries`, `feedSystemMessages`, `feedGatewayErrors`, `feedGatewayErrorDetail` | `getFeeds` | the Atom feeds, read |
+
+**abapGit: structure and facts only.** `abapGitFacts[slot](answer)` reduces a
+success to the HTTP status and the fields the slot's route keeps, built field by
+field from the document; everything else is dropped — bodies, headers, status
+texts, message texts, exception texts, message variables, properties, links.
+There is no redactor: names, paths, branches and people are the user's data and
+pass as they are.
+
+| slot | route | `facts` |
+|---|---|---|
+| `reposFacts` | R1 | `repos[]`: `key`, `package`, `url`, `branchName`, `runStatus`, `statusText`, `appLogKey` |
+| `linkedFacts`, `repoPulled`, `runLog` | R2, R4, R8 | `objects[]`: `type`, `name`, `package`, `status`, `messageType` (`msgText` dropped); an empty body is no objects |
+| `modifiedObjects` | R6 | `overwriteObjects[]`, `packageWarningObjects[]`: `uri`, `type`, `name`, `packageName`, `action` — an `IAbapGitPullSelection`, so it goes back to `pullRepo` as it is |
+| `staging` | R9 | `unstaged[]`, `staged[]`, `ignored[]` (`IAbapGitStagedObject`: `wbkey`, `version`, `uri`, `type`, `name`, `packageName`, `files[]` of `name`, `path`, `localState`, `remoteState`); `author`, `committer` (`name`, `email`) |
+| `externalRepoFacts` | R13 | `accessMode`; `branches[]`: `sha1`, `name`, `type`, `isHead` |
+| `branchInfo` | R14 | as R13, each branch also `folderLogic` (SAP writes it in the branch; `''` when absent) |
+| `file` | R12 | `content`, with `filename` and `version` from the call's arguments (`abapGitFacts.file(answer, args)`) |
+| `status` | R7 | `text`, the fixed text SAP answers |
+| `repoPulledInDialog`, `pushed`, `checked`, `switched` | R5, R10, R11, R15 | none: the status alone |
+
+A success that is not the route's document throws
+`ABAPGIT_ERROR_MESSAGES.unreadableAnswer`. `abapGitErrorFacts(answer)` reduces a
+failure to `status` and, from an `exc:exception` document, `messageClass`
+(`T100KEY-ID`), `messageNumber` (`T100KEY-NO`, as SAP writes it) and
+`gitHttpStatus` (R11's `http_status`, an integer); any other answer is its
+status alone.
 
 **Readings of members with no slot.** `IUtilResults` of interfaces-adt names no
 slot for these `getUtils()` members, so the member answers the document as it

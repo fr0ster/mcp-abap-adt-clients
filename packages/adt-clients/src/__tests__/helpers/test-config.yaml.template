@@ -3187,26 +3187,115 @@ execute_class:
 # abapGit client — only on systems that activate the ADT abapGit app
 # (ABAP Platform 2022+ or SAP BTP ABAP Environment / Steampunk).
 abapgit:
+  # The abapGit live suite (integration/clients/abapGit/AbapGit.test.ts), one
+  # case per member, available where its route is served. It runs
+  # only with ~/.config/mcp-abap-adt/sessions/abapgit-live.env and where
+  # discovery lists /sap/bc/adt/abapgit/repos; it creates and deletes its own
+  # branches, package and interface. Its package: onprem a local $ZAGL_<run>
+  # (software component LOCAL, no request), so it deletes completely; cloud
+  # ZAGL_<run>, a child of create_package[adt_package].package_name in that
+  # case's software component.
+  # The system whose checkRepo handler fault was measured (its
+  # environment.default_master_system): there check_repo asserts the fault
+  # exactly as measured; everywhere else it must succeed. Set in that
+  # system's overlay; empty: checkRepo succeeds everywhere.
+  check_repo_fault_system: ""
   test_cases:
     - name: "list_repos"
       enabled: true
       available_in: ["onprem", "cloud"]
-      description: "List all linked abapGit repositories"
+      description: "R1 listRepos (the 46.1 form): the repository list, read by abapGitRepos"
       params: {}
     - name: "check_external_repo"
       enabled: true
       available_in: ["onprem", "cloud"]
-      description: "Probe a public read-only git repo"
-      params:
-        url: "https://github.com/SAP-samples/cloud-abap-rap.git"
-    - name: "link_pull_unlink_flow"
-      enabled: false   # disabled by default: mutates the target system
+      description: "R13 checkExternalRepo, new form with the test credential: the run's branch is listed"
+      params: {}
+    - name: "branch_info"
+      enabled: true
+      available_in: ["cloud"]
+      description: "R14 getBranchInfo: the run's branch for the run's package, with its folder logic"
+      params: {}
+    - name: "link"
+      enabled: true
       available_in: ["onprem", "cloud"]
-      description: "Full link → pull → unlink cycle against a disposable package"
-      params:
-        package: "ZAC_SHR_ABAPGIT_TEST"
-        url: "https://github.com/SAP-samples/cloud-abap-rap.git"
-        branch: "refs/heads/main"
+      description: "R2 link, new form: the run's package to the run's branch"
+      params: {}
+    - name: "list_repos_quiet"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "R1 listReposQuiet: the linked key with its package, URL and branch"
+      params: {}
+    - name: "staging"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "R9 getStaging: the run-owned interface shows unstaged"
+      params: {}
+    - name: "push"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "R10 push with explicit author and committer; cloud waits for its job; the remote holds the file"
+      params: {}
+    - name: "run_log"
+      enabled: true
+      available_in: ["cloud"]
+      description: "R8 getRunLog by the key and the selective pull's new log key: the run's interface, imported (a push's log names no object)"
+      params: {}
+    - name: "check_repo"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "R11 checkRepo: cloud answers, its success status logged; onprem asserts the measured SAP handler fault (500, SYNTAX_ERROR in ZCL_ABAPGIT_RES_REPO_CHECKS)"
+      params: {}
+    - name: "modified_objects"
+      enabled: true
+      available_in: ["cloud"]
+      description: "R6 getModifiedObjects after the remote changed: the run-owned interface is listed"
+      params: {}
+    - name: "pull_repo"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "R4 pullRepo: onprem answers when it ran; cloud 202, its job submitted with R6's selection"
+      params: {}
+    - name: "cancelled_wait"
+      enabled: true
+      available_in: ["cloud"]
+      description: "The wait on the cloud pull, cancelled: the fixtures and the ledger entry with its pre-submit log key stay"
+      params: {}
+    - name: "recovery"
+      enabled: true
+      available_in: ["cloud"]
+      description: "The ledger read afresh: the wait ends only on a new log key and a terminal status; the pull imported inactive, activated"
+      params: {}
+    - name: "pull_repo_in_dialog"
+      enabled: true
+      available_in: ["cloud"]
+      description: "R5 pullRepoInDialog: 202 when it ran; imported inactive, activated"
+      params: {}
+    - name: "status"
+      enabled: true
+      available_in: ["cloud"]
+      description: "R7 getStatus: answers its fixed text"
+      params: {}
+    - name: "switch_branch"
+      enabled: true
+      available_in: ["onprem"]
+      description: "R15 switchBranch to the run's second branch and back; R1's branch follows; success status logged"
+      params: {}
+    - name: "file"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "R12 getFile, local and remote: the interface's current source"
+      params: {}
+    - name: "t100_refusal"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "T100 gate: getFile of the remote without a credential — the private remote refused, answered with T100KEY-ID / T100KEY-NO"
+      params: {}
+    - name: "unlink"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "R3 unlink, then the run's interface, package and branches deleted (cloud: after every run is terminal)"
+      params: {}
 
 # Run Program (direct runProgram call)
 # Requires: program must already exist and be activated
