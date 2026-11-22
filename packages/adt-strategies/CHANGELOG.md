@@ -37,15 +37,18 @@ with a nameless entry added, and an entry with no attribute at all.
   reading; one without `tm:position` was already kept. It is now answered
   in `incompleteEntries` (`ITransportIncompleteEntry`: every field of an
   entry, each present only when the entry carries it, the task's number
-  included), in document order, present only when the document holds one:
-  - **`transportObjectEntryList` / `parseObjectEntryList`, new: the
-    complete entry reading.** It answers `ITransportObjectEntryList`,
-    `{ entries, incompleteEntries? }` — `entries` the same entries
-    `transportObjectEntries` answers. A plain object, so a copy or JSON of
-    it keeps both lists.
+  included), in document order, present only when the document holds one.
+  In both complete readings below a name or a type is missing when it is
+  absent, empty, or blank once decoded and trimmed (`&#32;&#x20;`):
+  - **`transportObjectEntryList`, new: the complete entry reading.** It
+    answers `ITransportObjectEntryList`, `{ entries, incompleteEntries? }`
+    — `entries` the entries `transportObjectEntries` answers, less any with
+    a blank name or type. A plain object, so a copy or JSON of it keeps
+    both lists.
   - **`transportObjectEntries` / `parseObjectEntries` are unchanged and
     leave out an entry without a name or a type**, as they always did: the
-    answer is still the plain `ITransportObjectEntry[]`. A caller who must
+    answer is still the plain `ITransportObjectEntry[]`, an entry whose name
+    or type is blank only after decoding still answered in it. A caller who must
     see every entry SAP lists moves to `transportObjectEntryList`.
   - **`transportItem` / `readTransportItem`: `ITransportTaskItem` (a task's
     document) gains `incompleteEntries`.**
@@ -59,11 +62,12 @@ with a nameless entry added, and an entry with no attribute at all.
   `objectCount`, which has counted every `tm:abap_object`, complete or not,
   since 0.28.0 (now stated on the field and pinned).
 
-  The new names, all exported: `transportObjectEntryList`,
-  `parseObjectEntryList`, `ITransportObjectEntryList`,
-  `ITransportIncompleteEntry`. Nothing existing changes type; the one
-  consumer an added key reaches is an exhaustive mapping over
-  `ITransportTaskItem`'s keys, which now needs `incompleteEntries`.
+  The new names, exported from the package root: `transportObjectEntryList`,
+  `ITransportObjectEntryList`, `ITransportIncompleteEntry` (the pure
+  function underneath, like `parseObjectEntries`, is not). Nothing existing
+  changes type; the one consumer an added key reaches is an exhaustive
+  mapping over the interface's keys (`Record<keyof ITransportTaskItem, …>`),
+  which now needs `incompleteEntries`.
 
 ## [0.28.1] - 2026-11-23
 
