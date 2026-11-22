@@ -60,6 +60,30 @@ range is now `^0.28.0`). A major: the breaking changes below. Migration:
   `detailUri`. `feedGatewayErrorDetail` refuses an answer that names no
   error (an unknown OPID's empty skeleton, an empty body).
 
+- **The types a constructing or exhaustive caller writes against changed**
+  (adt-strategies 0.28.0, the shapes these readings answer):
+  - `IGatewayErrorDetail`: `serviceInfo`'s six fields, `errorContext.errorInfo`
+    and `sourceCode.errorLine` are optional; `errorContext.tree`
+    (`IGatewayContextNode[]`) is **required** — a caller that builds detail
+    values (a test double, a fixture) adds it.
+  - `IGatewayException.text` is optional.
+  - `IWhereUsedReference.kind` (`'package' | 'object'`) is **required** — a
+    caller that builds references adds it; `description` is new and optional.
+  - `ISystemMessageEntry`'s fields are all optional (see above).
+  - `SystemMessagesValues` loses its `message` key with the slot.
+  - Additions only, not breaking: `ITransportObjectEntry.task` / `.info`,
+    `IRepositoryObjectNode.description` (optional), and the new
+    `ITransportItem`, `ITransportItemHeader`, `ITransportRequestItem`,
+    `ITransportTaskItem`, `ITransportTaskSummary`, `IGatewayContextNode`,
+    `WhereUsedReferenceKind`.
+- **Upstream, pending:** `@mcp-abap-adt/interfaces-adt` 31.0.0
+  (fr0ster/mcp-abap-adt-interfaces#200, under review) drops
+  `ISystemMessages.getById` and its `TMessage` parameter
+  (`ISystemMessages<TList>`). Until it is published `SystemMessages`
+  implements `Omit<ISystemMessages<T['list'], never>, 'getById'>`; a consumer
+  that types a value as `ISystemMessages<…>` and calls `getById` on it gets a
+  member SAP never routes.
+
 ### Changed
 
 - **The gateway error document is asked for as `text/html`**

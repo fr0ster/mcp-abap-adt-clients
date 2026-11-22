@@ -9,6 +9,8 @@ consumer that uses what it names; the readings' other fixes are in
 - [System messages: no read by id](#system-messages-no-read-by-id)
 - [System messages: no severity or validity](#system-messages-no-severity-or-validity)
 - [Gateway errors: the entry's fields](#gateway-errors-the-entrys-fields)
+- [Types a caller constructs](#types-a-caller-constructs)
+- [`ISystemMessages` upstream](#isystemmessages-upstream)
 
 ## `INamedItem.description` is optional
 
@@ -115,3 +117,68 @@ const detail = entry.detailUri
 
 Or, through `GatewayErrorLog.getById(type, opid)`, pass the entry's `opid` and
 the kind its `detailUri` names.
+
+## Types a caller constructs
+
+### What changed
+
+A caller that builds these values — a test double, a fixture, an adapter —
+writes against their new shape (adt-strategies 0.28.0):
+
+- `IGatewayErrorDetail`: `errorContext.tree` (`IGatewayContextNode[]`) is
+  **required**; `serviceInfo`'s fields, `errorContext.errorInfo` and
+  `sourceCode.errorLine` are optional.
+- `IGatewayException.text` is optional.
+- `IWhereUsedReference.kind` (`'package' | 'object'`) is **required**.
+- `SystemMessagesValues` has no `message` key.
+
+### What fails
+
+```typescript
+const detail: IGatewayErrorDetail = {
+  serviceInfo: {},
+  errorContext: { resolution: {}, exceptions: [] }, // error: tree is missing
+  sourceCode: { lines: [] },
+  callStack: [],
+};
+const reference: IWhereUsedReference = {
+  name: 'ZCL_A', type: 'CLAS/OC', uri: '/sap/bc/adt/oo/classes/zcl_a',
+  isResult: true, // error: kind is missing
+};
+```
+
+And a reader of the now optional fields checks for absence, as for
+`INamedItem.description`:
+
+```typescript
+const info: string = detail.errorContext.errorInfo ?? '';
+const text: string = exception.text ?? '';
+```
+
+### Remedy
+
+```typescript
+const detail: IGatewayErrorDetail = {
+  serviceInfo: {},
+  errorContext: { resolution: {}, exceptions: [], tree: [] },
+  sourceCode: { lines: [] },
+  callStack: [],
+};
+const reference: IWhereUsedReference = {
+  kind: 'object',
+  name: 'ZCL_A', type: 'CLAS/OC', uri: '/sap/bc/adt/oo/classes/zcl_a',
+  isResult: true,
+};
+```
+
+A type written over `SystemMessagesValues['message']` drops it with the slot.
+
+## `ISystemMessages` upstream
+
+`@mcp-abap-adt/interfaces-adt` 31.0.0 (under review) drops
+`ISystemMessages.getById` and the `TMessage` parameter: `ISystemMessages<TList>`.
+Until it is published, `SystemMessages` implements
+`Omit<ISystemMessages<TList, never>, 'getById'>`. A consumer that types its value
+as `ISystemMessages<TList, TMessage>` keeps compiling against 30.x and calls no
+`getById` (there is none to call); with 31.0.0 it writes `ISystemMessages<TList>`.
+

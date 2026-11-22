@@ -99,7 +99,9 @@ servers and other users' object names replaced.
 - **One reader of the inactive list for both readings** (`utilInactiveObjects`
   and the activation verdict): names by namespace URI, not prefix, the same
   reference decoding, and **fail closed** — an entry, object or reference of
-  another name, a reference without `adtcore:name`, or text where the list
+  another name, a reference without `adtcore:name` or without both
+  `adtcore:uri` and `adtcore:parentUri` (what an activation is matched by),
+  or text where the list
   has elements refuses the whole list (`utilInactiveObjects` throws,
   `stillInactiveAmong` answers `null`, which the verdict reads as not
   decided), never an empty one.
@@ -162,7 +164,10 @@ servers and other users' object names replaced.
   (`CL_STSK_ADT_RES_SYSTEM_MESSAGE->get_feed`, `lcl_atom_service->
   map_feed_entry`, the same on both systems): a plain Atom entry with an HTML
   summary — no `sm:` element. `ISystemMessageEntry` is now `id`, `messageId`,
-  `title`, `text` (every line; it read `content`, which SAP never writes),
+  `title`, `text` (every line as SAP writes it, blank lines and leading
+  spaces kept, the `</BR>` breaks as `\n` — built from SAP's code,
+  `map_feed_entry` / `convert_textlines_to_html`, not measured; it read
+  `content`, which SAP never writes),
   `createdOn`, `updated`, `createdBy` and `author`, each optional;
   **`severity`, `validFrom` and `validTo` are removed** — SAP writes none of
   them (the expiry only filters the rows). Not measured: both systems held no
