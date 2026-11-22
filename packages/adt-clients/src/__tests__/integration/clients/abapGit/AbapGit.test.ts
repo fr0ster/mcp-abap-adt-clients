@@ -18,11 +18,12 @@
  *
  * **Fixtures.** Each run makes its own: two branches of an object-empty
  * commit (GitHub's API, the test token), a package and an interface named
- * with the run id. Onprem: the package is transportable, a child of the
- * create-package case's parent, in its software component and transport
- * layer, recorded in `environment.default_transport` (a `$` package cannot be
- * transported, so the request path would not run). Cloud: the same parent
- * and component (the local one), no request.
+ * with the run id. Onprem: a local package `$ZAGL_<run>`, top level, in
+ * software component LOCAL, no request — it deletes completely, where a
+ * transportable package keeps every deleted object's directory entry until
+ * its request is released (ERRATA). Cloud: `ZAGL_<run>`, a child of the
+ * create-package case's parent, in its component (the local one), no
+ * request.
  *
  * **Recovery.** Every fixture is in the ledger (`helpers/abapGitLedger.ts`)
  * before it is relied on. A cloud job is correlated by a new log key and a
@@ -129,7 +130,8 @@ const EXTERNAL_INFO: IAdtHeaders = {
 
 // --- The run's names: every one carries the run id. ---
 const RUN = randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase();
-const PACKAGE = `ZAGL_${RUN}`;
+/** The run's package: `$ZAGL_<run>` on premise, `ZAGL_<run>` on cloud (set in `beforeAll`). */
+let PACKAGE = `ZAGL_${RUN}`;
 const INTERFACE = `ZIF_AGL_${RUN}`;
 const BRANCH = `abapgit-live-${RUN.toLowerCase()}`;
 const SECOND_BRANCH = `${BRANCH}-b`;
@@ -145,9 +147,11 @@ const BACKENDS: readonly AbapGitBackend[] = ['onprem', 'cloud'];
 interface IGateRecord {
   readonly passed: Set<string>;
   t100?: string;
+  /** Cases whose assertion is a measured SAP handler fault, not our pass. */
+  readonly faults: Set<string>;
 }
 const gates = new Map<AbapGitBackend, IGateRecord>(
-  BACKENDS.map((backend) => [backend, { passed: new Set<string>() }]),
+  BACKENDS.map((backend) => [backend, { passed: new Set<string>(), faults: new Set<string>() }]),
 );
 
 /** The member cases the template makes available on `backend`. */
@@ -192,7 +196,7 @@ function summaryLines(
             : undefined;
     const functional =
       why === undefined && required.length > 0 && missing.length === 0
-        ? `CLOSED — ${required.length}/${required.length} member cases passed`
+        ? `CLOSED — ${required.length}/${required.length} member cases passed${record.faults.size > 0 ? ` (${[...record.faults].join('; ')})` : ''}`
         : `OPEN — ${why ?? `${required.length - missing.length}/${required.length} passed; not passed: ${missing.join(', ')}`}`;
     const t100 =
       why === undefined && record.t100
@@ -583,18 +587,16 @@ describeLive(
       )?.find((c) => c.name === 'adt_package');
       const params = packageCase?.params ?? {};
       const parent = String(params.package_name ?? '');
-      if (!parent)
+      if (backend === 'cloud' && !parent)
         throw new Error(
-          'create_package[adt_package].params.package_name is not configured: the run package is created under it',
+          'create_package[adt_package].params.package_name is not configured: the cloud run package is created under it',
         );
-      transportRequest =
-        backend === 'onprem'
-          ? String(config.environment?.default_transport ?? '') || undefined
-          : undefined;
-      if (backend === 'onprem' && !transportRequest)
-        throw new Error(
-          'environment.default_transport is not configured: the onprem run package is transportable and recorded in it',
-        );
+      // Onprem: local, so nothing is recorded and the package deletes
+      // completely. A Z package must record changes there, and a deleted
+      // object keeps its directory entry until the request is released
+      // (measured 2026-11-22; ERRATA).
+      if (backend === 'onprem') PACKAGE = `$ZAGL_${RUN}`;
+      transportRequest = undefined;
 
       ledger.put({
         runId: RUN,
@@ -644,15 +646,21 @@ describeLive(
         await pkg.create(
           {
             packageName: PACKAGE,
-            superPackage: parent,
+            superPackage: backend === 'onprem' ? '' : parent,
             description: `abapGit live test ${RUN}`,
             packageType: 'development',
-            softwareComponent: String(params.software_component ?? ''),
-            transportLayer: String(params.transport_layer ?? '') || undefined,
+            softwareComponent:
+              backend === 'onprem'
+                ? 'LOCAL'
+                : String(params.software_component ?? ''),
+            transportLayer:
+              backend === 'onprem'
+                ? undefined
+                : String(params.transport_layer ?? '') || undefined,
             transportRequest,
             masterSystem: context.masterSystem,
             responsible: context.responsible,
-            recordChanges: backend === 'onprem',
+            recordChanges: false,
           },
           {
             headers: integrationHeadersOf(pkg, 'create'),
@@ -935,8 +943,32 @@ describeLive(
 
     memberCase(
       'check_repo',
-      'checkRepo answers (its success status is logged, not asserted)',
+      'checkRepo answers (cloud: its success status is logged; onprem: the measured SAP handler fault, asserted as it is)',
       async () => {
+        if (backend === 'onprem') {
+          // A measured SAP handler fault, not a pass of ours: on the onprem
+          // test system every call ends in the runtime error SYNTAX_ERROR in
+          // ZCL_ABAPGIT_RES_REPO_CHECKS, answered 500 as an HTML page with no
+          // T100 key (measured 2026-11-22); its syntax check reports "No
+          // value was passed to the mandatory parameter IV_SERVICE" at L53,
+          // col. 22 (Code; ERRATA). The member returns SAP's answer as it is.
+          const failure = expectFailure(
+            await abapGit.checkRepo(
+              { key: requireKey() },
+              { credentials, analyse: analyseAbapGitFacts },
+            ),
+            'check repository (onprem: SAP handler fault)',
+          );
+          expect(failure.facts.status).toBe(500);
+          expect(failure.facts.messageClass).toBeUndefined();
+          expect(failure.facts.messageNumber).toBeUndefined();
+          gates
+            .get(backend)
+            ?.faults.add(
+              'check_repo: the measured SAP handler fault — 500, no T100, SYNTAX_ERROR in ZCL_ABAPGIT_RES_REPO_CHECKS L53 (IV_SERVICE)',
+            );
+          return;
+        }
         const answer = expectResult(
           await abapGit.checkRepo(
             { key: requireKey() },

@@ -3191,9 +3191,10 @@ abapgit:
   # case per member, available where its route is served. It runs
   # only with ~/.config/mcp-abap-adt/sessions/abapgit-live.env and where
   # discovery lists /sap/bc/adt/abapgit/repos; it creates and deletes its own
-  # branches, package and interface. Its package: a child of
-  # create_package[adt_package].package_name, in that case's software component
-  # and transport layer; onprem recorded in environment.default_transport.
+  # branches, package and interface. Its package: onprem a local $ZAGL_<run>
+  # (software component LOCAL, no request), so it deletes completely; cloud
+  # ZAGL_<run>, a child of create_package[adt_package].package_name in that
+  # case's software component.
   test_cases:
     - name: "list_repos"
       enabled: true
@@ -3213,7 +3214,7 @@ abapgit:
     - name: "link"
       enabled: true
       available_in: ["onprem", "cloud"]
-      description: "R2 link, new form: the run's package to the run's branch (onprem: recorded in the configured request)"
+      description: "R2 link, new form: the run's package to the run's branch"
       params: {}
     - name: "list_repos_quiet"
       enabled: true
@@ -3238,7 +3239,7 @@ abapgit:
     - name: "check_repo"
       enabled: true
       available_in: ["onprem", "cloud"]
-      description: "R11 checkRepo: answers; its success status is logged, not asserted"
+      description: "R11 checkRepo: cloud answers, its success status logged; onprem asserts the measured SAP handler fault (500, SYNTAX_ERROR in ZCL_ABAPGIT_RES_REPO_CHECKS)"
       params: {}
     - name: "modified_objects"
       enabled: true
