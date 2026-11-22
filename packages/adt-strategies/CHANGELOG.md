@@ -66,7 +66,11 @@ tree holds one copy).
   `deserializedEmail`, `deserializedAt` and `links` (every link with its
   `rel`; onprem writes its pull link without a `type`, so `pullLink` misses it
   there and `links` has it). `status` and `statusText` keep their contract:
-  `''` when SAP writes none.
+  `''` when SAP writes none. The six keys are optional, so an existing
+  value of `IAbapGitRepo` still fits; the one edge case is a type built from
+  its keys — a `Record<keyof IAbapGitRepo, …>` now needs the six new keys too.
+  Adding optional properties is a minor (the owner's ruling, as for
+  interfaces-adt-connection 5.2.0 and 5.3.0).
 
 ## [0.26.0] - 2026-11-19
 

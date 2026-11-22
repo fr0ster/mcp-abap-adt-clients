@@ -131,7 +131,10 @@ tested with `@mcp-abap-adt/connection` `^25.2.0`, which implements them.
   shows in an extracted options type: `keyof Parameters<AdtAbapGitClient['link']>[1]`
   (and `checkExternalRepo`'s) is now `'headers' | 'analyse' | 'credentials'`,
   where 46.1.0's was `'headers' | 'analyse'`; the parameter and return types
-  themselves are 46.1.0's (the deprecated overload is the last one).
+  themselves are 46.1.0's (the deprecated overload is the last one), so a
+  type built from those keys — a `Record<keyof Parameters<AdtAbapGitClient['link']>[1], …>`
+  — now needs `credentials` too. Adding an optional property is a minor (the
+  owner's ruling, as for interfaces-adt-connection 5.2.0 and 5.3.0).
 
 ### Fixed
 
