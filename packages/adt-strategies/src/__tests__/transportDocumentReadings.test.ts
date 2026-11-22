@@ -172,6 +172,17 @@ describe('transportTree refuses in fixed words', () => {
     );
   });
 
+  // The empty list SAP_BASIS 7.40 SP04 answered `GET /sap/bc/cts/transportrequests`
+  // (a probe over RFC, 2026-10-23, 319 bytes; the user replaced): a root, too,
+  // that names whose list it is.
+  it('reads the 7.40 empty list as no requests', () => {
+    const tree = parseTransportTree(
+      '<?xml version="1.0" encoding="utf-8"?><tm:root adtcore:name="SAPUSER01" adtcore:type="" adtcore:changedAt="2026-10-23T15:31:49Z" adtcore:createdAt="2026-10-23T15:31:49Z" adtcore:changedBy="SAPUSER01" adtcore:createdBy="SAPUSER01" xmlns:tm="http://www.sap.com/cts/adt/tm" xmlns:adtcore="http://www.sap.com/adt/core"/>',
+    );
+    expect(tree.requests).toEqual([]);
+    expect(tree.attributes['adtcore:name']).toBe('SAPUSER01');
+  });
+
   it('reads the recorded empty list — its root carries the search it ran — as no requests', () => {
     const tree = transportTree(
       stepTagged('read-transport-list-structure', 'cts-transportrequests'),
