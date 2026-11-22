@@ -81,6 +81,36 @@ describe('the inactive list, read once for both readings', () => {
     expect(stillNamed(stripped)).toBeNull();
   });
 
+  /** The recorded list with every reference's `adtcore:uri` and `adtcore:parentUri` removed, names kept. */
+  const withoutAddresses = (): string => {
+    let out = '';
+    let from = 0;
+    for (;;) {
+      const at = [' adtcore:uri="', ' adtcore:parentUri="']
+        .map((attribute) => body.indexOf(attribute, from))
+        .filter((index) => index >= 0)
+        .sort((a, b) => a - b)[0];
+      if (at === undefined) break;
+      const close = body.indexOf('"', body.indexOf('="', at) + 2);
+      out += body.slice(from, at);
+      from = close + 1;
+    }
+    return out + body.slice(from);
+  };
+
+  it('refuses the list with its references stripped of their addresses, in both (the review’s replay)', () => {
+    const stripped = withoutAddresses();
+    expect(stripped).toContain('adtcore:name="ZACT751P9325"');
+    expect(stripped).not.toContain('adtcore:uri=');
+    expect(() => names(stripped)).toThrow(REFUSAL);
+    expect(stillNamed(stripped)).toBeNull();
+    const verdict = readActivationRefusal(
+      '<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties activationExecuted="false"/></chkl:messages>',
+      { named: [GROUP], inactiveObjects: withBody(stripped) },
+    );
+    expect(verdict).not.toBeNull();
+  });
+
   it('refuses a namespaced list holding only text, in both', () => {
     const textOnly =
       '<?xml version="1.0" encoding="utf-8"?><ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects">nothing here</ioc:inactiveObjects>';

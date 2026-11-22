@@ -126,10 +126,10 @@ function childrenOf(element: ParsedElement, scope: Scope): IChild[] | null {
 }
 
 /**
- * One reference, read whole, or `null`: a reference without `adtcore:name`
- * cannot be matched against what an activation named, so the list holding
- * it is refused rather than read without it (an object dropped would read as
- * activated).
+ * One reference, read whole, or `null`: a reference without `adtcore:name`,
+ * or without both `adtcore:uri` and `adtcore:parentUri`, cannot be matched
+ * against what an activation named, so the list holding it is refused rather
+ * than read without it (an object dropped would read as activated).
  */
 function listed(
   element: ParsedElement,
@@ -140,6 +140,10 @@ function listed(
   const type = adtcoreAttribute(element, scope, 'type');
   const uri = adtcoreAttribute(element, scope, 'uri');
   const parentUri = adtcoreAttribute(element, scope, 'parentUri');
+  // Nor without an address: an activation's objects are matched by `uri` or
+  // `parentUri` (`stillInactiveAmong`), so a reference with neither cannot
+  // be matched, and the list holding it is refused, as one without a name.
+  if (uri === undefined && parentUri === undefined) return null;
   return {
     name,
     ...(type === undefined ? {} : { type }),
