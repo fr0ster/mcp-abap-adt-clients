@@ -185,6 +185,7 @@ after this one):
 |---|---|---|
 | `asItCame`, `rawOf` | any | the answer unchanged; `answer.data` as text |
 | `transportTree`, `transportCreated`, `transportSearchConfigurations`, `transportObjectEntries` | `getRequest`: `list`; `created`/`createdTask`; `searchConfigurations`; `objects` | `ITransportTree`, `ICreatedTransport`, `ITransportSearchConfiguration[]`, `ITransportObjectEntry[]` |
+| `transportItem(number)`, `readTransportItem` | `getRequest`: `objects` (the request or task document) | `ITransportItem`: `{ kind: 'request', header, tasks }` or `{ kind: 'task', header, parent, objects }`; refused when the element read does not name `number` |
 | `objectVersions` | any versionable type: `versions` | `IObjectVersion[]` |
 | `unitTestRunId` | `AdtExecutor.getClassTestRunner`: `run` | the run id, from the header ADT puts it in |
 | `featureToggleRuntimeState`, `featureToggleCheckState` | `getFeatureToggle`: `runtimeState`, `checkState` | the two states |
@@ -291,9 +292,21 @@ tell those apart calls the specific reading rather than the dispatcher.
 document; shaping it is the consumer's decision — which fields, to what end —
 and these are offered by name for the consumer who wants the shape the library
 used to impose. Most readings answer an empty shape for a document they cannot
-read — judging the document is `analyse`'s job, not the reading's. Two throw when
-the document has no `tm:root`: `transportTree` and `transportCreated`, because
-an empty tree or an empty request would report something that does not exist. `adt-clients` lets a reading's exception surface as itself.
+read — judging the document is `analyse`'s job, not the reading's. Some throw,
+in fixed words with nothing of the document, because an empty answer would
+report something that does not exist: `transportTree` (no `tm:root`, or a root
+that carries nothing), `transportCreated` (no `tm:root`, or no number),
+`transportItem` (not the request or task asked for) and, since 0.28.0,
+`utilInactiveObjects` (neither inactive-list form — an activation is confirmed
+off it). `adt-clients` lets a reading's exception surface as itself.
+
+**Values are text as written** (0.28.0, every util and transport reading): no
+tag or attribute is coerced to a number (`007` stays `007`, a position
+`000025` keeps its width), and references decode as an XML parser decodes them
+(`&#x26;` is `&`). Readings keep what the document holds: `transportObjectEntries`
+one entry per task entry, with `task`; `utilWhereUsedReferences` every
+reference, packages included, with `kind`; `utilNodeContents` each object's
+`description`; `utilNamedItems` an absent description absent.
 
 ## How the defaults are justified
 

@@ -14,6 +14,77 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.28.0] - 2026-11-22
+
+Released with `@mcp-abap-adt/adt-clients` 46.2.1. The readings the server
+team found reading something other than what the document holds, fixed on
+the documents they were found with (the adt-clients corpus, and the server's
+test documents in `src/__tests__/serverDocuments.ts`, each with its source),
+and one new reading.
+
+### Added
+
+- **`transportItem(number)` / `readTransportItem(document, number)`** — the
+  document `GET /cts/transportrequests/{n}` answers, read as `ITransportItem`:
+  `{ kind: 'request', header, tasks }` (each task's `header` and
+  `objectCount`) or `{ kind: 'task', header, parent, objects }` (the parent's
+  header from `tm:request`, the task's entries as `ITransportObjectEntry`).
+  SAP answers a task's number with the task's own document
+  (`CL_CTS_ADT_TM_RES_REQUEST_CONT->fetch_request_data` →
+  `prepare_tm_root_for_task`, on premise and on the cloud). `kind` is read
+  from `tm:root/@tm:object_type` (`R`, `T`), or — without it — from a
+  `tm:task` naming the number. A header (`ITransportItemHeader`) is
+  `number`, `parent`, `description`, `type`, `status`, `statusText`,
+  `owner`, `target`, `client`, `ctsProject`, `lastChanged`, each attribute as
+  written. A document whose selected element is missing, names no number or
+  another one, or that is no `tm:root` document is refused in fixed words.
+  The strategy is made per number, since the document does not say what was
+  asked.
+- `ITransportObjectEntry.task` (the entry's `tm:task/@tm:number`) and `.info`
+  (`tm:obj_info`); `IWhereUsedReference.kind` (`'package' | 'object'`,
+  `WhereUsedReferenceKind`) and `.description`; `IRepositoryObjectNode.description`.
+
+### Fixed — what an existing caller now sees differently
+
+- **`transportObjectEntries`** answers entries per task, each once, each with
+  its task number. It read every `tm:abap_object` wherever it sat, so a
+  request's entries came twice (its tasks' and `tm:all_objects`') and none
+  named its task. A task document yields that task's entries.
+- **`utilWhereUsedReferences`** keeps every reference the document holds,
+  package nodes (`DEVC/K`) included, with `kind`: the recorded
+  `read-where-used-list-structure` answer reads 4 references, not 1. A caller
+  that wants the places of use alone filters `kind === 'object'`.
+- **`utilInactiveObjects`** reads the SAP_BASIS 7.40 form
+  (`adtcore:objectReferences`, which answered no objects) and every
+  `ioc:object` / `ioc:ref` of an entry, and **throws** for any other answer —
+  an empty body, an exception, a logon page, text that is not XML — instead
+  of answering no objects: an activation is confirmed off this list.
+- **`transportCreated`** (`parseCreatedTransport`) answers the root's own
+  number as the created item and a `tm:request` beside it as `parent`; it
+  preferred the nested `tm:request`, so a created task under a named parent
+  read as the parent (`SIDK907073` under `SIDK907071` read `SIDK907071`). A
+  document naming no number now throws instead of answering
+  `transportNumber: ''`. Its values are no longer coerced: a numeric
+  attribute (a description `007`) keeps its text.
+- **`utilSearchHits`** / `readSearchHits` decode character references:
+  `&#x26;` reads `&` (it read `&#x26;`), as do decimal references and the
+  five predefined entities — in one pass, so `&amp;#x26;` is `&#x26;`. A
+  reference XML does not define (`&nbsp;`) stays as written.
+- **`utilNamedItems`** / `readNamedItems` coerce nothing (`007` stayed `7`)
+  and leave an absent description absent (`description` is optional now; it
+  was `''`).
+- **`transportTree`** (`parseTransportTree`) refuses in fixed words —
+  `parseTransportTree: the answer is no transport list` — with nothing of the
+  body (it quoted up to 200 characters and the root it found), and refuses a
+  root that carries nothing (`<tm:root/>`, a bare root with only its
+  namespace), which it read as an empty list. A list that names its search
+  (`adtcore:name` on the root, the recorded empty list) reads as before.
+  `tm:long_desc` text is no longer coerced.
+- **`utilNodeContents`** keeps each object's `DESCRIPTION`.
+- Every parser of these readings now shares one set of options
+  (`XML_TEXT_OPTIONS`, internal): no tag or attribute value is coerced, and
+  references decode as an XML parser decodes them.
+
 ## [0.27.0] - 2026-11-22
 
 Released with `@mcp-abap-adt/adt-clients` 46.2.0, on
