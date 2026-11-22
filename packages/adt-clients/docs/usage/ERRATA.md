@@ -200,9 +200,13 @@ library judges none of them: each is an answer the caller reads.
   `unstaged_objects`, `staged_objects` and `ignored_objects` as literal
   elements, in that order (cloud L14, L25, L36; onprem the same); the library
   writes the first and the last empty.
-- **A present, empty attribute fails a push or a selective pull** (measured on
-  premise, 2026-11-22: 400, T100 `00`/`001` "Check of condition failed",
-  `CX_ST_COND_CHECK_FAIL`). The transformations read every file attribute
+- **A present, empty attribute fails a push** — measured on premise
+  2026-11-22: a push whose new file carried `remoteState=""` answered 400,
+  T100 `00`/`001` "Check of condition failed" (`CX_ST_COND_CHECK_FAIL`); the
+  cloud push of the first live run was refused with a T100 message for the
+  same document (key not recorded). **A selective pull's empty attribute is
+  refused by the same rule from Code alone** (`SADT_OBJECT_REFERENCE` under
+  `ABAPGIT_ST_PULL_MODIFIED_OBJS`), not measured. The transformations read every file attribute
   (`…ST_REPO_STAGE_OBJECT` onprem L41–54, cloud L76–90), the comment and the
   people (`…ST_REPO_STAGE` onprem L44–72, cloud L52–83) and the object
   reference's `uri`, `type` and `packageName` (`SADT_OBJECT_REFERENCE`
@@ -210,8 +214,11 @@ library judges none of them: each is an answer the caller reads.
   the value it read (Code). Staging answers such values — `remoteState` is
   empty for a file the remote does not hold, `packageName` may be empty
   (measured, both systems) — so the library writes an attribute only when it
-  has a value. With that, a push answered `200` on premise and `202` on cloud,
-  whose job ended `S` "Pushed successfully" (measured 2026-11-22).
+  has a value. With that (measured 2026-11-22): `push` answered `200` on
+  premise and `202` on cloud, whose job ended `S` "Pushed successfully"; the
+  selective `pullRepo` (cloud only) answered `202`, its job ended `S` and
+  imported the one selected interface of two changed; `pullRepoInDialog`
+  (cloud) and `pullRepo` with `repo.v3` (on premise) answered `202` / `200`.
 - **`getFile` of a file the repository does not hold answers `200` with an
   empty text** (R12): the handler reads the file table without checking that
   the file was found (onprem `ZCL_ABAPGIT_RES_REPO_FILES->get` L69, cloud
@@ -231,9 +238,14 @@ library judges none of them: each is an answer the caller reads.
   passed to the mandatory parameter IV_SERVICE" at L53, col. 22 — its
   `zcl_abapgit_http=>create_by_url( … )` call (Code). The installed abapGit
   and its ADT handler disagree; the request the library sends is not the
-  cause. The member returns that answer as it is (a failure, `facts.status`
-  `500`, no T100 key), and the live suite asserts exactly that on premise,
-  labelled a measured SAP handler fault.
+  cause. The member returns that answer as it is: a failure whose facts are
+  exactly `status` `500` — no T100 key, no git host status — with the fixed
+  `refused` words. Those facts carry nothing more; the dump's name and line
+  are not in them, so the live suite cannot tell this 500 from another 500
+  with no T100 key. It therefore asserts that exact shape only on the system
+  where the fault was measured (`abapgit.check_repo_fault_system`, matched
+  against `environment.default_master_system`), labelled a measured SAP
+  handler fault, and expects success everywhere else.
 - **On premise a local `$` package works with abapGit end to end** (measured
   2026-11-22, `$ZAGL_…` in software component LOCAL, no request): `link`
   answered `200`, `push` `200` with the file in the remote, `pullRepo` `200`

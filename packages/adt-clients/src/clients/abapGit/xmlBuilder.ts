@@ -108,9 +108,10 @@ function attribute(name: string, value: string): string {
  * An attribute SAP reads under `tt:cond check="not-initial(…)"`: written only
  * when it has a value. On deserialization the check runs on the value read, so
  * an attribute present and empty fails the whole document with
- * `CX_ST_COND_CHECK_FAIL` — 400, T100 00/001 "Check of condition failed"
- * (measured on premise, 2026-11-22, a push whose new file had
- * `remoteState=""`). The conds are on every file attribute
+ * `CX_ST_COND_CHECK_FAIL`. Measured for the push only, on premise
+ * (2026-11-22): a new file's `remoteState=""` answered 400, T100 00/001
+ * "Check of condition failed". The selective pull's refusal of an empty
+ * attribute is read from its transformation (Code), not measured. The conds are on every file attribute
  * (`ZABAPGIT_ST_REPO_STAGE_OBJECT` L41–54, `ABAPGIT_ST_REPO_STAGE_OBJECT`
  * L76–90), on the comment and the people (`…ST_REPO_STAGE` L44–72 onprem,
  * L52–83 cloud), and on the object reference's `uri`, `type` and

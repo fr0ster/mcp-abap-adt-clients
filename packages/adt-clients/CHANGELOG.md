@@ -89,9 +89,11 @@ tested with `@mcp-abap-adt/connection` `^25.2.0`, which implements them.
   check — `wbkey`, `version`, a file's `name` / `path` / `localState` /
   `remoteState`, the comment and the people, the object reference's `uri` /
   `type` / `packageName` — only when it has a value, because a present, empty
-  one fails the whole document: 400, T100 `00`/`001` "Check of condition
-  failed" (measured on premise: staging answers `remoteState` empty for every
-  new file, so the first push of an object was refused); the pulls send the
+  one fails the whole document (Code). Measured for the push on premise: 400,
+  T100 `00`/`001` "Check of condition failed" — staging answers
+  `remoteState` empty for every new file, so the first push of an object was
+  refused; the cloud push of the same document was refused with a T100
+  message. The selective pull's refusal is Code only; the pulls send the
   caller's `Content-Type` exactly (SAP refuses a `; charset=…` suffix).
 - **Signatures and result types:** `link` and `checkExternalRepo` declare the
   deprecated overload last, so `Parameters<…>` and `ReturnType<…>` are
@@ -153,12 +155,14 @@ tested with `@mcp-abap-adt/connection` `^25.2.0`, which implements them.
 
 ### Verified live
 
-- The corrected push and selective-pull documents are accepted (measured
-  2026-11-22 on both systems; ground in ERRATA): a push answered `200` on
-  premise and `202` on cloud, its job ended `S` "Pushed successfully"; a
-  selective pull with R6's selection was accepted `202`, its job ended `S`
-  with the interface imported (cloud imports inactive); the onprem pull
-  answered `200` with the source changed.
+- The corrected documents are accepted (measured 2026-11-22; ground in
+  ERRATA): `push` answered `200` on premise and `202` on cloud, its job ended
+  `S` "Pushed successfully"; the selective `pullRepo` (cloud only — on
+  premise there is no selective pull) answered `202`, its job ended `S` and
+  imported the one selected interface of two changed, inactive as every
+  cloud pull; `pullRepoInDialog` (cloud) answered `202` with the pull run;
+  `pullRepo` with `repo.v3` (on premise) answered `200` with the source
+  changed.
 
 ## [46.1.0] - 2026-11-19
 
