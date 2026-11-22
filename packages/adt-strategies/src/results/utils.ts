@@ -26,12 +26,15 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
+import { readInactiveList } from '../inactiveList';
 import {
   at,
   field,
   isElement,
   leafText,
   listOf,
+  parsedOrNothing,
+  parsedText,
   XML_TEXT_OPTIONS,
 } from '../parsed';
 import { rawOf } from '../result';
@@ -214,7 +217,7 @@ function parsedWith(parser: XMLParser, xml: string): unknown {
   if (xml.trim() === '' || XMLValidator.validate(xml) !== true) {
     return undefined;
   }
-  return parser.parse(xml);
+  return parsedText(parser, xml);
 }
 
 /** A non-empty attribute or leaf, trimmed; `undefined` otherwise. */
@@ -385,22 +388,6 @@ export const utilNodeContents: IResultStrategy<IRepositoryNodeContents> = (
 export const INACTIVE_OBJECTS_REFUSAL =
   'utilInactiveObjects: the answer is no inactive-objects list';
 
-/** One `adtcore:` reference, read; nothing for one without a name. */
-function inactiveObjectOf(ref: unknown): IInactiveObject[] {
-  const name = leafText(field(ref, '@_adtcore:name'));
-  if (name === undefined || name === '') return [];
-  const uri = leafText(field(ref, '@_adtcore:uri'));
-  const parentUri = leafText(field(ref, '@_adtcore:parentUri'));
-  return [
-    {
-      ...answeredObject(leafText(field(ref, '@_adtcore:type')) ?? ''),
-      name,
-      ...(uri !== undefined && uri !== '' ? { uri } : {}),
-      ...(parentUri !== undefined && parentUri !== '' ? { parentUri } : {}),
-    },
-  ];
-}
-
 /**
  * What `/activation/inactiveobjects` answers, read into references a caller can
  * hand straight to `activateObjectsGroup`, in either form SAP answers it:
@@ -409,6 +396,10 @@ function inactiveObjectOf(ref: unknown): IInactiveObject[] {
  *   `ioc:entry`; a transport's `ioc:ref` is not an object and is not read;
  * - `adtcore:objectReferences`, the flat list of SAP_BASIS 7.40 (recorded
  *   `activation-class-basis-740`) — every `adtcore:objectReference`.
+ *
+ * Read by `readInactiveList`, the one reader the activation verdict
+ * (`stillInactiveAmong`) shares: names by namespace URI, not prefix, and
+ * an entry, object or reference of another name refuses the whole list.
  *
  * **Any other answer is refused** (`INACTIVE_OBJECTS_REFUSAL`) — an empty
  * body, an exception, a logon page, text that is not XML. An activation is
@@ -419,26 +410,16 @@ function inactiveObjectOf(ref: unknown): IInactiveObject[] {
 export const utilInactiveObjects: IResultStrategy<IInactiveObjectsResponse> = (
   answer,
 ) => {
-  const parsed = parsedWith(textParser, rawOf(answer));
-  const listing = field(parsed, 'ioc:inactiveObjects');
-  if (listing !== undefined) {
-    return {
-      objects: listOf(field(listing, 'ioc:entry')).flatMap((entry) =>
-        listOf(field(entry, 'ioc:object')).flatMap((object) =>
-          listOf(field(object, 'ioc:ref')).flatMap(inactiveObjectOf),
-        ),
-      ),
-    };
-  }
-  const references = field(parsed, 'adtcore:objectReferences');
-  if (references !== undefined) {
-    return {
-      objects: listOf(field(references, 'adtcore:objectReference')).flatMap(
-        inactiveObjectOf,
-      ),
-    };
-  }
-  throw new Error(INACTIVE_OBJECTS_REFUSAL);
+  const listed = readInactiveList(rawOf(answer));
+  if (listed === null) throw new Error(INACTIVE_OBJECTS_REFUSAL);
+  return {
+    objects: listed.map(({ name, type, uri, parentUri }) => ({
+      ...answeredObject(type ?? ''),
+      name,
+      ...(uri === undefined ? {} : { uri }),
+      ...(parentUri === undefined ? {} : { parentUri }),
+    })),
+  };
 };
 
 // ---------------------------------------------------------------------------
@@ -579,7 +560,7 @@ export const utilDiscoveryCollections: IResultStrategy<ReadonlySet<string>> = (
   if (xml.trim() === '' || XMLValidator.validate(xml) !== true) {
     return collections;
   }
-  const parsed: unknown = discoveryParser.parse(xml);
+  const parsed: unknown = parsedOrNothing(discoveryParser, xml);
   const service = field(parsed, 'service');
   if (!isElement(service)) return collections;
   for (const workspace of listOf(field(service, 'workspace'))) {

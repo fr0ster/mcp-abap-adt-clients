@@ -4,6 +4,7 @@ import {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
+import { readInactiveList } from '../inactiveList';
 import {
   at,
   field,
@@ -393,43 +394,15 @@ function rootIs(parsed: ParsedElement | null, name: string): boolean {
   return parsed !== null && Object.hasOwn(parsed, name);
 }
 
-/** A reference's attributes, when it carries a name; nothing otherwise. */
-function stillInactiveOf(ref: unknown): IAdtStillInactive[] {
-  const name = leafText(field(ref, '@name'));
-  if (!name) return [];
-  const uri = leafText(field(ref, '@uri')) ?? '';
-  const type = leafText(field(ref, '@type')) ?? '';
-  const parentUri = leafText(field(ref, '@parentUri'));
-  return parentUri === undefined
-    ? [{ uri, type, name }]
-    : [{ uri, type, name, parentUri }];
-}
-
-/**
- * The objects an inactive-objects list names, in either shape it is answered
- * in: `ioc:inactiveObjects` (every `ioc:ref` of every `ioc:object` of an
- * entry — since 0.28.0; it read one, and none when either repeated; a transport's
- * `ioc:ref` is never read, so the transport-only entry contributes nothing)
- * and the flat `adtcore:objectReferences` of SAP_BASIS 7.40. `null` for a
- * document that is neither.
- */
-function listedObjects(
-  parsed: ParsedElement | null,
-): IAdtStillInactive[] | null {
-  if (parsed === null) return null;
-  if (rootIs(parsed, 'inactiveObjects')) {
-    return listOf(at(parsed, 'inactiveObjects', 'entry')).flatMap((entry) =>
-      listOf(field(entry, 'object')).flatMap((object) =>
-        listOf(field(object, 'ref')).flatMap(stillInactiveOf),
-      ),
-    );
-  }
-  if (rootIs(parsed, 'objectReferences')) {
-    return listOf(at(parsed, 'objectReferences', 'objectReference')).flatMap(
-      stillInactiveOf,
-    );
-  }
-  return null;
+/** The objects an inactive-objects list names, as `IAdtStillInactive`; `null` for no list. */
+function listedObjects(document: unknown): IAdtStillInactive[] | null {
+  const listed = readInactiveList(document);
+  if (listed === null) return null;
+  return listed.map(({ name, type, uri, parentUri }) =>
+    parentUri === undefined
+      ? { uri: uri ?? '', type: type ?? '', name }
+      : { uri: uri ?? '', type: type ?? '', name, parentUri },
+  );
 }
 
 /**
@@ -453,7 +426,7 @@ export function stillInactiveAmong(
   if (inactiveObjects.status < 200 || inactiveObjects.status >= 300) {
     return null;
   }
-  const listed = listedObjects(wellFormed(inactiveObjects.data));
+  const listed = listedObjects(inactiveObjects.data);
   if (listed === null) return null;
   const names = new Set(named.map(sameEscapes));
   return listed.filter(
@@ -663,7 +636,7 @@ export function readActivationRefusal(
   if (rootIs(parsed, 'inactiveObjects')) {
     return notActivated(
       'SAP answered the objects still inactive; nothing was activated',
-      listedObjects(parsed) ?? [],
+      listedObjects(document) ?? [],
     );
   }
   if (!rootIs(parsed, 'messages')) {
