@@ -28,6 +28,7 @@ import {
   isElement,
   leafText,
   listOf,
+  parsedText,
   XML_TEXT_OPTIONS,
 } from '../parsed';
 import { rawOf } from '../result';
@@ -218,7 +219,7 @@ const xmlParser = new XMLParser({
 function parseOrEmpty(xml: string): unknown {
   if (!xml.trim()) return {};
   try {
-    return xmlParser.parse(xml) ?? {};
+    return parsedText(xmlParser, xml) ?? {};
   } catch {
     return {};
   }
