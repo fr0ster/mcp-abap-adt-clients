@@ -940,7 +940,9 @@ had:
   (`task`), each entry once — a request's `tm:all_objects`, which repeats its
   tasks' entries, is not read beside them (adt-strategies 0.28.0; before, a
   request's entries came twice and none named its task) —, rather than a
-  document to dig through (its
+  document to dig through. An entry SAP lists without a name or a type is
+  in the answer's `incompleteEntries` (adt-strategies 0.28.2; dropped before),
+  present only when there is one — a copy of the array does not carry it (its
   default, like every member's, is the document). The header it
   sends changes nothing: measured against an on-premise system, 2026-09-21,
   the same URL with and without
@@ -1077,7 +1079,9 @@ entries. Since 0.28.1 the number asked selects the item: the root's `task` or
 `tm:number`, trimmed, is `number`, the root's `tm:object_type` confirming it.
 A document where no element or more than one names `number`, whose marker
 contradicts the element found, or — unmarked — a task's document asked for by
-its parent's number, is refused:
+its parent's number, is refused. A task's entry without a name or a type is in
+`item.incompleteEntries` (0.28.2; dropped before), present only when there is
+one; a request's `objectCount` counts every entry, those included:
 
 ```typescript
 import { transportItem } from '@mcp-abap-adt/adt-strategies';
