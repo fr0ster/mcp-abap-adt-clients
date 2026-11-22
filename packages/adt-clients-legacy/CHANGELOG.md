@@ -6,7 +6,9 @@ one changelog per package.
 
 ## [0.11.2] - 2026-11-22
 
-Released with `@mcp-abap-adt/adt-clients` 47.0.0. Its peer range is
+Released with `@mcp-abap-adt/adt-clients` 47.0.0, on
+`@mcp-abap-adt/interfaces-adt` `^31.0.0` (was `^30.1.0`; the range follows
+adt-clients', so the tree holds one copy). Its peer range is
 `^46.1.0 || ^47.0.0` (it was `^46.1.0`): this package uses none of what
 47.0.0 removes or changes (the system-message read by id, `INamedItem`, the
 feed readings), so both majors serve it. No code changed; its tests run on
