@@ -159,6 +159,18 @@ library judges none of them: each is an answer the caller reads.
 - **A `202` from `pullRepoInDialog` (R5, `…/pull/v2`) is finished.** The
   handler runs the pull in the request and answers `202` after it
   (`RES_REPO_PULL_V1->post` L270–274).
+- **A cloud pull imports inactive.** On SAP Cloud Platform the deserializer
+  writes the inactive worklist instead of activating ("Object activation
+  rejected in SAP Cloud Platform, ABAP Environment -> import inactive
+  version(!)", `CL_ABAPGIT_OBJECTS` L1127–1133; Code). Measured 2026-11-22,
+  `pullRepoInDialog` and a selective `pullRepo`: the run ends `S` "Pulled
+  successfully", its log lists each object imported `S`, the inactive
+  version holds the pulled source, the active one the previous, and
+  `getFile` `local` answers the active one. Activating is the caller's. An
+  onprem pull activates (measured: the active source changed).
+- **A push's run log names no object** (measured on cloud 2026-11-22: one
+  entry, type and name empty, status `S`, message type `I`); a pull's names
+  each object it imported.
 - **An onprem `200` from `pullRepo` says nothing about objects.** The handler
   runs the pull synchronously and never fills the result table it answers
   (`ZCL_ABAPGIT_RES_REPO_PULL->post` L60–171).
