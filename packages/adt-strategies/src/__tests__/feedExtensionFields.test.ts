@@ -1,17 +1,22 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
-import { feedGatewayErrors, feedSystemMessages } from '../results/feeds';
+import { feedSystemMessages } from '../results/feeds';
 
 /**
- * The extension fields of the system-messages and gateway-error feeds
- * (0.28.0): read under the local name the parser leaves once it strips the
- * prefix. They were looked up as `sm:…` / `gw:…`, which the stripping had
- * removed, and read empty.
+ * The system-messages feed's extension fields (0.28.0): read under the local
+ * name the parser leaves once it strips the prefix. They were looked up as
+ * `sm:…`, which the stripping had removed, and read empty.
  *
- * **Written, not recorded.** No recording of either feed exists — not in the
- * adt-clients corpus, nor in the server repository (`fr0ster/mcp-abap-adt`,
- * tests and fixtures). These are Atom entries in the form the feed tests use
- * (`feedReadings.test.ts`), with the extension elements the readings name;
- * the extension namespaces' URIs are placeholders. A live capture is owed.
+ * **The entry shape is not measured.** The feed answered no entry on either
+ * system (recorded 2026-11-22, `fixtures/feeds/*-systemmessages.xml`, read
+ * below), and SAP's handler code was not read in this change: the entry is
+ * written — an Atom entry in the form the feed tests use, with the elements
+ * the reading names, the extension namespace's URI a placeholder. Whether SAP
+ * writes these elements is unverified; a capture of a system holding a
+ * message, or the handler's code, is owed. When both a category and
+ * `sm:severity` are present the category's `term` is read; whether SAP sends
+ * both is unverified too.
  */
 const answer = (data: string): IAdtWireResponse => ({
   data,
@@ -34,22 +39,20 @@ const SYSTEM_MESSAGES = `<?xml version="1.0" encoding="utf-8"?>
   </atom:entry>
 </atom:feed>`;
 
-const GATEWAY_ERRORS = `<?xml version="1.0" encoding="utf-8"?>
-<atom:feed xmlns:atom="http://www.w3.org/2005/Atom" xmlns:gw="urn:written:gatewayerrors">
-  <atom:entry>
-    <atom:id>0050568A1B2C</atom:id>
-    <atom:title>Resource not found for segment</atom:title>
-    <atom:updated>2026-11-21T10:15:00Z</atom:updated>
-    <atom:author><atom:name>SAPUSER01</atom:name></atom:author>
-    <atom:category term="Backend"/>
-    <gw:package>ZPKG</gw:package>
-    <gw:applicationComponent>BC-ESI-ODATA</gw:applicationComponent>
-    <gw:client>100</gw:client>
-    <gw:requestKind>OData V2</gw:requestKind>
-  </atom:entry>
-</atom:feed>`;
+describe('the system-messages feed', () => {
+  it.each(['cloud-systemmessages.xml', 'onprem-systemmessages.xml'])(
+    'reads the recorded %s, which holds no entry, as none',
+    (file) => {
+      expect(
+        feedSystemMessages(
+          answer(
+            readFileSync(join(__dirname, 'fixtures', 'feeds', file), 'utf-8'),
+          ),
+        ),
+      ).toEqual([]);
+    },
+  );
 
-describe('the feeds’ extension fields', () => {
   it('feedSystemMessages reads severity, validFrom and validTo', () => {
     expect(feedSystemMessages(answer(SYSTEM_MESSAGES))).toEqual([
       {
@@ -60,22 +63,6 @@ describe('the feeds’ extension fields', () => {
         validFrom: '2026-11-22T06:00:00Z',
         validTo: '2026-11-22T18:00:00Z',
         createdBy: 'SAPUSER01',
-      },
-    ]);
-  });
-
-  it('feedGatewayErrors reads package, applicationComponent, client and requestKind', () => {
-    expect(feedGatewayErrors(answer(GATEWAY_ERRORS))).toEqual([
-      {
-        type: 'Backend',
-        shortText: 'Resource not found for segment',
-        transactionId: '0050568A1B2C',
-        package: 'ZPKG',
-        applicationComponent: 'BC-ESI-ODATA',
-        dateTime: '2026-11-21T10:15:00Z',
-        username: 'SAPUSER01',
-        client: '100',
-        requestKind: 'OData V2',
       },
     ]);
   });

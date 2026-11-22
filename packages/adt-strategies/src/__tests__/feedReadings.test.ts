@@ -92,22 +92,13 @@ describe('the other feed readings', () => {
     ]);
   });
 
-  it('feedGatewayErrors reads the category as the type and the id as the transaction', () => {
-    expect(feedGatewayErrors(answer(ENTRY))).toMatchObject([
-      {
-        type: 'dump',
-        shortText: 'Test Entry',
-        transactionId: 'entry1',
-        dateTime: '2026-04-10T10:00:00Z',
-        username: 'TESTUSER',
-      },
-    ]);
-  });
-
+  // The gateway readings are pinned on recorded answers in
+  // gatewayErrorReadings.test.ts (0.28.0); this entry is not their shape.
   it('feedGatewayErrorDetail reads an empty document as empty fields', () => {
     const detail = feedGatewayErrorDetail(answer(''));
-    expect(detail.shortText).toBe('');
+    expect(detail).not.toHaveProperty('shortText');
     expect(detail.callStack).toEqual([]);
+    expect(detail.sourceCode.lines).toEqual([]);
   });
 
   it('reads a body that is not XML, or none, as nothing — never a throw', () => {

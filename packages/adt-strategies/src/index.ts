@@ -160,6 +160,7 @@ export {
   type IFeedDescriptor,
   type IFeedEntry,
   type IFeedVariant,
+  type IGatewayContextNode,
   type IGatewayErrorDetail,
   type IGatewayErrorEntry,
   type IGatewayException,

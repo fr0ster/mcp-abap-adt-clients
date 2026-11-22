@@ -1,9 +1,5 @@
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
-import {
-  feedDescriptors,
-  feedEntries,
-  feedGatewayErrorDetail,
-} from '../results/feeds';
+import { feedDescriptors, feedEntries } from '../results/feeds';
 
 /**
  * The feed readings read text as written and every repeated Atom element
@@ -75,22 +71,5 @@ describe('feed readings keep text as written', () => {
       ),
     )[0];
     expect([entry.author, entry.category]).toEqual(['SAPUSER01', 'dump']);
-  });
-
-  // Written: numbers typed as numbers are converted from their text.
-  it('converts the fields typed as numbers explicitly', () => {
-    const detail = feedGatewayErrorDetail(
-      answer(
-        '<errorEntry><callStack><entry number="007" line="0012" event="e" program="p" name="n"/></callStack>' +
-          '<sourceCode errorLine="003"><line number="1" isError="true">0042</line></sourceCode></errorEntry>',
-      ),
-    );
-    expect(detail.callStack[0]).toMatchObject({ number: 7, line: 12 });
-    expect(detail.sourceCode.errorLine).toBe(3);
-    expect(detail.sourceCode.lines[0]).toEqual({
-      number: 1,
-      content: '0042',
-      isError: true,
-    });
   });
 });
