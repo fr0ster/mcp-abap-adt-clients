@@ -194,6 +194,10 @@ const ALLOWED_OVERLAY_KEYS = Object.freeze(
       'create_function_include.test_cases[adt_function_include].params.function_group_route',
       { values: ['shared', 'default_package'] },
     ],
+    // The system whose abapGit checkRepo handler fault was measured (its
+    // default_master_system): check_repo asserts that fault there and expects
+    // success everywhere else. Optional; "" or absent names none.
+    ['abapgit.check_repo_fault_system', { empty: true }],
     // ATC needs a check variant the system can run.
     [`${ATC_RUN}.enabled`, { type: 'boolean' }],
     [`${ATC_RUN}.params.check_variant`, { empty: true }],
