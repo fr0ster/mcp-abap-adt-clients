@@ -13,6 +13,7 @@ import {
   leafText,
   listOf,
   type ParsedElement,
+  parsedText,
   XML_TEXT_OPTIONS,
 } from '../../parsed';
 
@@ -31,7 +32,7 @@ const parser = new XMLParser({
 export function transportRoot(document: unknown): ParsedElement | undefined {
   if (typeof document !== 'string' || document.trim() === '') return undefined;
   if (XMLValidator.validate(document) !== true) return undefined;
-  const parsed: unknown = parser.parse(document);
+  const parsed: unknown = parsedText(parser, document);
   const root = field(parsed, 'tm:root') ?? field(parsed, 'root');
   if (isElement(root) && !Array.isArray(root)) return root;
   // A self-closed root without attributes is parsed as ''.

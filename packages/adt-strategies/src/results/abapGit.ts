@@ -4,7 +4,7 @@ import {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
-import { field, isElement, listOf } from '../parsed';
+import { field, isElement, listOf, parsedOrNothing } from '../parsed';
 import { rawOf } from '../result';
 
 /**
@@ -148,7 +148,7 @@ function optionalText(node: unknown, name: string): Record<string, string> {
 
 /** The repositories list, one entry per linked repository. */
 export const abapGitRepos: IResultStrategy<IAbapGitRepo[]> = (answer) => {
-  const parsed: unknown = parser.parse(rawOf(answer));
+  const parsed: unknown = parsedOrNothing(parser, rawOf(answer));
   const repos = field(field(parsed, 'repositories'), 'repository') ?? [];
   return listOf(repos)
     .filter(Boolean)
@@ -174,7 +174,7 @@ export const abapGitRepos: IResultStrategy<IAbapGitRepo[]> = (answer) => {
 export const abapGitErrorLog: IResultStrategy<IAbapGitErrorLogEntry[]> = (
   answer,
 ) => {
-  const parsed: unknown = parser.parse(rawOf(answer));
+  const parsed: unknown = parsedOrNothing(parser, rawOf(answer));
   const items = field(field(parsed, 'abapObjects'), 'abapObject') ?? [];
   return listOf(items)
     .filter(Boolean)
@@ -190,7 +190,7 @@ export const abapGitErrorLog: IResultStrategy<IAbapGitErrorLogEntry[]> = (
 export const abapGitExternalRepo: IResultStrategy<IAbapGitExternalRepoInfo> = (
   answer,
 ) => {
-  const parsed: unknown = parser.parse(rawOf(answer));
+  const parsed: unknown = parsedOrNothing(parser, rawOf(answer));
   const root = field(parsed, 'externalRepoInfo') ?? {};
   const raw = field(root, 'branch') ?? [];
   return {
