@@ -48,7 +48,9 @@ import type {
   IAbapGitCredentials,
   IAbapGitPullSelection,
   IAbapGitStagedObject,
+  IAbapGitStructuredError,
   IAdtHeaders,
+  IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
 import { analyseAbapGitFacts } from '../../../helpers/abapGitFacts';
 import {
@@ -343,6 +345,22 @@ describeLive(
       };
       ledger.amend(RUN, (entry) => ({ ...entry, pending }));
       return pending;
+    }
+
+    /**
+     * A cloud submit SAP refused with an answer scheduled no job: the handler
+     * schedules it as its last step and rolls back on any exception before
+     * (`CL_ABAPGIT_RES_REPO_PUSH->post` L100, L110–114;
+     * `CL_ABAPGIT_RES_REPO_PULL->post` L253, L262–267; Code). Its pending
+     * entry goes, or the next run waits for a log key that never comes. A
+     * failure without SAP's answer (status 0) keeps it: the job may exist.
+     */
+    function settleRefusedSubmit(
+      answer: IAdtResponse<unknown, IAbapGitStructuredError>,
+    ): void {
+      if (answer.ok) return;
+      if (answer.getError().facts.status !== 0)
+        ledger.amend(RUN, (entry) => ({ ...entry, pending: undefined }));
     }
 
     function fixturesOf(entry: ILedgerEntry | undefined): string {
@@ -846,21 +864,20 @@ describeLive(
           name: 'adt-clients abapGit live test',
           email: `${theRemote.user}@users.noreply.github.com`,
         };
-        const answer = expectResult(
-          await abapGit.push(
-            {
-              key: requireKey(),
-              staged,
-              comment: {
-                text: `abapGit live test ${RUN}: ${INTERFACE}`,
-                author: person,
-                committer: person,
-              },
+        const pushed = await abapGit.push(
+          {
+            key: requireKey(),
+            staged,
+            comment: {
+              text: `abapGit live test ${RUN}: ${INTERFACE}`,
+              author: person,
+              committer: person,
             },
-            { credentials, analyse: analyseAbapGitFacts },
-          ),
-          'push',
+          },
+          { credentials, analyse: analyseAbapGitFacts },
         );
+        if (pending) settleRefusedSubmit(pushed);
+        const answer = expectResult(pushed, 'push');
         if (pending) {
           expect(answer.status).toBe(202);
           pushLogKey = await awaitCloudRun(pending);
@@ -952,17 +969,16 @@ describeLive(
         const branchName = (await repoRow(key))?.branchName ?? ref(BRANCH);
         if (backend === 'cloud') {
           await notePending('pullRepo');
-          const answer = expectResult(
-            await abapGit.pullRepo(
-              { key, branchName, ...(selection ? { selection } : {}) },
-              {
-                headers: selection ? PULL_SELECTIVE : REPO_V3,
-                credentials,
-                analyse: analyseAbapGitFacts,
-              },
-            ),
-            'pull',
+          const pulled = await abapGit.pullRepo(
+            { key, branchName, ...(selection ? { selection } : {}) },
+            {
+              headers: selection ? PULL_SELECTIVE : REPO_V3,
+              credentials,
+              analyse: analyseAbapGitFacts,
+            },
           );
+          settleRefusedSubmit(pulled);
+          const answer = expectResult(pulled, 'pull');
           // Accepted, not finished: `cancelled_wait` and `recovery` wait.
           expect(answer.status).toBe(202);
           return;
@@ -1089,7 +1105,7 @@ describeLive(
     );
 
     gate('abapgit', GATE_CASE_T100)(
-      `${GATE_CASE_T100}: getFile of a file the repository does not hold carries T100KEY-ID / T100KEY-NO`,
+      `${GATE_CASE_T100}: getFile of the remote without a credential — the private remote's refusal carries T100KEY-ID / T100KEY-NO`,
       async () => {
         if (skipReason) {
           testsLogger.warn?.(
@@ -1097,16 +1113,22 @@ describeLive(
           );
           return;
         }
+        // Not a file the repository does not hold: R12 answers that 200 with
+        // an empty text — it reads the file table without checking that the
+        // file was found (onprem `ZCL_ABAPGIT_RES_REPO_FILES->get` L69, cloud
+        // L80; Code; measured on premise 2026-11-22). Without a credential
+        // SAP reads the private remote anonymously, the git host refuses, and
+        // the abapGit exception is answered 500 with its T100 key (onprem
+        // L84–87, cloud L97–100; measured 2026-11-22 on both systems: 500,
+        // 00/001).
+        const file = requireFile();
         const failure = expectFailure(
           await abapGit.getFile(
-            {
-              key: requireKey(),
-              filename: `zz_absent_${RUN.toLowerCase()}.txt`,
-              version: 'remote',
-            },
-            { credentials, analyse: analyseAbapGitFacts },
+            { key: requireKey(), filename: file.name, version: 'remote' },
+            // No credential: no `Username` / `Password` header at all.
+            { analyse: analyseAbapGitFacts },
           ),
-          'file the repository does not hold',
+          'file of the remote without a credential',
         );
         const { messageClass, messageNumber, status } = failure.facts;
         expect(messageClass).toEqual(expect.any(String));
@@ -1115,7 +1137,7 @@ describeLive(
         expect(messageNumber).not.toBe('');
         const record = gates.get(backend);
         if (record)
-          record.t100 = `status ${status}, T100 ${messageClass}/${messageNumber} on getFile of an absent file`;
+          record.t100 = `status ${status}, T100 ${messageClass}/${messageNumber} on getFile of the remote without a credential`;
       },
       STEP_TIMEOUT_MS,
     );

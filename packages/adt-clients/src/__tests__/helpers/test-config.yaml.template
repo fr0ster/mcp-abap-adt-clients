@@ -3283,7 +3283,7 @@ abapgit:
     - name: "t100_refusal"
       enabled: true
       available_in: ["onprem", "cloud"]
-      description: "T100 gate: getFile of a file the repository does not hold is refused with T100KEY-ID / T100KEY-NO"
+      description: "T100 gate: getFile of the remote without a credential — the private remote refused, answered with T100KEY-ID / T100KEY-NO"
       params: {}
     - name: "unlink"
       enabled: true
