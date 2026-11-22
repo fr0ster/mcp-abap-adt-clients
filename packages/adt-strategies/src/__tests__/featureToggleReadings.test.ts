@@ -70,3 +70,26 @@ describe('featureToggleCheckState', () => {
     expect(featureToggleCheckState(answer('')).currentState).toBe('undefined');
   });
 });
+
+describe('a body that is no JSON', () => {
+  // Written: JSON cut short, its text a marker no error may repeat.
+  const broken = {
+    status: 200,
+    statusText: 'OK',
+    headers: {},
+    data: '{"STATES": BODY_MARKER_NEVER_IN_AN_ERROR',
+  };
+
+  it.each([
+    ['featureToggleRuntimeState', featureToggleRuntimeState],
+    ['featureToggleCheckState', featureToggleCheckState],
+  ])('%s refuses it in fixed words, nothing of the body', (_name, read) => {
+    let said = '';
+    try {
+      read(broken);
+    } catch (error) {
+      said = error instanceof Error ? error.message : String(error);
+    }
+    expect(said).toBe('featureToggle: the answer is no JSON document');
+  });
+});
