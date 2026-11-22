@@ -3,9 +3,11 @@ import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   type ITransportObjectEntry,
   parseObjectEntries,
+  parseObjectEntryList,
   readTransportItem,
   transportItem,
   transportObjectEntries,
+  transportObjectEntryList,
 } from '../results/transport';
 import {
   EMPTY_TASK,
@@ -136,26 +138,39 @@ describe('transportItem: a task entry without a name or a type is kept', () => {
   });
 });
 
-describe('transportObjectEntries: an entry without a name or a type is kept', () => {
+describe('transportObjectEntryList: an entry without a name or a type is kept', () => {
   it('the reconstructed task, an entry without its name: in incompleteEntries', () => {
-    const entries = parseObjectEntries(TASK_NAMELESS_ENTRY);
-    expect(entries.map((e) => e.name)).toEqual(['ZCL_ONE']);
-    expect(entries.incompleteEntries).toEqual([METHOD_WITHOUT_NAME]);
+    const list = parseObjectEntryList(TASK_NAMELESS_ENTRY);
+    expect(list.entries.map((e) => e.name)).toEqual(['ZCL_ONE']);
+    expect(list.incompleteEntries).toEqual([METHOD_WITHOUT_NAME]);
+    // Same counting rule as a task item: every entry SAP lists.
+    expect(list.entries.length + (list.incompleteEntries?.length ?? 0)).toBe(2);
   });
 
   it('the recorded cloud task, an entry added without its name: in incompleteEntries', () => {
-    const entries = transportObjectEntries(wire(CLOUD_TASK_NAMELESS_ENTRY));
-    expect([...entries]).toEqual([]);
-    expect(entries.incompleteEntries).toEqual([
-      { task: TASK, pgmid: 'R3TR', type: 'CLAS', position: '000001' },
-    ]);
+    const list = transportObjectEntryList(wire(CLOUD_TASK_NAMELESS_ENTRY));
+    expect(list).toEqual({
+      entries: [],
+      incompleteEntries: [
+        { task: TASK, pgmid: 'R3TR', type: 'CLAS', position: '000001' },
+      ],
+    });
   });
 
   it('a request, its task’s entry without its name: in incompleteEntries with the task; the aggregate is not read', () => {
-    const entries = transportObjectEntries(wire(REQUEST_NAMELESS_ENTRY));
-    expect([...entries]).toEqual([]);
-    expect(entries.incompleteEntries).toEqual([
-      { task: TASK, pgmid: 'R3TR', type: 'CLAS', position: '000001' },
+    const list = transportObjectEntryList(wire(REQUEST_NAMELESS_ENTRY));
+    expect(list).toEqual({
+      entries: [],
+      incompleteEntries: [
+        { task: TASK, pgmid: 'R3TR', type: 'CLAS', position: '000001' },
+      ],
+    });
+  });
+
+  it('survives serialisation: the incomplete entry is in the JSON', () => {
+    const list = transportObjectEntryList(wire(TASK_NAMELESS_ENTRY));
+    expect(JSON.parse(JSON.stringify(list)).incompleteEntries).toEqual([
+      METHOD_WITHOUT_NAME,
     ]);
   });
 
@@ -164,7 +179,7 @@ describe('transportObjectEntries: an entry without a name or a type is kept', ()
       '</tm:task>',
       '<tm:abap_object/></tm:task>',
     );
-    expect(parseObjectEntries(empty).incompleteEntries).toEqual([
+    expect(parseObjectEntryList(empty).incompleteEntries).toEqual([
       { task: TASK },
     ]);
     const item = readTransportItem(empty, TASK);
@@ -172,16 +187,23 @@ describe('transportObjectEntries: an entry without a name or a type is kept', ()
     expect(item.incompleteEntries).toEqual([{ task: TASK }]);
   });
 
-  it('the documents as recorded and reconstructed: no incompleteEntries key', () => {
+  it('the documents as recorded and reconstructed: no incompleteEntries key, the same entries as transportObjectEntries', () => {
     for (const document of [TASK_WITH_OBJECTS, EMPTY_TASK, REQUEST]) {
-      expect('incompleteEntries' in parseObjectEntries(document)).toBe(false);
+      const list = parseObjectEntryList(document);
+      expect('incompleteEntries' in list).toBe(false);
+      expect(list.entries).toEqual(parseObjectEntries(document));
     }
   });
 });
 
-describe('the change is additive', () => {
-  it('transportObjectEntries still fits where an array of entries was declared', () => {
-    // Compiles only while the answer is still an ITransportObjectEntry[].
+describe('transportObjectEntries is the array it was', () => {
+  it('answers the complete entries only, and carries nothing on the array', () => {
+    const entries = transportObjectEntries(wire(TASK_NAMELESS_ENTRY));
+    expect(entries.map((e) => e.name)).toEqual(['ZCL_ONE']);
+    expect(Object.keys(entries)).toEqual(['0']);
+  });
+
+  it('still fits where an array of entries was declared', () => {
     const asBefore: IResultStrategy<ITransportObjectEntry[]> =
       transportObjectEntries;
     expect(asBefore(wire(TASK_WITH_OBJECTS))).toHaveLength(2);
