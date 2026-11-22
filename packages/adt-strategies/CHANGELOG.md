@@ -64,7 +64,12 @@ the measured on-premise answer).
   refusal. Every field of the item — its header, its parent's header, a
   request's tasks and their counts, a task's entries — is read by the tm
   namespace URI and local name, so an item written under another prefix
-  bound to tm reads in full. Every document SAP answers reads as before.
+  bound to tm reads in full; a `tm:`-qualified attribute wins over a bare one
+  of the same name. Every value the reading returns — the item's header, the
+  parent's, the task summaries, each entry's `task` and fields — is trimmed
+  after decoding, so a number padded with `&#32;` gives the same item as one
+  padded literally (the parser already trimmed literal padding). Every
+  document SAP answers reads as before.
 - **`utilNodeContents` drops no node SAP lists.** An object node without
   `OBJECT_NAME`, `TECH_NAME` or `OBJECT_URI` was dropped; it is now answered
   in `incompleteObjects` (`IRepositoryIncompleteNode`: every field the node
