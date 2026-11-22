@@ -12,7 +12,7 @@
 import {
   existsSync,
   mkdtempSync,
-  readFileSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -27,6 +27,8 @@ import {
   type IRunRow,
   RunLockHeld,
   RunWaitCancelled,
+  readRunLock,
+  releasingRunLock,
   runState,
   waitForRun,
 } from '../../helpers/abapGitLedger';
@@ -219,44 +221,52 @@ describe('the recovery ledger', () => {
 describe('the run lock', () => {
   let dir: string;
   let file: string;
+  const content = { pid: 4242, startedAt: '2026-11-22T10:00:00.000Z' };
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'abapgit-lock-'));
     file = join(dir, 'abapgit-live.lock');
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-  it('takes a free lock with O_EXCL, holding its pid, and releases it', () => {
-    const release = acquireRunLock(file, 4242, () => true);
-    expect(readFileSync(file, 'utf8').trim()).toBe('4242');
+  it('the lock holds its whole content as soon as the file exists, and no temporary file is left', () => {
+    const release = acquireRunLock(file, content);
+    // The file appears by a hard link of a fully written file: there is no
+    // moment it exists empty or half written.
+    expect(readRunLock(file)).toEqual(content);
+    expect(readdirSync(dir)).toEqual(['abapgit-live.lock']);
     release();
     expect(existsSync(file)).toBe(false);
   });
 
-  it('refuses while the holder is alive, and leaves its lock alone', () => {
-    const release = acquireRunLock(file, 4242, () => true);
-    expect(() => acquireRunLock(file, 5151, () => true)).toThrow(RunLockHeld);
-    expect(() => acquireRunLock(file, 5151, () => true)).toThrow(
-      /pid 4242, alive/,
-    );
-    expect(readFileSync(file, 'utf8').trim()).toBe('4242');
+  it('an existing lock refuses, alive or not, naming its file, pid and start; it stays as it was', () => {
+    const release = acquireRunLock(file, content);
+    let refusal: unknown;
+    try {
+      acquireRunLock(file, { pid: 5151, startedAt: 'later' });
+    } catch (error) {
+      refusal = error;
+    }
+    expect(refusal).toBeInstanceOf(RunLockHeld);
+    const message = (refusal as Error).message;
+    expect(message).toContain(file);
+    expect(message).toContain('pid 4242');
+    expect(message).toContain('started 2026-11-22T10:00:00.000Z');
+    expect(message).toContain('remove');
+    expect(readRunLock(file)).toEqual(content);
+    expect(readdirSync(dir)).toEqual(['abapgit-live.lock']);
     release();
+    // A lock no live process holds refuses all the same: no takeover.
+    writeFileSync(file, JSON.stringify({ pid: 999999999, startedAt: 'x' }));
+    expect(() => acquireRunLock(file, content)).toThrow(RunLockHeld);
   });
 
-  it('takes over a stale lock whose pid is gone, or that holds no pid', () => {
-    writeFileSync(file, '4242\n');
-    const release = acquireRunLock(file, 5151, (pid) => pid !== 4242);
-    expect(readFileSync(file, 'utf8').trim()).toBe('5151');
-    release();
-    writeFileSync(file, 'garbage');
-    const again = acquireRunLock(file, 5151, () => true);
-    expect(readFileSync(file, 'utf8').trim()).toBe('5151');
-    again();
-  });
-
-  it('a release removes the file only while it still holds its own pid', () => {
-    const release = acquireRunLock(file, 4242, () => true);
-    writeFileSync(file, '5151\n');
-    release();
-    expect(readFileSync(file, 'utf8').trim()).toBe('5151');
+  it('the release runs when the teardown throws, and the teardown error is kept', async () => {
+    const release = acquireRunLock(file, content);
+    await expect(
+      releasingRunLock(release, async () => {
+        JSON.parse('not a ledger');
+      }),
+    ).rejects.toThrow(SyntaxError);
+    expect(existsSync(file)).toBe(false);
   });
 });

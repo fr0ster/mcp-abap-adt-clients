@@ -19,23 +19,23 @@
  * **One run at a time.** Recovery takes every entry of its system for
  * abandoned, and the file is written whole on every change; both hold only
  * while one run owns the ledger. The suite takes the run lock
- * (`acquireRunLock`, an `O_EXCL` file holding its pid) before recovery and
- * keeps it through teardown; a second run that finds a live holder refuses
- * and touches nothing, a stale lock (its pid gone) is taken over.
+ * (`acquireRunLock`: its pid and start time, linked into place whole) before
+ * recovery and releases it in a `finally` around teardown; a run that finds
+ * the lock refuses and touches nothing. A lock a dead run left is removed by
+ * hand, never taken over.
  *
  * The file is gitignored and sits beside the test config.
  */
 
+import { randomUUID } from 'node:crypto';
 import {
-  closeSync,
   existsSync,
+  linkSync,
   mkdirSync,
-  openSync,
   readFileSync,
   renameSync,
   unlinkSync,
   writeFileSync,
-  writeSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 
@@ -49,41 +49,44 @@ export const LEDGER_FILE = join(__dirname, 'abapgit-live.ledger.json');
 /** The run lock: one suite at a time owns the ledger and its fixtures. */
 export const LOCK_FILE = join(__dirname, 'abapgit-live.lock');
 
-/** Another run holds the lock: this one touches nothing. */
+/** What a run lock holds: its pid and when it started. */
+export interface IRunLockContent {
+  readonly pid: number;
+  readonly startedAt: string;
+}
+
+/** A lock file exists: this run starts nothing and cleans up nothing. */
 export class RunLockHeld extends Error {
-  constructor(file: string, pid: number) {
+  constructor(file: string, content: IRunLockContent | undefined) {
     super(
-      `another abapGit live run holds ${file} (pid ${pid}, alive): this run starts nothing and cleans up nothing — wait for it to end`,
+      `the abapGit live run lock ${file} exists (pid ${content?.pid ?? 'unknown'}, started ${content?.startedAt ?? 'unknown'}): this run starts nothing and cleans up nothing. If no run is alive, remove ${file} by hand and run again.`,
     );
     this.name = 'RunLockHeld';
   }
 }
 
-/** Whether a process with this pid exists (EPERM: it exists, not ours to signal). */
-export function pidAlive(pid: number): boolean {
+/** The lock file's content, or `undefined` when it holds none readable. */
+export function readRunLock(file: string): IRunLockContent | undefined {
   try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === 'EPERM';
-  }
-}
-
-/** The pid a lock file holds, or `undefined` when it holds none. */
-function lockPid(file: string): number | undefined {
-  try {
-    const pid = Number.parseInt(readFileSync(file, 'utf8').trim(), 10);
-    return Number.isInteger(pid) && pid > 0 ? pid : undefined;
+    const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'));
+    if (parsed === null || typeof parsed !== 'object') return undefined;
+    const { pid, startedAt } = parsed as Record<string, unknown>;
+    return typeof pid === 'number' && typeof startedAt === 'string'
+      ? { pid, startedAt }
+      : undefined;
   } catch {
     return undefined;
   }
 }
 
 /**
- * Take the run lock: an `O_EXCL` file holding this process's pid. A lock
- * whose pid is alive refuses (`RunLockHeld`); a stale one — its pid gone, or
- * no pid in it — is taken over. Answers the release, which removes the file
- * only while it still holds this pid.
+ * Take the run lock. The content — the pid and the start time — is written
+ * whole to a uniquely named file first, then hard-linked to the lock path:
+ * `link` fails when the lock exists, so the lock is never seen empty and two
+ * runs cannot both take it. An existing lock refuses (`RunLockHeld`), alive
+ * or not: there is no automatic takeover, so neither a takeover race nor a
+ * reused pid can hand a live run's fixtures to another. A lock left by a run
+ * that died is removed by hand. Answers the release.
  *
  * Startup recovery treats every ledger entry of its system as abandoned, and
  * the ledger is read, changed and written whole: both are sound only while
@@ -91,37 +94,42 @@ function lockPid(file: string): number | undefined {
  */
 export function acquireRunLock(
   file: string = LOCK_FILE,
-  pid: number = process.pid,
-  alive: (pid: number) => boolean = pidAlive,
+  content: IRunLockContent = {
+    pid: process.pid,
+    startedAt: new Date().toISOString(),
+  },
 ): () => void {
   mkdirSync(dirname(file), { recursive: true });
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      const fd = openSync(file, 'wx', 0o600);
-      try {
-        writeSync(fd, `${pid}\n`);
-      } finally {
-        closeSync(fd);
-      }
-      return () => {
-        if (lockPid(file) === pid) unlinkSync(file);
-      };
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-    }
-    const holder = lockPid(file);
-    if (holder !== undefined && alive(holder))
-      throw new RunLockHeld(file, holder);
-    // Stale: its holder is gone. Removed, then taken with O_EXCL again, so
-    // two runs taking over the same stale lock cannot both win.
-    try {
-      unlinkSync(file);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-    }
+  const temporary = `${file}.${content.pid}.${randomUUID()}.tmp`;
+  writeFileSync(temporary, `${JSON.stringify(content)}\n`, {
+    mode: 0o600,
+    flag: 'wx',
+  });
+  try {
+    linkSync(temporary, file);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST')
+      throw new RunLockHeld(file, readRunLock(file));
+    throw error;
+  } finally {
+    unlinkSync(temporary);
   }
-  const holder = lockPid(file);
-  throw new RunLockHeld(file, holder ?? 0);
+  return () => unlinkSync(file);
+}
+
+/**
+ * Run `teardown`, then release the lock whatever it threw — a bad ledger
+ * file included; the teardown's exception is rethrown after the release.
+ */
+export async function releasingRunLock(
+  release: () => void,
+  teardown: () => Promise<void>,
+): Promise<void> {
+  try {
+    await teardown();
+  } finally {
+    release();
+  }
 }
 
 /** A cloud run submitted and not yet seen terminal under a new log key. */
