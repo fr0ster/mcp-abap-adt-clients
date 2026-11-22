@@ -96,6 +96,14 @@ and one new reading.
   `category` elements (Atom allows them) read `''` / `undefined`; it now
   reads the entry's own link (`rel` absent or `alternate`, else the first),
   and the first author and category.
+- **`feedSystemMessages`** and **`feedGatewayErrors`** read their extension
+  fields. They were looked up prefixed (`sm:severity`, `sm:validFrom`,
+  `sm:validTo`, `gw:package`, `gw:applicationComponent`, `gw:client`,
+  `gw:requestKind`), but the parser strips prefixes, so every one read `''`
+  (`validFrom` fell back to `updated`). They are read by local name now and
+  carry the values the entry holds; stripping loses nothing for them, since
+  none is an Atom element name. Pinned on written documents — no recording of
+  either feed exists yet.
 - `parseSearchConfigurations`' parser no longer coerces (no field it reads
   was affected).
 - Every parser in the package now shares one set of options

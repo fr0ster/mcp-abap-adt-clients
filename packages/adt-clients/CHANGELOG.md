@@ -52,6 +52,10 @@ fixes. What changed is what those readings answer when a caller passes them:
 - The feed readings (`FeedRepository`'s slots): text as written (`0042` no
   longer `42`), references decoded (`&amp;` in an `href` is `&`), and an
   entry with several links, authors or categories read.
+- `feedSystemMessages` / `feedGatewayErrors`: `severity`, `validTo`
+  (and `validFrom`, which fell back to `updated`), `package`,
+  `applicationComponent`, `client` and `requestKind` came back empty; they now
+  carry the entry's values.
 - New: `transportItem(number)`, a request or task document read as what it
   is.
 
