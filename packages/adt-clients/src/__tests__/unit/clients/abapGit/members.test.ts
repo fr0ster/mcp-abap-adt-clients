@@ -214,7 +214,9 @@ describe('the requests of the new members', () => {
           '<abapgitstaging:unstaged_objects></abapgitstaging:unstaged_objects>' +
           '<abapgitstaging:staged_objects>' +
           '<abapgitstaging:abapgitobject abapgitstaging:wbkey="CLASZCL_DEMO" abapgitstaging:version="active" adtcore:uri="/sap/bc/adt/oo/classes/zcl_demo" adtcore:type="CLAS/OC" adtcore:name="ZCL_DEMO" adtcore:packageName="ZPKG">' +
-          '<abapgitstaging:abapgitfile abapgitstaging:name="zcl_demo.clas.abap" abapgitstaging:path="/src/" abapgitstaging:localState="M" abapgitstaging:remoteState=""/>' +
+          // An empty `remoteState` is not written: its `not-initial` cond
+          // fails a present, empty attribute (measured; see below).
+          '<abapgitstaging:abapgitfile abapgitstaging:name="zcl_demo.clas.abap" abapgitstaging:path="/src/" abapgitstaging:localState="M"/>' +
           '</abapgitstaging:abapgitobject>' +
           '</abapgitstaging:staged_objects>' +
           '<abapgitstaging:ignored_objects></abapgitstaging:ignored_objects>' +
@@ -570,5 +572,88 @@ describe('push: wbkey and version only when they are not empty', () => {
     );
     expect(data).not.toContain('wbkey');
     expect(data).not.toContain('abapgitstaging:version');
+  });
+});
+
+describe('push and the selective pull: an empty attribute is not written', () => {
+  // Every attribute below sits under `tt:cond check="not-initial(…)"` in
+  // SAP's transformation, and deserialization checks the value it read: a
+  // present, empty attribute fails the document — 400, T100 00/001 "Check of
+  // condition failed" (measured on premise, 2026-11-22: a new file's
+  // `remoteState=""`). Staging answers exactly such files (`remoteState` empty
+  // for a file the remote does not hold, `packageName` empty), and a push
+  // hands them back.
+  const empty = {
+    wbkey: '',
+    version: '',
+    uri: '',
+    type: '',
+    name: 'ZIF_DEMO',
+    packageName: '',
+    files: [{ name: '', path: '', localState: '', remoteState: '' }],
+  };
+
+  it('push writes no empty attribute of an object, a file, the comment or a person', async () => {
+    const connection = new ScriptedConnection();
+    await gitClient(connection).push({
+      key: 'K',
+      staged: [empty],
+      comment: {
+        text: '',
+        author: { name: '', email: '' },
+        committer: { name: '', email: '' },
+      },
+    });
+    const data = String(connection.sent[0]?.data);
+    expect(data).not.toContain('=""');
+    expect(data).toContain(
+      '<abapgitstaging:abapgitobject adtcore:name="ZIF_DEMO"><abapgitstaging:abapgitfile/></abapgitstaging:abapgitobject>',
+    );
+    expect(data).toContain(
+      '<abapgitstaging:abapgit_comment><abapgitstaging:author/><abapgitstaging:committer/></abapgitstaging:abapgit_comment>',
+    );
+  });
+
+  it('push keeps every attribute that has a value', async () => {
+    const connection = new ScriptedConnection();
+    await gitClient(connection).push({
+      key: 'K',
+      staged: [
+        {
+          ...empty,
+          files: [
+            { name: 'n', path: '/p/', localState: 'A', remoteState: 'M' },
+          ],
+        },
+      ],
+      comment: {
+        text: 't',
+        author: { name: 'a', email: 'a@x.invalid' },
+        committer: { name: 'c', email: 'c@x.invalid' },
+      },
+    });
+    expect(String(connection.sent[0]?.data)).toContain(
+      '<abapgitstaging:abapgitfile abapgitstaging:name="n" abapgitstaging:path="/p/" abapgitstaging:localState="A" abapgitstaging:remoteState="M"/>',
+    );
+  });
+
+  it('a selective pull writes no empty uri, type or packageName', async () => {
+    const connection = new ScriptedConnection();
+    await gitClient(connection).pullRepo(
+      {
+        key: 'K',
+        branchName: 'refs/heads/main',
+        selection: {
+          overwriteObjects: [
+            { uri: '', type: '', name: 'ZIF_DEMO', packageName: '', action: 2 },
+          ],
+          packageWarningObjects: [],
+        },
+      },
+      { headers: HEADERS },
+    );
+    expect(String(connection.sent[0]?.data)).toContain(
+      '<agitpullmodifiedobjects:abapgitobjects adtcore:name="ZIF_DEMO" agitpullmodifiedobjects:action="2"/>',
+    );
   });
 });

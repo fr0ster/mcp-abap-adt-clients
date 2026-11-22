@@ -104,6 +104,38 @@ function attribute(name: string, value: string): string {
   return ` ${name}="${escapeXmlAttr(value)}"`;
 }
 
+/**
+ * An attribute SAP reads under `tt:cond check="not-initial(…)"`: written only
+ * when it has a value. On deserialization the check runs on the value read, so
+ * an attribute present and empty fails the whole document with
+ * `CX_ST_COND_CHECK_FAIL` — 400, T100 00/001 "Check of condition failed"
+ * (measured on premise, 2026-11-22, a push whose new file had
+ * `remoteState=""`). The conds are on every file attribute
+ * (`ZABAPGIT_ST_REPO_STAGE_OBJECT` L41–54, `ABAPGIT_ST_REPO_STAGE_OBJECT`
+ * L76–90), on the comment and the people (`…ST_REPO_STAGE` L44–72 onprem,
+ * L52–83 cloud), and on the object reference's `uri`, `type` and
+ * `packageName` (`SADT_OBJECT_REFERENCE` L38–56, both systems; Code). Its
+ * `name` is under `s-check`, which deserialization does not run.
+ */
+function presentAttribute(name: string, value: string): string {
+  return value === '' ? '' : attribute(name, value);
+}
+
+/** The object reference attributes, as `SADT_OBJECT_REFERENCE` reads them. */
+function objectReference(object: {
+  readonly uri: string;
+  readonly type: string;
+  readonly name: string;
+  readonly packageName: string;
+}): string {
+  return (
+    presentAttribute('adtcore:uri', object.uri) +
+    presentAttribute('adtcore:type', object.type) +
+    attribute('adtcore:name', object.name) +
+    presentAttribute('adtcore:packageName', object.packageName)
+  );
+}
+
 /** R2, the new form: `remoteUser` / `remotePassword` from the credential. */
 export function buildLinkBodyNew(
   args: IAbapGitLinkNewArgs,
@@ -150,10 +182,7 @@ function selectedObjects(
     .map(
       (object) =>
         '<agitpullmodifiedobjects:abapgitobjects' +
-        attribute('adtcore:uri', object.uri) +
-        attribute('adtcore:type', object.type) +
-        attribute('adtcore:name', object.name) +
-        attribute('adtcore:packageName', object.packageName) +
+        objectReference(object) +
         attribute('agitpullmodifiedobjects:action', String(object.action)) +
         '/>',
     )
@@ -216,27 +245,20 @@ function stagedObject(object: IAbapGitStagedObject): string {
     .map(
       (file) =>
         '<abapgitstaging:abapgitfile' +
-        attribute('abapgitstaging:name', file.name) +
-        attribute('abapgitstaging:path', file.path) +
-        attribute('abapgitstaging:localState', file.localState) +
-        attribute('abapgitstaging:remoteState', file.remoteState) +
+        presentAttribute('abapgitstaging:name', file.name) +
+        presentAttribute('abapgitstaging:path', file.path) +
+        presentAttribute('abapgitstaging:localState', file.localState) +
+        presentAttribute('abapgitstaging:remoteState', file.remoteState) +
         '/>',
     )
     .join('');
   return (
     '<abapgitstaging:abapgitobject' +
-    // Both `not-initial` in `ABAPGIT_ST_REPO_STAGE_OBJECT` (cloud L23–30):
-    // written only when there is a value, as SAP's own answer does.
-    (object.wbkey === ''
-      ? ''
-      : attribute('abapgitstaging:wbkey', object.wbkey)) +
-    (object.version === ''
-      ? ''
-      : attribute('abapgitstaging:version', object.version)) +
-    attribute('adtcore:uri', object.uri) +
-    attribute('adtcore:type', object.type) +
-    attribute('adtcore:name', object.name) +
-    attribute('adtcore:packageName', object.packageName) +
+    // Both `not-initial` in `ABAPGIT_ST_REPO_STAGE_OBJECT` (cloud L23–30,
+    // onprem L20–26).
+    presentAttribute('abapgitstaging:wbkey', object.wbkey) +
+    presentAttribute('abapgitstaging:version', object.version) +
+    objectReference(object) +
     `>${files}</abapgitstaging:abapgitobject>`
   );
 }
@@ -256,9 +278,9 @@ export function buildPushBody(args: IAbapGitPushArgs): string {
     '<abapgitstaging:unstaged_objects></abapgitstaging:unstaged_objects>' +
     `<abapgitstaging:staged_objects>${args.staged.map(stagedObject).join('')}</abapgitstaging:staged_objects>` +
     '<abapgitstaging:ignored_objects></abapgitstaging:ignored_objects>' +
-    `<abapgitstaging:abapgit_comment${attribute('abapgitstaging:comment', comment.text)}>` +
-    `<abapgitstaging:author${attribute('abapgitstaging:name', comment.author.name)}${attribute('abapgitstaging:email', comment.author.email)}/>` +
-    `<abapgitstaging:committer${attribute('abapgitstaging:name', comment.committer.name)}${attribute('abapgitstaging:email', comment.committer.email)}/>` +
+    `<abapgitstaging:abapgit_comment${presentAttribute('abapgitstaging:comment', comment.text)}>` +
+    `<abapgitstaging:author${presentAttribute('abapgitstaging:name', comment.author.name)}${presentAttribute('abapgitstaging:email', comment.author.email)}/>` +
+    `<abapgitstaging:committer${presentAttribute('abapgitstaging:name', comment.committer.name)}${presentAttribute('abapgitstaging:email', comment.committer.email)}/>` +
     '</abapgitstaging:abapgit_comment>' +
     '</abapgitstaging:abapgitstaging>'
   );
