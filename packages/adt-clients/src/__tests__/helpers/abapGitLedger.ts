@@ -16,15 +16,26 @@
  * waits as above, then cleans up exactly what the entry names, and removes
  * the entry. Nothing the entry does not name is ever deleted.
  *
+ * **One run at a time.** Recovery takes every entry of its system for
+ * abandoned, and the file is written whole on every change; both hold only
+ * while one run owns the ledger. The suite takes the run lock
+ * (`acquireRunLock`, an `O_EXCL` file holding its pid) before recovery and
+ * keeps it through teardown; a second run that finds a live holder refuses
+ * and touches nothing, a stale lock (its pid gone) is taken over.
+ *
  * The file is gitignored and sits beside the test config.
  */
 
 import {
+  closeSync,
   existsSync,
   mkdirSync,
+  openSync,
   readFileSync,
   renameSync,
+  unlinkSync,
   writeFileSync,
+  writeSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 
@@ -34,6 +45,84 @@ export type AbapGitBackend = 'onprem' | 'cloud';
 export const TERMINAL_STATUSES: readonly string[] = ['S', 'W', 'E', 'A'];
 
 export const LEDGER_FILE = join(__dirname, 'abapgit-live.ledger.json');
+
+/** The run lock: one suite at a time owns the ledger and its fixtures. */
+export const LOCK_FILE = join(__dirname, 'abapgit-live.lock');
+
+/** Another run holds the lock: this one touches nothing. */
+export class RunLockHeld extends Error {
+  constructor(file: string, pid: number) {
+    super(
+      `another abapGit live run holds ${file} (pid ${pid}, alive): this run starts nothing and cleans up nothing — wait for it to end`,
+    );
+    this.name = 'RunLockHeld';
+  }
+}
+
+/** Whether a process with this pid exists (EPERM: it exists, not ours to signal). */
+export function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+/** The pid a lock file holds, or `undefined` when it holds none. */
+function lockPid(file: string): number | undefined {
+  try {
+    const pid = Number.parseInt(readFileSync(file, 'utf8').trim(), 10);
+    return Number.isInteger(pid) && pid > 0 ? pid : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Take the run lock: an `O_EXCL` file holding this process's pid. A lock
+ * whose pid is alive refuses (`RunLockHeld`); a stale one — its pid gone, or
+ * no pid in it — is taken over. Answers the release, which removes the file
+ * only while it still holds this pid.
+ *
+ * Startup recovery treats every ledger entry of its system as abandoned, and
+ * the ledger is read, changed and written whole: both are sound only while
+ * one run at a time holds this lock, from before recovery to after teardown.
+ */
+export function acquireRunLock(
+  file: string = LOCK_FILE,
+  pid: number = process.pid,
+  alive: (pid: number) => boolean = pidAlive,
+): () => void {
+  mkdirSync(dirname(file), { recursive: true });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const fd = openSync(file, 'wx', 0o600);
+      try {
+        writeSync(fd, `${pid}\n`);
+      } finally {
+        closeSync(fd);
+      }
+      return () => {
+        if (lockPid(file) === pid) unlinkSync(file);
+      };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    }
+    const holder = lockPid(file);
+    if (holder !== undefined && alive(holder))
+      throw new RunLockHeld(file, holder);
+    // Stale: its holder is gone. Removed, then taken with O_EXCL again, so
+    // two runs taking over the same stale lock cannot both win.
+    try {
+      unlinkSync(file);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+  }
+  const holder = lockPid(file);
+  throw new RunLockHeld(file, holder ?? 0);
+}
 
 /** A cloud run submitted and not yet seen terminal under a new log key. */
 export interface IPendingRun {
@@ -206,7 +295,8 @@ export interface ICleanupSteps {
     name: string,
     transportRequest: string | undefined,
   ) => Promise<void>;
-  readonly deleteBranch: (name: string) => Promise<void>;
+  /** Delete `name` in the remote `remoteUrl` the entry recorded; resolves once its absence is confirmed. */
+  readonly deleteBranch: (name: string, remoteUrl: string) => Promise<void>;
 }
 
 /**
@@ -254,7 +344,7 @@ export async function cleanUpEntry(
     entry = ledger.amend(runId, (e) => ({ ...e, package: undefined }));
   }
   for (const name of entry.branches) {
-    await steps.deleteBranch(name);
+    await steps.deleteBranch(name, entry.url);
     entry = ledger.amend(runId, (e) => ({
       ...e,
       branches: e.branches.filter((n) => n !== name),

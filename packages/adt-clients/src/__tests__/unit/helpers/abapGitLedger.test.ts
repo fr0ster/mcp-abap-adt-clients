@@ -9,15 +9,23 @@
  * what the entry names and clears it.
  */
 
-import { mkdtempSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   AbapGitLedger,
+  acquireRunLock,
   cleanUpEntry,
   type ICleanupSteps,
   type ILedgerEntry,
   type IRunRow,
+  RunLockHeld,
   RunWaitCancelled,
   runState,
   waitForRun,
@@ -111,6 +119,7 @@ describe('the recovery ledger', () => {
 
   function recordingSteps(rows: (IRunRow | undefined)[]) {
     const done: string[] = [];
+    const remotes: string[] = [];
     const r1 = scriptedR1(rows);
     let linked = true;
     const steps: ICleanupSteps = {
@@ -125,11 +134,12 @@ describe('the recovery ledger', () => {
       deletePackage: async (name) => {
         done.push(`package ${name}`);
       },
-      deleteBranch: async (name) => {
+      deleteBranch: async (name, remoteUrl) => {
         done.push(`branch ${name}`);
+        remotes.push(remoteUrl);
       },
     };
-    return { done, steps, r1 };
+    return { done, steps, r1, remotes };
   }
 
   it('an uncorrelated run keeps its fixtures and its entry with the backend and L0', async () => {
@@ -150,7 +160,7 @@ describe('the recovery ledger', () => {
     const restarted = new AbapGitLedger(file);
     expect(restarted.entriesOf('cloud', entry.systemKey)).toHaveLength(1);
     expect(restarted.entriesOf('onprem', entry.systemKey)).toEqual([]);
-    const { done, steps, r1 } = recordingSteps([
+    const { done, steps, r1, remotes } = recordingSteps([
       row('S', 'L0'),
       row('R', 'L1'),
       row('S', 'L1'),
@@ -162,6 +172,8 @@ describe('the recovery ledger', () => {
       row('R', 'L1'),
       row('S', 'L1'),
     ]);
+    // Each branch is deleted in the remote the entry recorded.
+    expect(remotes).toEqual([entry.url, entry.url]);
     expect(done).toEqual([
       'unlink K1',
       'interface ZIF_AGL_RUN1',
@@ -201,5 +213,50 @@ describe('the recovery ledger', () => {
       cleanUpEntry(ledger, 'RUN1', ignored, live(), 0),
     ).rejects.toThrow(/still listed after unlink/);
     expect(new AbapGitLedger(file).find('RUN1')?.repoKey).toBe('K1');
+  });
+});
+
+describe('the run lock', () => {
+  let dir: string;
+  let file: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'abapgit-lock-'));
+    file = join(dir, 'abapgit-live.lock');
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  it('takes a free lock with O_EXCL, holding its pid, and releases it', () => {
+    const release = acquireRunLock(file, 4242, () => true);
+    expect(readFileSync(file, 'utf8').trim()).toBe('4242');
+    release();
+    expect(existsSync(file)).toBe(false);
+  });
+
+  it('refuses while the holder is alive, and leaves its lock alone', () => {
+    const release = acquireRunLock(file, 4242, () => true);
+    expect(() => acquireRunLock(file, 5151, () => true)).toThrow(RunLockHeld);
+    expect(() => acquireRunLock(file, 5151, () => true)).toThrow(
+      /pid 4242, alive/,
+    );
+    expect(readFileSync(file, 'utf8').trim()).toBe('4242');
+    release();
+  });
+
+  it('takes over a stale lock whose pid is gone, or that holds no pid', () => {
+    writeFileSync(file, '4242\n');
+    const release = acquireRunLock(file, 5151, (pid) => pid !== 4242);
+    expect(readFileSync(file, 'utf8').trim()).toBe('5151');
+    release();
+    writeFileSync(file, 'garbage');
+    const again = acquireRunLock(file, 5151, () => true);
+    expect(readFileSync(file, 'utf8').trim()).toBe('5151');
+    again();
+  });
+
+  it('a release removes the file only while it still holds its own pid', () => {
+    const release = acquireRunLock(file, 4242, () => true);
+    writeFileSync(file, '5151\n');
+    release();
+    expect(readFileSync(file, 'utf8').trim()).toBe('5151');
   });
 });
