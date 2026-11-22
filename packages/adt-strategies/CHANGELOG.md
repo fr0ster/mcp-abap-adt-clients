@@ -14,6 +14,58 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.28.1] - 2026-11-22
+
+Two readings the server team still worked around after 0.28.0 (mcp-abap-adt
+`GetTransport` and its package walks), fixed on the documents they were found
+with. `@mcp-abap-adt/adt-clients` is unchanged: none of its default sets uses
+either reading (every slot is `rawDocument`), so it is not released.
+
+**Which test documents are recorded, which written.** Recorded: the
+adt-clients corpus case `read-object-tree-structure` (its step 02, and
+variants of it with one element left out, each test says which), and the
+server's task documents `EMPTY_TASK` and `TASK_WITH_OBJECTS` (variants
+without the marker, or with another number, built in the tests). Written:
+the server's two package-walk levels (`NODE_NOT_LOADED`, `NODE_NAME_ONLY`,
+`serverDocuments.ts`, shaped after the measured on-premise answer).
+
+### Fixed
+
+- **`readTransportItem` / `transportItem(number)` picks the item by the
+  number asked.** The root's `tm:task` or `tm:request` whose own number is
+  the one asked is the item; exactly one may name it, and `tm:object_type`
+  must confirm what the number found (`T` a task, `R` a request). Without the
+  marker the number decides, and a root that holds a `tm:task` of its own is
+  a task's document, whose `tm:request` is only the parent's header. Until
+  now a task's document without the marker, asked for by its parent's number,
+  was read as the parent request, from the parent's header alone; it is now
+  refused (`TRANSPORT_ITEM_REFUSAL`). SAP marks every task document
+  (`CL_CTS_ADT_TM_RES_REQUEST_CONT->prepare_tm_root_for_task`, on premise and
+  on the cloud), so that case is defensive. Also refused now: a document in
+  which a `tm:task` and a `tm:request` both name the number, and a document
+  whose marker contradicts the element found (a task element under `R`, a
+  request element under `T`). Every document SAP answers reads as before.
+- **`utilNodeContents` keeps every node SAP lists.** An object node without
+  `OBJECT_NAME`, `TECH_NAME` or `OBJECT_URI` was dropped; it is now kept, the
+  field it lacks absent. **Caller-visible:** `IRepositoryObjectNode`'s
+  `objectName`, `techName` and `objectUri` are optional (were `string`), and
+  `objects` holds the nodes that were dropped before; every node that was
+  answered before is answered with the same values.
+- **A node SAP could not load is answered as such.** SAP answers a tree line
+  it cannot resolve with an entry of no `OBJECT_TYPE`, its message `SEU_ADT
+  101` "Error loading node:" in `OBJECT_NAME` and an explanation in
+  `TECH_NAME` (`CL_SEU_ADT_RES_REPO_STRUCTURE->create_tree_content`; measured
+  on premise, 2026-11-22, for a package's `VIEW/DV` node). The level answers
+  each such entry in `notLoaded` (`IRepositoryNotLoadedNode`,
+  `{ notLoaded: true }`), with none of SAP's text; `notLoaded` is present only
+  when the level lists one. The entry carries no type (that is how it is
+  known); the node's type is the child node the level was asked for by. Until
+  now the entry was dropped, and the level said nothing.
+
+### Added
+
+- `IRepositoryNotLoadedNode`, and `IRepositoryNodeContents.notLoaded`.
+
 ## [0.28.0] - 2026-11-22
 
 Released with `@mcp-abap-adt/adt-clients` 47.0.0, on
