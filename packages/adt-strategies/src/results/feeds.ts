@@ -22,7 +22,14 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
-import { at, field, isElement, leafText, listOf } from '../parsed';
+import {
+  at,
+  field,
+  isElement,
+  leafText,
+  listOf,
+  XML_TEXT_OPTIONS,
+} from '../parsed';
 import { rawOf } from '../result';
 
 export interface IFeedEntry {
@@ -116,11 +123,15 @@ export interface ISourceCodeLine {
   isError: boolean;
 }
 
+// Values as written (`XML_TEXT_OPTIONS`, since 0.28.0): no tag or attribute
+// is coerced to a number, and references decode as an XML parser decodes them.
+// Until 0.28.0 element text that looked numeric was coerced (`0042` read
+// `42`) and no reference was decoded (`&amp;` stayed `&amp;`).
 const xmlParser = new XMLParser({
+  ...XML_TEXT_OPTIONS,
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
   removeNSPrefix: true,
-  processEntities: false,
 });
 
 /**
@@ -137,20 +148,18 @@ function parseOrEmpty(xml: string): unknown {
 }
 
 /**
- * A leaf as text, `''` when absent or no text. This parser coerces element
- * text that looks numeric (`parseTagValue` is on), so a number is read back
- * as its text: every field below is declared a string.
+ * A leaf as text, `''` when absent or no text. The parser coerces nothing, so
+ * the text is as written; every field below is declared a string.
  */
 function str(value: unknown): string {
   return leafText(value) ?? '';
 }
 
 /**
- * A count as a number: a number as it is, a numeric text (attributes are kept
- * as text) as its value, anything else the fallback.
+ * A count as a number, converted here because the field is typed a number:
+ * a numeric text as its value, anything else the fallback.
  */
 function count(value: unknown, fallback: number): number {
-  if (typeof value === 'number') return value;
   if (typeof value === 'string' && value.trim() !== '') {
     const n = Number(value);
     if (Number.isFinite(n)) return n;
@@ -170,10 +179,34 @@ function feedEntriesOf(xml: string): unknown[] {
   return Array.isArray(entry) ? entry : [entry];
 }
 
-/** The `term` of an entry's `category`, where it is an element. */
+/** The first of an element an entry may repeat (Atom allows several). */
+function first(entry: unknown, name: string): unknown {
+  return listOf(field(entry, name))[0];
+}
+
+/** The `term` of an entry's first `category`, where it is an element. */
 function categoryTerm(entry: unknown): string | undefined {
-  const category = field(entry, 'category');
+  const category = first(entry, 'category');
   return isElement(category) ? leafText(field(category, '@_term')) : undefined;
+}
+
+/**
+ * The entry's link: the `href` of its first `link` whose `rel` is absent or
+ * `alternate` (the entry's own, RFC 4287 §4.2.7.2), else of its first `link`.
+ * Until 0.28.0 an entry with several links read `''`.
+ */
+function entryLink(entry: unknown): string {
+  const links = listOf(field(entry, 'link'));
+  const own = links.find((link) => {
+    const rel = leafText(field(link, '@_rel'));
+    return rel === undefined || rel === 'alternate';
+  });
+  return str(field(own ?? links[0], '@_href'));
+}
+
+/** The name of the entry's first `author`. */
+function authorName(entry: unknown): string | undefined {
+  return leafText(field(first(entry, 'author'), 'name'));
 }
 
 /**
@@ -184,9 +217,9 @@ function parseAtomFeed(xml: string): IFeedEntry[] {
     id: str(field(entry, 'id')),
     title: elementText(field(entry, 'title')),
     updated: str(field(entry, 'updated')),
-    link: str(at(entry, 'link', '@_href')),
+    link: entryLink(entry),
     content: elementText(field(entry, 'content')),
-    author: leafText(at(entry, 'author', 'name')),
+    author: authorName(entry),
     category: categoryTerm(entry),
   }));
 }
@@ -198,7 +231,7 @@ function parseFeedDescriptors(xml: string): IFeedDescriptor[] {
   return feedEntriesOf(xml).map((entry) => ({
     id: str(field(entry, 'id')),
     title: elementText(field(entry, 'title')),
-    url: str(at(entry, 'link', '@_href')),
+    url: entryLink(entry),
     category: categoryTerm(entry),
   }));
 }
@@ -210,7 +243,7 @@ function parseFeedVariants(xml: string): IFeedVariant[] {
   return feedEntriesOf(xml).map((entry) => ({
     id: str(field(entry, 'id')),
     title: elementText(field(entry, 'title')),
-    url: str(at(entry, 'link', '@_href')),
+    url: entryLink(entry),
   }));
 }
 
@@ -223,12 +256,10 @@ function parseSystemMessages(xml: string): ISystemMessageEntry[] {
     title: elementText(field(entry, 'title')),
     // System message fields may be in the content or as extensions
     text: elementText(field(entry, 'content')),
-    severity: str(
-      at(entry, 'category', '@_term') ?? field(entry, 'sm:severity'),
-    ),
+    severity: str(categoryTerm(entry) ?? field(entry, 'sm:severity')),
     validFrom: str(field(entry, 'sm:validFrom') ?? field(entry, 'updated')),
     validTo: str(field(entry, 'sm:validTo')),
-    createdBy: str(at(entry, 'author', 'name')),
+    createdBy: str(authorName(entry)),
   }));
 }
 
@@ -237,7 +268,7 @@ function parseSystemMessages(xml: string): ISystemMessageEntry[] {
  */
 function parseGatewayErrors(xml: string): IGatewayErrorEntry[] {
   return feedEntriesOf(xml).map((entry) => {
-    const category = field(entry, 'category');
+    const category = first(entry, 'category');
     return {
       type: isElement(category)
         ? str(field(category, '@_term'))
@@ -247,7 +278,7 @@ function parseGatewayErrors(xml: string): IGatewayErrorEntry[] {
       package: str(field(entry, 'gw:package')),
       applicationComponent: str(field(entry, 'gw:applicationComponent')),
       dateTime: str(field(entry, 'updated')),
-      username: str(at(entry, 'author', 'name')),
+      username: str(authorName(entry)),
       client: str(field(entry, 'gw:client')),
       requestKind: str(field(entry, 'gw:requestKind')),
     };
@@ -283,7 +314,7 @@ function parseGatewayErrorDetail(xml: string): IGatewayErrorDetail {
   const sourceLines = listOf(linesRaw).map((l, idx) => ({
     number: count(field(l, '@_number'), idx),
     content: elementText(l),
-    isError: field(l, '@_isError') === 'true' || field(l, '@_isError') === true,
+    isError: field(l, '@_isError') === 'true',
   }));
 
   const exceptionsRaw = either('errorContext', 'exceptions', 'exception') ?? [];
