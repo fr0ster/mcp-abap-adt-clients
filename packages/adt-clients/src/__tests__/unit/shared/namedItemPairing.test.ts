@@ -4,7 +4,7 @@ import type { INamedItem } from '../../../core/shared/utilResults';
 
 /**
  * adt-clients' `INamedItem` pairs with adt-strategies' `utilNamedItems`
- * (46.3.0): the documented `types: utilNamedItems` slot answers items this
+ * (47.0.0): the documented `types: utilNamedItems` slot answers items this
  * type takes, a description absent where the list carries none. Until then
  * `description` was required here and optional there, and the assignment
  * below failed to compile (TS2322).

@@ -17,7 +17,7 @@ export interface INamedItem {
   name: string;
   /**
    * The entry's description as written; absent when it carries none
-   * (46.3.0, as adt-strategies' `INamedItem` since 0.28.0 — it was required).
+   * (47.0.0, as adt-strategies' `INamedItem` since 0.28.0 — it was required).
    */
   description?: string;
 }
