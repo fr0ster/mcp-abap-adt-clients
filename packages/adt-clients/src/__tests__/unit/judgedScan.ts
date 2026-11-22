@@ -278,6 +278,14 @@ function judgeVerdict(
     const initializer = constInitializer(symbol);
     const declaration = symbol?.valueDeclaration ?? symbol?.declarations?.[0];
     const file = declaration?.getSourceFile().fileName ?? '';
+    // The abapGit new forms' judge: the facts exchange has judged the answer
+    // already, and this keeps its verdict (helpers/abapGitFacts.ts).
+    if (
+      symbol?.name === 'analyseAbapGitFacts' &&
+      file.endsWith('/helpers/abapGitFacts.ts')
+    ) {
+      return JUDGED;
+    }
     if (symbol && isStrategyFile(file)) {
       return SELF_JUDGING.has(symbol.name)
         ? JUDGED
