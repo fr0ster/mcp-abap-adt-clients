@@ -96,14 +96,43 @@ and one new reading.
   `category` elements (Atom allows them) read `''` / `undefined`; it now
   reads the entry's own link (`rel` absent or `alternate`, else the first),
   and the first author and category.
-- **`feedSystemMessages`** and **`feedGatewayErrors`** read their extension
-  fields. They were looked up prefixed (`sm:severity`, `sm:validFrom`,
-  `sm:validTo`, `gw:package`, `gw:applicationComponent`, `gw:client`,
-  `gw:requestKind`), but the parser strips prefixes, so every one read `''`
-  (`validFrom` fell back to `updated`). They are read by local name now and
-  carry the values the entry holds; stripping loses nothing for them, since
-  none is an Atom element name. Pinned on written documents — no recording of
-  either feed exists yet.
+- **`feedGatewayErrors`** and **`feedGatewayErrorDetail`** read what SAP
+  answers. Measured on the cloud (2026-11-22, 115 entries): an entry holds
+  `atom:id`, `title`, `updated`, `author/name` and an HTML `summary`; every
+  other field is a cell of the summary's `Header Information` table, and the
+  error's own document is HTML, not the XML `errorEntry` the detail reading
+  parsed. Pinned on the scrubbed recordings (`fixtures/feeds/`). What a
+  caller sees:
+  - `type`, `package`, `applicationComponent`, `client`, `requestKind` read
+    `''`; they carry the cells now.
+  - `transactionId` was the `atom:id`; it is the `Transaction ID` cell. The
+    `atom:id` is the new `id`.
+  - `shortText` kept the title's `Frontend Error: ` prefix; it is the
+    `Short Text` cell (the title's remainder when there is none), and the
+    prefix is the new `kind`.
+  - `username` was `name (id)`; it is the name, the id the new `userId`.
+  - New: `detailUri` (the summary's `HTTP link` as a path) and `errorId`, its
+    last segment — what the error's own document is addressed by. It is not
+    the transaction id.
+  - Every field of `IGatewayErrorEntry` is optional now and absent when the
+    entry does not carry it, never `''` (a Backend entry measured with no
+    short text). A caller that read them as `string` checks for absence.
+  - `feedGatewayErrorDetail` read every field empty; it reads the header, the
+    service information (its fields optional now), the error context
+    (`errorInfo`, `resolution`, each exception with `text`, `raiseLocation`,
+    `attributes` — `text` optional now — and, new, the whole `tree`), the
+    source extract (the highlighted line numbered after the one before it,
+    `errorLine` optional now) and the call stack, numbers converted from their
+    text. Its `dateTime` is the `Date/Time` cell as written.
+  - The on-premise feed answered no entry, so its entry shape is not
+    measured.
+- **`feedSystemMessages`** reads `severity`, `validFrom` and `validTo` by local
+  name: they were looked up as `sm:…`, which the parser's prefix stripping
+  had removed, so they read `''` (`validFrom` fell back to `updated`). **Not
+  measured:** the feed answered no entry on either system, and SAP's handler
+  code was not read; the test entry is written. When an entry carries both a
+  category and `sm:severity` the category's `term` is read; whether SAP sends
+  both is unverified.
 - `parseSearchConfigurations`' parser no longer coerces (no field it reads
   was affected).
 - Every parser in the package now shares one set of options

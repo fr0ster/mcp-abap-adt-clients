@@ -52,10 +52,18 @@ fixes. What changed is what those readings answer when a caller passes them:
 - The feed readings (`FeedRepository`'s slots): text as written (`0042` no
   longer `42`), references decoded (`&amp;` in an `href` is `&`), and an
   entry with several links, authors or categories read.
-- `feedSystemMessages` / `feedGatewayErrors`: `severity`, `validTo`
-  (and `validFrom`, which fell back to `updated`), `package`,
-  `applicationComponent`, `client` and `requestKind` came back empty; they now
-  carry the entry's values.
+- `feedGatewayErrors` / `feedGatewayErrorDetail` (`getFeeds().gatewayErrors`,
+  `gatewayErrorDetail`, `GatewayErrorLog`): read the summary's table and the
+  error's HTML as SAP answers them (measured on the cloud). `type`,
+  `package`, `applicationComponent`, `client`, `requestKind` and the whole
+  detail came back empty; `transactionId` is the summary's Transaction ID (it
+  was the `atom:id`, now `id`), `shortText` loses the `Frontend Error: `
+  prefix (now `kind`), `username` is the name (the id is `userId`); new
+  `detailUri` / `errorId`. Every entry field is optional and absent when not
+  carried.
+- `feedSystemMessages`: `severity`, `validTo` (and `validFrom`, which fell
+  back to `updated`) came back `''`; they carry the entry's values (entry
+  shape not measured).
 - New: `transportItem(number)`, a request or task document read as what it
   is.
 
