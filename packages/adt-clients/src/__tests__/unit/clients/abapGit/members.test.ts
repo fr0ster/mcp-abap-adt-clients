@@ -254,6 +254,7 @@ describe('the requests of the new members', () => {
         url: '/sap/bc/adt/abapgit/repos/000001/files',
         params: { filename: 'zcl_demo.clas.abap', version: 'local' },
         headers: { Accept: 'text/plain' },
+        rawText: true,
         ...FLAGS,
       },
     ]);
