@@ -249,6 +249,7 @@ export {
   type IInactiveObjectsResponse,
   type INamedItem,
   type IParsedNodeStructure,
+  type IRepositoryIncompleteNode,
   type IRepositoryNodeChild,
   type IRepositoryNodeContents,
   type IRepositoryNotLoadedNode,

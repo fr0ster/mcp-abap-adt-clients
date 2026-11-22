@@ -214,25 +214,30 @@ describe('utilNodeContents keeps every node SAP lists (since 0.28.1)', () => {
     ['TECH_NAME', 'techName'],
     ['OBJECT_URI', 'objectUri'],
     ['OBJECT_NAME', 'objectName'],
-  ])('an object without %s is kept, the field absent', (element, key) => {
-    const { objects } = utilNodeContents(wire(withoutElement(step(), element)));
-    expect(objects).toHaveLength(1);
-    const [object] = objects;
-    expect(object?.type).toBe('BDEF/BDO');
-    expect(object !== undefined && key in object).toBe(false);
-    expect(object?.description).toBe(
-      'Shared BDEF for BehaviorDefinition and BehaviorImplementatio',
-    );
-  });
+  ])(
+    'an object without %s is kept in incompleteObjects, the field absent',
+    (element, key) => {
+      const contents = utilNodeContents(wire(withoutElement(step(), element)));
+      expect(contents.objects).toEqual([]);
+      expect(contents.incompleteObjects).toHaveLength(1);
+      const [object] = contents.incompleteObjects ?? [];
+      expect(object?.type).toBe('BDEF/BDO');
+      expect(object !== undefined && key in object).toBe(false);
+      expect(object?.description).toBe(
+        'Shared BDEF for BehaviorDefinition and BehaviorImplementatio',
+      );
+    },
+  );
 
-  it('the server’s level of a named, typed object is that object', () => {
+  it('the server’s level of a named, typed object answers it in incompleteObjects', () => {
     expect(utilNodeContents(wire(NODE_NAME_ONLY))).toEqual({
-      objects: [{ type: 'TABL/DT', objectName: 'ZT_ONE' }],
+      objects: [],
       childNodes: [],
+      incompleteObjects: [{ type: 'TABL/DT', objectName: 'ZT_ONE' }],
     });
   });
 
-  it('a recorded level reads as before: every field, no notLoaded', () => {
+  it('a recorded level reads as before: every field, no notLoaded, no incompleteObjects', () => {
     const contents = utilNodeContents(step());
     expect(contents.objects).toEqual([
       {
@@ -245,6 +250,7 @@ describe('utilNodeContents keeps every node SAP lists (since 0.28.1)', () => {
       },
     ]);
     expect('notLoaded' in contents).toBe(false);
+    expect('incompleteObjects' in contents).toBe(false);
   });
 
   it('a node SAP could not load is marked notLoaded, none of SAP’s text kept', () => {

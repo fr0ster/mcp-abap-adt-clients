@@ -157,19 +157,27 @@ export interface INamedItem {
 }
 
 /**
- * One object under a repository node, every field SAP wrote for it. Since
- * 0.28.1 a node is kept whatever it lacks: a field it does not carry is
- * absent (until 0.28.0 a node without all of `OBJECT_NAME`, `TECH_NAME` and
- * `OBJECT_URI` was dropped, and the walks list such nodes).
+ * One object under a repository node. The four fields are the ones a caller
+ * needs to identify and fetch it; a node SAP lists without one of them is
+ * answered in `incompleteObjects` instead (since 0.28.1; dropped before).
  */
 export type IRepositoryObjectNode = IAdtAnsweredObject & {
-  /** `OBJECT_NAME`, when the node carries one. */
-  objectName?: string;
-  /** `TECH_NAME`, when the node carries one. */
-  techName?: string;
-  /** `OBJECT_URI`, when the node carries one. */
-  objectUri?: string;
+  objectName: string;
+  techName: string;
+  objectUri: string;
   /** Since 0.28.0: `DESCRIPTION` as written, when the node carries one. */
+  description?: string;
+};
+
+/**
+ * An object node SAP lists without its `OBJECT_NAME`, `TECH_NAME` or
+ * `OBJECT_URI` (since 0.28.1): every field it carries, the ones it lacks
+ * absent. Until 0.28.1 such a node was dropped, and the walks list them.
+ */
+export type IRepositoryIncompleteNode = IAdtAnsweredObject & {
+  objectName?: string;
+  techName?: string;
+  objectUri?: string;
   description?: string;
 };
 
@@ -204,6 +212,11 @@ export interface IRepositoryNodeContents {
    * only when the level lists one.
    */
   notLoaded?: IRepositoryNotLoadedNode[];
+  /**
+   * Since 0.28.1: each object node SAP lists without one of the identity
+   * fields, in document order; present only when the level lists one.
+   */
+  incompleteObjects?: IRepositoryIncompleteNode[];
 }
 
 /** The node-structure document's two halves, the nodes still as parsed XML. */
@@ -373,18 +386,19 @@ export function readNodeStructure(xml: string): IParsedNodeStructure {
 }
 
 /**
- * One level of the repository tree — `/repository/nodestructure`: every
- * object SAP lists here, each with the fields it carries, the nodes SAP could
- * not load (`notLoaded`), and the typed child nodes to ask for next.
- *
- * An entry with no `OBJECT_TYPE` is no object: it is SAP's message for a node
- * it could not load, and is answered as `notLoaded` without its text.
+ * One level of the repository tree — `/repository/nodestructure`: the objects
+ * here, each with its description where the node carries one, and the typed
+ * child nodes to ask for next. Since 0.28.1 nothing SAP lists is dropped: a
+ * node without one of the four identity fields is in `incompleteObjects`,
+ * and an entry with no `OBJECT_TYPE` — SAP's message for a node it could not
+ * load — is in `notLoaded`, without its text.
  */
 export const utilNodeContents: IResultStrategy<IRepositoryNodeContents> = (
   answer,
 ) => {
   const { nodes, objectTypes } = readNodeStructure(rawOf(answer));
   const objects: IRepositoryObjectNode[] = [];
+  const incompleteObjects: IRepositoryIncompleteNode[] = [];
   const notLoaded: IRepositoryNotLoadedNode[] = [];
   for (const node of nodes) {
     const objectType = nodeText(node, 'OBJECT_TYPE');
@@ -396,17 +410,35 @@ export const utilNodeContents: IResultStrategy<IRepositoryNodeContents> = (
     const techName = nodeText(node, 'TECH_NAME');
     const objectUri = nodeText(node, 'OBJECT_URI');
     const description = nodeValue(node, 'DESCRIPTION');
-    objects.push({
+    const described = description === undefined ? {} : { description };
+    if (
+      objectName !== undefined &&
+      techName !== undefined &&
+      objectUri !== undefined
+    ) {
+      objects.push({
+        ...answeredObject(objectType),
+        objectName,
+        techName,
+        objectUri,
+        ...described,
+      });
+      continue;
+    }
+    incompleteObjects.push({
       ...answeredObject(objectType),
       ...(objectName === undefined ? {} : { objectName }),
       ...(techName === undefined ? {} : { techName }),
       ...(objectUri === undefined ? {} : { objectUri }),
-      ...(description === undefined ? {} : { description }),
+      ...described,
     });
   }
-  return notLoaded.length === 0
-    ? { objects, childNodes: objectTypes }
-    : { objects, childNodes: objectTypes, notLoaded };
+  return {
+    objects,
+    childNodes: objectTypes,
+    ...(notLoaded.length === 0 ? {} : { notLoaded }),
+    ...(incompleteObjects.length === 0 ? {} : { incompleteObjects }),
+  };
 };
 
 // ---------------------------------------------------------------------------
