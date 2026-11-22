@@ -253,8 +253,10 @@ library judges none of them: each is an answer the caller reads.
   are not in them, so the live suite cannot tell this 500 from another 500
   with no T100 key. It therefore asserts that exact shape only on the system
   where the fault was measured (`abapgit.check_repo_fault_system`, matched
-  against `environment.default_master_system`), labelled a measured SAP
-  handler fault, and expects success everywhere else.
+  against `environment.default_master_system`), reported as observed —
+  refused, 500, no T100, consistent with the SYNTAX_ERROR measured at L53 —
+  and expects success everywhere else. The dump itself was observed only in
+  the system's runtime-error list during diagnosis, never by the suite.
 - **On premise a local `$` package works with abapGit end to end** (measured
   2026-11-22, `$ZAGL_…` in software component LOCAL, no request): `link`
   answered `200`, `push` `200` with the file in the remote, `pullRepo` `200`

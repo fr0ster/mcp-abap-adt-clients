@@ -65,6 +65,7 @@ import {
   type IPendingRun,
   type IRunRow,
   RunWaitCancelled,
+  releasingRunLock,
   waitForRun,
 } from '../../../helpers/abapGitLedger';
 import {
@@ -743,35 +744,41 @@ describeLive(
         printSummary(skipReason, origin, backendOrUndefined());
         return;
       }
-      if (opened && !cleanedUp && ledger.find(RUN)) {
-        if (uncorrelated) {
-          logger.warn?.(
-            `abapGit: a cloud job could not be correlated; left for the next run: ${fixturesOf(ledger.find(RUN))}`,
-          );
-        } else {
+      // The lock goes whatever the teardown throws — a bad ledger file
+      // included; `printSummary` follows, and the error stays the hook's.
+      try {
+        await releasingRunLock(releaseLock, async () => {
+          if (opened && !cleanedUp && ledger.find(RUN)) {
+            if (uncorrelated) {
+              logger.warn?.(
+                `abapGit: a cloud job could not be correlated; left for the next run: ${fixturesOf(ledger.find(RUN))}`,
+              );
+            } else {
+              try {
+                await cleanUpEntry(
+                  ledger,
+                  RUN,
+                  cleanupSteps(),
+                  AbortSignal.timeout(CLOUD_RUN_WAIT_MS),
+                );
+              } catch (error) {
+                logger.warn?.(
+                  `abapGit: cleanup did not finish; left for the next run: ${fixturesOf(ledger.find(RUN))} — ${error instanceof Error ? error.message : String(error)}`,
+                );
+              }
+            }
+          }
           try {
-            await cleanUpEntry(
-              ledger,
-              RUN,
-              cleanupSteps(),
-              AbortSignal.timeout(CLOUD_RUN_WAIT_MS),
-            );
+            await opened?.logOff();
           } catch (error) {
             logger.warn?.(
-              `abapGit: cleanup did not finish; left for the next run: ${fixturesOf(ledger.find(RUN))} — ${error instanceof Error ? error.message : String(error)}`,
+              `abapGit: log off failed: ${error instanceof Error ? error.message : String(error)}`,
             );
           }
-        }
+        });
+      } finally {
+        printSummary(skipReason, origin, backendOrUndefined());
       }
-      try {
-        await opened?.logOff();
-      } catch (error) {
-        logger.warn?.(
-          `abapGit: log off failed: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
-      releaseLock();
-      printSummary(skipReason, origin, backendOrUndefined());
     }, STEP_TIMEOUT_MS * 2);
 
     memberCase(
@@ -1024,7 +1031,7 @@ describeLive(
 
     memberCase(
       'check_repo',
-      'checkRepo answers; on the system where its handler fault was measured, the fault exactly as measured',
+      'checkRepo answers; on the system where its handler fault was measured, refused exactly as observed there',
       async () => {
         // `abapgit.check_repo_fault_system` names the system the fault was
         // measured on (the onprem overlay); this system's id is
@@ -1038,22 +1045,21 @@ describeLive(
           faultSystem !== '' &&
           systemId === faultSystem
         ) {
-          // A measured SAP handler fault, not a pass of ours: every call ends
-          // in the runtime error SYNTAX_ERROR in ZCL_ABAPGIT_RES_REPO_CHECKS,
-          // answered 500 as an HTML page with no T100 key (measured
-          // 2026-11-22); its syntax check reports "No value was passed to the
-          // mandatory parameter IV_SERVICE" at L53, col. 22 (Code; ERRATA).
-          // The member returns SAP's answer as it is. What our facts can tell
-          // of it is exactly this: the fixed `refused` words, status 500, no
-          // T100 key, no git host status — asserted whole, so a 500 that
-          // carries anything more fails.
+          // Not a pass of ours, and not the dump itself: what this run
+          // observes is SAP's refusal — 500, no T100 key, the fixed `refused`
+          // words — consistent with the SYNTAX_ERROR in
+          // ZCL_ABAPGIT_RES_REPO_CHECKS measured on this system (its syntax
+          // check: no value for the mandatory parameter IV_SERVICE at L53,
+          // col. 22; Code; ERRATA). Our facts cannot identify the dump: they
+          // carry the status and no T100 key, nothing more — asserted whole,
+          // so a 500 that carries anything more fails.
           const key = requireKey();
           const failure = expectFailure(
             await abapGit.checkRepo(
               { key },
               { credentials, analyse: analyseAbapGitFacts },
             ),
-            'check repository (the measured SAP handler fault)',
+            'check repository (refused, as on the system its handler fault was measured)',
           );
           expect(failure.message).toBe(ABAPGIT_ERROR_MESSAGES.refused);
           expect(
@@ -1066,7 +1072,7 @@ describeLive(
           gates
             .get(backend)
             ?.faults.add(
-              `check_repo: the measured SAP handler fault on ${faultSystem} — 500, no T100, SYNTAX_ERROR in ZCL_ABAPGIT_RES_REPO_CHECKS L53 (IV_SERVICE)`,
+              `check_repo on ${faultSystem}: refused, 500, no T100 — consistent with the SYNTAX_ERROR measured at ZCL_ABAPGIT_RES_REPO_CHECKS L53 (IV_SERVICE), which our facts cannot identify`,
             );
           return;
         }
