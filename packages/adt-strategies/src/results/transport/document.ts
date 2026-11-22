@@ -4,6 +4,10 @@
  *
  * Every name is read prefixed (`tm:number`) and, failing that, bare
  * (`number`): a release that writes the attributes unqualified reads the same.
+ *
+ * Readings parse SAP's answers, which use the `tm:` prefix (recorded, both
+ * systems); documents that rebind or alias the prefix are out of scope
+ * (controller ruling 2026-11-23).
  */
 
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
@@ -130,8 +134,10 @@ export function tmElements(parent: ITmElement, local: string): ITmElement[] {
 }
 
 /**
- * A `tm:<local>` attribute of an element by namespace — a prefix bound to
- * tm, or the bare name — as written; `undefined` when absent.
+ * A `tm:<local>` attribute of an element by namespace, decoded and trimmed:
+ * literal padding and padding written as a reference (`&#32;`) read the
+ * same. A qualified attribute (a prefix bound to tm) wins over a bare one of
+ * the same local name, whatever their order. `undefined` when absent.
  */
 export function tmAttributeIn(
   tm: ITmElement,
@@ -139,27 +145,21 @@ export function tmAttributeIn(
 ): string | undefined {
   const { element, scope } = tm;
   if (!isElement(element) || Array.isArray(element)) return undefined;
+  let bare: string | undefined;
   for (const [key, value] of Object.entries(element)) {
     if (!key.startsWith('@_') || key.startsWith('@_xmlns')) continue;
     const name = key.slice(2);
     const colon = name.indexOf(':');
-    const matches =
-      colon < 0
-        ? name === local
-        : name.slice(colon + 1) === local &&
-          scope.get(name.slice(0, colon)) === TM_NAMESPACE;
-    if (matches) return leafText(value);
+    if (colon < 0) {
+      if (name === local) bare = leafText(value);
+      continue;
+    }
+    if (
+      name.slice(colon + 1) === local &&
+      scope.get(name.slice(0, colon)) === TM_NAMESPACE
+    ) {
+      return leafText(value)?.trim();
+    }
   }
-  return undefined;
-}
-
-/**
- * The same, decoded and trimmed: literal padding and padding written as a
- * reference (`&#32;`) read the same.
- */
-export function tmTrimmedAttribute(
-  tm: ITmElement,
-  local: string,
-): string | undefined {
-  return tmAttributeIn(tm, local)?.trim();
+  return bare?.trim();
 }

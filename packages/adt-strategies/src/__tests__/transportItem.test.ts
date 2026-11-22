@@ -98,9 +98,10 @@ describe('transportItem reads a request or a task document', () => {
 
   // Since 0.28.1. SAP marks a task's document (`prepare_tm_root_for_task`,
   // on premise and on the cloud), so these documents are built from the
-  // recordings by removing the marker: the case is defensive.
+  // recorded cloud task and the on-premise reconstruction by removing the
+  // marker: the case is defensive.
   it.each([
-    ['the recorded on-premise task', TASK_WITH_OBJECTS],
+    ['the on-premise task (reduced from a recording)', TASK_WITH_OBJECTS],
     ['the recorded cloud task', EMPTY_TASK],
   ])(
     'without tm:object_type, %s asked by its parent’s number is not the parent',
@@ -330,4 +331,141 @@ describe('transportItem reads every field of the item by namespace, whatever the
     const t2 = underT2(REQUEST, '<tm:request ', '</tm:request>');
     expect(readTransportItem(t2, PARENT)).toEqual(asTm);
   });
+});
+
+// ---------------------------------------------------------------------------
+// Codex round 3: precedence, trimming of every value, duplicates and
+// foreign elements. Variants of the documents above, each built here.
+// ---------------------------------------------------------------------------
+
+describe('transportItem: a tm-qualified attribute wins over a bare one', () => {
+  it('for the number, a header field and the marker', () => {
+    const document = TASK_WITH_OBJECTS.replace(
+      `<tm:task tm:number="${TASK}"`,
+      `<tm:task number="SIDK999999" desc="BARE" tm:number="${TASK}"`,
+    ).replace('tm:object_type="T"', 'object_type="R" tm:object_type="T"');
+    const item = readTransportItem(document, TASK);
+    expect(item.kind).toBe('task');
+    expect(item.header.description).toBe('Integration tests');
+    expect(() => readTransportItem(document, 'SIDK999999')).toThrow(REFUSAL);
+  });
+});
+
+describe('transportItem trims every value after decoding it', () => {
+  /** Every number of the document padded, `pad` on each side. */
+  const padded = (document: string, pad: string): string =>
+    document
+      .split(`tm:number="${TASK}"`)
+      .join(`tm:number="${pad}${TASK}${pad}"`)
+      .split(`tm:number="${PARENT}"`)
+      .join(`tm:number="${pad}${PARENT}${pad}"`)
+      .split(`tm:parent="${PARENT}"`)
+      .join(`tm:parent="${pad}${PARENT}${pad}"`)
+      .split('tm:desc="Integration tests"')
+      .join(`tm:desc="${pad}Integration tests${pad}"`);
+
+  it.each([
+    ['a task document', TASK_WITH_OBJECTS, TASK],
+    ['a request document', REQUEST, PARENT],
+  ])(
+    '%s reads the same padded literally, by reference, or not at all',
+    (_what, document, number) => {
+      const plain = readTransportItem(document, number);
+      expect(readTransportItem(padded(document, ' '), number)).toEqual(plain);
+      expect(readTransportItem(padded(document, '&#32;'), number)).toEqual(
+        plain,
+      );
+    },
+  );
+
+  it('pins the values read off a reference-padded task', () => {
+    const item = readTransportItem(padded(TASK_WITH_OBJECTS, '&#32;'), TASK);
+    if (item.kind !== 'task') throw new Error('expected a task');
+    expect(item.header.parent).toBe(PARENT);
+    expect(item.header.description).toBe('Integration tests');
+    expect(item.parent?.number).toBe(PARENT);
+    expect(item.objects.map((o) => o.task)).toEqual([TASK, TASK]);
+  });
+
+  it('pins the task summaries of a reference-padded request', () => {
+    const item = readTransportItem(padded(REQUEST, '&#32;'), PARENT);
+    if (item.kind !== 'request') throw new Error('expected a request');
+    expect(item.tasks.map((t) => [t.header.number, t.header.parent])).toEqual([
+      [TASK, PARENT],
+    ]);
+  });
+});
+
+describe('transportItem: duplicates under one prefix, and elements of no tm namespace', () => {
+  /** `SIDK…` with its first letter written as a numeric reference. */
+  const referenced = (number: string): string => `&#83;${number.slice(1)}`;
+
+  it.each([
+    [
+      'a second tm:task',
+      TASK_WITH_OBJECTS,
+      `<tm:task tm:number="${TASK}"/>`,
+      TASK,
+    ],
+    [
+      'a second tm:task naming the number by reference',
+      TASK_WITH_OBJECTS,
+      `<tm:task tm:number="${referenced(TASK)}"/>`,
+      TASK,
+    ],
+    [
+      'a second tm:request',
+      REQUEST,
+      `<tm:request tm:number="${PARENT}"/>`,
+      PARENT,
+    ],
+    [
+      'a second tm:request naming the number by reference',
+      REQUEST,
+      `<tm:request tm:number="${referenced(PARENT)}"/>`,
+      PARENT,
+    ],
+  ])('refuses %s', (_what, document, element, number) => {
+    expect(() =>
+      readTransportItem(withRootChild(document, element), number),
+    ).toThrow(REFUSAL);
+  });
+
+  it.each([
+    [
+      'a foreign task',
+      TASK_WITH_OBJECTS,
+      `<x:task xmlns:x="urn:other" tm:number="${TASK}"/>`,
+      TASK,
+      'task',
+    ],
+    [
+      'an unbound task',
+      TASK_WITH_OBJECTS,
+      `<u:task tm:number="${TASK}"/>`,
+      TASK,
+      'task',
+    ],
+    [
+      'a foreign request',
+      REQUEST,
+      `<x:request xmlns:x="urn:other" tm:number="${PARENT}"/>`,
+      PARENT,
+      'request',
+    ],
+    [
+      'an unbound request',
+      REQUEST,
+      `<u:request tm:number="${PARENT}"/>`,
+      PARENT,
+      'request',
+    ],
+  ])(
+    'ignores %s carrying a valid tm:number',
+    (_what, document, element, number, kind) => {
+      const item = readTransportItem(withRootChild(document, element), number);
+      expect(item.kind).toBe(kind);
+      expect(item).toEqual(readTransportItem(document, number));
+    },
+  );
 });

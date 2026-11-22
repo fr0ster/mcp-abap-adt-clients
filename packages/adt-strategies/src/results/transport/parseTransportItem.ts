@@ -19,7 +19,6 @@ import {
   tmAttributeIn,
   tmElements,
   tmRootElement,
-  tmTrimmedAttribute,
   transportRoot,
 } from './document';
 import {
@@ -28,8 +27,9 @@ import {
 } from './parseObjectEntries';
 
 /**
- * A request's or a task's header, each field the attribute as written (an
- * empty one `''`), `undefined` when the element does not carry it.
+ * A request's or a task's header, each field the attribute decoded and
+ * trimmed (since 0.28.1; an empty one `''`), `undefined` when the element
+ * does not carry it. A `tm:`-qualified attribute wins over a bare one.
  */
 export interface ITransportItemHeader {
   /** `tm:number`. */
@@ -91,7 +91,7 @@ const refuse = (): never => {
   throw new Error(TRANSPORT_ITEM_REFUSAL);
 };
 
-/** Every header field of an element, read by the tm namespace whatever the prefix. */
+/** Every header field of an element, by the tm namespace, each decoded and trimmed. */
 function headerOf(tm: ITmElement, number: string): ITransportItemHeader {
   const field = (local: string): string | undefined => tmAttributeIn(tm, local);
   return {
@@ -122,7 +122,7 @@ function ownHeader(
 
 /** The elements among `elements` whose own `tm:number`, trimmed, is `asked`. */
 const naming = (elements: ITmElement[], asked: string): ITmElement[] =>
-  elements.filter((tm) => tmTrimmedAttribute(tm, 'number') === asked);
+  elements.filter((tm) => tmAttributeIn(tm, 'number') === asked);
 
 /**
  * Read a transport request or task document, asked for by `number`.
@@ -151,7 +151,7 @@ export function readTransportItem(
   number: string,
 ): ITransportItem {
   const root = tmRootElement(transportRoot(document) ?? refuse());
-  const marker = tmTrimmedAttribute(root, 'object_type');
+  const marker = tmAttributeIn(root, 'object_type');
   if (marker !== undefined && marker !== 'T' && marker !== 'R') refuse();
   const asked = number.trim();
   if (asked === '') refuse();
