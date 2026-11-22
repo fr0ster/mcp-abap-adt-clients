@@ -61,7 +61,10 @@ the measured on-premise answer).
     after decoding, so padding written `&#32;` reads as literal padding does.
 
   A caller who relied on reading such a document as the parent now gets the
-  refusal. Every document SAP answers reads as before.
+  refusal. Every field of the item — its header, its parent's header, a
+  request's tasks and their counts, a task's entries — is read by the tm
+  namespace URI and local name, so an item written under another prefix
+  bound to tm reads in full. Every document SAP answers reads as before.
 - **`utilNodeContents` drops no node SAP lists.** An object node without
   `OBJECT_NAME`, `TECH_NAME` or `OBJECT_URI` was dropped; it is now answered
   in `incompleteObjects` (`IRepositoryIncompleteNode`: every field the node
