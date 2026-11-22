@@ -17,6 +17,10 @@ export function getFileRequest(
     url: repoPath(args.key, 'files'),
     params: { filename: args.filename, version: args.version },
     headers: { Accept: ACCEPT_ABAPGIT_FILE, ...credentialHeaders(credentials) },
+    // The file is the text SAP sent (R12 answers only `text/plain;
+    // charset=utf-8`): without this the HTTP wire parses a JSON-looking body
+    // and strips a BOM (connection 25.2.0, interfaces-adt-connection 5.3.0).
+    rawText: true,
     ...NEW_FORM,
   };
 }
