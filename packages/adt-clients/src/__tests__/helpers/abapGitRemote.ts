@@ -59,15 +59,25 @@ export function readRemote(
     .map(([name]) => name);
   if (absent.length > 0 || !url || !user || !token)
     return { missing: `${path} states no ${absent.join(', ')}` };
+  const where = gitHubRepoOf(url);
+  if (!where)
+    return {
+      missing: `ABAPGIT_REPO_URL in ${path} is not https://github.com/<owner>/<repo>: the branch fixtures use GitHub's API`,
+    };
+  return { url, user, token, ...where };
+}
+
+/** `https://github.com/<owner>/<repo>[.git]` taken apart, or `undefined`. */
+export function gitHubRepoOf(
+  url: string,
+): { readonly owner: string; readonly repo: string } | undefined {
   const prefix = 'https://github.com/';
   const tail = url.startsWith(prefix) ? url.slice(prefix.length) : '';
   const [owner, rawRepo, ...rest] = tail.split('/');
   const repo = rawRepo?.endsWith('.git') ? rawRepo.slice(0, -4) : rawRepo;
   if (!owner || !repo || rest.some((segment) => segment !== ''))
-    return {
-      missing: `ABAPGIT_REPO_URL in ${path} is not https://github.com/<owner>/<repo>: the branch fixtures use GitHub's API`,
-    };
-  return { url, user, token, owner, repo };
+    return undefined;
+  return { owner, repo };
 }
 
 /** A GitHub answer that was not the one expected: method, path, status. */
@@ -108,6 +118,20 @@ export const ABAPGIT_SETTINGS_XML = `<?xml version="1.0" encoding="utf-8"?>
 
 export class GitHubFixtures {
   constructor(private readonly remote: IAbapGitRemote) {}
+
+  /**
+   * The same token against the remote `url` a ledger entry recorded: a
+   * branch is deleted where it was made, never in whatever remote is
+   * configured now.
+   */
+  forUrl(url: string): GitHubFixtures {
+    const where = gitHubRepoOf(url);
+    if (!where)
+      throw new Error(
+        'the ledger records a remote that is not https://github.com/<owner>/<repo>: its branches are not deleted from here',
+      );
+    return new GitHubFixtures({ ...this.remote, url, ...where });
+  }
 
   private async call<T>(
     method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
@@ -186,14 +210,25 @@ export class GitHubFixtures {
     });
   }
 
-  /** Delete a branch; an absent one is gone already. */
+  /**
+   * Delete a branch. Resolves once its absence is confirmed: `204` deleted,
+   * `404` from this remote absent. A `422` proves nothing ("Reference does
+   * not exist" and other refusals share it): the exact ref is read, and only
+   * its `404` confirms; a ref still there throws. Anything else throws.
+   */
   async deleteBranch(name: string): Promise<'deleted' | 'absent'> {
     const answer = await this.call(
       'DELETE',
       `/git/refs/heads/${encodeURIComponent(name)}`,
       [204, 404, 422],
     );
-    return answer.status === 204 ? 'deleted' : 'absent';
+    if (answer.status === 204) return 'deleted';
+    if (answer.status === 404) return 'absent';
+    if (await this.branchExists(name))
+      throw new Error(
+        `branch ${name} was refused deletion (422) and still exists in ${this.remote.owner}/${this.remote.repo}`,
+      );
+    return 'absent';
   }
 
   /** Whether a branch exists. */
