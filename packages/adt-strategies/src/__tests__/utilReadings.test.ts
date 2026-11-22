@@ -108,7 +108,7 @@ const NODE_XML =
   '<TECH_NAME>ZMY_PROGRAM</TECH_NAME>' +
   '<OBJECT_URI>/sap/bc/adt/programs/programs/zmy_program</OBJECT_URI>' +
   '</SEU_ADT_REPOSITORY_OBJ_NODE>' +
-  // Missing OBJECT_URI — cannot be fetched, so it is not a node.
+  // Missing OBJECT_URI — kept since 0.28.1, the field absent (dropped before).
   '<SEU_ADT_REPOSITORY_OBJ_NODE>' +
   '<OBJECT_TYPE>PROG/I</OBJECT_TYPE><OBJECT_NAME>ZBROKEN</OBJECT_NAME>' +
   '<TECH_NAME>ZBROKEN</TECH_NAME>' +
@@ -134,7 +134,7 @@ describe('utilNodeContents', () => {
     ]);
   });
 
-  it('drops a node that cannot be identified or fetched', () => {
+  it('keeps a node without OBJECT_URI, the field absent (since 0.28.1)', () => {
     expect(utilNodeContents(wire(NODE_XML)).objects).toEqual([
       {
         type: 'PROG/P',
@@ -142,6 +142,7 @@ describe('utilNodeContents', () => {
         techName: 'ZMY_PROGRAM',
         objectUri: '/sap/bc/adt/programs/programs/zmy_program',
       },
+      { type: 'PROG/I', objectName: 'ZBROKEN', techName: 'ZBROKEN' },
     ]);
   });
 

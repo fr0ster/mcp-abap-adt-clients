@@ -8,7 +8,12 @@ import {
   utilWhereUsedReferences,
 } from '../results/utils';
 import { stepsOf, stepTagged } from './corpus';
-import { NAMED_ITEMS, SEARCH_ENTITY } from './serverDocuments';
+import {
+  NAMED_ITEMS,
+  NODE_NAME_ONLY,
+  NODE_NOT_LOADED,
+  SEARCH_ENTITY,
+} from './serverDocuments';
 
 /**
  * The readings the server team found reading something other than what the
@@ -182,6 +187,93 @@ describe('utilNodeContents keeps the node descriptions', () => {
         description:
           'Shared BDEF for BehaviorDefinition and BehaviorImplementatio',
       }),
+    ]);
+  });
+});
+
+/** The recorded step with one element of its one object left out. */
+const withoutElement = (answer: IAdtWireResponse, name: string): string => {
+  const data = String(answer.data);
+  const open = data.indexOf(`<${name}>`);
+  const close = `</${name}>`;
+  const end = data.indexOf(close, open) + close.length;
+  if (open < 0 || end < close.length) throw new Error(`no ${name}`);
+  return data.slice(0, open) + data.slice(end);
+};
+
+describe('utilNodeContents keeps every node SAP lists (since 0.28.1)', () => {
+  // Step 02 of read-object-tree-structure: one BDEF, all fields written.
+  const recorded = () => stepsOf('read-object-tree-structure')[1];
+  const step = (): IAdtWireResponse => {
+    const answer = recorded();
+    if (answer === undefined) throw new Error('step 02 is not recorded');
+    return answer;
+  };
+
+  it.each([
+    ['TECH_NAME', 'techName'],
+    ['OBJECT_URI', 'objectUri'],
+    ['OBJECT_NAME', 'objectName'],
+  ])('an object without %s is kept, the field absent', (element, key) => {
+    const { objects } = utilNodeContents(wire(withoutElement(step(), element)));
+    expect(objects).toHaveLength(1);
+    const [object] = objects;
+    expect(object?.type).toBe('BDEF/BDO');
+    expect(object !== undefined && key in object).toBe(false);
+    expect(object?.description).toBe(
+      'Shared BDEF for BehaviorDefinition and BehaviorImplementatio',
+    );
+  });
+
+  it('the server’s level of a named, typed object is that object', () => {
+    expect(utilNodeContents(wire(NODE_NAME_ONLY))).toEqual({
+      objects: [{ type: 'TABL/DT', objectName: 'ZT_ONE' }],
+      childNodes: [],
+    });
+  });
+
+  it('a recorded level reads as before: every field, no notLoaded', () => {
+    const contents = utilNodeContents(step());
+    expect(contents.objects).toEqual([
+      {
+        type: 'BDEF/BDO',
+        objectName: 'ZMCP_SHR_I_ROOT',
+        techName: 'ZMCP_SHR_I_ROOT',
+        objectUri: '/sap/bc/adt/bo/behaviordefinitions/zmcp_shr_i_root',
+        description:
+          'Shared BDEF for BehaviorDefinition and BehaviorImplementatio',
+      },
+    ]);
+    expect('notLoaded' in contents).toBe(false);
+  });
+
+  it('a node SAP could not load is marked notLoaded, none of SAP’s text kept', () => {
+    const contents = utilNodeContents(wire(NODE_NOT_LOADED));
+    expect(contents).toEqual({
+      objects: [],
+      childNodes: [],
+      notLoaded: [{ notLoaded: true }],
+    });
+    const shown = JSON.stringify(contents);
+    expect(shown).not.toContain('SAP_TEXT_NEVER_IN_A_ROW');
+    expect(shown).not.toContain('Error loading node');
+  });
+
+  it('beside the objects SAP did load, each not-loaded node once', () => {
+    const [head, tail] = String(step().data).split('</TREE_CONTENT>');
+    const notLoadedNode = NODE_NOT_LOADED.slice(
+      NODE_NOT_LOADED.indexOf('<SEU_ADT_REPOSITORY_OBJ_NODE>'),
+      NODE_NOT_LOADED.indexOf('</TREE_CONTENT>'),
+    );
+    const contents = utilNodeContents(
+      wire(`${head}${notLoadedNode}${notLoadedNode}</TREE_CONTENT>${tail}`),
+    );
+    expect(contents.objects.map((o) => o.objectName)).toEqual([
+      'ZMCP_SHR_I_ROOT',
+    ]);
+    expect(contents.notLoaded).toEqual([
+      { notLoaded: true },
+      { notLoaded: true },
     ]);
   });
 });

@@ -251,6 +251,7 @@ export {
   type IParsedNodeStructure,
   type IRepositoryNodeChild,
   type IRepositoryNodeContents,
+  type IRepositoryNotLoadedNode,
   type IRepositoryObjectNode,
   type ISearchResult,
   type IWhereUsedListResult,

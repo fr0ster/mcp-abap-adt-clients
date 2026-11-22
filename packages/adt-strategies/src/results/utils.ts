@@ -157,17 +157,34 @@ export interface INamedItem {
 }
 
 /**
- * One object under a repository node. The four fields are the ones a caller
- * needs to identify and fetch it; a node the server sends without all four is
- * not one.
+ * One object under a repository node, every field SAP wrote for it. Since
+ * 0.28.1 a node is kept whatever it lacks: a field it does not carry is
+ * absent (until 0.28.0 a node without all of `OBJECT_NAME`, `TECH_NAME` and
+ * `OBJECT_URI` was dropped, and the walks list such nodes).
  */
 export type IRepositoryObjectNode = IAdtAnsweredObject & {
-  objectName: string;
-  techName: string;
-  objectUri: string;
+  /** `OBJECT_NAME`, when the node carries one. */
+  objectName?: string;
+  /** `TECH_NAME`, when the node carries one. */
+  techName?: string;
+  /** `OBJECT_URI`, when the node carries one. */
+  objectUri?: string;
   /** Since 0.28.0: `DESCRIPTION` as written, when the node carries one. */
   description?: string;
 };
+
+/**
+ * A node SAP listed but could not load (since 0.28.1). SAP answers such a
+ * line of its tree with an entry of no `OBJECT_TYPE`, its message `SEU_ADT
+ * 101` "Error loading node:" in `OBJECT_NAME` and its explanation in
+ * `TECH_NAME` (`CL_SEU_ADT_RES_REPO_STRUCTURE->create_tree_content`;
+ * measured on premise, 2026-11-22, for a package's `VIEW/DV` node). None of
+ * SAP's text is kept, and there is no type to keep: the entry has none. The
+ * node's type is the child node the level was asked for by.
+ */
+export interface IRepositoryNotLoadedNode {
+  notLoaded: true;
+}
 
 /**
  * One child level: an object type, and the node id holding objects of it.
@@ -182,6 +199,11 @@ export type IRepositoryNodeChild = IAdtAnsweredObject & {
 export interface IRepositoryNodeContents {
   objects: IRepositoryObjectNode[];
   childNodes: IRepositoryNodeChild[];
+  /**
+   * Since 0.28.1: each node SAP could not load, in document order; present
+   * only when the level lists one.
+   */
+  notLoaded?: IRepositoryNotLoadedNode[];
 }
 
 /** The node-structure document's two halves, the nodes still as parsed XML. */
@@ -351,33 +373,40 @@ export function readNodeStructure(xml: string): IParsedNodeStructure {
 }
 
 /**
- * One level of the repository tree — `/repository/nodestructure`: the objects
- * here, each with its description where the node carries one, and the typed
- * child nodes to ask for next. A node missing any of the four identity fields
- * is dropped.
+ * One level of the repository tree — `/repository/nodestructure`: every
+ * object SAP lists here, each with the fields it carries, the nodes SAP could
+ * not load (`notLoaded`), and the typed child nodes to ask for next.
+ *
+ * An entry with no `OBJECT_TYPE` is no object: it is SAP's message for a node
+ * it could not load, and is answered as `notLoaded` without its text.
  */
 export const utilNodeContents: IResultStrategy<IRepositoryNodeContents> = (
   answer,
 ) => {
   const { nodes, objectTypes } = readNodeStructure(rawOf(answer));
   const objects: IRepositoryObjectNode[] = [];
+  const notLoaded: IRepositoryNotLoadedNode[] = [];
   for (const node of nodes) {
     const objectType = nodeText(node, 'OBJECT_TYPE');
+    if (objectType === undefined) {
+      notLoaded.push({ notLoaded: true });
+      continue;
+    }
     const objectName = nodeText(node, 'OBJECT_NAME');
     const techName = nodeText(node, 'TECH_NAME');
     const objectUri = nodeText(node, 'OBJECT_URI');
-    if (objectType && objectName && techName && objectUri) {
-      const description = nodeValue(node, 'DESCRIPTION');
-      objects.push({
-        ...answeredObject(objectType),
-        objectName,
-        techName,
-        objectUri,
-        ...(description === undefined ? {} : { description }),
-      });
-    }
+    const description = nodeValue(node, 'DESCRIPTION');
+    objects.push({
+      ...answeredObject(objectType),
+      ...(objectName === undefined ? {} : { objectName }),
+      ...(techName === undefined ? {} : { techName }),
+      ...(objectUri === undefined ? {} : { objectUri }),
+      ...(description === undefined ? {} : { description }),
+    });
   }
-  return { objects, childNodes: objectTypes };
+  return notLoaded.length === 0
+    ? { objects, childNodes: objectTypes }
+    : { objects, childNodes: objectTypes, notLoaded };
 };
 
 // ---------------------------------------------------------------------------

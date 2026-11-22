@@ -85,3 +85,30 @@ export const NOT_TRANSPORT = `${xmlHead}<html><body>BODY_MARKER_NEVER_IN_AN_ERRO
 
 /** The bare root its `GetTransport` / `ListTransports` cases answer. */
 export const BARE_ROOT = `${xmlHead}<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm"/>`;
+
+// ---------------------------------------------------------------------------
+// `src/__tests__/unit/packageWalk.test.ts` (commit 76d233660):
+//
+// "A node SAP cannot load is reported, not dropped: on premise (2026-11-22) a
+// package's Views node (`VIEW/DV`) comes from SAP's stored package tree
+// (`DWTREE`), whose entry SAP cannot load and answers 'Error loading node:'
+// (`CL_SEU_ADT_RES_REPO_STRUCTURE`, `create_tree_content`, message
+// `SEU_ADT 101`)."
+//
+// Both levels are written by the server team to the measured shape: the
+// not-loaded entry has an empty `OBJECT_TYPE`, SAP's words in `OBJECT_NAME`
+// and its explanation in `TECH_NAME` (here a marker no reading may repeat);
+// the good level's object carries no `TECH_NAME` and no `OBJECT_URI`.
+// ---------------------------------------------------------------------------
+
+/** "failedLevel": the level of a node SAP could not load. */
+export const NODE_NOT_LOADED =
+  '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><TREE_CONTENT>' +
+  '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE/><OBJECT_NAME>Error loading node:</OBJECT_NAME><TECH_NAME>SAP_TEXT_NEVER_IN_A_ROW</TECH_NAME></SEU_ADT_REPOSITORY_OBJ_NODE>' +
+  '</TREE_CONTENT></DATA></asx:values></asx:abap>';
+
+/** "goodLevel": one object named and typed, nothing else. */
+export const NODE_NAME_ONLY =
+  '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><TREE_CONTENT>' +
+  '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>TABL/DT</OBJECT_TYPE><OBJECT_NAME>ZT_ONE</OBJECT_NAME></SEU_ADT_REPOSITORY_OBJ_NODE>' +
+  '</TREE_CONTENT></DATA></asx:values></asx:abap>';
