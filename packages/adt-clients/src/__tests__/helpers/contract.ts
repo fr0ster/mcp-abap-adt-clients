@@ -14,7 +14,12 @@ import {
   readAdtRefusal,
   readDeletionRefusal,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapGitErrorFacts,
+  IAbapGitStructuredError,
+  IAdtError,
+  IAdtResponse,
+} from '@mcp-abap-adt/interfaces-adt';
 
 /**
  * The value, failing the test with what SAP said when there is none.
@@ -81,18 +86,43 @@ export function failureOf(answer: IAdtResponse<unknown>, what: string): string {
  * parameter — becomes `<lock handle>`, and SAP's reason stays.
  */
 export function whatFailureSays(failure: IAdtError): string {
-  const status = failure.response?.status;
+  const facts = factsOf(failure);
+  const status = failure.response?.status ?? facts?.status;
   const said = sapSaid(failure.response?.data);
-  const url = failure.request?.url;
+  const url = failure.request?.url ?? requestPathOf(failure);
   const told =
     failure.message +
     (status === undefined ? '' : `; HTTP ${status}`) +
+    (facts?.messageClass !== undefined || facts?.messageNumber !== undefined
+      ? `; T100 ${facts.messageClass ?? '?'}/${facts.messageNumber ?? '?'}`
+      : '') +
+    (facts?.gitHttpStatus !== undefined
+      ? `; git host HTTP ${facts.gitHttpStatus}`
+      : '') +
     (said ? `; SAP: ${said}` : '');
   const handle = url === undefined ? '' : lockHandleOf(url);
   return (
     (handle ? told.split(handle).join(LOCK_HANDLE) : told) +
     (url ? ` (${pathOf(url)})` : '')
   );
+}
+
+/**
+ * The facts an abapGit new form's error carries (`IAbapGitStructuredError`):
+ * the status, the T100 key and the git host's status — facts, safe to print.
+ * Its `response` is never set, so without this a log names none of them.
+ */
+function factsOf(failure: IAdtError): IAbapGitErrorFacts | undefined {
+  return 'facts' in failure
+    ? (failure as IAbapGitStructuredError).facts
+    : undefined;
+}
+
+/** An abapGit error's request path (`{ method, path }`, no query). */
+function requestPathOf(failure: IAdtError): string | undefined {
+  return 'facts' in failure
+    ? (failure as IAbapGitStructuredError).request?.path
+    : undefined;
 }
 
 /** What stands in a log line for the lock handle a step sent. */
