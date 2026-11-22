@@ -439,8 +439,10 @@ describe('readObjects', () => {
 
     if (!answer.ok) throw new Error('expected the list');
     const entries = answer.getResult().value;
+    // Each entry names the task it is on (adt-strategies 0.28.0).
     expect(entries).toEqual([
       {
+        task: 'DEVK905943',
         name: 'ZMCP_BLD_FGR_H1',
         type: 'FUGR',
         pgmid: 'R3TR',
@@ -450,6 +452,7 @@ describe('readObjects', () => {
         imageActivity: undefined,
       },
       {
+        task: 'DEVK905943',
         name: 'ZCL_X',
         type: 'CLAS',
         pgmid: 'R3TR',
