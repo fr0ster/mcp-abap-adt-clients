@@ -24,6 +24,37 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [46.2.1] - 2026-11-22
+
+Released with `@mcp-abap-adt/adt-strategies` 0.28.0 (published first; the
+range is now `^0.28.0`). No member of adt-clients changed: every default is
+still the document, and no default set ships one of the readings 0.28.0
+fixes. What changed is what those readings answer when a caller passes them:
+
+- `transportObjectEntries` (`objects`): each entry once, with the number of
+  the task it is on (`task`) and `info`; a request's entries no longer come
+  twice.
+- `transportCreated` (`created`, `createdTask`): a created task under a named
+  parent answers the task's number, the parent as `parent`; a document naming
+  no number throws instead of answering `transportNumber: ''`.
+- `transportTree` (`list`): its error is fixed words with nothing of the body,
+  and a root that carries nothing (`<tm:root/>`) is refused, not read as an
+  empty list.
+- `utilWhereUsedReferences` (`whereUsed`): package nodes are kept, with `kind`.
+- `utilInactiveObjects` (`inactive`): reads the SAP_BASIS 7.40 form and
+  refuses an answer that is no inactive list.
+- `utilSearchHits`, `utilNamedItems`, `utilNodeContents`: references decoded,
+  nothing coerced, descriptions kept.
+- New: `transportItem(number)`, a request or task document read as what it
+  is.
+
+The details, and the old values, are in
+[adt-strategies' changelog](../adt-strategies/CHANGELOG.md); the transport
+and where-used sections of `docs/usage/CLIENT_API_REFERENCE.md` describe the
+new readings. The unit tests that pass these readings
+(`objectActions.test.ts`, `searchConfigurations.test.ts`) pin the new
+answers.
+
 ## [46.2.0] - 2026-11-22
 
 Released with `@mcp-abap-adt/adt-strategies` 0.27.0 (published first, its

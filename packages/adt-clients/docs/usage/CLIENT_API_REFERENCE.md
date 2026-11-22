@@ -936,7 +936,11 @@ had:
   removed every one. `readObjects()` is where the number comes from.
 - **`readObjects()` exists for the parsing, not for the representation.** With
   `transportObjectEntries` it answers the entries as values, each with the
-  `position` `removeObject()` needs, rather than a document to dig through (its
+  `position` `removeObject()` needs and the number of the task it is on
+  (`task`), each entry once — a request's `tm:all_objects`, which repeats its
+  tasks' entries, is not read beside them (adt-strategies 0.28.0; before, a
+  request's entries came twice and none named its task) —, rather than a
+  document to dig through (its
   default, like every member's, is the document). The header it
   sends changes nothing: measured against an on-premise system, 2026-09-21,
   the same URL with and without
@@ -1062,6 +1066,33 @@ const request = client.getRequest({
 
 The `readObjects()` and `createTask()` examples above assume that set.
 
+**A request or a task, read as what it is.** SAP answers
+`GET /cts/transportrequests/{n}` for a task's number with the task's own
+document (`tm:object_type="T"`: the task and its entries in `tm:task`, the
+parent's header alone in `tm:request`). `transportItem(number)` from
+adt-strategies (0.28.0) reads either kind — the request's header and its tasks
+with their object counts, or the task's header, its parent's header and its
+entries — and refuses a document whose element does not name `number`:
+
+```typescript
+import { transportItem } from '@mcp-abap-adt/adt-strategies';
+
+const read = await client
+  .getRequest({ ...transportDocuments, objects: transportItem('DEVK907073') })
+  .readObjects('DEVK907073');
+if (read.ok) {
+  const item = read.getResult().value;
+  if (item.kind === 'task') item.parent?.number; // the request it is on
+  else item.tasks.map((t) => [t.header.number, t.objectCount]);
+}
+```
+
+**`createTask()`'s answer names the task on its root** (`tm:number`), and a
+`tm:request` beside it names the parent: `transportCreated` answers the root's
+number as `transportNumber` and the parent as `parent` (since adt-strategies
+0.28.0; before, a nested `tm:request` was preferred and the parent was reported
+as the task).
+
 **On a batch connection** (an `AdtClient` built on `AdtBatchConnection`, see
 [BATCH.md](BATCH.md)) `list({ configUri })` records normally and resolves after
 `batch.execute()`, like any other member: it is one request now, so there is no
@@ -1139,14 +1170,18 @@ const requests = client.getRequest({
 XML — and the default, `rawDocument`, is there for a caller who wants exactly
 that.
 
-**A body `transportTree` does not recognise throws.** That is what stops
-`list()`'s original defect (an empty root read as success) from recurring: a
-reading that cannot read is the reading failing, not the server refusing, and
-it surfaces as itself rather than as a verdict about SAP. An empty `tm:root` is
-different — that is **not** an error, and the answer succeeds with
-`requests: []` and whatever attributes the root itself carried. A system with no
-transport requests must be able to say so without being reported as broken; the
-distinction is the root element and the nesting, never a count.
+**A body `transportTree` does not recognise throws**, in fixed words with
+nothing of the body (`parseTransportTree: the answer is no transport list`,
+since adt-strategies 0.28.0). That is what stops `list()`'s original defect (an
+empty root read as success) from recurring: a reading that cannot read is the
+reading failing, not the server refusing, and it surfaces as itself rather than
+as a verdict about SAP. A list with no request is different — that is **not** an
+error: the recorded empty list is a `tm:root` that names the search it ran
+(`adtcore:name` and the created/changed stamps), and the answer succeeds with
+`requests: []` and those attributes. A system with no transport requests must be
+able to say so without being reported as broken. A root that carries nothing —
+`<tm:root/>`, or one with only its namespace — names no search and is refused
+(since 0.28.0; before, it read as an empty list).
 
 **Legacy systems answer the same member** — `AdtRequestLegacy` in `@mcp-abap-adt/adt-clients-legacy`. Its `list()` reads
 `/sap/bc/cts/transportrequests` — measured on 7.40 SP04 over RFC: `200`, a
@@ -2362,7 +2397,9 @@ const result = await utils.getWhereUsed({
 if (result.ok) {
   const found = result.getResult().value;
   console.log(`Found ${found.totalReferences} references`);
-  for (const ref of found.references) {
+  // Every reference the document holds, package nodes included (`kind`,
+  // since adt-strategies 0.28.0): keep `object` for the places of use alone.
+  for (const ref of found.references.filter((r) => r.kind === 'object')) {
     console.log(`${ref.name} (${ref.type ?? ref.unknownType}) in ${ref.packageName}`);
   }
 }
