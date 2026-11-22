@@ -142,6 +142,11 @@ tested with `@mcp-abap-adt/connection` `^25.2.0`, which implements them.
   `abapgitexternalrepo:user` / `password`. The legacy form keeps its 46.1.0
   fields exactly.
 
+### Not verified live yet
+
+- SAP's acceptance of the corrected selective-pull and push documents is so
+  far grounded in the transformations only (Code).
+
 ## [46.1.0] - 2026-11-19
 
 Released with `@mcp-abap-adt/adt-strategies` 0.26.0 and
