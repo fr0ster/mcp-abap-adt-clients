@@ -3,6 +3,7 @@ import type {
   ITransportSearchConfiguration,
 } from '@mcp-abap-adt/interfaces-adt';
 import {
+  CREATED_TRANSPORT_REFUSAL,
   type ICreatedTransport,
   parseCreatedTransport,
 } from './parseCreatedTransport';
@@ -11,7 +12,10 @@ import {
   parseObjectEntries,
 } from './parseObjectEntries';
 import { parseSearchConfigurations } from './parseSearchConfigurations';
-import { parseTransportTree } from './parseTransportTree';
+import {
+  parseTransportTree,
+  TRANSPORT_TREE_REFUSAL,
+} from './parseTransportTree';
 import type { ITransportTree } from './types';
 
 /**
@@ -44,17 +48,22 @@ export const transportSearchConfigurations: IResultStrategy<
   ITransportSearchConfiguration[]
 > = (answer) => parseSearchConfigurations(answer.data);
 
-/** A request's object list, each entry with its position. */
+/**
+ * A request's object list: its tasks' entries, each once, with its position
+ * and the number of the task it is on.
+ */
 export const transportObjectEntries: IResultStrategy<
   ITransportObjectEntry[]
 > = (answer) => parseObjectEntries(answer.data);
 
 export type * from './types';
 export {
+  CREATED_TRANSPORT_REFUSAL,
   type ICreatedTransport,
   type ITransportObjectEntry,
   parseCreatedTransport,
   parseObjectEntries,
   parseSearchConfigurations,
   parseTransportTree,
+  TRANSPORT_TREE_REFUSAL,
 };

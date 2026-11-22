@@ -103,14 +103,14 @@ describe('parseTransportTree reads both captured shapes', () => {
     expect(keys).not.toContain('description');
   });
 
-  it('returns no requests for an empty root, without throwing', () => {
-    const tree = parseTransportTree(
-      '<?xml version="1.0"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm"/>',
-    );
-
-    // A shape, not a bare list: attributes is always there, empty here because
-    // this root carries nothing but its namespace.
-    expect(tree).toEqual({ attributes: {}, requests: [] });
+  // Since 0.28.0: a root carrying nothing but its namespace is no list. A
+  // list names the search it ran even when it lists no request (the next case).
+  it('refuses a root that carries nothing', () => {
+    expect(() =>
+      parseTransportTree(
+        '<?xml version="1.0"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm"/>',
+      ),
+    ).toThrow('parseTransportTree: the answer is no transport list');
   });
 
   it('still says whose list it is when the list is empty', () => {
@@ -123,10 +123,11 @@ describe('parseTransportTree reads both captured shapes', () => {
     expect(tree.attributes['adtcore:name']).toBe('SAPUSER01');
   });
 
-  it('throws on a body it does not recognise, carrying the payload', () => {
+  // Since 0.28.0 in fixed words: the payload is no longer quoted.
+  it('throws on a body it does not recognise, in fixed words', () => {
     expect(() =>
       parseTransportTree('<html><body>Gateway timeout</body></html>'),
-    ).toThrow(/tm:root/);
+    ).toThrow('parseTransportTree: the answer is no transport list');
     expect(() => parseTransportTree('')).toThrow();
     expect(() => parseTransportTree(undefined)).toThrow();
   });

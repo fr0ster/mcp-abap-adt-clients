@@ -11,7 +11,8 @@
  * on the other.
  */
 
-import { XMLParser } from 'fast-xml-parser';
+import { isElement, leafText, listOf, type ParsedElement } from '../../parsed';
+import { hasContent, transportRoot } from './document';
 import type {
   ITransportTree,
   ITransportTreeLink,
@@ -20,26 +21,20 @@ import type {
   ITransportTreeTask,
 } from './types';
 
-const xmlParser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: '@_',
-  parseAttributeValue: false,
-});
-
 /** Elements that are structural but never "containers" on the way to a request. */
 const NON_CONTAINER_NAMES = new Set(['task', 'link', 'long_desc']);
 
-const asArray = (value: unknown): Record<string, unknown>[] => {
-  if (!value) return [];
-  return (Array.isArray(value) ? value : [value]) as Record<string, unknown>[];
-};
+/** The elements of a parsed value that may be one or several. */
+const elements = (value: unknown): ParsedElement[] =>
+  listOf(value).filter(
+    (item): item is ParsedElement => isElement(item) && !Array.isArray(item),
+  );
 
 /** Element name with the namespace prefix stripped: "tm:request" -> "request". */
-const bareName = (key: string): string =>
-  key.includes(':') ? (key.split(':').pop() as string) : key;
+const bareName = (key: string): string => key.slice(key.lastIndexOf(':') + 1);
 
 /** The first child key (namespace-qualified or not) whose bare name matches. */
-const findChild = (node: Record<string, unknown>, bare: string): unknown => {
+const findChild = (node: ParsedElement, bare: string): unknown => {
   for (const key of Object.keys(node)) {
     if (key.startsWith('@_')) continue;
     if (bareName(key) === bare) return node[key];
@@ -52,15 +47,14 @@ const findChild = (node: Record<string, unknown>, bare: string): unknown => {
  * `xmlns` declarations describe the document, not the element, so they are
  * dropped here rather than handed to a consumer as if they meant something.
  */
-const ownAttributes = (
-  node: Record<string, unknown>,
-): Record<string, string> => {
+const ownAttributes = (node: ParsedElement): Record<string, string> => {
   const attributes: Record<string, string> = {};
   for (const key of Object.keys(node)) {
     if (!key.startsWith('@_')) continue;
     const name = key.slice(2);
     if (name === 'xmlns' || name.startsWith('xmlns:')) continue;
-    attributes[name] = String(node[key]);
+    const value = leafText(node[key]);
+    if (value !== undefined) attributes[name] = value;
   }
   return attributes;
 };
@@ -71,32 +65,31 @@ const ownAttributes = (
  * means the element was never there. Collapsing the two would be the same
  * silent flattening as dropping a container.
  */
-const readLongDesc = (node: Record<string, unknown>): string | undefined => {
+const readLongDesc = (node: ParsedElement): string | undefined => {
   const value = findChild(node, 'long_desc');
   if (value === undefined) return undefined;
-  if (typeof value === 'object' && value !== null) return '';
-  return String(value);
+  return leafText(value) ?? '';
 };
 
-const buildLink = (node: Record<string, unknown>): ITransportTreeLink => ({
+const buildLink = (node: ParsedElement): ITransportTreeLink => ({
   attributes: ownAttributes(node),
 });
 
-const buildTask = (node: Record<string, unknown>): ITransportTreeTask => ({
+const buildTask = (node: ParsedElement): ITransportTreeTask => ({
   attributes: ownAttributes(node),
-  links: asArray(findChild(node, 'link')).map(buildLink),
+  links: elements(findChild(node, 'link')).map(buildLink),
   longDesc: readLongDesc(node),
 });
 
 const buildRequest = (
-  node: Record<string, unknown>,
+  node: ParsedElement,
   containers: ITransportTreeNode[],
 ): ITransportTreeRequest => ({
   attributes: ownAttributes(node),
   containers,
-  links: asArray(findChild(node, 'link')).map(buildLink),
+  links: elements(findChild(node, 'link')).map(buildLink),
   longDesc: readLongDesc(node),
-  tasks: asArray(findChild(node, 'task')).map(buildTask),
+  tasks: elements(findChild(node, 'task')).map(buildTask),
 });
 
 /**
@@ -107,7 +100,7 @@ const buildRequest = (
  * through, not a shape this module assumed in advance.
  */
 const walk = (
-  node: Record<string, unknown>,
+  node: ParsedElement,
   containers: ITransportTreeNode[],
   requests: ITransportTreeRequest[],
 ): void => {
@@ -116,16 +109,14 @@ const walk = (
     const bare = bareName(key);
 
     if (bare === 'request') {
-      for (const requestNode of asArray(node[key])) {
+      for (const requestNode of elements(node[key])) {
         requests.push(buildRequest(requestNode, containers));
       }
       continue;
     }
     if (NON_CONTAINER_NAMES.has(bare)) continue;
 
-    const value = node[key];
-    if (typeof value !== 'object' || value === null) continue;
-    for (const childNode of asArray(value)) {
+    for (const childNode of elements(node[key])) {
       walk(
         childNode,
         [
@@ -138,27 +129,29 @@ const walk = (
   }
 };
 
+/** The words this reading refuses an answer with; nothing of the document. */
+export const TRANSPORT_TREE_REFUSAL =
+  'parseTransportTree: the answer is no transport list';
+
+/**
+ * Read a saved search's answer into its tree.
+ *
+ * Throws `TRANSPORT_TREE_REFUSAL` — fixed words, nothing of the body — for an
+ * answer that is no well-formed `tm:root` document, and for a root that
+ * carries nothing: no attribute of its own and no element. A list always
+ * names the search it ran (`adtcore:name` and the created/changed stamps on
+ * the root, recorded `read-transport-list-structure` even when it lists no
+ * request), so a bare `<tm:root/>` is no list, not an empty one. Until 0.28.0
+ * the error quoted up to 200 characters of the body, and a bare root read as
+ * an empty list.
+ */
 export function parseTransportTree(data: unknown): ITransportTree {
-  const raw = typeof data === 'string' ? data : '';
-  const xml = raw.trim();
-
-  const parsed = xmlParser.parse(xml) as Record<string, unknown>;
-  const rootKey = Object.keys(parsed).find(
-    (key) => key !== '?xml' && (key === 'tm:root' || key === 'root'),
-  );
-
-  if (!rootKey) {
-    const foundKey = Object.keys(parsed).find((key) => key !== '?xml');
-    const found = foundKey ? `"${foundKey}"` : 'no root element';
-    throw new Error(
-      `parseTransportTree: expected tm:root, found ${found}: "${xml.slice(0, 200)}"`,
-    );
+  const root = transportRoot(data);
+  if (root === undefined || !hasContent(root)) {
+    throw new Error(TRANSPORT_TREE_REFUSAL);
   }
-
-  const root = parsed[rootKey] as Record<string, unknown>;
   const requests: ITransportTreeRequest[] = [];
   walk(root, [], requests);
-
   return {
     attributes: ownAttributes(root),
     requests,
