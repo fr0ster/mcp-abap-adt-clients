@@ -45,6 +45,13 @@ fixes. What changed is what those readings answer when a caller passes them:
   refuses an answer that is no inactive list.
 - `utilSearchHits`, `utilNamedItems`, `utilNodeContents`: references decoded,
   nothing coerced, descriptions kept.
+- `stillInactiveAmong` — what `analyseActivation` / `analyseAny` decide a
+  silent checklist by, after the inactive list the activation members read —
+  reads every object and reference of an entry; one listed beside another in
+  the same entry was missed.
+- The feed readings (`FeedRepository`'s slots): text as written (`0042` no
+  longer `42`), references decoded (`&amp;` in an `href` is `&`), and an
+  entry with several links, authors or categories read.
 - New: `transportItem(number)`, a request or task document read as what it
   is.
 

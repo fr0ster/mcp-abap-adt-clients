@@ -81,9 +81,27 @@ and one new reading.
   (`adtcore:name` on the root, the recorded empty list) reads as before.
   `tm:long_desc` text is no longer coerced.
 - **`utilNodeContents`** keeps each object's `DESCRIPTION`.
-- Every parser of these readings now shares one set of options
-  (`XML_TEXT_OPTIONS`, internal): no tag or attribute value is coerced, and
-  references decode as an XML parser decodes them.
+- **`stillInactiveAmong`** (the activation verdict's reading of the inactive
+  list) reads every `ioc:ref` of every `ioc:object` of an entry, as
+  `utilInactiveObjects` does; it read one, and none when either repeated —
+  an object listed that way was not found still inactive.
+- **The feed readings** (`feedEntries`, `feedDescriptors`, `feedVariants`,
+  `feedSystemMessages`, `feedGatewayErrors`, `feedGatewayErrorDetail`) coerce
+  nothing: element text that looked numeric read as the number's text
+  (`0042` read `42`, in a title, content, id, client or source line) and now
+  reads as written. References decode (an `href` holding `&amp;` read
+  `&amp;`, it reads `&`). The fields typed as numbers — a call-stack entry's
+  `number` and `line`, a source line's `number`, `errorLine` — are converted
+  from their text, as before. An entry with several `link`, `author` or
+  `category` elements (Atom allows them) read `''` / `undefined`; it now
+  reads the entry's own link (`rel` absent or `alternate`, else the first),
+  and the first author and category.
+- `parseSearchConfigurations`' parser no longer coerces (no field it reads
+  was affected).
+- Every parser in the package now shares one set of options
+  (`XML_TEXT_OPTIONS`, internal) or turns both coercions off, pinned by a
+  source check: no tag or attribute value is coerced, and in the readings
+  named above references decode as an XML parser decodes them.
 
 ## [0.27.0] - 2026-11-22
 
