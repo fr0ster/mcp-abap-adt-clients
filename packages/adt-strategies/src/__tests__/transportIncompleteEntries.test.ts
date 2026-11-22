@@ -196,6 +196,130 @@ describe('transportObjectEntryList: an entry without a name or a type is kept', 
   });
 });
 
+/** TASK_WITH_OBJECTS, the second entry's attribute `from` replaced by `to`. */
+const secondEntryWith = (from: string, to: string): string => {
+  if (!TASK_WITH_OBJECTS.includes(from)) throw new Error(`not in: ${from}`);
+  return TASK_WITH_OBJECTS.replace(from, to);
+};
+
+/** A name or a type written as two encoded spaces: blank once decoded and trimmed. */
+const ENCODED_BLANK = '&#32;&#x20;';
+const TASK_BLANK_NAME = secondEntryWith(
+  SECOND_NAME,
+  ` tm:name="${ENCODED_BLANK}"`,
+);
+const TASK_BLANK_TYPE = secondEntryWith(
+  ' tm:type="METH"',
+  ` tm:type="${ENCODED_BLANK}"`,
+);
+
+describe('a blank name or type is missing in both complete readings', () => {
+  it('an encoded blank name: in incompleteEntries, the name absent', () => {
+    const item = readTransportItem(TASK_BLANK_NAME, TASK);
+    if (item.kind !== 'task') throw new Error('expected a task');
+    const list = parseObjectEntryList(TASK_BLANK_NAME);
+    for (const [objects, incomplete] of [
+      [item.objects, item.incompleteEntries],
+      [list.entries, list.incompleteEntries],
+    ] as const) {
+      expect(objects.map((o) => o.name)).toEqual(['ZCL_ONE']);
+      expect(incomplete).toEqual([METHOD_WITHOUT_NAME]);
+      expect(incomplete?.map((e) => 'name' in e)).toEqual([false]);
+    }
+  });
+
+  it('an encoded blank type: in incompleteEntries, the type absent', () => {
+    const item = readTransportItem(TASK_BLANK_TYPE, TASK);
+    if (item.kind !== 'task') throw new Error('expected a task');
+    const list = parseObjectEntryList(TASK_BLANK_TYPE);
+    for (const incomplete of [item.incompleteEntries, list.incompleteEntries]) {
+      expect(incomplete).toEqual([
+        {
+          task: TASK,
+          pgmid: 'LIMU',
+          name: 'ZCL_ONE                       RUN',
+          position: '000002',
+          info: 'Method',
+        },
+      ]);
+      expect(incomplete?.map((e) => 'type' in e)).toEqual([false]);
+    }
+  });
+
+  it('the legacy array is unchanged: it answers the blank-named entry as before', () => {
+    // Pinned as it was: the array is not where 0.28.2 changes anything.
+    expect(parseObjectEntries(TASK_BLANK_NAME).map((e) => e.name)).toEqual([
+      'ZCL_ONE',
+      '  ',
+    ]);
+    expect(parseObjectEntries(TASK_BLANK_TYPE).map((e) => e.type)).toEqual([
+      'CLAS',
+      '  ',
+    ]);
+  });
+});
+
+describe('transportObjectEntryList keeps what the entry carries, as decoded', () => {
+  it('a typeless entry is in incompleteEntries', () => {
+    expect(parseObjectEntryList(TASK_TYPELESS_ENTRY).incompleteEntries).toEqual(
+      [
+        {
+          task: TASK,
+          pgmid: 'LIMU',
+          name: 'ZCL_ONE                       RUN',
+          position: '000002',
+          info: 'Method',
+        },
+      ],
+    );
+  });
+
+  it('a reference in a name or a type is decoded, complete or not', () => {
+    const encoded = secondEntryWith(
+      SECOND_NAME,
+      ' tm:name="Z&amp;ONE"',
+    ).replace(' tm:type="CLAS"', ' tm:type="C&amp;S"');
+    const list = parseObjectEntryList(encoded);
+    expect(list.entries).toEqual([
+      expect.objectContaining({ name: 'ZCL_ONE', type: 'C&S' }),
+      expect.objectContaining({ name: 'Z&ONE', type: 'METH' }),
+    ]);
+    const typeless = without(encoded, ' tm:type="METH"');
+    expect(parseObjectEntryList(typeless).incompleteEntries).toEqual([
+      expect.objectContaining({ name: 'Z&ONE' }),
+    ]);
+    const nameless = without(TASK_WITH_OBJECTS, SECOND_NAME).replace(
+      ' tm:type="METH"',
+      ' tm:type="M&amp;TH"',
+    );
+    expect(parseObjectEntryList(nameless).incompleteEntries).toEqual([
+      expect.objectContaining({ type: 'M&TH' }),
+    ]);
+    const item = readTransportItem(nameless, TASK);
+    if (item.kind !== 'task') throw new Error('expected a task');
+    expect(item.incompleteEntries).toEqual([
+      expect.objectContaining({ type: 'M&TH' }),
+    ]);
+  });
+
+  it('an absent field is no key at all, in either reading', () => {
+    const item = readTransportItem(CLOUD_TASK_NAMELESS_ENTRY, TASK);
+    if (item.kind !== 'task') throw new Error('expected a task');
+    const list = parseObjectEntryList(CLOUD_TASK_NAMELESS_ENTRY);
+    for (const incomplete of [item.incompleteEntries, list.incompleteEntries]) {
+      const [entry] = incomplete ?? [];
+      if (entry === undefined) throw new Error('expected an entry');
+      expect(Object.keys(entry).sort()).toEqual([
+        'pgmid',
+        'position',
+        'task',
+        'type',
+      ]);
+      expect('name' in entry).toBe(false);
+    }
+  });
+});
+
 describe('transportObjectEntries is the array it was', () => {
   it('answers the complete entries only, and carries nothing on the array', () => {
     const entries = transportObjectEntries(wire(TASK_NAMELESS_ENTRY));
