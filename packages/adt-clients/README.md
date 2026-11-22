@@ -16,6 +16,11 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 > **From 18.x?** Read [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md)
 > first: 19.0.0 is where members became one endpoint call each.
 >
+> **From 46.x?** 47.0.0 (with adt-strategies 0.28.0): `INamedItem.description`
+> is optional; `SystemMessages.getById` is gone (SAP routes no single
+> message); the system-message and gateway-error readings answer what SAP
+> writes. See [`docs/usage/MIGRATION-47.md`](docs/usage/MIGRATION-47.md).
+>
 > **On a cloud client, 46.1.0** (on `interfaces-adt` ^30.1.0) requires
 > `isWritableByAMDP` in a settings write — 46.0.0 reset it on every cloud
 > write — and adds `patchMetadata` to `getTableSettings()`. See the

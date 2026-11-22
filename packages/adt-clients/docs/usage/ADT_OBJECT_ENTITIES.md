@@ -306,4 +306,4 @@ Classes under `src/runtime/`. Most are handed out by `AdtRuntimeClient`; a class
 
 ### SystemMessages
 - Source: `src/runtime/systemMessages/SystemMessages.ts`
-- Public methods: `getById`, `list`
+- Public methods: `list`

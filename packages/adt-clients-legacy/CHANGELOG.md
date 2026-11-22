@@ -4,6 +4,16 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [0.11.2] - 2026-11-22
+
+Released with `@mcp-abap-adt/adt-clients` 47.0.0. Its peer range is
+`^46.1.0 || ^47.0.0` (it was `^46.1.0`): this package uses none of what
+47.0.0 removes or changes (the system-message read by id, `INamedItem`, the
+feed readings), so both majors serve it. No code changed; its tests run on
+the workspace's 47.0.0 and adt-strategies 0.28.0, and the legacy transport
+list's test answers the empty list 7.40 SP04 was measured to send (a root that
+names whose list it is).
+
 ## [0.11.1] - 2026-11-19
 
 Released with `@mcp-abap-adt/adt-clients` 46.1.0, on

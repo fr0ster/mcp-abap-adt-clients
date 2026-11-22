@@ -631,10 +631,9 @@ Type exports that left with their readings: `ObjectVersion` (now
 `ITransportTreeTask`, `ICreatedTransport`, `ITransportObjectEntry` — all from
 adt-strategies now. `IObjectReference` comes from `@mcp-abap-adt/interfaces-adt`,
 as it always did. `INamedItem` is still exported here, and from adt-strategies.
-Since adt-clients 46.3.0 (adt-strategies 0.28.0) its `description` is optional —
+Since adt-clients 47.0.0 (adt-strategies 0.28.0) its `description` is optional —
 absent where the type catalogue carries none, which `utilNamedItems` read as
-`''` before: a caller that reads it as a `string` checks for absence
-(`item.description ?? ''` keeps the old value).
+`''` before: see [MIGRATION-47](MIGRATION-47.md).
 `PackageHierarchyCodeFormat` and `PackageHierarchySupportedType` are gone: they
 described a walk that left in 19.0.0.
 

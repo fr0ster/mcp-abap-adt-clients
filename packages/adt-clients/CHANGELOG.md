@@ -24,23 +24,52 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [46.3.0] - 2026-11-22
+## [47.0.0] - 2026-11-22
 
 Released with `@mcp-abap-adt/adt-strategies` 0.28.0 (published first; the
-range is now `^0.28.0`). A minor release: one exported type changed.
+range is now `^0.28.0`). A major: the breaking changes below. Migration:
+[`docs/usage/MIGRATION-47.md`](docs/usage/MIGRATION-47.md).
 
-### Changed — incompatible for a caller that reads it
+### Breaking
 
 - **`INamedItem.description` is optional** (it was `string`), as in
-  adt-strategies 0.28.0, whose `utilNamedItems` answers the type catalogue
-  for the `types` slot and leaves an absent description absent. With the two
-  disagreeing, the documented pairing
-  `getUtils({ ...utilDocuments, types: utilNamedItems })` failed to compile
-  against this package's `INamedItem` (TS2322); pinned by
-  `unit/shared/namedItemPairing.test.ts`. **Migration:** a caller that read
-  `item.description` as a `string` checks for absence —
-  `item.description ?? ''` keeps the 46.2.0 value. `docs/usage/MIGRATION-23.md`
-  says the same. No other type is declared both here and in adt-strategies.
+  adt-strategies 0.28.0, whose `utilNamedItems` fills the `types` slot and
+  leaves an absent description absent. With the two disagreeing, the
+  documented pairing `getUtils({ ...utilDocuments, types: utilNamedItems })`
+  failed to compile against this package's `INamedItem` (TS2322); pinned by
+  `unit/shared/namedItemPairing.test.ts`. A strict consumer that reads
+  `item.description` as a `string`, or forwards the item where a required
+  `description` is declared, no longer compiles. No other type is declared
+  both here and in adt-strategies.
+- **`SystemMessages.getById`, `getSystemMessage` and the `message` slot of
+  `ISystemMessagesResults` / `systemMessagesDocuments` are removed.** They
+  asked for `/runtime/systemmessages/{id}`, a route SAP does not register:
+  `CL_STSK_ADT_RES_APP->register_resources` (l. 31-48, the same on premise
+  and on the cloud) registers the collection alone. `SystemMessages`
+  implements `ISystemMessages` without `getById`. Each listed message
+  carries its text, id, creation and author.
+- **The system-message readings lose `severity`, `validFrom` and `validTo`**
+  (adt-strategies `ISystemMessageEntry`): SAP writes none of them
+  (`CL_STSK_ADT_RES_SYSTEM_MESSAGE`, `lcl_atom_service->map_feed_entry`); the
+  entry carries `messageId`, `text` (every line), `createdOn`, `createdBy`,
+  `author`, `updated`.
+- **The gateway error readings' entries changed shape** (adt-strategies
+  `IGatewayErrorEntry`, every field optional): `transactionId` is the
+  `Transaction ID` cell (it was the `atom:id`), `username` the name alone
+  (`userId` beside it), the title's prefix is `kind`; new `opid` and
+  `detailUri`. `feedGatewayErrorDetail` refuses an answer that names no
+  error (an unknown OPID's empty skeleton, an empty body).
+
+### Changed
+
+- **The gateway error document is asked for as `text/html`**
+  (`GatewayErrorLog.getById`, `FeedRepository.gatewayErrorDetail`; it was
+  `application/xml` and the Atom feed type): `/IWBEP/CL_ERROR_LOG_VIEWER->get`
+  negotiates against `text/html` alone (onprem l. 89-93, cloud l. 93-97).
+  `getGatewayError`'s `errorId` is documented as what the viewer takes — the
+  OPID (l. 59/73), not the transaction id — and its kind as the system's
+  viewer spells it (`BackendError` on premise, `Backend Error` on the cloud,
+  l. 57); an entry's `detailUri` carries both.
 
 ### What the readings now answer
 
@@ -69,20 +98,11 @@ readings answer when a caller passes them:
 - The feed readings (`FeedRepository`'s slots): text as written (`0042` no
   longer `42`), references decoded (`&amp;` in an `href` is `&`), and an
   entry with several links, authors or categories read.
-- `feedGatewayErrors` / `feedGatewayErrorDetail` (`getFeeds().gatewayErrors`,
-  `gatewayErrorDetail`, `GatewayErrorLog`): read the summary's table and the
-  error's HTML as SAP answers them (measured on the cloud). `type`,
-  `package`, `applicationComponent`, `client`, `requestKind` and the whole
-  detail came back empty; `transactionId` is the summary's Transaction ID (it
-  was the `atom:id`, now `id`), `shortText` loses the `Frontend Error: `
-  prefix (now `kind`), `username` is the name (the id is `userId`); new
-  `detailUri` / `errorId`. Every entry field is optional and absent when not
-  carried.
-- `feedSystemMessages`: `severity`, `validTo` (and `validFrom`, which fell
-  back to `updated`) came back `''`; they carry the entry's values (entry
-  shape not measured). Where an entry carries both a category and
-  `sm:severity`, the category's `term` is the `severity`; whether SAP sends
-  both is unverified.
+- `feedGatewayErrors` / `feedGatewayErrorDetail` and `feedSystemMessages`:
+  read what SAP writes — see Breaking above and adt-strategies' changelog.
+- The inactive list, read by `utilInactiveObjects` and the activation
+  verdict through one reader, fails closed: a list it cannot read whole is
+  refused, never read as nothing inactive.
 - New: `transportItem(number)`, a request or task document read as what it
   is.
 

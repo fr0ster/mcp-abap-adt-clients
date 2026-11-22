@@ -16,7 +16,7 @@ The tags made before the packages moved under `packages/` are
 
 ## [0.28.0] - 2026-11-22
 
-Released with `@mcp-abap-adt/adt-clients` 46.3.0. The readings the server
+Released with `@mcp-abap-adt/adt-clients` 47.0.0. The readings the server
 team found reading something other than what the document holds, fixed on
 the documents they were found with, and one new reading.
 
@@ -33,7 +33,9 @@ nested-parent `TASK_UNDER_PARENT`, `TRANSPORT_CREATED` —, the numeric
 character reference in a search hit (`SEARCH_ENTITY`), the named items with
 an omitted description (`NAMED_ITEMS`), and every variant a test builds from
 a recording (each says so); `src/__tests__/serverDocuments.ts` names each
-server document's source.
+server document's source. Every recorded document is scrubbed: users, hosts,
+clients (the task documents' `tm:source_client` is `CLIENT1`), application
+servers and other users' object names replaced.
 
 ### Added
 
@@ -85,7 +87,7 @@ server document's source.
   reference XML does not define (`&nbsp;`) stays as written.
 - **`utilNamedItems`** / `readNamedItems` coerce nothing (`007` stayed `7`)
   and leave an absent description absent (`description` is optional now; it
-  was `''`) — adt-clients' own `INamedItem` follows in 46.3.0.
+  was `''`) — adt-clients' own `INamedItem` follows in 47.0.0.
 - **`transportTree`** (`parseTransportTree`) refuses in fixed words —
   `parseTransportTree: the answer is no transport list` — with nothing of the
   body (it quoted up to 200 characters and the root it found), and refuses a
@@ -94,6 +96,13 @@ server document's source.
   (`adtcore:name` on the root, the recorded empty list) reads as before.
   `tm:long_desc` text is no longer coerced.
 - **`utilNodeContents`** keeps each object's `DESCRIPTION`.
+- **One reader of the inactive list for both readings** (`utilInactiveObjects`
+  and the activation verdict): names by namespace URI, not prefix, the same
+  reference decoding, and **fail closed** — an entry, object or reference of
+  another name, a reference without `adtcore:name`, or text where the list
+  has elements refuses the whole list (`utilInactiveObjects` throws,
+  `stillInactiveAmong` answers `null`, which the verdict reads as not
+  decided), never an empty one.
 - **`stillInactiveAmong`** (the activation verdict's reading of the inactive
   list) reads every `ioc:ref` of every `ioc:object` of an entry, as
   `utilInactiveObjects` does; it read one, and none when either repeated —
@@ -110,23 +119,30 @@ server document's source.
   reads the entry's own link (`rel` absent or `alternate`, else the first),
   and the first author and category.
 - **`feedGatewayErrors`** and **`feedGatewayErrorDetail`** read what SAP
-  answers. Measured on the cloud (2026-11-22, 115 entries): an entry holds
-  `atom:id`, `title`, `updated`, `author/name` and an HTML `summary`; every
-  other field is a cell of the summary's `Header Information` table, and the
-  error's own document is HTML, not the XML `errorEntry` the detail reading
-  parsed. Pinned on the scrubbed recordings (`fixtures/feeds/`). What a
-  caller sees:
+  answers. Grounded in SAP's code, read on premise and on the cloud
+  (`/IWBEP/CL_ERROR_LOG_FEED_PROV->build_feed`,
+  `/IWBEP/CL_ERROR_LOG_FORMATTER->build_html` / `build_for_header`,
+  `/IWBEP/CL_ERROR_LOG_VIEWER->get`), and measured on the cloud (2026-11-22,
+  115 entries): an entry holds `atom:id`, `title`, `updated`, `author/name`
+  and an HTML `summary`; every other field is a cell of the summary's
+  `Header Information` table; the error's own document is HTML on both
+  systems, not the XML `errorEntry` the detail reading parsed. Pinned on the
+  scrubbed recordings (`fixtures/feeds/`) and on variants written from the
+  code. What a caller sees:
   - `type`, `package`, `applicationComponent`, `client`, `requestKind` read
     `''`; they carry the cells now.
-  - `transactionId` was the `atom:id`; it is the `Transaction ID` cell. The
-    `atom:id` is the new `id`.
+  - `transactionId` was the `atom:id`; it is the `Transaction ID` cell, without
+    the `(Replay in GW Client)` link or `(Not replayable in GW Client)` note
+    SAP may append. The `atom:id` is the new `id`.
   - `shortText` kept the title's `Frontend Error: ` prefix; it is the
     `Short Text` cell (the title's remainder when there is none), and the
     prefix is the new `kind`.
   - `username` was `name (id)`; it is the name, the id the new `userId`.
-  - New: `detailUri` (the summary's `HTTP link` as a path) and `errorId`, its
-    last segment — what the error's own document is addressed by. It is not
-    the transaction id.
+  - New: `opid` (the id's second segment; the id is `Kind/opid` on premise,
+    `Kind/opid/timestamp` on the cloud, the kind's spaces removed) and
+    `detailUri`, built from the entry's own id: the viewer looks an error up
+    by its OPID, not its transaction id, and reads the Backend log for
+    `BackendError` on premise and `Backend Error` on the cloud.
   - Every field of `IGatewayErrorEntry` is optional now and absent when the
     entry does not carry it, never `''` (a Backend entry measured with no
     short text). A caller that read them as `string` checks for absence.
@@ -135,19 +151,35 @@ server document's source.
     (`errorInfo`, `resolution`, each exception with `text`, `raiseLocation`,
     `attributes` — `text` optional now — and, new, the whole `tree`), the
     source extract (the highlighted line numbered after the one before it,
-    `errorLine` optional now) and the call stack, numbers converted from their
-    text. Its `dateTime` is the `Date/Time` cell as written.
-  - The on-premise feed answered no entry, so its entry shape is not
-    measured.
-- **`feedSystemMessages`** reads `severity`, `validFrom` and `validTo` by local
-  name: they were looked up as `sm:…`, which the parser's prefix stripping
-  had removed, so they read `''` (`validFrom` fell back to `updated`). **Not
-  measured:** the feed answered no entry on either system, and SAP's handler
-  code was not read; the test entry is written. When an entry carries both a
-  category and `sm:severity` the category's `term` is read; whether SAP sends
-  both is unverified.
+    or before the one after it when it comes first; `errorLine` optional
+    now) and the call stack, numbers converted from their text. Its
+    `dateTime` is the `Date/Time` cell as written. It **refuses** an answer
+    that names no error — the empty skeleton SAP renders for an unknown id
+    (no 404 path), an empty body.
+  - The on-premise feed answered no entry, so its entry shape is from the
+    code alone.
+- **`feedSystemMessages`** reads what SAP writes
+  (`CL_STSK_ADT_RES_SYSTEM_MESSAGE->get_feed`, `lcl_atom_service->
+  map_feed_entry`, the same on both systems): a plain Atom entry with an HTML
+  summary — no `sm:` element. `ISystemMessageEntry` is now `id`, `messageId`,
+  `title`, `text` (every line; it read `content`, which SAP never writes),
+  `createdOn`, `updated`, `createdBy` and `author`, each optional;
+  **`severity`, `validFrom` and `validTo` are removed** — SAP writes none of
+  them (the expiry only filters the rows). Not measured: both systems held no
+  message; the test entry is built from the code.
 - `parseSearchConfigurations`' parser no longer coerces (no field it reads
   was affected).
+- **A CDATA section is kept as written** (`XML_TEXT_OPTIONS` parses it apart
+  with the parser's own `cdataPropName`; references decode in text and
+  attribute values only).
+- **Reference decoding is one linear pass** (the XML and the HTML decoder
+  alike): a text of many `&` and one late `;` was read once per `&`.
+- **A parser's own error never reaches a reading's caller**: every parse is
+  caught, and the reading answers its empty shape or its fixed-word refusal
+  (an entity name the parser refuses in a DTD, nesting past its limit).
+- **`featureToggleRuntimeState` / `featureToggleCheckState`** refuse a body
+  that is no JSON in fixed words (`featureToggle: the answer is no JSON
+  document`); `JSON.parse`'s message quoted the body.
 - Every parser in the package now shares one set of options
   (`XML_TEXT_OPTIONS`, internal) or turns both coercions off, pinned by a
   source check: no tag or attribute value is coerced, and in the readings

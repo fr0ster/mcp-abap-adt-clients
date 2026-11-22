@@ -2904,8 +2904,12 @@ allowed could not work. Required since `@mcp-abap-adt/interfaces@26.0.0`.
 const sysMsgs = runtime.getSystemMessages();
 
 const list = await sysMsgs.list();
-const msg = await sysMsgs.getById(id);
 ```
+
+There is no read of one message: SAP routes `/runtime/systemmessages` alone
+(`CL_STSK_ADT_RES_APP->register_resources`), and `getById`, which asked for
+`/{id}`, left in 47.0.0. Each message of the list carries its text, id,
+creation and author; `feedSystemMessages` reads them.
 
 ### Gateway Error Log
 
@@ -2913,7 +2917,10 @@ const msg = await sysMsgs.getById(id);
 const gwLog = runtime.getGatewayErrorLog();
 
 const list = await gwLog.list();
-const entry = await gwLog.getById(type, id);
+// The kind as this system's viewer takes it and the error's OPID — not its
+// transaction id. feedGatewayErrors answers both in an entry's `detailUri`
+// (and `opid`); the answer is HTML, read by feedGatewayErrorDetail.
+const entry = await gwLog.getById(type, opid);
 ```
 
 ## Debugging
