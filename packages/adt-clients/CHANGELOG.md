@@ -33,11 +33,13 @@ installed). No code or type change.
 ### Fixed
 
 - **`docs/usage/ERRATA.md`** (shipped in the package) matches adt-strategies
-  0.28.2: the transport entry says a `tm:abap_object` without a name or a
-  type is answered in `incompleteEntries` and counted, not dropped.
+  0.28.2: the transport entry says `transportObjectEntries` leaves out a
+  `tm:abap_object` without a name or a type, and that the complete
+  readings — the new `transportObjectEntryList`, and `transportItem`'s task
+  item — answer it in `incompleteEntries` and count it.
 - **`docs/usage/CLIENT_API_REFERENCE.md`** (shipped) says the same for
-  `readObjects()` with `transportObjectEntries` and with
-  `transportItem(number)`.
+  `readObjects()` with `transportObjectEntries` /
+  `transportObjectEntryList` and with `transportItem(number)`.
 
 ## [47.0.1] - 2026-11-23
 

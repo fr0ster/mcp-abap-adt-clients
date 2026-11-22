@@ -940,10 +940,12 @@ had:
   (`task`), each entry once — a request's `tm:all_objects`, which repeats its
   tasks' entries, is not read beside them (adt-strategies 0.28.0; before, a
   request's entries came twice and none named its task) —, rather than a
-  document to dig through. An entry SAP lists without a name or a type is
-  in the answer's `incompleteEntries` (adt-strategies 0.28.2; dropped before),
-  present only when there is one — a copy of the array does not carry it (its
-  default, like every member's, is the document). The header it
+  document to dig through (its
+  default, like every member's, is the document). `transportObjectEntries`
+  leaves out an entry SAP lists without a name or a type; the complete
+  reading is `transportObjectEntryList` (adt-strategies 0.28.2), which
+  answers `{ entries, incompleteEntries? }`, such an entry in
+  `incompleteEntries`, present only when there is one. The header it
   sends changes nothing: measured against an on-premise system, 2026-09-21,
   the same URL with and without
   `application/vnd.sap.adt.transportorganizer.v1+xml` came back byte for byte

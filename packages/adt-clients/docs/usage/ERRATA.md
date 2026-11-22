@@ -172,10 +172,11 @@ it; a document where none or both name it is refused, and so is an
 unmarked task document asked for by its parent's number (SAP marks every
 task document, so that case is defensive; until 0.28.1 it read as the
 parent). `transportObjectEntries`
-reads either document's entries per task, each once. Since 0.28.2 neither
-drops an entry SAP lists: one without `tm:name` or `tm:type` is answered in
-`incompleteEntries` (a task's item, the entries' array), the field it lacks
-absent, and a request's per-task `objectCount` counts it.
+reads either document's entries per task, each once, and leaves out an
+entry without `tm:name` or `tm:type`. The complete readings (0.28.2) keep
+it: `transportObjectEntryList` answers `{ entries, incompleteEntries? }`,
+and `transportItem`'s task item has `incompleteEntries`, the field the
+entry lacks absent; a request's per-task `objectCount` counts it.
 
 ## A node SAP cannot load is answered as a tree line
 
