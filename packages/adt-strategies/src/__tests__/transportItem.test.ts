@@ -41,7 +41,7 @@ describe('transportItem reads a request or a task document', () => {
       statusText: 'Modifiable',
       owner: 'SAPUSER01',
       target: '',
-      client: '100',
+      client: 'CLIENT1',
       ctsProject: '',
       lastChanged: '20261122090956',
     });
@@ -54,7 +54,7 @@ describe('transportItem reads a request or a task document', () => {
       statusText: 'Modifiable',
       owner: 'SAPUSER01',
       target: '/SIDTOQAS/',
-      client: '100',
+      client: 'CLIENT1',
       ctsProject: '',
       lastChanged: '20261122090950',
     });
@@ -81,7 +81,7 @@ describe('transportItem reads a request or a task document', () => {
       description: 'A request',
       type: 'K',
       target: '/SIDTOQAS/',
-      client: '100',
+      client: 'CLIENT1',
     });
     expect(item.header.lastChanged).toBeUndefined();
     expect(
