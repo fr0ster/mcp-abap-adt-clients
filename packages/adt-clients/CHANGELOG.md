@@ -38,6 +38,8 @@ installed). No code or type change.
   without its name, technical name or URI in `incompleteObjects`), and the
   transport entry now says `transportItem(number)` picks the item by the
   number asked.
+- **`docs/usage/CLIENT_API_REFERENCE.md`** (shipped) states the same
+  selection rule for `transportItem(number)`.
 
 ## [47.0.0] - 2026-11-22
 
