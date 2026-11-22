@@ -38,7 +38,6 @@ import {
   contextTree,
   elementsOf,
   findNode,
-  firstHref,
   htmlText,
   type IGatewayContextNode,
   labelledRows,
@@ -71,14 +70,38 @@ export interface IFeedVariant {
 
 // --- System message types ---
 
+/**
+ * One SM02 system message, as `/runtime/systemmessages` writes it.
+ *
+ * Built from SAP's code, the same on premise and on the cloud
+ * (`CL_STSK_ADT_RES_SYSTEM_MESSAGE->get_feed`, `lcl_atom_service->
+ * map_feed_entry`, implementations include l. 415-451): a plain Atom entry —
+ * `id` `uuid:<message id>`, `updated` / `published` the creation time,
+ * `author/name`, `title` the first text line — whose `summary` (HTML) holds
+ * every text line (`convert_textlines_to_html`, l. 454-474) and a table of
+ * `Created on (System Timestamp)`, `Message ID` and `Created by`
+ * (`get_header_as_html`, l. 486-511). No `sm:` element, no severity and no
+ * validity is written (the expiry only filters the rows, l. 129-147). Not
+ * measured: both systems held no message. Every field is absent when the
+ * entry does not carry it.
+ */
 export interface ISystemMessageEntry {
-  id: string;
-  title: string;
-  text: string;
-  severity: string;
-  validFrom: IAbapTimestamp;
-  validTo: IAbapTimestamp;
-  createdBy: string;
+  /** `atom:id` — `uuid:<message id>`. */
+  id?: string;
+  /** The `Message ID` cell (SM02's id). */
+  messageId?: string;
+  /** `atom:title` — the first text line. */
+  title?: string;
+  /** Every text line of the summary, joined by `\n`. */
+  text?: string;
+  /** The `Created on (System Timestamp)` cell, as SAP renders it (system time). */
+  createdOn?: string;
+  /** `atom:updated` — the creation time, UTC. */
+  updated?: IAbapTimestamp;
+  /** The `Created by` cell. */
+  createdBy?: string;
+  /** `atom:author/atom:name`. */
+  author?: string;
 }
 
 // --- Gateway error types ---
@@ -86,24 +109,42 @@ export interface ISystemMessageEntry {
 /**
  * One entry of `gw/errorlog`, read.
  *
- * **Measured on the cloud, 2026-11-22 (115 entries):** an entry holds
- * `atom:id`, `atom:title`, `atom:updated`, `atom:author/atom:name` and an
- * `atom:summary type="html"` — no category, no link, no extension element.
- * Everything else is a cell of the summary's `Header Information` table, read
- * by its label (`gatewayHtml.ts`). Every field is absent when the entry does
+ * **Code** (`/IWBEP/CL_ERROR_LOG_FEED_PROV->build_feed`, onprem from l. 185,
+ * cloud from l. 134), **measured on the cloud** (2026-11-22, 115 entries): an
+ * entry holds `atom:author/atom:name` (`USER (Full Name)`), `atom:title`
+ * (`<kind>: <text>`), `atom:id`, `atom:updated` and an `atom:summary
+ * type="html"` built by `/IWBEP/CL_ERROR_LOG_FORMATTER->build_html` — no
+ * category, no link, no extension element. Everything else is a cell of the
+ * summary's `Header Information` table (`build_for_header`, l. 368: `Type`,
+ * `Short Text`, `Transaction ID`, `Package`, `Application Component`,
+ * `Date/Time`, `Username`, `Client`, `Request Kind`, in that order), read by
+ * its label (`gatewayHtml.ts`). The labels are text symbols, so a logon in
+ * another language may write them translated (inference). Every field is absent when the entry does
  * not carry it, never `''` (until 0.28.0 each was a string, and all but
  * `shortText`, `dateTime` and `username` read `''`).
  */
 export interface IGatewayErrorEntry {
-  /** `atom:id` — `{Type without the space}/{errorId}/{timestamp}`. */
+  /**
+   * `atom:id`: `{kind, spaces removed}/{opid}` on premise, and
+   * `{kind}/{opid}/{timestamp}` on the cloud
+   * (`/IWBEP/CL_ERROR_LOG_FEED_PROV->build_feed`: onprem l. 263-264, cloud
+   * l. 188-189).
+   */
   id?: string;
+  /** The OPID — the id's second segment; what the error's own document is addressed by. */
+  opid?: string;
   /** The title's prefix before `: ` — `Frontend Error`, `Backend Error`. */
   kind?: string;
   /** The `Type` cell. */
   type?: string;
   /** The `Short Text` cell; the title without its prefix when there is none. */
   shortText?: string;
-  /** The `Transaction ID` cell (until 0.28.0 this was the `atom:id`). */
+  /**
+   * The `Transaction ID` cell, without the `(Replay in GW Client)` link or
+   * `(Not replayable in GW Client)` note SAP may append to it
+   * (`/IWBEP/CL_ERROR_LOG_FORMATTER->build_for_header`, onprem l. 389-398,
+   * cloud l. 388-397). Until 0.28.0 this was the `atom:id`.
+   */
   transactionId?: string;
   /** The `Package` cell. */
   package?: string;
@@ -123,17 +164,24 @@ export interface IGatewayErrorEntry {
   /** The `Request Kind` cell. */
   requestKind?: string;
   /**
-   * The error's own document, as a path — the summary's `HTTP link`, from
-   * `/sap/bc/adt/` on. Its last segment is `errorId`, not `transactionId`.
+   * The error's own document, as a path, built from the entry's own id:
+   * `/sap/bc/adt/gw/errorlog/{kind}/{opid}`. The viewer reads the Backend
+   * log when the kind is `BackendError` on premise and `Backend Error` on the
+   * cloud (`/IWBEP/CL_ERROR_LOG_VIEWER->get` l. 57 on each), so the kind is
+   * the id's own segment for an on-premise id (two segments) and the `Type`
+   * cell, its space kept, for a cloud id (three). The summary's `HTTP link`
+   * writes the spaced kind on both systems, which on premise misses the
+   * Backend log (code; the call itself is not measured).
    */
   detailUri?: string;
-  /** The error's id in `detailUri` — what `getGatewayError(type, id)` takes. */
-  errorId?: string;
 }
 
 /**
- * One error in full — the document `gw/errorlog/{type}/{id}` answers, which
- * is HTML (measured: an empty content type, for both `Accept`s), not XML.
+ * One error in full — the document `gw/errorlog/{kind}/{opid}` answers
+ * (`/IWBEP/CL_ERROR_LOG_VIEWER->get`, l. 26): `build_html`'s HTML on both
+ * systems, not XML, its content type negotiated against `text/html` alone
+ * (onprem l. 89-93, cloud l. 93-97; measured: an empty content type when
+ * `Accept` names something else).
  * The header fields are its `Header Information` table's.
  */
 export interface IGatewayErrorDetail extends IGatewayErrorEntry {
@@ -318,22 +366,48 @@ function parseFeedVariants(xml: string): IFeedVariant[] {
  * Parse Atom XML system messages feed into ISystemMessageEntry array
  */
 function parseSystemMessages(xml: string): ISystemMessageEntry[] {
-  return feedEntriesOf(xml).map((entry) => ({
-    id: str(field(entry, 'id')),
-    title: elementText(field(entry, 'title')),
-    // System message fields may be in the content or as extensions
-    text: elementText(field(entry, 'content')),
-    severity: str(categoryTerm(entry) ?? field(entry, 'severity')),
-    validFrom: str(field(entry, 'validFrom') ?? field(entry, 'updated')),
-    validTo: str(field(entry, 'validTo')),
-    createdBy: str(authorName(entry)),
-  }));
+  return feedEntriesOf(xml).map((entry) => {
+    const summary = elementText(field(entry, 'summary'));
+    const tableAt = summary.indexOf('<table');
+    const textPart = tableAt < 0 ? summary : summary.slice(0, tableAt);
+    const rows = labelledRows(tableAt < 0 ? undefined : summary.slice(tableAt));
+    // `<P>line</BR>line</BR></P>`, each space written `&nbsp;`
+    // (`make_html_conform`, l. 537-544).
+    const lines = textPart
+      .split('</BR>')
+      .map((line) => htmlText(line).split('\u00a0').join(' ').trim())
+      .filter((line) => line !== '');
+    return present({
+      id: leafText(field(entry, 'id')),
+      messageId: cell(rows, 'Message ID'),
+      title: elementText(field(entry, 'title')) || undefined,
+      text: lines.length === 0 ? undefined : lines.join('\n'),
+      createdOn: cell(rows, 'Created on (System Timestamp)'),
+      updated: leafText(field(entry, 'updated')),
+      createdBy: cell(rows, 'Created by'),
+      author: authorName(entry),
+    });
+  });
 }
 
 /** A cell of a labelled table, as text; absent when the label is not there or the cell is empty. */
 function cell(rows: Map<string, string>, label: string): string | undefined {
   const value = rows.get(label);
   return value === undefined ? undefined : cellText(value);
+}
+
+/**
+ * A cell's text before its first tag: the `Transaction ID` cell is the id,
+ * then `&nbsp;` and a link or a note (`build_for_header`, see `transactionId`).
+ */
+function cellBeforeMarkup(
+  rows: Map<string, string>,
+  label: string,
+): string | undefined {
+  const value = rows.get(label);
+  if (value === undefined) return undefined;
+  const tag = value.indexOf('<');
+  return cellText(tag < 0 ? value : value.slice(0, tag));
 }
 
 /** `name (id)` into its two parts; a text without ` (` is the name alone. */
@@ -358,7 +432,7 @@ function headerFields(html: string): IGatewayErrorEntry {
   const fields: Record<string, string | undefined> = {
     type: cell(rows, 'Type'),
     shortText: cell(rows, 'Short Text'),
-    transactionId: cell(rows, 'Transaction ID'),
+    transactionId: cellBeforeMarkup(rows, 'Transaction ID'),
     package: cell(rows, 'Package'),
     applicationComponent: cell(rows, 'Application Component'),
     dateTime: cell(rows, 'Date/Time'),
@@ -380,27 +454,22 @@ function present(
   return kept;
 }
 
-const ADT_PATH = '/sap/bc/adt/';
-
-/** The summary's `HTTP link`, as a path from `/sap/bc/adt/`, and its last segment. */
-function detailAddress(html: string): { detailUri?: string; errorId?: string } {
-  const heading = html.indexOf('HTTP link');
-  if (heading < 0) return {};
-  const href = firstHref(html.slice(heading));
-  if (href === undefined) return {};
-  const at = href.indexOf(ADT_PATH);
-  if (at < 0) return {};
-  const detailUri = href.slice(at);
-  const last = detailUri.slice(detailUri.lastIndexOf('/') + 1);
-  let errorId: string | undefined;
-  try {
-    errorId = decodeURIComponent(last);
-  } catch {
-    errorId = undefined;
+/** The entry's id, read: the OPID, and the kind segment the viewer takes. */
+function idParts(
+  id: string | undefined,
+  type: string | undefined,
+): { opid?: string; detailUri?: string } {
+  if (id === undefined) return {};
+  const segments = id.split('/');
+  const [kindSegment, opid] = segments;
+  if (kindSegment === undefined || opid === undefined || opid === '') {
+    return {};
   }
-  return errorId === undefined || errorId === ''
-    ? { detailUri }
-    : { detailUri, errorId };
+  const kind = segments.length >= 3 ? (type ?? kindSegment) : kindSegment;
+  return {
+    opid,
+    detailUri: `/sap/bc/adt/gw/errorlog/${encodeURIComponent(kind)}/${encodeURIComponent(opid)}`,
+  };
 }
 
 /**
@@ -427,10 +496,14 @@ function parseGatewayErrors(xml: string): IGatewayErrorEntry[] {
         shortText: header.shortText ?? (rest === '' ? undefined : rest),
         dateTime: updated,
       }),
-      ...detailAddress(summary),
+      ...idParts(id, header.type ?? kind),
     };
   });
 }
+
+/** The words an answer that names no gateway error is refused with. */
+export const GATEWAY_ERROR_REFUSAL =
+  'feedGatewayErrorDetail: the answer names no gateway error';
 
 /** A number written as decimal digits; `undefined` for anything else. */
 function wholeNumber(text: string | undefined): number | undefined {
@@ -465,7 +538,17 @@ function sourceCodeOf(html: string): IGatewayErrorDetail['sourceCode'] {
     const isError = highlighted[index] === true;
     let number: number | undefined;
     if (isError) {
-      number = previous === undefined ? undefined : previous + 1;
+      // The highlighted line's number is `sy-tabix + lv_from_scan`, written
+      // as `>`s (`build_for_source_code`, cloud l. 546-550, onprem
+      // l. 553-558): the one after the line before it, or — a first line —
+      // the one before the line after it.
+      const next = wholeNumber(numbers[numberAt]);
+      number =
+        previous !== undefined
+          ? previous + 1
+          : next === undefined
+            ? undefined
+            : next - 1;
     } else {
       number = wholeNumber(numbers[numberAt]);
       numberAt += 1;
@@ -559,9 +642,16 @@ function errorContextOf(html: string): IGatewayErrorDetail['errorContext'] {
  * headings.
  */
 function parseGatewayErrorDetail(html: string): IGatewayErrorDetail {
+  const header = headerFields(html);
+  // `/IWBEP/CL_ERROR_LOG_VIEWER->get` (l. 26) has no path for an id it
+  // does not find: the empty error is rendered all the same, a header with
+  // no value (code). That skeleton is no error, and it is refused.
+  if (Object.keys(header).length === 0) {
+    throw new Error(GATEWAY_ERROR_REFUSAL);
+  }
   const service = labelledRows(sectionTable(html, 'SERVICE'));
   return {
-    ...headerFields(html),
+    ...header,
     serviceInfo: present({
       namespace: cell(service, 'Service Namespace'),
       serviceName: cell(service, 'Service Name'),

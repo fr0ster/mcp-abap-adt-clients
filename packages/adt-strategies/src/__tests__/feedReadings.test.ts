@@ -78,27 +78,10 @@ describe('the other feed readings', () => {
     ]);
   });
 
-  it('feedSystemMessages reads the content as the text and the category as severity', () => {
-    expect(feedSystemMessages(answer(ENTRY))).toEqual([
-      {
-        id: 'entry1',
-        title: 'Test Entry',
-        text: 'Some content',
-        severity: 'dump',
-        validFrom: '2026-04-10T10:00:00Z',
-        validTo: '',
-        createdBy: 'TESTUSER',
-      },
-    ]);
-  });
-
-  // The gateway readings are pinned on recorded answers in
-  // gatewayErrorReadings.test.ts (0.28.0); this entry is not their shape.
-  it('feedGatewayErrorDetail reads an empty document as empty fields', () => {
-    const detail = feedGatewayErrorDetail(answer(''));
-    expect(detail).not.toHaveProperty('shortText');
-    expect(detail.callStack).toEqual([]);
-    expect(detail.sourceCode.lines).toEqual([]);
+  it('feedGatewayErrorDetail refuses an empty document, which names no error', () => {
+    expect(() => feedGatewayErrorDetail(answer(''))).toThrow(
+      'feedGatewayErrorDetail: the answer names no gateway error',
+    );
   });
 
   it('reads a body that is not XML, or none, as nothing — never a throw', () => {

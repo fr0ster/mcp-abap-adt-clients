@@ -80,16 +80,6 @@ export function cellText(fragment: string): string | undefined {
   return text === '' ? undefined : text;
 }
 
-/** The value of the first `href` attribute in a fragment, either quote. */
-export function firstHref(fragment: string): string | undefined {
-  const at = fragment.indexOf('href=');
-  if (at < 0) return undefined;
-  const quote = fragment[at + 5];
-  if (quote !== '"' && quote !== "'") return undefined;
-  const end = fragment.indexOf(quote, at + 6);
-  return end < 0 ? undefined : decodeHtml(fragment.slice(at + 6, end));
-}
-
 /** The inner HTML of every `<tag …>…</tag>` in a fragment, in order (not nested). */
 export function elementsOf(fragment: string, tag: string): string[] {
   const found: string[] = [];

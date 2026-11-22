@@ -70,13 +70,13 @@ describe('the feed readings answer their declared types', () => {
   // Since 0.28.0 an error's document is read as the HTML SAP answers; the
   // call stack's numbers are pinned on the recorded one in
   // gatewayErrorReadings.test.ts. An XML `errorEntry` is no such document.
-  it('an XML errorEntry is not an error document: no header, no calls', () => {
-    const detail = feedGatewayErrorDetail(
-      answer(
-        '<errorEntry type="X"><callStack><entry number="3" line="42" event="E"/></callStack></errorEntry>',
+  it('an XML errorEntry is not an error document: it is refused', () => {
+    expect(() =>
+      feedGatewayErrorDetail(
+        answer(
+          '<errorEntry type="X"><callStack><entry number="3" line="42" event="E"/></callStack></errorEntry>',
+        ),
       ),
-    );
-    expect(detail).not.toHaveProperty('type');
-    expect(detail.callStack).toEqual([]);
+    ).toThrow('feedGatewayErrorDetail: the answer names no gateway error');
   });
 });

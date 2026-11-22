@@ -53,9 +53,9 @@ describe('feedGatewayErrors reads the recorded cloud feed', () => {
       userId: 'USERGUID1',
       client: 'CLIENT1',
       requestKind: 'Server OData V4',
+      opid: 'BA98DDFC64FB1FE1B9D15494303F12B9',
       detailUri:
         '/sap/bc/adt/gw/errorlog/Frontend%20Error/BA98DDFC64FB1FE1B9D15494303F12B9',
-      errorId: 'BA98DDFC64FB1FE1B9D15494303F12B9',
     });
   });
 
@@ -70,7 +70,10 @@ describe('feedGatewayErrors reads the recorded cloud feed', () => {
       requestKind: 'Server OData V2',
       username: 'USER2',
       userId: 'USERGUID2',
-      errorId: 'BA98DDFC64FB1FE1B9D0322F855592B9',
+      opid: 'BA98DDFC64FB1FE1B9D0322F855592B9',
+      // A cloud id (three segments): the Backend kind keeps its space.
+      detailUri:
+        '/sap/bc/adt/gw/errorlog/Backend%20Error/BA98DDFC64FB1FE1B9D0322F855592B9',
     });
   });
 
@@ -96,8 +99,90 @@ describe('feedGatewayErrors reads the recorded cloud feed', () => {
     expect(entries[4].transactionId).toBe('6DFFBDC8ADC50190E006B01C583E7446');
   });
 
+  // Written from SAP's code: `build_for_header` appends
+  // `&nbsp;<a href="adt://…/vit/gw/client/project/<opid>,<subno>">(Replay in GW Client)</a>`
+  // (onprem l. 396, cloud l. 395) or `&nbsp;<h4 …>(Not replayable in GW Client)</h4>`.
+  it.each([
+    [
+      'a replay link',
+      '&amp;nbsp;&lt;a href="adt://cloud/sap/bc/adt/vit/gw/client/project/BA98,1"&gt;(Replay in GW Client)&lt;/a&gt;',
+    ],
+    [
+      'a not-replayable note',
+      '&amp;nbsp;&lt;h4 style="display:inline; color:#bdbdbd"&gt;(Not replayable in GW Client)&lt;/h4&gt;',
+    ],
+  ])('strips %s from the transaction id', (_what, suffix) => {
+    const raw = String(answer('cloud-gatewayerrors.xml').data);
+    const id = ' 4E2D1E2EAF429FC7A0FC9684ADD399BF ';
+    const withSuffix = raw.replace(id, `${id}${suffix}`);
+    expect(withSuffix).not.toBe(raw);
+    const [first] = feedGatewayErrors({
+      ...answer('cloud-gatewayerrors.xml'),
+      data: withSuffix,
+    });
+    expect(first?.transactionId).toBe('4E2D1E2EAF429FC7A0FC9684ADD399BF');
+  });
+
+  // Written from SAP's code: the on-premise id is `{kind, no spaces}/{opid}`
+  // (`build_feed` l. 263-264), and the viewer reads the Backend log for the
+  // kind `BackendError` (`/IWBEP/CL_ERROR_LOG_VIEWER->get` l. 57).
+  it('builds an on-premise Backend entry’s address from its id’s own kind', () => {
+    const raw = String(answer('cloud-gatewayerrors.xml').data);
+    const onprem = raw.replace(
+      'BackendError/BA98DDFC64FB1FE1B9D0322F855592B9/20261122143239.5848030',
+      'BackendError/BA98DDFC64FB1FE1B9D0322F855592B9',
+    );
+    const backend = feedGatewayErrors({
+      ...answer('cloud-gatewayerrors.xml'),
+      data: onprem,
+    })[1];
+    expect(backend?.opid).toBe('BA98DDFC64FB1FE1B9D0322F855592B9');
+    expect(backend?.detailUri).toBe(
+      '/sap/bc/adt/gw/errorlog/BackendError/BA98DDFC64FB1FE1B9D0322F855592B9',
+    );
+  });
+
   it('reads the on-premise feed, which has no entry, as none', () => {
     expect(feedGatewayErrors(answer('onprem-gatewayerrors.xml'))).toEqual([]);
+  });
+});
+
+describe('feedGatewayErrorDetail refuses what names no error', () => {
+  const REFUSAL = 'feedGatewayErrorDetail: the answer names no gateway error';
+  // Written from SAP's code: for an unknown id the viewer renders the empty
+  // error (`/IWBEP/CL_ERROR_LOG_VIEWER->get` l. 26, no 404 path) — the
+  // recorded document with every header value emptied.
+  it('refuses the empty skeleton an unknown id answers', () => {
+    const raw = String(answer('cloud-gatewayerror-detail.body.txt').data);
+    const start = raw.indexOf('<h4 id="HEADER_INFO"');
+    const end = raw.indexOf('</table>', start);
+    const header = raw.slice(start, end);
+    let emptied = '';
+    let from = 0;
+    for (;;) {
+      const at = header.indexOf('<td class="sourceline">', from);
+      if (at < 0) break;
+      const close = header.indexOf('</td>', at);
+      emptied += `${header.slice(from, at)}<td class="sourceline"> `;
+      from = close;
+    }
+    emptied += header.slice(from);
+    const skeleton = raw.slice(0, start) + emptied + raw.slice(end);
+    expect(() =>
+      feedGatewayErrorDetail({
+        ...answer('cloud-gatewayerror-detail.body.txt'),
+        data: skeleton,
+      }),
+    ).toThrow(REFUSAL);
+  });
+
+  it('refuses an empty body', () => {
+    expect(() =>
+      feedGatewayErrorDetail({
+        ...answer('cloud-gatewayerror-detail.body.txt'),
+        data: '',
+      }),
+    ).toThrow(REFUSAL);
   });
 });
 
@@ -191,6 +276,42 @@ describe('feedGatewayErrorDetail reads the recorded error document (HTML)', () =
       },
     ]);
     expect(lines[12]?.number).toBe(60);
+  });
+
+  // Written from the recording: the source extract cut so the highlighted
+  // line comes first, as `build_for_source_code` writes it when the error is
+  // on the include's first line.
+  it('keeps a highlighted first line, numbered before the line after it', () => {
+    const raw = String(answer('cloud-gatewayerror-detail.body.txt').data);
+    const numbersStart =
+      raw.indexOf('<td id="sourcetablecolumn" style="vertical-align:top;">') +
+      '<td id="sourcetablecolumn" style="vertical-align:top;">'.length;
+    const firstIndicator = raw.indexOf(
+      '<span class="linenumber"><a',
+      numbersStart,
+    );
+    const linesStart =
+      raw.indexOf('<td id="sourcetablecolumn">', firstIndicator) +
+      '<td id="sourcetablecolumn">'.length;
+    const firstHighlight = raw.indexOf(
+      '<div class="sourceline highlight">',
+      linesStart,
+    );
+    const cut =
+      raw.slice(0, numbersStart) +
+      raw.slice(firstIndicator, linesStart) +
+      raw.slice(firstHighlight);
+    const { lines, errorLine } = feedGatewayErrorDetail({
+      ...answer('cloud-gatewayerror-detail.body.txt'),
+      data: cut,
+    }).sourceCode;
+    expect(errorLine).toBe(59);
+    expect(lines[0]).toEqual({
+      number: 59,
+      content: '      raise exception type cx_no_authorization',
+      isError: true,
+    });
+    expect(lines[1]?.number).toBe(60);
   });
 
   it('reads the call stack, numbers as numbers', () => {
