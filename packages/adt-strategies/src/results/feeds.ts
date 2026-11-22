@@ -123,6 +123,15 @@ export interface ISourceCodeLine {
   isError: boolean;
 }
 
+// Namespace prefixes are stripped, so every field is looked up by its local
+// name: `sm:validFrom` is `validFrom`, `gw:package` is `package`. Nothing is
+// lost for the fields read here — none of the extension names these readings
+// take (`severity`, `validFrom`, `validTo`, `package`,
+// `applicationComponent`, `client`, `requestKind`) is an Atom element name
+// (RFC 4287 §4) — and SAP's prefix for an extension is not fixed by the
+// namespace. Until 0.28.0 the extensions were looked up prefixed, which the
+// stripping had removed, so they read empty.
+//
 // Values as written (`XML_TEXT_OPTIONS`, since 0.28.0): no tag or attribute
 // is coerced to a number, and references decode as an XML parser decodes them.
 // Until 0.28.0 element text that looked numeric was coerced (`0042` read
@@ -256,9 +265,9 @@ function parseSystemMessages(xml: string): ISystemMessageEntry[] {
     title: elementText(field(entry, 'title')),
     // System message fields may be in the content or as extensions
     text: elementText(field(entry, 'content')),
-    severity: str(categoryTerm(entry) ?? field(entry, 'sm:severity')),
-    validFrom: str(field(entry, 'sm:validFrom') ?? field(entry, 'updated')),
-    validTo: str(field(entry, 'sm:validTo')),
+    severity: str(categoryTerm(entry) ?? field(entry, 'severity')),
+    validFrom: str(field(entry, 'validFrom') ?? field(entry, 'updated')),
+    validTo: str(field(entry, 'validTo')),
     createdBy: str(authorName(entry)),
   }));
 }
@@ -275,12 +284,12 @@ function parseGatewayErrors(xml: string): IGatewayErrorEntry[] {
         : String(category ?? ''),
       shortText: elementText(field(entry, 'title')),
       transactionId: str(field(entry, 'id')),
-      package: str(field(entry, 'gw:package')),
-      applicationComponent: str(field(entry, 'gw:applicationComponent')),
+      package: str(field(entry, 'package')),
+      applicationComponent: str(field(entry, 'applicationComponent')),
       dateTime: str(field(entry, 'updated')),
       username: str(authorName(entry)),
-      client: str(field(entry, 'gw:client')),
-      requestKind: str(field(entry, 'gw:requestKind')),
+      client: str(field(entry, 'client')),
+      requestKind: str(field(entry, 'requestKind')),
     };
   });
 }
@@ -290,15 +299,10 @@ function parseGatewayErrors(xml: string): IGatewayErrorEntry[] {
  */
 function parseGatewayErrorDetail(xml: string): IGatewayErrorDetail {
   const parsed = parseOrEmpty(xml);
-  const root =
-    field(parsed, 'errorlog:errorEntry') ??
-    field(parsed, 'errorEntry') ??
-    parsed;
-  /** `errorlog:<name>` or `<name>`, the first present. */
-  const either = (...names: string[]): unknown =>
-    at(root, ...names.map((n) => `errorlog:${n}`)) ?? at(root, ...names);
+  // Prefixes are stripped (`errorlog:errorEntry` is `errorEntry`).
+  const root = field(parsed, 'errorEntry') ?? parsed;
+  const either = (...names: string[]): unknown => at(root, ...names);
   const attribute = (element: string, name: string): unknown =>
-    field(field(root, `errorlog:${element}`), name) ??
     field(field(root, element), name);
 
   const callStackRaw = either('callStack', 'entry') ?? [];
