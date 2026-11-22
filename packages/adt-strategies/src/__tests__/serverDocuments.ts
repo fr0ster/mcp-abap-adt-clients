@@ -24,7 +24,7 @@ const xmlHead = '<?xml version="1.0" encoding="utf-8"?>';
 // document (`tm:object_type="R"`): its header, its task and the aggregate
 // `tm:all_objects`."
 //
-// The recordings are of task E19K907112 (on premise) and TRLK901187 (cloud).
+// The recordings are of one task on premise and one on the cloud.
 // ---------------------------------------------------------------------------
 
 export const PARENT = 'SIDK900011';
