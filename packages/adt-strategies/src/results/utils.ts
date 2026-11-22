@@ -361,6 +361,7 @@ const nodeText = (node: unknown, key: string): string | undefined => {
 /**
  * The node-structure document, parsed into its two halves. A document that is
  * not this one — an exception, a logon page, nothing — reads as an empty level.
+ * Since 0.28.1 every row is a node, an empty one an empty record.
  */
 export function readNodeStructure(xml: string): IParsedNodeStructure {
   const data = at(
@@ -369,9 +370,12 @@ export function readNodeStructure(xml: string): IParsedNodeStructure {
     'asx:values',
     'DATA',
   );
+  // Every row is kept: an empty one (`<SEU_ADT_REPOSITORY_OBJ_NODE/>`, which
+  // the parser makes `''`) or one holding only text reads as a node with no
+  // fields, so the readings above it account for it instead of losing it.
   const nodes = listOf(
     at(data, 'TREE_CONTENT', 'SEU_ADT_REPOSITORY_OBJ_NODE'),
-  ).filter(isRecord);
+  ).map((node): XmlRecord => (isRecord(node) ? node : {}));
   const objectTypes: IRepositoryNodeChild[] = [];
   for (const info of listOf(
     at(data, 'OBJECT_TYPES', 'SEU_ADT_OBJECT_TYPE_INFO'),

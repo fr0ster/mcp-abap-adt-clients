@@ -283,3 +283,27 @@ describe('utilNodeContents keeps every node SAP lists (since 0.28.1)', () => {
     ]);
   });
 });
+
+describe('utilNodeContents drops no row, an empty one included (0.28.1)', () => {
+  // The recorded step 02 with an empty row added: a variant built here.
+  const withRow = (row: string): IAdtWireResponse => {
+    const answer = stepsOf('read-object-tree-structure')[1];
+    if (answer === undefined) throw new Error('step 02 is not recorded');
+    const [head, tail] = String(answer.data).split('</TREE_CONTENT>');
+    return wire(`${head}${row}</TREE_CONTENT>${tail}`);
+  };
+
+  it.each([
+    ['self-closed', '<SEU_ADT_REPOSITORY_OBJ_NODE/>'],
+    [
+      'open and closed',
+      '<SEU_ADT_REPOSITORY_OBJ_NODE></SEU_ADT_REPOSITORY_OBJ_NODE>',
+    ],
+  ])('a %s empty row, no OBJECT_TYPE, is in notLoaded', (_what, row) => {
+    const contents = utilNodeContents(withRow(row));
+    expect(contents.objects.map((o) => o.objectName)).toEqual([
+      'ZMCP_SHR_I_ROOT',
+    ]);
+    expect(contents.notLoaded).toEqual([{ notLoaded: true }]);
+  });
+});
