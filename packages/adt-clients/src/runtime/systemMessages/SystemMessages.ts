@@ -3,8 +3,8 @@
  *
  * Provides the list of system messages. SAP routes no single message
  * (`CL_STSK_ADT_RES_APP->register_resources`, l. 31-48), so there is no
- * `getById` (removed in 47.0.0): `ISystemMessages` declares one, which this
- * class leaves out rather than ask a route that does not exist.
+ * `getById` (removed in 47.0.0), and since interfaces-adt 31.0.0
+ * `ISystemMessages<TList>` declares none.
  */
 
 import type {
@@ -50,7 +50,7 @@ export class SystemMessages<
   T extends SystemMessagesValues = ResultValuesOf<
     typeof systemMessagesDocuments
   >,
-> implements Omit<ISystemMessages<T['list'], never>, 'getById'>
+> implements ISystemMessages<T['list']>
 {
   readonly kind = 'systemMessages' as const;
   private readonly results: ResultStrategiesOf<T>;

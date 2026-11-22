@@ -27,7 +27,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ## [47.0.0] - 2026-11-22
 
 Released with `@mcp-abap-adt/adt-strategies` 0.28.0 (published first; the
-range is now `^0.28.0`). A major: the breaking changes below. Migration:
+range is now `^0.28.0`), on `@mcp-abap-adt/interfaces-adt` `^31.0.0`. A major:
+the breaking changes below. Migration:
 [`docs/usage/MIGRATION-47.md`](docs/usage/MIGRATION-47.md).
 
 ### Breaking
@@ -76,13 +77,11 @@ range is now `^0.28.0`). A major: the breaking changes below. Migration:
     `ITransportItem`, `ITransportItemHeader`, `ITransportRequestItem`,
     `ITransportTaskItem`, `ITransportTaskSummary`, `IGatewayContextNode`,
     `WhereUsedReferenceKind`.
-- **Upstream, pending:** `@mcp-abap-adt/interfaces-adt` 31.0.0
-  (fr0ster/mcp-abap-adt-interfaces#200, under review) drops
+- **On `@mcp-abap-adt/interfaces-adt` `^31.0.0`** (was `^30.2.0`), which drops
   `ISystemMessages.getById` and its `TMessage` parameter
-  (`ISystemMessages<TList>`). Until it is published `SystemMessages`
-  implements `Omit<ISystemMessages<T['list'], never>, 'getById'>`; a consumer
-  that types a value as `ISystemMessages<…>` and calls `getById` on it gets a
-  member SAP never routes.
+  (`ISystemMessages<TList>`); `SystemMessages` implements it whole. A consumer
+  that types a value as `ISystemMessages<TList, TMessage>` writes
+  `ISystemMessages<TList>`.
 
 ### Changed
 
