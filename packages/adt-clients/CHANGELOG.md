@@ -151,11 +151,14 @@ tested with `@mcp-abap-adt/connection` `^25.2.0`, which implements them.
   `abapgitexternalrepo:user` / `password`. The legacy form keeps its 46.1.0
   fields exactly.
 
-### Not verified live yet
+### Verified live
 
-- SAP's acceptance of the corrected selective-pull document is so far
-  grounded in the transformations only (Code). The push document is measured:
-  `200` on premise, `202` on cloud with its job ended `S` (2026-11-22).
+- The corrected push and selective-pull documents are accepted (measured
+  2026-11-22 on both systems; ground in ERRATA): a push answered `200` on
+  premise and `202` on cloud, its job ended `S` "Pushed successfully"; a
+  selective pull with R6's selection was accepted `202`, its job ended `S`
+  with the interface imported (cloud imports inactive); the onprem pull
+  answered `200` with the source changed.
 
 ## [46.1.0] - 2026-11-19
 
