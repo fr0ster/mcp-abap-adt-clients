@@ -156,10 +156,13 @@ describe('utilSearchHits decodes references as an XML parser does', () => {
 
 describe('utilNamedItems keeps text as written', () => {
   it('keeps 007 as 007 and an absent description absent', () => {
-    expect(utilNamedItems(wire(NAMED_ITEMS))).toEqual([
+    const items = utilNamedItems(wire(NAMED_ITEMS));
+    expect(items).toEqual([
       { name: '007', description: 'leading zeros' },
       { name: 'NODESC' },
     ]);
+    // A present `description: undefined` is refused, not only a missing one.
+    expect(items[1] !== undefined && 'description' in items[1]).toBe(false);
   });
 });
 

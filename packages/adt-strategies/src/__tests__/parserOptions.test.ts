@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { XML_TEXT_OPTIONS } from '../parsed';
 
 /**
  * No reading's parser coerces a value (0.28.0): every `new XMLParser({` in
@@ -29,14 +30,30 @@ describe('parser options', () => {
         if (start < 0) break;
         const end = text.indexOf('})', start);
         const options = text.slice(start, end);
+        // Spread or not, nothing may switch coercion on after it.
+        const switchedOn =
+          options.includes('parseTagValue: true') ||
+          options.includes('parseAttributeValue: true');
         const safe =
-          options.includes('...XML_TEXT_OPTIONS') ||
-          (options.includes('parseTagValue: false') &&
-            options.includes('parseAttributeValue: false'));
+          !switchedOn &&
+          (options.includes('...XML_TEXT_OPTIONS') ||
+            (options.includes('parseTagValue: false') &&
+              options.includes('parseAttributeValue: false')));
         if (!safe) offenders.push(file.slice(SRC.length + 1));
         from = end;
       }
     }
     expect(offenders).toEqual([]);
+  });
+
+  it('the shared options themselves switch coercion off', () => {
+    expect(XML_TEXT_OPTIONS.parseTagValue).toBe(false);
+    expect(XML_TEXT_OPTIONS.parseAttributeValue).toBe(false);
+    const text = readFileSync(join(SRC, 'parsed.ts'), 'utf-8');
+    const start = text.indexOf('export const XML_TEXT_OPTIONS');
+    const definition = text.slice(start, text.indexOf('};', start));
+    expect(definition).toContain('parseTagValue: false');
+    expect(definition).toContain('parseAttributeValue: false');
+    expect(definition).not.toContain(': true');
   });
 });

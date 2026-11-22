@@ -193,9 +193,9 @@ describe('utilNamedItems', () => {
       { name: 'CLAS/OC', description: 'Class' },
       { name: 'PROG/P' },
     ]);
-    expect(utilNamedItems(wire(TYPES_XML))[1]).not.toHaveProperty(
-      'description',
-    );
+    const second = utilNamedItems(wire(TYPES_XML))[1];
+    // A present `description: undefined` is refused too.
+    expect(second !== undefined && 'description' in second).toBe(false);
   });
 
   it('reads a single entry the parser does not wrap in an array', () => {
