@@ -168,6 +168,15 @@ library judges none of them: each is an answer the caller reads.
   version holds the pulled source, the active one the previous, and
   `getFile` `local` answers the active one. Activating is the caller's. An
   onprem pull activates (measured: the active source changed).
+- **A selection decides only for objects changed locally.** The pull job
+  sets each selected entry's decision `Y` and every other `N`, but
+  `warning_overwrite_find` lists only objects modified locally, and
+  `warning_overwrite_adjust` drops only those with `N`
+  (`CL_ABAPGIT_OBJECTS` L1791–1855; Code): a remote-only change is imported
+  whatever the selection (measured 2026-11-22: an interface left out of the
+  selection, changed only in the remote, was imported). An object left out
+  is logged `S`, "not imported; no import requested" (L308–313), so the run
+  log does not tell it from one imported.
 - **A push's run log names no object** (measured on cloud 2026-11-22: one
   entry, type and name empty, status `S`, message type `I`); a pull's names
   each object it imported.
@@ -217,7 +226,7 @@ library judges none of them: each is an answer the caller reads.
   has a value. With that (measured 2026-11-22): `push` answered `200` on
   premise and `202` on cloud, whose job ended `S` "Pushed successfully"; the
   selective `pullRepo` (cloud only) answered `202`, its job ended `S` and
-  imported the one selected interface of two changed; `pullRepoInDialog`
+  imported the one selected interface of two changed on both sides; `pullRepoInDialog`
   (cloud) and `pullRepo` with `repo.v3` (on premise) answered `202` / `200`.
 - **`getFile` of a file the repository does not hold answers `200` with an
   empty text** (R12): the handler reads the file table without checking that

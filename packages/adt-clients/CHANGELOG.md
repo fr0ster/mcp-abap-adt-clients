@@ -159,7 +159,7 @@ tested with `@mcp-abap-adt/connection` `^25.2.0`, which implements them.
   ERRATA): `push` answered `200` on premise and `202` on cloud, its job ended
   `S` "Pushed successfully"; the selective `pullRepo` (cloud only — on
   premise there is no selective pull) answered `202`, its job ended `S` and
-  imported the one selected interface of two changed, inactive as every
+  imported the one selected interface of two changed on both sides — a selection decides only for objects changed locally (ERRATA), inactive as every
   cloud pull; `pullRepoInDialog` (cloud) answered `202` with the pull run;
   `pullRepo` with `repo.v3` (on premise) answered `200` with the source
   changed.
