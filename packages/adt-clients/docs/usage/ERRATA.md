@@ -244,7 +244,8 @@ library judges none of them: each is an answer the caller reads.
   L1858–1897); an `N` overwrite entry is left out only when it has a local
   state (`warning_overwrite_adjust` L1791; `warning_overwrite_find`
   L1833–1855, L1841–1844). So an unselected local change, remote deletion or
-  other-package object, a selected entry whose action changed, and a selected
+  other-package object, a selected entry whose action changed (unless it is now
+  a remote-only add or update outside the package warnings), and a selected
   `delete_add` package warning keep their system state, and only a remote-only add or
   update that is not a package warning is imported whatever the selection (Code; that last case measured
   2026-11-22: an unselected interface changed only in the remote was
@@ -335,7 +336,7 @@ library judges none of them: each is an answer the caller reads.
   exactly `status` `500` — no T100 key, no git host status — with the fixed
   `refused` words. Those facts carry nothing more; the dump's name and line
   are not in them, so the live suite cannot tell this 500 from another 500
-  with no T100 key. It therefore asserts that exact shape only on the system
+  with no T100 key and no git host status. It therefore asserts that exact shape only on the system
   where the fault was measured (`abapgit.check_repo_fault_system`, matched
   against `environment.default_master_system`), reported as observed —
   refused, 500, no T100, consistent with the SYNTAX_ERROR measured at L53 —
@@ -369,8 +370,9 @@ library judges none of them: each is an answer the caller reads.
   key.** `CL_ADT_EXCEPTION_UTILITY`
   writes `T100KEY-ID` / `T100KEY-NO` for every exception that is a T100
   message (L94–97), and the abapGit exceptions are (Code, both systems); the new
-  forms keep the response's HTTP status and, when present, those and R11's
-  `http_status` (`gitHttpStatus`), as facts. Measured
+  forms keep the response's HTTP status and, when present and well formed (a
+  three-digit T100 number; an R11 `http_status` that parses as an integer),
+  those and `gitHttpStatus`, as facts. Measured
   2026-11-22: `getFile` (both systems), `push` and `pullRepo` (on premise). A
   runtime error answered as an HTML `500` carries none, like the on-premise
   `checkRepo` `SYNTAX_ERROR` above: its only fact is `status`.
