@@ -38,23 +38,28 @@ with a nameless entry added, and an entry with no attribute at all.
   in `incompleteEntries` (`ITransportIncompleteEntry`: every field of an
   entry, each present only when the entry carries it, the task's number
   included), in document order, present only when the document holds one.
-  In both complete readings below a name or a type is missing when it is
-  absent, empty, or blank once decoded and trimmed (`&#32;&#x20;`):
+  **Both complete readings below answer the same values:** every field
+  and the task's number decoded and trimmed, literal and entity-encoded
+  padding alike (`&#32;ZCL_ONE&#x20;` is `ZCL_ONE`), a blank one absent; a
+  name or a type is missing when it is absent, empty, or blank once
+  decoded and trimmed (`&#32;&#x20;`):
   - **`transportObjectEntryList`, new: the complete entry reading.** It
     answers `ITransportObjectEntryList`, `{ entries, incompleteEntries? }`
-    — `entries` the entries `transportObjectEntries` answers, less any with
-    a blank name or type. A plain object, so a copy or JSON of it keeps
+    — `entries` the entries `transportItem` answers for a task's document,
+    with the same values. A plain object, so a copy or JSON of it keeps
     both lists.
   - **`transportObjectEntries` / `parseObjectEntries` are unchanged and
     leave out an entry without a name or a type**, as they always did: the
-    answer is still the plain `ITransportObjectEntry[]`, an entry whose name
-    or type is blank only after decoding still answered in it. A caller who must
-    see every entry SAP lists moves to `transportObjectEntryList`.
+    answer is still the plain `ITransportObjectEntry[]` and keeps its 0.28.1
+    output exactly: values as decoded, untrimmed, and an entry whose name or
+    type is blank only after decoding still in it. A caller who must see
+    every entry SAP lists, trimmed, moves to `transportObjectEntryList`.
   - **`transportItem` / `readTransportItem`: `ITransportTaskItem` (a task's
     document) gains `incompleteEntries`.**
 
   `ITransportObjectEntry` is unchanged: `name` and `type` stay required,
-  and `objects` / `entries` hold the same entries with the same values.
+  and `transportItem`'s `objects` hold the same entries with the same
+  values as in 0.28.1.
 
   **The count includes them.** A task holds `objects.length +
   (incompleteEntries?.length ?? 0)` entries (`entries.length + …` in the
