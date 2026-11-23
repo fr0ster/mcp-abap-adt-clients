@@ -52,8 +52,12 @@ jobs:
       - name: Security audit (moderate+)
         run: npm audit --omit=dev --audit-level=moderate
 
+      # adt-strategies first: adt-clients compiles against its built
+      # declarations through the workspace link (since 46.2.0).
       - name: Build the package
-        run: npm run build --workspace packages/adt-clients
+        run: |
+          npm run build --workspace packages/adt-strategies
+          npm run build --workspace packages/adt-clients
 
       # --ignore-scripts, as tools/publish-changed.js publishes: the tarball
       # holds what the build made, nothing a pack-time script adds.
@@ -151,10 +155,11 @@ jobs:
       - name: Security audit (moderate+)
         run: npm audit --omit=dev --audit-level=moderate
 
-      # adt-clients first: this package compiles against its built
-      # declarations, through the workspace link.
+      # adt-strategies, then adt-clients: this package compiles against
+      # their built declarations, through the workspace links.
       - name: Build the package
         run: |
+          npm run build --workspace packages/adt-strategies
           npm run build --workspace packages/adt-clients
           npm run build --workspace packages/adt-clients-legacy
 
