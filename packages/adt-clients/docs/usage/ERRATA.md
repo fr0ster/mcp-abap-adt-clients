@@ -221,15 +221,40 @@ library judges none of them: each is an answer the caller reads.
   version holds the pulled source, the active one the previous, and
   `getFile` `local` answers the active one. Activating is the caller's. An
   onprem pull activates (measured: the active source changed).
-- **A selection decides only for objects changed locally.** The pull job
-  sets each selected entry's decision `Y` and every other `N`, but
-  `warning_overwrite_find` lists only objects modified locally, and
-  `warning_overwrite_adjust` drops only those with `N`
-  (`CL_ABAPGIT_OBJECTS` L1791–1855; Code): a remote-only change is imported
-  whatever the selection (measured 2026-11-22: an interface left out of the
-  selection, changed only in the remote, was imported). An object left out
-  is logged `S`, "not imported; no import requested" (L308–313), so the run
-  log does not tell it from one imported.
+- **A selection decides for every entry that still matches when the job runs,
+  with two exceptions:** a remote-only add or update outside the package
+  warnings is imported unselected, and a `delete_add` package warning is
+  skipped even when selected. `getModifiedObjects` (R6) answers `deserialize_checks`' overwrite
+  list without the repository's own package
+  (`CL_ABAPGIT_RES_PULL_MOD_OBJS->get_all_modified_objects` L127–130), plus
+  its package warnings: the objects whose TADIR package differs from their
+  path's (L162–173; `CL_ABAPGIT_OBJECTS_CHECK=>warning_package_find`
+  L257–295). The overwrite list holds every changed object; among them a
+  remote-only update is action `2` (update), and the handler's overwrite case
+  (a local change) is `3`
+  (`CL_ABAPGIT_OBJECTS_CHECK=>warning_overwrite_find` L140–210); that the
+  repository's `deserialize_checks` reaches it is Inference, and fits the live
+  answer of `2` measured on 2026-11-23. The job recomputes both lists when it
+  runs (`CL_ABAPGIT_BG_ACTION_PULL->execute` L113). It marks an entry `Y`
+  when the selection holds its name and its action still matches: a selected
+  deletion whose action changed gets `N`, and a `delete_add` package warning is
+  always `N`; every other entry gets `N` (L123–152). Deletions run only for
+  `Y` entries (`delete_unnecessary_objects` L39–72). An `N` package warning is
+  left out whatever its state (`CL_ABAPGIT_OBJECTS->warning_package_adjust`
+  L1858–1897); an `N` overwrite entry is left out only when it has a local
+  state (`warning_overwrite_adjust` L1791; `warning_overwrite_find`
+  L1833–1855, L1841–1844). So an unselected local change, remote deletion or
+  other-package object, a selected entry whose action changed (unless it is now
+  a remote-only add or update outside the package warnings), and a selected
+  `delete_add` package warning keep their system state, and only a remote-only add or
+  update that is not a package warning is imported whatever the selection (Code; that last case measured
+  2026-11-22: an unselected interface changed only in the remote was
+  imported). A skipped entry is logged `S`, "not imported; no import
+  requested" (L308–313): the raw log names it, but its `S` status, and
+  `getRunLog`'s facts, which carry no message text, do not tell it from one
+  imported. `pullRepoInDialog` (R5) takes the same selective document and runs
+  the job in the request (`CL_ABAPGIT_RES_REPO_PULL_V1->post` L244–247,
+  L266–274).
 - **A push's run log names no object** (measured on cloud 2026-11-22: one
   entry, type and name empty, status `S`, message type `I`); a pull's names
   each object it imported.
@@ -250,24 +275,28 @@ library judges none of them: each is an answer the caller reads.
   `ZABAPGIT_ST_REPO_POST` has no such field and skips unknown elements
   (`extensible="deep"`, L8); cloud's `ABAPGIT_ST_REPO_POST_V3` reads it
   (L20–24). The library sends it when given, on either system.
-- **A selective pull with its lists in the wrong namespace pulls nothing.**
+- **A selective pull with its lists in the wrong namespace selects nothing.**
   `ABAPGIT_ST_REPO_SELECTIVE_PULL` (cloud) reads `overwriteObjects`,
   `packageWarningObjects`, their `abapgitobjects` and `action` in R6's
   namespace `agitpullmodifiedobjects` (L5, L42, L55;
-  `ABAPGIT_ST_PULL_MODIFIED_OBJS` L46, L52) and skips anything else silently:
-  the job then sets every entry to `'N'` and answers `202`. The library writes
+  `ABAPGIT_ST_PULL_MODIFIED_OBJS` L46, L52) and silently skips selection lists
+  in any other namespace:
+  `pullRepo`'s handler answers `202` on accepting the job, and the job then sets every
+  entry to `'N'`, so nothing listed is pulled but remote-only adds and
+  updates outside the package warnings (Code; see the selection entry above). The library writes
   them there; the two pull handlers pick the document by the exact
   `Content-Type` (a `; charset=…` suffix answers 400, `RES_REPO_PULL` L167–182).
 - **A push needs all three stage lists.** `ABAPGIT_ST_REPO_STAGE` reads
   `unstaged_objects`, `staged_objects` and `ignored_objects` as literal
   elements, in that order (cloud L14, L25, L36; onprem the same); the library
   writes the first and the last empty.
-- **A present, empty attribute fails a push** — measured on premise
+- **A present, empty attribute under `tt:cond check="not-initial(…)"` fails
+  a push** — measured on premise
   2026-11-22: a push whose new file carried `remoteState=""` answered 400,
   T100 `00`/`001` "Check of condition failed" (`CX_ST_COND_CHECK_FAIL`); the
   cloud push of the first live run was refused with a T100 message for the
-  same document (key not recorded). **A selective pull's empty attribute is
-  refused by the same rule from Code alone** (`SADT_OBJECT_REFERENCE` under
+  same document (key not recorded). **A selective pull's empty attribute under
+  such a `tt:cond` is refused by the same rule from Code alone** (`SADT_OBJECT_REFERENCE` under
   `ABAPGIT_ST_PULL_MODIFIED_OBJS`), not measured. The transformations read every file attribute
   (`…ST_REPO_STAGE_OBJECT` onprem L41–54, cloud L76–90), the comment and the
   people (`…ST_REPO_STAGE` onprem L44–72, cloud L52–83) and the object
@@ -275,12 +304,15 @@ library judges none of them: each is an answer the caller reads.
   L38–56) under `tt:cond check="not-initial(…)"`, and deserialization checks
   the value it read (Code). Staging answers such values — `remoteState` is
   empty for a file the remote does not hold, `packageName` may be empty
-  (measured, both systems) — so the library writes an attribute only when it
-  has a value. With that (measured 2026-11-22): `push` answered `200` on
+  (measured, both systems) — so the library writes an attribute under such a
+  `tt:cond` only when it has a value. With that (measured 2026-11-22): `push` answered `200` on
   premise and `202` on cloud, whose job ended `S` "Pushed successfully"; the
   selective `pullRepo` (cloud only) answered `202`, its job ended `S` and
   imported the one selected interface of two changed on both sides; `pullRepoInDialog`
   (cloud) and `pullRepo` with `repo.v3` (on premise) answered `202` / `200`.
+  The object reference's `name` is under `s-check`, which deserialization does
+  not run, so the library always sends it, empty included
+  (`src/clients/abapGit/xmlBuilder.ts`).
 - **`getFile` of a file the repository does not hold answers `200` with an
   empty text** (R12): the handler reads the file table without checking that
   the file was found (onprem `ZCL_ABAPGIT_RES_REPO_FILES->get` L69, cloud
@@ -300,11 +332,11 @@ library judges none of them: each is an answer the caller reads.
   passed to the mandatory parameter IV_SERVICE" at L53, col. 22 — its
   `zcl_abapgit_http=>create_by_url( … )` call (Code). The installed abapGit
   and its ADT handler disagree; the request the library sends is not the
-  cause. The member returns that answer as it is: a failure whose facts are
+  cause. The member reduces that HTML answer to a structured failure whose facts are
   exactly `status` `500` — no T100 key, no git host status — with the fixed
   `refused` words. Those facts carry nothing more; the dump's name and line
   are not in them, so the live suite cannot tell this 500 from another 500
-  with no T100 key. It therefore asserts that exact shape only on the system
+  with no T100 key and no git host status. It therefore asserts that exact shape only on the system
   where the fault was measured (`abapgit.check_repo_fault_system`, matched
   against `environment.default_master_system`), reported as observed —
   refused, 500, no T100, consistent with the SYNTAX_ERROR measured at L53 —
@@ -334,9 +366,14 @@ library judges none of them: each is an answer the caller reads.
 - **The success status of `checkRepo` (R11) and `switchBranch` (R15)** is the
   framework's default, set inside the handler's `CATCH` (Inference); it is not
   asserted until a live run measures it.
-- **A key-addressed failure carries a T100 key.** `CL_ADT_EXCEPTION_UTILITY`
+- **A key-addressed failure raised as an abapGit exception carries a T100
+  key.** `CL_ADT_EXCEPTION_UTILITY`
   writes `T100KEY-ID` / `T100KEY-NO` for every exception that is a T100
   message (L94–97), and the abapGit exceptions are (Code, both systems); the new
-  forms keep exactly those, and R11's `http_status`, as facts. Measured
-  2026-11-22: `getFile` (both systems), `push` and `pullRepo` (on premise).
+  forms keep the response's HTTP status and, when present and well formed (a
+  three-digit T100 number; an R11 `http_status` that parses as an integer),
+  those and `gitHttpStatus`, as facts. Measured
+  2026-11-22: `getFile` (both systems), `push` and `pullRepo` (on premise). A
+  runtime error answered as an HTML `500` carries none, like the on-premise
+  `checkRepo` `SYNTAX_ERROR` above: its only fact is `status`.
 
