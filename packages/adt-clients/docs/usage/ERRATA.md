@@ -221,14 +221,17 @@ library judges none of them: each is an answer the caller reads.
   version holds the pulled source, the active one the previous, and
   `getFile` `local` answers the active one. Activating is the caller's. An
   onprem pull activates (measured: the active source changed).
-- **A selection decides for every listed object except a remote-only add or
-  update outside the package warnings.** `getModifiedObjects` (R6) answers `deserialize_checks`' overwrite
+- **A selection decides for every listed object, with two exceptions:** a
+  remote-only add or update outside the package warnings is imported
+  unselected, and a `delete_add` package warning is skipped even when
+  selected. `getModifiedObjects` (R6) answers `deserialize_checks`' overwrite
   list without the repository's own package
   (`CL_ABAPGIT_RES_PULL_MOD_OBJS->get_all_modified_objects` L127–130), plus
   its package warnings: the objects whose TADIR package differs from their
   path's (L162–173; `CL_ABAPGIT_OBJECTS_CHECK=>warning_package_find`
-  L257–295). The overwrite list holds every changed object, a remote-only
-  change as `2` (update) and a local change as `3` (overwrite)
+  L257–295). The overwrite list holds every changed object; among them a
+  remote-only update is action `2` (update) and a local change `3`
+  (overwrite)
   (`CL_ABAPGIT_OBJECTS_CHECK=>warning_overwrite_find` L140–210); that the
   repository's `deserialize_checks` reaches it is Inference, and fits the live
   answer of `2` measured on 2026-11-23. The job recomputes both lists when it
