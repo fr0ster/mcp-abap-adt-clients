@@ -222,7 +222,7 @@ library judges none of them: each is an answer the caller reads.
   `getFile` `local` answers the active one. Activating is the caller's. An
   onprem pull activates (measured: the active source changed).
 - **A selection decides for every listed object except a remote-only add or
-  update.** `getModifiedObjects` (R6) answers `deserialize_checks`' overwrite
+  update outside the package warnings.** `getModifiedObjects` (R6) answers `deserialize_checks`' overwrite
   list without the repository's own package
   (`CL_ABAPGIT_RES_PULL_MOD_OBJS->get_all_modified_objects` L127–130), plus
   its package warnings: the objects whose TADIR package differs from their
@@ -242,7 +242,7 @@ library judges none of them: each is an answer the caller reads.
   state (`warning_overwrite_adjust` L1791; `warning_overwrite_find`
   L1833–1855, L1841–1844). So an unselected local change, remote deletion or
   other-package object keeps its system state, and only a remote-only add or
-  update is imported whatever the selection (Code; that last case measured
+  update that is not a package warning is imported whatever the selection (Code; that last case measured
   2026-11-22: an unselected interface changed only in the remote was
   imported). A skipped entry is logged `S`, "not imported; no import
   requested" (L308–313): the raw log names it, but its `S` status, and
@@ -277,19 +277,20 @@ library judges none of them: each is an answer the caller reads.
   `ABAPGIT_ST_PULL_MODIFIED_OBJS` L46, L52) and skips anything else silently:
   `pullRepo`'s handler answers `202` on accepting the job, and the job then sets every
   entry to `'N'`, so nothing listed is pulled but remote-only adds and
-  updates (Code; see the selection entry above). The library writes
+  updates outside the package warnings (Code; see the selection entry above). The library writes
   them there; the two pull handlers pick the document by the exact
   `Content-Type` (a `; charset=…` suffix answers 400, `RES_REPO_PULL` L167–182).
 - **A push needs all three stage lists.** `ABAPGIT_ST_REPO_STAGE` reads
   `unstaged_objects`, `staged_objects` and `ignored_objects` as literal
   elements, in that order (cloud L14, L25, L36; onprem the same); the library
   writes the first and the last empty.
-- **A present, empty attribute fails a push** — measured on premise
+- **A present, empty attribute under `tt:cond check="not-initial(…)"` fails
+  a push** — measured on premise
   2026-11-22: a push whose new file carried `remoteState=""` answered 400,
   T100 `00`/`001` "Check of condition failed" (`CX_ST_COND_CHECK_FAIL`); the
   cloud push of the first live run was refused with a T100 message for the
-  same document (key not recorded). **A selective pull's empty attribute is
-  refused by the same rule from Code alone** (`SADT_OBJECT_REFERENCE` under
+  same document (key not recorded). **A selective pull's empty attribute under
+  such a `tt:cond` is refused by the same rule from Code alone** (`SADT_OBJECT_REFERENCE` under
   `ABAPGIT_ST_PULL_MODIFIED_OBJS`), not measured. The transformations read every file attribute
   (`…ST_REPO_STAGE_OBJECT` onprem L41–54, cloud L76–90), the comment and the
   people (`…ST_REPO_STAGE` onprem L44–72, cloud L52–83) and the object
@@ -303,6 +304,8 @@ library judges none of them: each is an answer the caller reads.
   selective `pullRepo` (cloud only) answered `202`, its job ended `S` and
   imported the one selected interface of two changed on both sides; `pullRepoInDialog`
   (cloud) and `pullRepo` with `repo.v3` (on premise) answered `202` / `200`.
+  The object reference's `name` is under `s-check`, which deserialization does
+  not run, so the library always sends it (`src/clients/abapGit/xmlBuilder.ts`).
 - **`getFile` of a file the repository does not hold answers `200` with an
   empty text** (R12): the handler reads the file table without checking that
   the file was found (onprem `ZCL_ABAPGIT_RES_REPO_FILES->get` L69, cloud
