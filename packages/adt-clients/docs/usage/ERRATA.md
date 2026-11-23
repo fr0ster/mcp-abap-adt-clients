@@ -347,9 +347,12 @@ library judges none of them: each is an answer the caller reads.
 - **The success status of `checkRepo` (R11) and `switchBranch` (R15)** is the
   framework's default, set inside the handler's `CATCH` (Inference); it is not
   asserted until a live run measures it.
-- **A key-addressed failure carries a T100 key.** `CL_ADT_EXCEPTION_UTILITY`
+- **A key-addressed failure raised as an abapGit exception carries a T100
+  key.** `CL_ADT_EXCEPTION_UTILITY`
   writes `T100KEY-ID` / `T100KEY-NO` for every exception that is a T100
   message (L94–97), and the abapGit exceptions are (Code, both systems); the new
   forms keep exactly those, and R11's `http_status`, as facts. Measured
-  2026-11-22: `getFile` (both systems), `push` and `pullRepo` (on premise).
+  2026-11-22: `getFile` (both systems), `push` and `pullRepo` (on premise). A
+  runtime error answered as an HTML `500` carries none, like the on-premise
+  `checkRepo` `SYNTAX_ERROR` above: its only fact is `status`.
 
