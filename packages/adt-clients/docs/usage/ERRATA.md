@@ -265,7 +265,8 @@ library judges none of them: each is an answer the caller reads.
   `packageWarningObjects`, their `abapgitobjects` and `action` in R6's
   namespace `agitpullmodifiedobjects` (L5, L42, L55;
   `ABAPGIT_ST_PULL_MODIFIED_OBJS` L46, L52) and skips anything else silently:
-  the job then sets every entry to `'N'` and answers `202`, so no locally
+  the handler answers `202` on accepting the job, and the job then sets every
+  entry to `'N'`, so no locally
   changed object is pulled (a remote-only change is still imported; see the
   selection entry above). The library writes
   them there; the two pull handlers pick the document by the exact
