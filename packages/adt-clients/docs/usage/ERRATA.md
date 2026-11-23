@@ -298,14 +298,15 @@ library judges none of them: each is an answer the caller reads.
   L38–56) under `tt:cond check="not-initial(…)"`, and deserialization checks
   the value it read (Code). Staging answers such values — `remoteState` is
   empty for a file the remote does not hold, `packageName` may be empty
-  (measured, both systems) — so the library writes an attribute only when it
-  has a value. With that (measured 2026-11-22): `push` answered `200` on
+  (measured, both systems) — so the library writes an attribute under such a
+  `tt:cond` only when it has a value. With that (measured 2026-11-22): `push` answered `200` on
   premise and `202` on cloud, whose job ended `S` "Pushed successfully"; the
   selective `pullRepo` (cloud only) answered `202`, its job ended `S` and
   imported the one selected interface of two changed on both sides; `pullRepoInDialog`
   (cloud) and `pullRepo` with `repo.v3` (on premise) answered `202` / `200`.
   The object reference's `name` is under `s-check`, which deserialization does
-  not run, so the library always sends it (`src/clients/abapGit/xmlBuilder.ts`).
+  not run, so the library always sends it, empty included
+  (`src/clients/abapGit/xmlBuilder.ts`).
 - **`getFile` of a file the repository does not hold answers `200` with an
   empty text** (R12): the handler reads the file table without checking that
   the file was found (onprem `ZCL_ABAPGIT_RES_REPO_FILES->get` L69, cloud
