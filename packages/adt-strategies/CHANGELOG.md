@@ -38,7 +38,10 @@ with a nameless entry added, and an entry with no attribute at all.
   in `incompleteEntries` (`ITransportIncompleteEntry`: every field of an
   entry, each present only when the entry carries it, the task's number
   included), in document order, present only when the document holds one.
-  **Both complete readings below answer the same values:** every field
+  **Both complete readings below answer the same field values for a task's
+  entries** (which entries each reads is its own: `transportObjectEntryList`
+  reads every entry of the document, `transportItem` the asked item's):
+  every field
   and the task's number decoded and trimmed, literal and entity-encoded
   padding alike (`&#32;ZCL_ONE&#x20;` is `ZCL_ONE`), a blank one absent; a
   name or a type is missing when it is absent, empty, or blank once
