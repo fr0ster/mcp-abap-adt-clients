@@ -14,6 +14,69 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.28.2] - 2026-11-23
+
+A transport entry SAP lists without a name was dropped from the readings,
+found by the server team's review (mcp-abap-adt #378): the entry vanished
+from a task's answer, and its count went down. Released with
+`@mcp-abap-adt/adt-clients` 47.0.2, a documentation patch (its shipped
+ERRATA and API reference describe these entries); none of its default sets
+uses either reading, so its behaviour does not change.
+
+**Which test documents are recorded, which written.** Recorded: the
+server's cloud task document `EMPTY_TASK`. Reduced from a recording:
+`TASK_WITH_OBJECTS`, the server's reconstruction of the measured on-premise
+task document. Written: the server's `REQUEST`. Built in the tests from
+those: each with one entry's `tm:name` (or `tm:type`) removed, `EMPTY_TASK`
+with a nameless entry added, and an entry with no attribute at all.
+
+### Fixed
+
+- **No entry SAP lists is dropped silently any more.** A `tm:abap_object`
+  without `tm:name` or `tm:type` was skipped by every transport entry
+  reading; one without `tm:position` was already kept. It is now answered
+  in `incompleteEntries` (`ITransportIncompleteEntry`: every field of an
+  entry, each present only when the entry carries it, the task's number
+  included), in document order, present only when the document holds one.
+  **Both complete readings below answer the same field values for a task's
+  entries** (which entries each reads is its own: `transportObjectEntryList`
+  reads every entry of the document, `transportItem` the asked item's):
+  every field
+  and the task's number decoded and trimmed, literal and entity-encoded
+  padding alike (`&#32;ZCL_ONE&#x20;` is `ZCL_ONE`), a blank one absent; a
+  name or a type is missing when it is absent, empty, or blank once
+  decoded and trimmed (`&#32;&#x20;`):
+  - **`transportObjectEntryList`, new: the complete entry reading.** It
+    answers `ITransportObjectEntryList`, `{ entries, incompleteEntries? }`
+    — `entries` the entries `transportItem` answers for a task's document,
+    with the same values. A plain object, so a copy or JSON of it keeps
+    both lists.
+  - **`transportObjectEntries` / `parseObjectEntries` are unchanged and
+    leave out an entry without a name or a type**, as they always did: the
+    answer is still the plain `ITransportObjectEntry[]` and keeps its 0.28.1
+    output exactly: values as decoded, untrimmed, and an entry whose name or
+    type is blank only after decoding still in it. A caller who must see
+    every entry SAP lists, trimmed, moves to `transportObjectEntryList`.
+  - **`transportItem` / `readTransportItem`: `ITransportTaskItem` (a task's
+    document) gains `incompleteEntries`.**
+
+  `ITransportObjectEntry` is unchanged: `name` and `type` stay required,
+  and `transportItem`'s `objects` hold the same entries with the same
+  values as in 0.28.1.
+
+  **The count includes them.** A task holds `objects.length +
+  (incompleteEntries?.length ?? 0)` entries (`entries.length + …` in the
+  list reading) — the number its request's document gives as the task's
+  `objectCount`, which has counted every `tm:abap_object`, complete or not,
+  since 0.28.0 (now stated on the field and pinned).
+
+  The new names, exported from the package root: `transportObjectEntryList`,
+  `ITransportObjectEntryList`, `ITransportIncompleteEntry` (the pure
+  function underneath, like `parseObjectEntries`, is not). Nothing existing
+  changes type; the one consumer an added key reaches is an exhaustive
+  mapping over the interface's keys (`Record<keyof ITransportTaskItem, …>`),
+  which now needs `incompleteEntries`.
+
 ## [0.28.1] - 2026-11-23
 
 Two readings the server team still worked around after 0.28.0 (mcp-abap-adt

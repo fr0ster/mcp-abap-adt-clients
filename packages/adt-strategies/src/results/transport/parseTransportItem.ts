@@ -22,6 +22,7 @@ import {
   transportRoot,
 } from './document';
 import {
+  type ITransportIncompleteEntry,
   type ITransportObjectEntry,
   taskEntriesIn,
 } from './parseObjectEntries';
@@ -58,7 +59,11 @@ export interface ITransportItemHeader {
 /** One task of a request: its header, and how many entries it holds. */
 export interface ITransportTaskSummary {
   header: ITransportItemHeader;
-  /** The task's `tm:abap_object` entries, counted. */
+  /**
+   * The task's `tm:abap_object` entries, counted — every one SAP lists, one
+   * without a name or a type included (the count a task's own document gives
+   * as `objects` plus `incompleteEntries`).
+   */
   objectCount: number;
 }
 
@@ -78,6 +83,14 @@ export interface ITransportTaskItem {
   parent: ITransportItemHeader | undefined;
   /** The task's entries, each with the task's number. */
   objects: ITransportObjectEntry[];
+  /**
+   * Since 0.28.2: each entry the task lists without a name or a type, with
+   * the task's number and the fields it carries, in document order; present
+   * only when the task lists one. Until 0.28.2 such an entry was dropped. The
+   * task holds `objects.length + (incompleteEntries?.length ?? 0)` entries —
+   * the `objectCount` its request's document gives the task.
+   */
+  incompleteEntries?: ITransportIncompleteEntry[];
 }
 
 /** What a transport request or task document is, read. */
@@ -166,11 +179,13 @@ export function readTransportItem(
   if (task !== undefined) {
     if (marker === 'R') refuse();
     const [request] = requests;
+    const { entries, incompleteEntries } = taskEntriesIn(task);
     return {
       kind: 'task',
       header: headerOf(task, asked),
       parent: ownHeader(request),
-      objects: taskEntriesIn(task),
+      objects: entries,
+      ...(incompleteEntries.length === 0 ? {} : { incompleteEntries }),
     };
   }
 

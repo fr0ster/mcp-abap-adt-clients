@@ -222,9 +222,11 @@ export {
 } from './results/traces';
 export {
   type ICreatedTransport,
+  type ITransportIncompleteEntry,
   type ITransportItem,
   type ITransportItemHeader,
   type ITransportObjectEntry,
+  type ITransportObjectEntryList,
   type ITransportRequestItem,
   type ITransportTaskItem,
   type ITransportTaskSummary,
@@ -237,6 +239,7 @@ export {
   transportCreated,
   transportItem,
   transportObjectEntries,
+  transportObjectEntryList,
   transportSearchConfigurations,
   transportTree,
 } from './results/transport';
