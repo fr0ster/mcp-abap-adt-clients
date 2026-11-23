@@ -74,7 +74,7 @@ npm run test:check:integration  # Integration tests only (runs as pretest)
   - push: `getStaging`, `push`;
   - inspection: `getStatus`, `getRunLog`, `getErrorLog`, `checkRepo`;
   - files: `getFile`.
-  `pull`, `getErrorLog` and the legacy forms of `link` and `checkExternalRepo` are deprecated. Each member's contract (credentials, the facts-only errors, the request flags, what changed in the legacy forms) is in its option and result types (`IAdtAbapGit.ts` in interfaces-adt) and its JSDoc. What SAP does on each route is in `docs/usage/ERRATA.md`.
+  `pull`, `getErrorLog` and the legacy forms of `link` and `checkExternalRepo` are deprecated. Each member's contract (credentials, the facts-only errors, the request flags, what changed in the legacy forms) is in its option and result types (`IAdtAbapGit.ts` in interfaces-adt) and its JSDoc. What is known of SAP's behaviour on these routes, read in its handlers or measured, is in `docs/usage/ERRATA.md`.
 
 All clients accept `IAbapConnection` (from `@mcp-abap-adt/interfaces-adt-connection`) + `ILogger`. No request is corrected, sent again or remembered: a `406`/`415` is the call's answer (Accept negotiation was removed in 36.0.0). A caller that knows a system's media types passes them per call: `options.headers` (`{ accept, contentType }`) on the object members, `options.accept` on the `getUtils` reads.
 
