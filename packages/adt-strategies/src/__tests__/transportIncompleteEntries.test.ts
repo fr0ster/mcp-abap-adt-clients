@@ -320,6 +320,64 @@ describe('transportObjectEntryList keeps what the entry carries, as decoded', ()
   });
 });
 
+describe('both complete readings answer the same trimmed values', () => {
+  /**
+   * The entries' attributes padded in front with an encoded space, the
+   * task's number on both sides.
+   */
+  const padded = (document: string): string => {
+    let out = document;
+    for (const attribute of [
+      'pgmid',
+      'type',
+      'name',
+      'position',
+      'lock_status',
+      'obj_info',
+    ]) {
+      out = out.split(` tm:${attribute}="`).join(` tm:${attribute}="&#32;`);
+    }
+    return out
+      .split(`tm:number="${TASK}"`)
+      .join(`tm:number="&#32;${TASK}&#x20;"`);
+  };
+
+  it('entity-encoded padding: transportObjectEntryList answers what transportItem answers', () => {
+    const document = padded(TASK_WITH_OBJECTS);
+    const item = readTransportItem(document, TASK);
+    if (item.kind !== 'task') throw new Error('expected a task');
+    const list = parseObjectEntryList(document);
+    expect(list.entries).toEqual(item.objects);
+    expect(list.entries.map((e) => [e.task, e.pgmid, e.type, e.name])).toEqual([
+      [TASK, 'R3TR', 'CLAS', 'ZCL_ONE'],
+      [TASK, 'LIMU', 'METH', 'ZCL_ONE                       RUN'],
+    ]);
+  });
+
+  it('a name padded on both sides, an incomplete entry padded too', () => {
+    const document = secondEntryWith(
+      SECOND_NAME,
+      ' tm:name="&#32;ZCL_ONE&#x20;"',
+    ).replace(' tm:type="METH"', '');
+    const item = readTransportItem(document, TASK);
+    if (item.kind !== 'task') throw new Error('expected a task');
+    const list = parseObjectEntryList(document);
+    expect(list.incompleteEntries).toEqual(item.incompleteEntries);
+    expect(list.incompleteEntries?.map((e) => e.name)).toEqual(['ZCL_ONE']);
+  });
+
+  it('the legacy array keeps its 0.28.1 output: the padding as decoded', () => {
+    const document = secondEntryWith(
+      SECOND_NAME,
+      ' tm:name="&#32;ZCL_ONE&#x20;"',
+    );
+    expect(parseObjectEntries(document).map((e) => e.name)).toEqual([
+      'ZCL_ONE',
+      ' ZCL_ONE ',
+    ]);
+  });
+});
+
 describe('transportObjectEntries is the array it was', () => {
   it('answers the complete entries only, and carries nothing on the array', () => {
     const entries = transportObjectEntries(wire(TASK_NAMELESS_ENTRY));
