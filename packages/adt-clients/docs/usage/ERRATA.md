@@ -221,15 +221,24 @@ library judges none of them: each is an answer the caller reads.
   version holds the pulled source, the active one the previous, and
   `getFile` `local` answers the active one. Activating is the caller's. An
   onprem pull activates (measured: the active source changed).
-- **A selection decides only for objects changed locally.** The pull job
-  sets each selected entry's decision `Y` and every other `N`, but
-  `warning_overwrite_find` lists only objects modified locally, and
-  `warning_overwrite_adjust` drops only those with `N`
-  (`CL_ABAPGIT_OBJECTS` L1791–1855; Code): a remote-only change is imported
-  whatever the selection (measured 2026-11-22: an interface left out of the
-  selection, changed only in the remote, was imported). An object left out
-  is logged `S`, "not imported; no import requested" (L308–313), so the run
-  log does not tell it from one imported.
+- **A selection decides only for objects changed locally.** The
+  modified-objects list (`getModifiedObjects`, R6) and the pull job's decision
+  table both come from `CL_ABAPGIT_OBJECTS_CHECK=>warning_overwrite_find`
+  (L140–210): every changed object, a remote-only change as action `2`
+  (update), a local change as `3` (overwrite) (`CL_ABAPGIT_RES_PULL_MOD_OBJS->get`
+  L99–127; that the repository's `deserialize_checks` reaches it is inferred,
+  and fits the live answer of action `2` on 2026-11-23). The job sets each
+  selected entry's decision `Y` and every other `N`, matching by name alone
+  (`CL_ABAPGIT_BG_ACTION_PULL->execute` L123–152). But
+  `CL_ABAPGIT_OBJECTS->warning_overwrite_adjust` (L1791) removes from the
+  import only the `N` entries that `CL_ABAPGIT_OBJECTS->warning_overwrite_find`
+  (L1833–1855) finds, and that method lists only objects with a local state
+  (L1841–1844; Code). So an unselected local change keeps its system version,
+  and a remote-only change is imported whatever the selection (measured
+  2026-11-22: an interface left out of the selection, changed only in the
+  remote, was imported). An object left out is logged `S`, "not imported; no
+  import requested" (L308–313), so the run log does not tell it from one
+  imported.
 - **A push's run log names no object** (measured on cloud 2026-11-22: one
   entry, type and name empty, status `S`, message type `I`); a pull's names
   each object it imported.
