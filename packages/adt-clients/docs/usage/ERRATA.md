@@ -221,25 +221,35 @@ library judges none of them: each is an answer the caller reads.
   version holds the pulled source, the active one the previous, and
   `getFile` `local` answers the active one. Activating is the caller's. An
   onprem pull activates (measured: the active source changed).
-- **A selection decides only for objects changed locally.** The
-  modified-objects list (`getModifiedObjects`, R6) and the pull job's decision
-  table both come from `CL_ABAPGIT_OBJECTS_CHECK=>warning_overwrite_find`
-  (L140–210): every changed object, a remote-only change as action `2`
-  (update), a local change as `3` (overwrite) (`CL_ABAPGIT_RES_PULL_MOD_OBJS->get`
-  L99–127; that the repository's `deserialize_checks` reaches it is inferred,
-  and fits the live answer of action `2` on 2026-11-23). The job sets each
-  selected entry's decision `Y` and every other `N`, matching by name alone
-  (`CL_ABAPGIT_BG_ACTION_PULL->execute` L123–152). But
-  `CL_ABAPGIT_OBJECTS->warning_overwrite_adjust` (L1791) removes from the
-  import only the `N` entries that `CL_ABAPGIT_OBJECTS->warning_overwrite_find`
-  (L1833–1855) finds, and that method lists only objects with a local state
-  (L1841–1844; Code). So an unselected local change keeps its system version,
-  and a remote-only change is imported whatever the selection (measured
-  2026-11-22: an interface left out of the selection, changed only in the
-  remote, was imported). A local change the import skips is logged `S`, "not
-  imported; no import requested" (L308–313): the raw log names it, but its
-  `S` status, and `getRunLog`'s facts, which carry no message text, do not
-  tell it from one imported.
+- **A selection decides for every listed object except a remote-only add or
+  update.** `getModifiedObjects` (R6) answers `deserialize_checks`' overwrite
+  list without the repository's own package
+  (`CL_ABAPGIT_RES_PULL_MOD_OBJS->get_all_modified_objects` L127–130), plus
+  its package warnings: the objects whose TADIR package differs from their
+  path's (L162–173; `CL_ABAPGIT_OBJECTS_CHECK=>warning_package_find`
+  L257–295). The overwrite list holds every changed object, a remote-only
+  change as `2` (update) and a local change as `3` (overwrite)
+  (`CL_ABAPGIT_OBJECTS_CHECK=>warning_overwrite_find` L140–210); that the
+  repository's `deserialize_checks` reaches it is Inference, and fits the live
+  answer of `2` measured on 2026-11-23. The job recomputes both lists when it
+  runs (`CL_ABAPGIT_BG_ACTION_PULL->execute` L113). It marks an entry `Y`
+  when the selection holds its name and its action still matches: a selected
+  deletion whose action changed gets `N`, and a `delete_add` package warning is
+  always `N`; every other entry gets `N` (L123–152). Deletions run only for
+  `Y` entries (`delete_unnecessary_objects` L39–72). An `N` package warning is
+  left out whatever its state (`CL_ABAPGIT_OBJECTS->warning_package_adjust`
+  L1858–1897); an `N` overwrite entry is left out only when it has a local
+  state (`warning_overwrite_adjust` L1791; `warning_overwrite_find`
+  L1833–1855, L1841–1844). So an unselected local change, remote deletion or
+  other-package object keeps its system state, and only a remote-only add or
+  update is imported whatever the selection (Code; that last case measured
+  2026-11-22: an unselected interface changed only in the remote was
+  imported). A skipped entry is logged `S`, "not imported; no import
+  requested" (L308–313): the raw log names it, but its `S` status, and
+  `getRunLog`'s facts, which carry no message text, do not tell it from one
+  imported. `pullRepoInDialog` (R5) takes the same selective document and runs
+  the job in the request (`CL_ABAPGIT_RES_REPO_PULL_V1->post` L244–247,
+  L266–274).
 - **A push's run log names no object** (measured on cloud 2026-11-22: one
   entry, type and name empty, status `S`, message type `I`); a pull's names
   each object it imported.
@@ -265,10 +275,9 @@ library judges none of them: each is an answer the caller reads.
   `packageWarningObjects`, their `abapgitobjects` and `action` in R6's
   namespace `agitpullmodifiedobjects` (L5, L42, L55;
   `ABAPGIT_ST_PULL_MODIFIED_OBJS` L46, L52) and skips anything else silently:
-  the handler answers `202` on accepting the job, and the job then sets every
-  entry to `'N'`, so no locally
-  changed object is pulled (a remote-only change is still imported; see the
-  selection entry above). The library writes
+  `pullRepo`'s handler answers `202` on accepting the job, and the job then sets every
+  entry to `'N'`, so nothing listed is pulled but remote-only adds and
+  updates (Code; see the selection entry above). The library writes
   them there; the two pull handlers pick the document by the exact
   `Content-Type` (a `; charset=…` suffix answers 400, `RES_REPO_PULL` L167–182).
 - **A push needs all three stage lists.** `ABAPGIT_ST_REPO_STAGE` reads
