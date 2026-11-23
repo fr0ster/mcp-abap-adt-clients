@@ -236,9 +236,10 @@ library judges none of them: each is an answer the caller reads.
   (L1841–1844; Code). So an unselected local change keeps its system version,
   and a remote-only change is imported whatever the selection (measured
   2026-11-22: an interface left out of the selection, changed only in the
-  remote, was imported). An object left out is logged `S`, "not imported; no
-  import requested" (L308–313), so the run log does not tell it from one
-  imported.
+  remote, was imported). A local change the import skips is logged `S`, "not
+  imported; no import requested" (L308–313): the raw log names it, but its
+  `S` status, and `getRunLog`'s facts, which carry no message text, do not
+  tell it from one imported.
 - **A push's run log names no object** (measured on cloud 2026-11-22: one
   entry, type and name empty, status `S`, message type `I`); a pull's names
   each object it imported.
@@ -259,12 +260,14 @@ library judges none of them: each is an answer the caller reads.
   `ZABAPGIT_ST_REPO_POST` has no such field and skips unknown elements
   (`extensible="deep"`, L8); cloud's `ABAPGIT_ST_REPO_POST_V3` reads it
   (L20–24). The library sends it when given, on either system.
-- **A selective pull with its lists in the wrong namespace pulls nothing.**
+- **A selective pull with its lists in the wrong namespace selects nothing.**
   `ABAPGIT_ST_REPO_SELECTIVE_PULL` (cloud) reads `overwriteObjects`,
   `packageWarningObjects`, their `abapgitobjects` and `action` in R6's
   namespace `agitpullmodifiedobjects` (L5, L42, L55;
   `ABAPGIT_ST_PULL_MODIFIED_OBJS` L46, L52) and skips anything else silently:
-  the job then sets every entry to `'N'` and answers `202`. The library writes
+  the job then sets every entry to `'N'` and answers `202`, so no locally
+  changed object is pulled (a remote-only change is still imported; see the
+  selection entry above). The library writes
   them there; the two pull handlers pick the document by the exact
   `Content-Type` (a `; charset=…` suffix answers 400, `RES_REPO_PULL` L167–182).
 - **A push needs all three stage lists.** `ABAPGIT_ST_REPO_STAGE` reads
