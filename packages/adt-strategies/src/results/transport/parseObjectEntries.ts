@@ -96,17 +96,18 @@ export interface ITransportObjectEntryList {
 }
 
 /**
- * One `tm:abap_object` read: an entry, or an entry missing a required field.
- * `legacy` is what `parseObjectEntries` answered for an entry whose name or
- * type is blank only after trimming (`&#32;`): its array keeps answering it
- * as before, while the complete readings count it as missing the field.
+ * One `tm:abap_object` read twice. `read` is the complete readings' (since
+ * 0.28.2): every value decoded and trimmed, a blank one absent, and the
+ * entry complete only with a name and a type. `legacy` is what
+ * `parseObjectEntries` answered in 0.28.1 — values as decoded, untrimmed,
+ * kept when the name and the type are not empty — so its array is unchanged.
  */
-type ReadEntry =
-  | { complete: ITransportObjectEntry }
-  | {
-      incomplete: ITransportIncompleteEntry;
-      legacy: ITransportObjectEntry | undefined;
-    };
+interface ReadEntry {
+  read:
+    | { complete: ITransportObjectEntry }
+    | { incomplete: ITransportIncompleteEntry };
+  legacy: ITransportObjectEntry | undefined;
+}
 
 /** The entries read, split into the complete and the incomplete, each in document order. */
 interface ISplitEntries {
@@ -117,7 +118,7 @@ interface ISplitEntries {
 const split = (read: ReadEntry[]): ISplitEntries => {
   const entries: ITransportObjectEntry[] = [];
   const incompleteEntries: ITransportIncompleteEntry[] = [];
-  for (const entry of read) {
+  for (const { read: entry } of read) {
     if ('complete' in entry) entries.push(entry.complete);
     else incompleteEntries.push(entry.incomplete);
   }
@@ -131,48 +132,80 @@ type AttributeOf = (name: string) => string | undefined;
 const nonEmpty = (value: string | undefined): string | undefined =>
   value === '' ? undefined : value;
 
-/** An attribute as written; `undefined` when absent or blank once trimmed. */
-const nonBlank = (value: string | undefined): string | undefined =>
-  value === undefined || value.trim() === '' ? undefined : value;
+/** An attribute decoded and trimmed; `undefined` when absent or blank. */
+const trimmed = (value: string | undefined): string | undefined =>
+  nonEmpty(value?.trim());
 
 const text = (node: unknown, name: string): string | undefined =>
   nonEmpty(tmAttribute(node, name));
 
+/** The fields of an entry besides its name and type, by attribute. */
+const FIELDS = {
+  pgmid: 'pgmid',
+  description: 'obj_desc',
+  position: 'position',
+  lockStatus: 'lock_status',
+  imageActivity: 'img_activity',
+  info: 'obj_info',
+} satisfies Record<
+  Exclude<keyof ITransportIncompleteEntry, 'task' | 'name' | 'type'>,
+  string
+>;
+
 /**
- * One entry, read through `attribute`: complete when it carries a name and a
- * type, neither blank once decoded and trimmed; else incomplete, with only
- * the fields it carries (a blank name or type absent).
+ * One entry, read through `attribute`, both ways (`ReadEntry`). In the
+ * complete readings it is complete when it carries a name and a type, both
+ * non-blank once decoded and trimmed; else incomplete, with only the fields
+ * it carries.
  */
 function entryOf(attribute: AttributeOf, task: string | undefined): ReadEntry {
-  const read = (name: string): string | undefined => nonEmpty(attribute(name));
-  const name = read('name');
-  const type = read('type');
+  const asWritten = (name: string): string | undefined =>
+    nonEmpty(attribute(name));
+  const asTrimmed = (name: string): string | undefined =>
+    trimmed(attribute(name));
+
+  // 0.28.1's entry, unchanged. No `?? ''` for the position: see its note.
+  const name = asWritten('name');
+  const type = asWritten('type');
+  const legacy: ITransportObjectEntry | undefined =
+    name === undefined || type === undefined
+      ? undefined
+      : {
+          ...(task === undefined ? {} : { task }),
+          name,
+          type,
+          pgmid: asWritten(FIELDS.pgmid),
+          description: asWritten(FIELDS.description),
+          position: asWritten(FIELDS.position),
+          lockStatus: asWritten(FIELDS.lockStatus),
+          imageActivity: asWritten(FIELDS.imageActivity),
+          info: asWritten(FIELDS.info),
+        };
+
+  const ownTask = trimmed(task);
+  const ownName = asTrimmed('name');
+  const ownType = asTrimmed('type');
   const fields = {
-    pgmid: read('pgmid'),
-    description: read('obj_desc'),
-    // No `?? ''`: see the field's own note. An absent position is absent.
-    position: read('position'),
-    lockStatus: read('lock_status'),
-    imageActivity: read('img_activity'),
-    info: read('obj_info'),
+    pgmid: asTrimmed(FIELDS.pgmid),
+    description: asTrimmed(FIELDS.description),
+    position: asTrimmed(FIELDS.position),
+    lockStatus: asTrimmed(FIELDS.lockStatus),
+    imageActivity: asTrimmed(FIELDS.imageActivity),
+    info: asTrimmed(FIELDS.info),
   };
-  const asEntry = (
-    entryName: string,
-    entryType: string,
-  ): ITransportObjectEntry => ({
-    ...(task === undefined ? {} : { task }),
-    name: entryName,
-    type: entryType,
-    ...fields,
-  });
-  // A name or a type blank once decoded and trimmed is missing (0.28.2).
-  const ownName = nonBlank(name);
-  const ownType = nonBlank(type);
   if (ownName !== undefined && ownType !== undefined) {
-    return { complete: asEntry(ownName, ownType) };
+    return {
+      read: {
+        complete: {
+          ...(ownTask === undefined ? {} : { task: ownTask }),
+          name: ownName,
+          type: ownType,
+          ...fields,
+        },
+      },
+      legacy,
+    };
   }
-  const legacy =
-    name !== undefined && type !== undefined ? asEntry(name, type) : undefined;
   // Only the fields the entry carries: an absent one is no key at all.
   const present = (
     key: keyof ITransportIncompleteEntry,
@@ -180,7 +213,7 @@ function entryOf(attribute: AttributeOf, task: string | undefined): ReadEntry {
   ): Partial<Record<keyof ITransportIncompleteEntry, string>> =>
     value === undefined ? {} : { [key]: value };
   const incomplete: ITransportIncompleteEntry = {
-    ...present('task', task),
+    ...present('task', ownTask),
     ...present('name', ownName),
     ...present('type', ownType),
     ...present('pgmid', fields.pgmid),
@@ -190,7 +223,7 @@ function entryOf(attribute: AttributeOf, task: string | undefined): ReadEntry {
     ...present('imageActivity', fields.imageActivity),
     ...present('info', fields.info),
   };
-  return { incomplete, legacy };
+  return { read: { incomplete }, legacy };
 }
 
 /** The entries `element` holds as its own children, each with `task`. */
@@ -273,18 +306,18 @@ function documentEntries(root: ParsedElement): ReadEntry[] {
 export function parseObjectEntries(document: unknown): ITransportObjectEntry[] {
   const root = transportRoot(document);
   if (root === undefined) return [];
-  return documentEntries(root).flatMap((entry) => {
-    if ('complete' in entry) return [entry.complete];
-    return entry.legacy === undefined ? [] : [entry.legacy];
-  });
+  return documentEntries(root).flatMap(({ legacy }) =>
+    legacy === undefined ? [] : [legacy],
+  );
 }
 
 /**
  * The complete reading of a transport document's entries (since 0.28.2):
  * `entries`, and each entry SAP lists without a name or a type — absent,
  * empty, or blank once decoded and trimmed — in `incompleteEntries`,
- * present only when the document holds one. `entries` are the ones
- * `parseObjectEntries` answers, less those with a blank name or type. A task holds `entries.length +
+ * present only when the document holds one. Every value is decoded and
+ * trimmed, as `readTransportItem` answers it; `parseObjectEntries` keeps
+ * 0.28.1's untrimmed values. A task holds `entries.length +
  * (incompleteEntries?.length ?? 0)` entries.
  */
 export function parseObjectEntryList(
