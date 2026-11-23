@@ -221,17 +221,17 @@ library judges none of them: each is an answer the caller reads.
   version holds the pulled source, the active one the previous, and
   `getFile` `local` answers the active one. Activating is the caller's. An
   onprem pull activates (measured: the active source changed).
-- **A selection decides for every listed object, with two exceptions:** a
-  remote-only add or update outside the package warnings is imported
-  unselected, and a `delete_add` package warning is skipped even when
-  selected. `getModifiedObjects` (R6) answers `deserialize_checks`' overwrite
+- **A selection decides for every entry that still matches when the job runs,
+  with two exceptions:** a remote-only add or update outside the package
+  warnings is imported unselected, and a `delete_add` package warning is
+  skipped even when selected. `getModifiedObjects` (R6) answers `deserialize_checks`' overwrite
   list without the repository's own package
   (`CL_ABAPGIT_RES_PULL_MOD_OBJS->get_all_modified_objects` L127–130), plus
   its package warnings: the objects whose TADIR package differs from their
   path's (L162–173; `CL_ABAPGIT_OBJECTS_CHECK=>warning_package_find`
   L257–295). The overwrite list holds every changed object; among them a
-  remote-only update is action `2` (update) and a local change `3`
-  (overwrite)
+  remote-only update is action `2` (update), and the handler's overwrite case
+  (a local change) is `3`
   (`CL_ABAPGIT_OBJECTS_CHECK=>warning_overwrite_find` L140–210); that the
   repository's `deserialize_checks` reaches it is Inference, and fits the live
   answer of `2` measured on 2026-11-23. The job recomputes both lists when it
@@ -244,7 +244,8 @@ library judges none of them: each is an answer the caller reads.
   L1858–1897); an `N` overwrite entry is left out only when it has a local
   state (`warning_overwrite_adjust` L1791; `warning_overwrite_find`
   L1833–1855, L1841–1844). So an unselected local change, remote deletion or
-  other-package object keeps its system state, and only a remote-only add or
+  other-package object, a selected entry whose action changed, and a selected
+  `delete_add` package warning keep their system state, and only a remote-only add or
   update that is not a package warning is imported whatever the selection (Code; that last case measured
   2026-11-22: an unselected interface changed only in the remote was
   imported). A skipped entry is logged `S`, "not imported; no import
@@ -277,7 +278,8 @@ library judges none of them: each is an answer the caller reads.
   `ABAPGIT_ST_REPO_SELECTIVE_PULL` (cloud) reads `overwriteObjects`,
   `packageWarningObjects`, their `abapgitobjects` and `action` in R6's
   namespace `agitpullmodifiedobjects` (L5, L42, L55;
-  `ABAPGIT_ST_PULL_MODIFIED_OBJS` L46, L52) and skips anything else silently:
+  `ABAPGIT_ST_PULL_MODIFIED_OBJS` L46, L52) and silently skips selection lists
+  in any other namespace:
   `pullRepo`'s handler answers `202` on accepting the job, and the job then sets every
   entry to `'N'`, so nothing listed is pulled but remote-only adds and
   updates outside the package warnings (Code; see the selection entry above). The library writes
@@ -329,7 +331,7 @@ library judges none of them: each is an answer the caller reads.
   passed to the mandatory parameter IV_SERVICE" at L53, col. 22 — its
   `zcl_abapgit_http=>create_by_url( … )` call (Code). The installed abapGit
   and its ADT handler disagree; the request the library sends is not the
-  cause. The member returns that answer as it is: a failure whose facts are
+  cause. The member reduces that HTML answer to a structured failure whose facts are
   exactly `status` `500` — no T100 key, no git host status — with the fixed
   `refused` words. Those facts carry nothing more; the dump's name and line
   are not in them, so the live suite cannot tell this 500 from another 500
@@ -367,7 +369,8 @@ library judges none of them: each is an answer the caller reads.
   key.** `CL_ADT_EXCEPTION_UTILITY`
   writes `T100KEY-ID` / `T100KEY-NO` for every exception that is a T100
   message (L94–97), and the abapGit exceptions are (Code, both systems); the new
-  forms keep exactly those, and R11's `http_status`, as facts. Measured
+  forms keep the response's HTTP status and, when present, those and R11's
+  `http_status` (`gitHttpStatus`), as facts. Measured
   2026-11-22: `getFile` (both systems), `push` and `pullRepo` (on premise). A
   runtime error answered as an HTML `500` carries none, like the on-premise
   `checkRepo` `SYNTAX_ERROR` above: its only fact is `status`.
