@@ -193,10 +193,10 @@ export interface IGatewayErrorDetail extends IGatewayErrorEntry {
     namespace?: string;
     serviceName?: string;
     serviceVersion?: string;
-    /** `Service Group`. */
+    /** `Service Group` (cloud), `Group ID` (on premise). */
     groupId?: string;
     serviceRepository?: string;
-    /** `RFC Destination`. */
+    /** `RFC Destination` (cloud), `Destination` (on premise). */
     destination?: string;
   };
   errorContext: {
