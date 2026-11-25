@@ -15,6 +15,16 @@ import { feedGatewayErrorDetail, feedGatewayErrors } from '../results/feeds';
  * - `cloud-gatewayerror-detail.body.txt` — what the first entry's `HTTP link`
  *   answered: HTML, not XML (an empty content type);
  * - `onprem-gatewayerrors.xml` — the on-premise feed, with no entry.
+ *
+ * **Recorded** on premise, 2026-11-25, read-only, scrubbed (user, client,
+ * system id, host, address, application server, the OPID and our own
+ * repository object names replaced):
+ * - `onprem-gatewayerror-detail.body.txt` — what `GET
+ *   gw/errorlog/FrontendError/<opid>` answered (`text/html`): its header
+ *   section is `<h4 id="HEADER">`, not the cloud's `HEADER_INFO`; its labels
+ *   are written after two `&nbsp;` in a plain `<td>`; the service section
+ *   says `Group ID` and `Destination` where the cloud says `Service Group`
+ *   and `RFC Destination`; `CONTEXT` comes before `SOURCE`.
  */
 const FIXTURES = join(__dirname, 'fixtures', 'feeds');
 const answer = (file: string): IAdtWireResponse => ({
@@ -330,5 +340,158 @@ describe('feedGatewayErrorDetail reads the recorded error document (HTML)', () =
       name: '%_HTTP_START',
       line: 12,
     });
+  });
+});
+
+describe('feedGatewayErrorDetail reads the recorded on-premise error document (HTML)', () => {
+  const detail = feedGatewayErrorDetail(
+    answer('onprem-gatewayerror-detail.body.txt'),
+  );
+
+  it('reads the header under `HEADER`; an empty cell is absent', () => {
+    expect(detail).toEqual(
+      expect.objectContaining({
+        shortText: "Service group 'ZSERVICE_GROUP1' not published",
+        package: '/IWFND/V4_COS_PUBLISHING',
+        applicationComponent: 'n/a',
+        dateTime: '25.11.2026 01:57:32 (System)',
+        username: 'USER1',
+        userId: 'USERGUID1',
+        client: 'CLIENT1',
+      }),
+    );
+    // SAP wrote no Type, no Request Kind and, before the replay link, no
+    // transaction id on this page.
+    expect(detail).not.toHaveProperty('type');
+    expect(detail).not.toHaveProperty('requestKind');
+    expect(detail).not.toHaveProperty('transactionId');
+  });
+
+  it('reads the service information by the on-premise labels', () => {
+    expect(detail.serviceInfo).toEqual({
+      serviceName: 'ZSERVICE1',
+      serviceVersion: '0001',
+      groupId: 'ZSERVICE_GROUP1',
+      serviceRepository: 'SRVD',
+    });
+  });
+
+  it('reads the error context', () => {
+    expect(detail.errorContext.errorInfo).toBe(
+      "Service group 'ZSERVICE_GROUP1' not published",
+    );
+    expect(detail.errorContext.resolution).toEqual({
+      SAP_NOTE: 'See SAP Note 1797736 for error analysis',
+      LINK_TO_SAP_NOTE: 'https://service.sap.com/sap/support/notes/1797736',
+    });
+    expect(detail.errorContext.exceptions).toEqual([
+      {
+        type: '/IWCOR/CX_OD_HTTP_ERROR',
+        text: 'Unknown http error occurred in the context of Data Services',
+        raiseLocation: '/IWBEP/CL_OD_ROOT_HANDLER',
+      },
+      {
+        type: '/IWBEP/CX_V4_ACCESS_CHECK',
+        text: "Service group 'ZSERVICE_GROUP1' not published",
+        raiseLocation: '/IWFND/CL_V4_PUBLISHING_DBA',
+        attributes: {
+          HTTP_STATUS_CODE: '404',
+          SAP_NOTE_ID: '0000000000',
+          SRG_ID: 'ZSERVICE_GROUP1',
+        },
+      },
+    ]);
+  });
+
+  it('reads the source extract and its highlighted line', () => {
+    const { lines, errorLine } = detail.sourceCode;
+    expect(lines).toHaveLength(19);
+    expect(errorLine).toBe(12);
+    expect(lines.filter((l) => l.isError).map((l) => l.number)).toEqual([12]);
+  });
+
+  it('reads the call stack', () => {
+    expect(detail.callStack).toHaveLength(12);
+    expect(detail.callStack[0]).toEqual({
+      number: 12,
+      event: 'METHOD',
+      program: '/IWFND/CL_V4_PUBLISHING_DBA',
+      name: 'CHECK_IS_GROUP_PUBLISHED',
+      line: 12,
+    });
+    expect(detail.callStack[11]).toEqual({
+      number: 1,
+      event: 'MODULE (PBO)',
+      program: 'SAPMHTTP',
+      name: '%_HTTP_START',
+      line: 12,
+    });
+  });
+});
+
+describe('the on-premise forms the recorded document leaves empty', () => {
+  const onprem = String(answer('onprem-gatewayerror-detail.body.txt').data);
+
+  // Built from the recorded on-premise document: its `HEADER` section, with
+  // the `Type` cell filled as the on-premise feed's summaries write it
+  // (measured 2026-11-25: ` Frontend Error `), escaped into an entry's
+  // `atom:summary type="html"` as the feed writes it. No `atom:updated`, and
+  // a title of other words, so every header field asserted is the summary's.
+  it("feedGatewayErrors reads an on-premise summary's header under `HEADER`", () => {
+    const start = onprem.indexOf('<h4 id="HEADER"');
+    const end = onprem.indexOf('</table>', start) + '</table>'.length;
+    const header = onprem
+      .slice(start, end)
+      .replace(
+        '<b>Type</b></td><td>  </td>',
+        '<b>Type</b></td><td> Frontend Error </td>',
+      );
+    expect(header).toContain(' Frontend Error ');
+    const escaped = header
+      .split('&')
+      .join('&amp;')
+      .split('<')
+      .join('&lt;')
+      .split('>')
+      .join('&gt;');
+    const feed =
+      '<?xml version="1.0" encoding="utf-8"?><atom:feed xml:lang="EN" xmlns:atom="http://www.w3.org/2005/Atom">' +
+      '<atom:title>SAP Gateway Error Log</atom:title><atom:entry>' +
+      '<atom:author><atom:name>USER1 (USERGUID1)</atom:name></atom:author>' +
+      '<atom:id>FrontendError/0123456789ABCDEF0123456789ABCDEF</atom:id>' +
+      `<atom:summary type="html">${escaped}</atom:summary>` +
+      '<atom:title>Frontend Error: the title, not the summary</atom:title>' +
+      '</atom:entry></atom:feed>';
+    const [entry, ...rest] = feedGatewayErrors({
+      ...answer('onprem-gatewayerrors.xml'),
+      data: feed,
+    });
+    expect(rest).toEqual([]);
+    expect(entry).toMatchObject({
+      type: 'Frontend Error',
+      shortText: "Service group 'ZSERVICE_GROUP1' not published",
+      package: '/IWFND/V4_COS_PUBLISHING',
+      applicationComponent: 'n/a',
+      dateTime: '25.11.2026 01:57:32 (System)',
+      client: 'CLIENT1',
+      opid: '0123456789ABCDEF0123456789ABCDEF',
+      detailUri:
+        '/sap/bc/adt/gw/errorlog/FrontendError/0123456789ABCDEF0123456789ABCDEF',
+    });
+  });
+
+  // The recorded document's `Destination` is empty; the same document with
+  // one written, in the on-premise label.
+  it('feedGatewayErrorDetail reads a non-empty on-premise `Destination`', () => {
+    const empty = '<b>Destination</b></td><td>  </td>';
+    expect(onprem).toContain(empty);
+    const detail = feedGatewayErrorDetail({
+      ...answer('onprem-gatewayerror-detail.body.txt'),
+      data: onprem.replace(
+        empty,
+        '<b>Destination</b></td><td> DESTINATION1 </td>',
+      ),
+    });
+    expect(detail.serviceInfo.destination).toBe('DESTINATION1');
   });
 });

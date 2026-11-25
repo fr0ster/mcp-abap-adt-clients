@@ -193,10 +193,10 @@ export interface IGatewayErrorDetail extends IGatewayErrorEntry {
     namespace?: string;
     serviceName?: string;
     serviceVersion?: string;
-    /** `Service Group`. */
+    /** `Service Group` (cloud), `Group ID` (on premise). */
     groupId?: string;
     serviceRepository?: string;
-    /** `RFC Destination`. */
+    /** `RFC Destination` (cloud), `Destination` (on premise). */
     destination?: string;
   };
   errorContext: {
@@ -434,9 +434,19 @@ function userParts(text: string | undefined): {
   };
 }
 
+/**
+ * The `Header Information` table: its heading is `<h4 id="HEADER_INFO">` on
+ * the cloud and `<h4 id="HEADER">` on premise (measured: the error's own
+ * document, cloud 2026-11-22 and on premise 2026-11-25, and the on-premise
+ * feed's summaries).
+ */
+function headerTable(html: string): string | undefined {
+  return sectionTable(html, 'HEADER_INFO') ?? sectionTable(html, 'HEADER');
+}
+
 /** The `Header Information` fields of an error's HTML. */
 function headerFields(html: string): IGatewayErrorEntry {
-  const rows = labelledRows(sectionTable(html, 'HEADER_INFO'));
+  const rows = labelledRows(headerTable(html));
   const fields: Record<string, string | undefined> = {
     type: cell(rows, 'Type'),
     shortText: cell(rows, 'Short Text'),
@@ -664,9 +674,12 @@ function parseGatewayErrorDetail(html: string): IGatewayErrorDetail {
       namespace: cell(service, 'Service Namespace'),
       serviceName: cell(service, 'Service Name'),
       serviceVersion: cell(service, 'Service Version'),
-      groupId: cell(service, 'Service Group'),
+      // The cloud labels `Service Group` and `RFC Destination`, on premise
+      // `Group ID` and `Destination` (measured, the two recorded documents).
+      groupId: cell(service, 'Service Group') ?? cell(service, 'Group ID'),
       serviceRepository: cell(service, 'Service Repository'),
-      destination: cell(service, 'RFC Destination'),
+      destination:
+        cell(service, 'RFC Destination') ?? cell(service, 'Destination'),
     }),
     errorContext: errorContextOf(html),
     sourceCode: sourceCodeOf(html),
