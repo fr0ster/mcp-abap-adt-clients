@@ -428,3 +428,70 @@ describe('feedGatewayErrorDetail reads the recorded on-premise error document (H
     });
   });
 });
+
+describe('the on-premise forms the recorded document leaves empty', () => {
+  const onprem = String(answer('onprem-gatewayerror-detail.body.txt').data);
+
+  // Built from the recorded on-premise document: its `HEADER` section, with
+  // the `Type` cell filled as the on-premise feed's summaries write it
+  // (measured 2026-11-25: ` Frontend Error `), escaped into an entry's
+  // `atom:summary type="html"` as the feed writes it. No `atom:updated`, and
+  // a title of other words, so every header field asserted is the summary's.
+  it("feedGatewayErrors reads an on-premise summary's header under `HEADER`", () => {
+    const start = onprem.indexOf('<h4 id="HEADER"');
+    const end = onprem.indexOf('</table>', start) + '</table>'.length;
+    const header = onprem
+      .slice(start, end)
+      .replace(
+        '<b>Type</b></td><td>  </td>',
+        '<b>Type</b></td><td> Frontend Error </td>',
+      );
+    expect(header).toContain(' Frontend Error ');
+    const escaped = header
+      .split('&')
+      .join('&amp;')
+      .split('<')
+      .join('&lt;')
+      .split('>')
+      .join('&gt;');
+    const feed =
+      '<?xml version="1.0" encoding="utf-8"?><atom:feed xml:lang="EN" xmlns:atom="http://www.w3.org/2005/Atom">' +
+      '<atom:title>SAP Gateway Error Log</atom:title><atom:entry>' +
+      '<atom:author><atom:name>USER1 (USERGUID1)</atom:name></atom:author>' +
+      '<atom:id>FrontendError/0123456789ABCDEF0123456789ABCDEF</atom:id>' +
+      `<atom:summary type="html">${escaped}</atom:summary>` +
+      '<atom:title>Frontend Error: the title, not the summary</atom:title>' +
+      '</atom:entry></atom:feed>';
+    const [entry, ...rest] = feedGatewayErrors({
+      ...answer('onprem-gatewayerrors.xml'),
+      data: feed,
+    });
+    expect(rest).toEqual([]);
+    expect(entry).toMatchObject({
+      type: 'Frontend Error',
+      shortText: "Service group 'ZSERVICE_GROUP1' not published",
+      package: '/IWFND/V4_COS_PUBLISHING',
+      applicationComponent: 'n/a',
+      dateTime: '25.11.2026 01:57:32 (System)',
+      client: 'CLIENT1',
+      opid: '0123456789ABCDEF0123456789ABCDEF',
+      detailUri:
+        '/sap/bc/adt/gw/errorlog/FrontendError/0123456789ABCDEF0123456789ABCDEF',
+    });
+  });
+
+  // The recorded document's `Destination` is empty; the same document with
+  // one written, in the on-premise label.
+  it('feedGatewayErrorDetail reads a non-empty on-premise `Destination`', () => {
+    const empty = '<b>Destination</b></td><td>  </td>';
+    expect(onprem).toContain(empty);
+    const detail = feedGatewayErrorDetail({
+      ...answer('onprem-gatewayerror-detail.body.txt'),
+      data: onprem.replace(
+        empty,
+        '<b>Destination</b></td><td> DESTINATION1 </td>',
+      ),
+    });
+    expect(detail.serviceInfo.destination).toBe('DESTINATION1');
+  });
+});
