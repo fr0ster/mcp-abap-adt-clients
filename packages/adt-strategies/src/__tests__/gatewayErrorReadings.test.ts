@@ -15,6 +15,16 @@ import { feedGatewayErrorDetail, feedGatewayErrors } from '../results/feeds';
  * - `cloud-gatewayerror-detail.body.txt` — what the first entry's `HTTP link`
  *   answered: HTML, not XML (an empty content type);
  * - `onprem-gatewayerrors.xml` — the on-premise feed, with no entry.
+ *
+ * **Recorded** on premise, 2026-11-25, read-only, scrubbed (user, client,
+ * system id, host, address, application server, the OPID and our own
+ * repository object names replaced):
+ * - `onprem-gatewayerror-detail.body.txt` — what `GET
+ *   gw/errorlog/FrontendError/<opid>` answered (`text/html`): its header
+ *   section is `<h4 id="HEADER">`, not the cloud's `HEADER_INFO`; its labels
+ *   are written after two `&nbsp;` in a plain `<td>`; the service section
+ *   says `Group ID` and `Destination` where the cloud says `Service Group`
+ *   and `RFC Destination`; `CONTEXT` comes before `SOURCE`.
  */
 const FIXTURES = join(__dirname, 'fixtures', 'feeds');
 const answer = (file: string): IAdtWireResponse => ({
@@ -324,6 +334,92 @@ describe('feedGatewayErrorDetail reads the recorded error document (HTML)', () =
       line: 26,
     });
     expect(detail.callStack[20]).toEqual({
+      number: 1,
+      event: 'MODULE (PBO)',
+      program: 'SAPMHTTP',
+      name: '%_HTTP_START',
+      line: 12,
+    });
+  });
+});
+
+describe('feedGatewayErrorDetail reads the recorded on-premise error document (HTML)', () => {
+  const detail = feedGatewayErrorDetail(
+    answer('onprem-gatewayerror-detail.body.txt'),
+  );
+
+  it('reads the header under `HEADER`; an empty cell is absent', () => {
+    expect(detail).toEqual(
+      expect.objectContaining({
+        shortText: "Service group 'ZSERVICE_GROUP1' not published",
+        package: '/IWFND/V4_COS_PUBLISHING',
+        applicationComponent: 'n/a',
+        dateTime: '25.11.2026 01:57:32 (System)',
+        username: 'USER1',
+        userId: 'USERGUID1',
+        client: 'CLIENT1',
+      }),
+    );
+    // SAP wrote no Type, no Request Kind and, before the replay link, no
+    // transaction id on this page.
+    expect(detail).not.toHaveProperty('type');
+    expect(detail).not.toHaveProperty('requestKind');
+    expect(detail).not.toHaveProperty('transactionId');
+  });
+
+  it('reads the service information by the on-premise labels', () => {
+    expect(detail.serviceInfo).toEqual({
+      serviceName: 'ZSERVICE1',
+      serviceVersion: '0001',
+      groupId: 'ZSERVICE_GROUP1',
+      serviceRepository: 'SRVD',
+    });
+  });
+
+  it('reads the error context', () => {
+    expect(detail.errorContext.errorInfo).toBe(
+      "Service group 'ZSERVICE_GROUP1' not published",
+    );
+    expect(detail.errorContext.resolution).toEqual({
+      SAP_NOTE: 'See SAP Note 1797736 for error analysis',
+      LINK_TO_SAP_NOTE: 'https://service.sap.com/sap/support/notes/1797736',
+    });
+    expect(detail.errorContext.exceptions).toEqual([
+      {
+        type: '/IWCOR/CX_OD_HTTP_ERROR',
+        text: 'Unknown http error occurred in the context of Data Services',
+        raiseLocation: '/IWBEP/CL_OD_ROOT_HANDLER',
+      },
+      {
+        type: '/IWBEP/CX_V4_ACCESS_CHECK',
+        text: "Service group 'ZSERVICE_GROUP1' not published",
+        raiseLocation: '/IWFND/CL_V4_PUBLISHING_DBA',
+        attributes: {
+          HTTP_STATUS_CODE: '404',
+          SAP_NOTE_ID: '0000000000',
+          SRG_ID: 'ZSERVICE_GROUP1',
+        },
+      },
+    ]);
+  });
+
+  it('reads the source extract and its highlighted line', () => {
+    const { lines, errorLine } = detail.sourceCode;
+    expect(lines).toHaveLength(19);
+    expect(errorLine).toBe(12);
+    expect(lines.filter((l) => l.isError).map((l) => l.number)).toEqual([12]);
+  });
+
+  it('reads the call stack', () => {
+    expect(detail.callStack).toHaveLength(12);
+    expect(detail.callStack[0]).toEqual({
+      number: 12,
+      event: 'METHOD',
+      program: '/IWFND/CL_V4_PUBLISHING_DBA',
+      name: 'CHECK_IS_GROUP_PUBLISHED',
+      line: 12,
+    });
+    expect(detail.callStack[11]).toEqual({
       number: 1,
       event: 'MODULE (PBO)',
       program: 'SAPMHTTP',

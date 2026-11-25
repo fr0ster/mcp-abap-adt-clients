@@ -4,8 +4,10 @@
  *
  * Measured on the cloud (2026-11-22, 115 entries and one error's document):
  * an error is rendered as sections, each an `<h4 id="…">` followed by one
- * `<table>` — `HEADER_INFO` and `SERVICE` (two cells a row: a `<b>` label and
- * its value), `SOURCE` (line numbers, then the lines), `STACK` (a header row
+ * `<table>` — `HEADER_INFO` (on premise `HEADER`, measured 2026-11-25) and
+ * `SERVICE` (two cells a row: a `<b>` label and its value; on premise the
+ * label written after two `&nbsp;`), `SOURCE` (line numbers, then the lines),
+ * `STACK` (a header row
  * of `<th>`, then one row a call) and `CONTEXT` (a tree, its depth written as
  * leading `&nbsp;` in the label, a node marked `&ndash;`). The error's own
  * document is that HTML alone, not XML.
