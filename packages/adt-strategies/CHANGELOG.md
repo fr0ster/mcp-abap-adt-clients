@@ -14,6 +14,26 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.28.3] - 2026-11-25
+
+An on-premise gateway error's own document was refused: `feedGatewayErrorDetail`
+threw "the answer names no gateway error" for every error the on-premise
+viewer rendered (mcp-abap-adt's live test of the gateway error detail failed
+on premise only). Recorded on premise, 2026-11-25, read-only, scrubbed:
+`onprem-gatewayerror-detail.body.txt`.
+
+### Fixed
+
+- **The `Header Information` section is read under both headings SAP
+  writes**: `<h4 id="HEADER_INFO">` on the cloud, `<h4 id="HEADER">` on
+  premise (measured on both). Only the cloud's was read, so an on-premise
+  document carried no header field and was refused; the on-premise feed's
+  summaries, also headed `HEADER`, lost their header cells to
+  `feedGatewayErrors` the same way.
+- **The service section's on-premise labels are read**: `Group ID` and
+  `Destination` beside the cloud's `Service Group` and `RFC Destination`
+  (measured), into `serviceInfo.groupId` and `serviceInfo.destination`.
+
 ## [0.28.2] - 2026-11-23
 
 A transport entry SAP lists without a name was dropped from the readings,
