@@ -13,7 +13,12 @@ import type { HttpError } from '@mcp-abap-adt/interfaces-network';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { INTERFACE } from '../../endpoints/objects';
-import { limitDescription, safeStringify } from '../../utils/internalUtils';
+import {
+  limitDescription,
+  responseDataHead,
+  safeStringify,
+} from '../../utils/internalUtils';
+import { propertyOf } from '../../utils/ownValue';
 import { createRequestHeaders } from '../../utils/requestHeaders';
 import { escapeXmlAttr, languageAttributes } from '../../utils/xml';
 import type { ICreateInterfaceParams } from './types';
@@ -87,18 +92,15 @@ export async function create(
     // It used to throw a new Error, which dropped SAP's answer.
     return response;
   } catch (error: unknown) {
-    const e = error as HttpError;
+    const response = propertyOf(error, 'response');
     // Log error details for debugging (similar to class create)
-    if (e.response) {
-      const errorData =
-        typeof e.response.data === 'string'
-          ? e.response.data.substring(0, 1000)
-          : safeStringify(e.response.data).substring(0, 1000);
+    if (response) {
+      const errorData = responseDataHead(propertyOf(response, 'data'));
       logger?.error?.(
-        `[ERROR] Create interface failed - Status: ${e.response.status}`,
+        `[ERROR] Create interface failed - Status: ${propertyOf(response, 'status')}`,
       );
       logger?.error?.(
-        `[ERROR] Create interface failed - StatusText: ${e.response.statusText}`,
+        `[ERROR] Create interface failed - StatusText: ${propertyOf(response, 'statusText')}`,
       );
       logger?.error?.(
         `[ERROR] Create interface failed - Response data:`,

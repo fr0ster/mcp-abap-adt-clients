@@ -49,6 +49,7 @@ import {
   RFC_RCS,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtSAPError } from './adtErrors';
+import { ownValue } from './ownValue';
 
 /**
  * An answer that succeeded, carrying the value a result strategy made.
@@ -105,12 +106,6 @@ interface IWithResponse {
 interface ICredentialRefusal {
   /** The response SAP refused the credential with, when SAP was asked. */
   readonly answered?: IWithResponse;
-}
-
-function ownValue(holder: unknown, key: string): unknown {
-  if (holder === null || typeof holder !== 'object') return undefined;
-  const descriptor = Object.getOwnPropertyDescriptor(holder, key);
-  return descriptor && 'value' in descriptor ? descriptor.value : undefined;
 }
 
 function credentialRefusal(error: unknown): ICredentialRefusal | undefined {

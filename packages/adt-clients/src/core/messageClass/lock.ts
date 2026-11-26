@@ -10,6 +10,7 @@ import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { MESSAGE_CLASS } from '../../endpoints/objects';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { lockHandleOf } from '../../utils/lockHandle';
+import { propertyOf } from '../../utils/ownValue';
 
 const BASE = MESSAGE_CLASS.collection;
 
@@ -124,8 +125,8 @@ export async function lockClassForMessageOrPlain(
     );
   } catch (error) {
     const status =
-      (error as { response?: { status?: number }; status?: number })?.response
-        ?.status ?? (error as { status?: number })?.status;
+      propertyOf(propertyOf(error, 'response'), 'status') ??
+      propertyOf(error, 'status');
     if (status !== 403) {
       throw error;
     }
@@ -160,8 +161,8 @@ export async function lockMessageIfGranted(
     );
   } catch (error) {
     const status =
-      (error as { response?: { status?: number } })?.response?.status ??
-      (error as { status?: number })?.status;
+      propertyOf(propertyOf(error, 'response'), 'status') ??
+      propertyOf(error, 'status');
     if (status !== 403) {
       throw error;
     }

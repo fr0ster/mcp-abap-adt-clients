@@ -21,6 +21,7 @@
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_DISCOVERY } from '../constants/contentTypes';
+import { propertyOf } from './ownValue';
 
 /**
  * Fetch /sap/bc/adt/discovery and extract all collection href paths.
@@ -58,8 +59,7 @@ export async function fetchDiscoveryEndpoints(
     // A failed discovery and a system advertising nothing used to come back as
     // the same empty set, which the caller could not tell apart. A system with
     // no discovery resource still answers empty; any other failure is raised.
-    const status = (error as { response?: { status?: number } })?.response
-      ?.status;
+    const status = propertyOf(propertyOf(error, 'response'), 'status');
     if (status !== 404 && status !== 405 && status !== 501) throw error;
   }
 

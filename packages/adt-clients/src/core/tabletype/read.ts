@@ -15,6 +15,7 @@ import {
   CT_TABLE_TYPE,
 } from '../../constants/contentTypes';
 import { sourceUri, TABLE_TYPE, transportUri } from '../../endpoints/objects';
+import { propertyOf } from '../../utils/ownValue';
 import { readQuery } from '../shared/readQuery';
 import type { IReadOptions } from '../shared/types';
 
@@ -40,16 +41,21 @@ export async function getTableTypeMetadata(
       },
     });
   } catch (error: unknown) {
-    const e = error as HttpError;
+    const response = propertyOf(error, 'response');
+    const data = propertyOf(response, 'data');
     // Output full error response as-is for debugging
-    const status = e.response?.status || 'unknown';
-    const statusText = e.response?.statusText || '';
-    const responseHeaders = JSON.stringify(e.response?.headers || {}, null, 2);
-    const responseData = e.response?.data
-      ? typeof e.response.data === 'string'
-        ? e.response.data
-        : JSON.stringify(e.response.data, null, 2)
-      : e.message || 'No response data';
+    const status = propertyOf(response, 'status') || 'unknown';
+    const statusText = propertyOf(response, 'statusText') || '';
+    const responseHeaders = JSON.stringify(
+      propertyOf(response, 'headers') || {},
+      null,
+      2,
+    );
+    const responseData = data
+      ? typeof data === 'string'
+        ? data
+        : JSON.stringify(data, null, 2)
+      : propertyOf(error, 'message') || 'No response data';
 
     const fullError = `getTableTypeMetadata failed for ${tableTypeName}
 HTTP Status: ${status} ${statusText}

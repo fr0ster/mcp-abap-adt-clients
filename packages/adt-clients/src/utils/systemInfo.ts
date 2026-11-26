@@ -26,6 +26,7 @@ import {
   sessionLostOf,
   succeeded,
 } from './adtResponse';
+import { propertyOf } from './ownValue';
 
 /**
  * Whether a failure says the endpoint is not there — the one failure
@@ -37,8 +38,7 @@ import {
  * modern system reached over a broken connection was handed a legacy client.
  */
 function endpointAbsent(error: unknown): boolean {
-  const status = (error as { response?: { status?: number } })?.response
-    ?.status;
+  const status = propertyOf(propertyOf(error, 'response'), 'status');
   return status === 404 || status === 405 || status === 501;
 }
 

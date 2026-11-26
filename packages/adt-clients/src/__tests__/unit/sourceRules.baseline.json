@@ -420,13 +420,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/core/class/create.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "error as HttpError",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/core/dataElement/AdtDataElement.ts",
     "rule": "cast",
     "kind": "asserts-present",
@@ -525,20 +518,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/core/enhancement/create.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "error as HttpError",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/enhancement/update.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "error as HttpError",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/core/enhancement/versions.ts",
     "rule": "cast",
     "kind": "asserts-present",
@@ -600,13 +579,6 @@
     "kind": "asserts-present",
     "text": "options?.source as string",
     "count": 2
-  },
-  {
-    "file": "packages/adt-clients/src/core/functionGroup/create.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "error as HttpError",
-    "count": 1
   },
   {
     "file": "packages/adt-clients/src/core/functionGroup/update.ts",
@@ -756,13 +728,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/core/interface/create.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "error as HttpError",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/core/interface/versions.ts",
     "rule": "cast",
     "kind": "asserts-present",
@@ -796,27 +761,6 @@
     "kind": "asserts-present",
     "text": "config.className as string",
     "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/messageClass/lock.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "error as { response?: { status?: number } }",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/messageClass/lock.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "error as { response?: { status?: number }; status?: number }",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/messageClass/lock.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "error as { status?: number }",
-    "count": 2
   },
   {
     "file": "packages/adt-clients/src/core/metadataExtension/AdtMetadataExtension.ts",
@@ -1246,13 +1190,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/core/tabletype/read.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "error as HttpError",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/core/tabletype/versions.ts",
     "rule": "cast",
     "kind": "asserts-present",
@@ -1394,13 +1331,6 @@
   },
   {
     "file": "packages/adt-clients/src/utils/adtResponse.ts",
-    "rule": "any",
-    "kind": "flow",
-    "text": "descriptor.value",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/utils/adtResponse.ts",
     "rule": "cast",
     "kind": "re-types",
     "text": "(verdict === ADT_NO_FAILURE ? { origin: 'connection', message: 'The request did not complete, and carried no answer', } : verdict) as E",
@@ -1471,13 +1401,6 @@
   },
   {
     "file": "packages/adt-clients/src/utils/discoveryEndpoints.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "error as { response?: { status?: number } }",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/utils/discoveryEndpoints.ts",
     "rule": "regex",
     "kind": "literal",
     "text": "/href=\"([^\"]+)\"/g",
@@ -1488,20 +1411,6 @@
     "rule": "any",
     "kind": "flow",
     "text": "value[0]",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/utils/internalUtils.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "e.response as Record<string, unknown>",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/utils/internalUtils.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "error as Record<string, unknown>",
     "count": 1
   },
   {
@@ -1519,13 +1428,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/utils/supportedMediaTypes.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "error as HttpError",
-    "count": 2
-  },
-  {
     "file": "packages/adt-clients/src/utils/systemInfo.ts",
     "rule": "any",
     "kind": "flow",
@@ -1537,13 +1439,6 @@
     "rule": "cast",
     "kind": "re-types",
     "text": "(verdict === ADT_NO_FAILURE ? { origin: 'connection', message: 'The request did not complete, and carried no answer', request, } : verdict) as E",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/utils/systemInfo.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "error as { response?: { status?: number } }",
     "count": 1
   },
   {

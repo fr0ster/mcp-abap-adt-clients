@@ -4,6 +4,7 @@
  */
 
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
+import { propertyOf } from './ownValue';
 
 type AdtHeaderValue = IAdtWireResponse['headers'][string];
 
@@ -75,31 +76,41 @@ export function safeErrorMessage(error: unknown): string {
   if (!error) return 'Unknown error';
   if (typeof error === 'string') return error;
 
-  const e = error as Record<string, unknown>;
+  const response = propertyOf(error, 'response');
+  const message = propertyOf(error, 'message');
 
   // Extract HTTP response details if available (AxiosError)
-  if (e.response && typeof e.response === 'object') {
-    const resp = e.response as Record<string, unknown>;
-    const status = resp.status;
-    const statusText = resp.statusText || '';
-    const data = resp.data;
+  if (response && typeof response === 'object') {
+    const status = propertyOf(response, 'status');
+    const statusText = propertyOf(response, 'statusText') || '';
+    const data = propertyOf(response, 'data');
 
     if (typeof data === 'string' && data.length > 0) {
       return `HTTP ${status} ${statusText}: ${data.substring(0, 500)}`;
     }
 
     if (status) {
-      const msg = typeof e.message === 'string' ? e.message : '';
+      const msg = typeof message === 'string' ? message : '';
       return `HTTP ${status} ${statusText}${msg ? `: ${msg}` : ''}`;
     }
   }
 
   // Standard Error object
-  if (typeof e.message === 'string' && e.message.length > 0) {
-    return e.message;
+  if (typeof message === 'string' && message.length > 0) {
+    return message;
   }
 
   return String(error);
+}
+
+/**
+ * A response body's first 1000 characters, as the create and update failures
+ * log it: the text itself, or its serialisation.
+ */
+export function responseDataHead(data: unknown): string {
+  return typeof data === 'string'
+    ? data.substring(0, 1000)
+    : safeStringify(data).substring(0, 1000);
 }
 
 /**
