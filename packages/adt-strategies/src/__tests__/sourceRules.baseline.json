@@ -1,0 +1,646 @@
+[
+  {
+    "file": "packages/adt-strategies/src/inactiveList.ts",
+    "rule": "hand-narrowed",
+    "kind": "widened",
+    "text": "document: unknown",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/parsed.ts",
+    "rule": "any",
+    "kind": "flow",
+    "text": "parser.parse(text)",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/refusals/analyse.ts",
+    "rule": "any",
+    "kind": "flow",
+    "text": "[ headers.location, headers['content-location'], headers['sap-adt-location'], ] .map((v) => (Array.isArray(v) ? v[0] : v)) .find((v) => typeof v === 'string' && /\\/runs\\/[^/]+/.test(v))",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/refusals/analyse.ts",
+    "rule": "any",
+    "kind": "flow",
+    "text": "v[0]",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/refusals/analyse.ts",
+    "rule": "any",
+    "kind": "flow",
+    "text": "value[0]",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/refusals/analyse.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "(answer?.headers ?? {}) as Record<string, unknown>",
+    "count": 2
+  },
+  {
+    "file": "packages/adt-strategies/src/refusals/analyse.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "answer as { config?: { method?: unknown; url?: unknown } }",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/refusals/analyse.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "answer as { data?: unknown } | undefined",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/refusals/analyse.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "answer as { request?: { method?: unknown; url?: unknown } }",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/refusals/analyse.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/\\/runs\\/[^/]+/",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/refusals/analyse.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/<aunit:run[^>]*uri=\"[^\"]*\\/runs\\/[^/\"]+/",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/refusals/read.ts",
+    "rule": "any",
+    "kind": "flow",
+    "text": "namespacedParser.parse(document)",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/refusals/read.ts",
+    "rule": "hand-narrowed",
+    "kind": "widened",
+    "text": "document: unknown",
+    "count": 2
+  },
+  {
+    "file": "packages/adt-strategies/src/refusals/read.ts",
+    "rule": "predicate",
+    "kind": "is",
+    "text": "m is AdtMessage",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/refusals/read.ts",
+    "rule": "predicate",
+    "kind": "is",
+    "text": "v is string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/refusals/read.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/\\/messageclass\\/([^/]+)\\/messages\\/([^/?]+)/i",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/refusals/read.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/&amp;/g",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/refusals/read.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/^T100KEY-V\\d+$/",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/result.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "answer as { data?: unknown }",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/abapGit.ts",
+    "rule": "any",
+    "kind": "flow",
+    "text": "documentParser.parse(body)",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/abapGit.ts",
+    "rule": "hand-narrowed",
+    "kind": "widened",
+    "text": "node: unknown",
+    "count": 2
+  },
+  {
+    "file": "packages/adt-strategies/src/results/abapGitFacts.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "(answer.headers ?? {}) as Record<string, unknown>",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/abapGitFacts.ts",
+    "rule": "hand-narrowed",
+    "kind": "widened",
+    "text": "type: unknown",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/answeredObject.ts",
+    "rule": "any",
+    "kind": "flow",
+    "text": "entry.codes",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/answeredObject.ts",
+    "rule": "predicate",
+    "kind": "is",
+    "text": "text is AdtTypeCode",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/atc.ts",
+    "rule": "any",
+    "kind": "flow",
+    "text": "parser.parse(body)",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/atc.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "answer.headers as Record<string, unknown> | undefined",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/atc.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "parser.parse(body) as Node",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/atc.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "parseXml(answer.data)?.customizing as Node | undefined",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/atc.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "parseXml(answer.data)?.run as Node | undefined",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/atc.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "parseXml(answer.data)?.worklistRun as Node | undefined",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/atc.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "root?.properties as Node | undefined",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/atc.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "run?.infos as Node | undefined",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/atc.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "run?.result as Node | undefined",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/atc.ts",
+    "rule": "predicate",
+    "kind": "is",
+    "text": "v is Node",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/atc.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/\\/+$/",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/featureToggle.ts",
+    "rule": "any",
+    "kind": "flow",
+    "text": "JSON.parse(data)",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/featureToggle.ts",
+    "rule": "hand-narrowed",
+    "kind": "widened",
+    "text": "node: unknown",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/outline.ts",
+    "rule": "hand-narrowed",
+    "kind": "widened",
+    "text": "node: unknown",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/tableSettings.ts",
+    "rule": "hand-narrowed",
+    "kind": "widened",
+    "text": "node: unknown",
+    "count": 2
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "any",
+    "kind": "flow",
+    "text": "parser.parse(body)",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "(ID_IN_URI.exec(idText)?.[1] ?? ID_IN_URI.exec(selfHref)?.[1]) as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "(text(entry.published) ?? text(entry.updated)) as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "(text(ext.user) ?? text(presentNode(entry.author)?.name)) as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "attr(ref, 'name') as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "attr(ref, 'uri') as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "attr(row, 'id') as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "attr(stateNode, 'text') as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "attr(stateNode, 'value') as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "attrNum(row, 'index') as number",
+    "count": 3
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "attrNum(t, 'percentage') as number",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "attrNum(t, 'time') as number",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "booleanOf(text(ext.isAggregated)) as boolean",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "numberOf(text(ext.amdpFileSize)) as number",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "numberOf(text(ext.runtime)) as number",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "numberOf(text(ext.runtimeABAP)) as number",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "numberOf(text(ext.runtimeDatabase)) as number",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "numberOf(text(ext.runtimeSystem)) as number",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "numberOf(text(ext.size)) as number",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "parser.parse(body) as Node",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "response?.headers as | Record<string, string | string[] | undefined> | undefined",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "root as Node",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "text(entry.id) as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "text(ext.client) as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "text(ext.expiration) as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "text(ext.host) as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "text(ext.objectName) as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "text(ext.system) as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "text(item.description) as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "text(item.name) as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "value as Node",
+    "count": 2
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "predicate",
+    "kind": "is",
+    "text": "href is string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/\\.(\\d+)/",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/^(.*T\\d{2}:\\d{2}:)60(\\D.*)?$/",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/traces.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/abaptraces\\/([A-Za-z0-9]{16,})(?:\\/|$)/",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/transport/document.ts",
+    "rule": "hand-narrowed",
+    "kind": "widened",
+    "text": "element: unknown",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/transport/document.ts",
+    "rule": "hand-narrowed",
+    "kind": "widened",
+    "text": "node: unknown",
+    "count": 2
+  },
+  {
+    "file": "packages/adt-strategies/src/results/transport/parseObjectEntries.ts",
+    "rule": "hand-narrowed",
+    "kind": "widened",
+    "text": "node: unknown",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/transport/parseSearchConfigurations.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "(Array.isArray(value) ? value : [value]) as Record<string, unknown>[]",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/transport/parseSearchConfigurations.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "(parsed['configurations:configurations'] ?? parsed.configurations) as Record<string, unknown> | undefined",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/transport/parseTransportTree.ts",
+    "rule": "predicate",
+    "kind": "is",
+    "text": "item is ParsedElement",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/unitTest.ts",
+    "rule": "any",
+    "kind": "flow",
+    "text": "value[0]",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/unitTest.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "(answer.headers ?? {}) as Record<string, unknown>",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/unitTest.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/\\/runs\\/([^/]+)/",
+    "count": 2
+  },
+  {
+    "file": "packages/adt-strategies/src/results/unitTest.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/<aunit:run[^>]*uri=\"([^\"]+)\"/",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/unitTest.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/uri=\"([^\"]+)\"/",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/utils.ts",
+    "rule": "any",
+    "kind": "flow",
+    "text": "value[0]",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/utils.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "(answer.headers ?? {}) as XmlRecord",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/utils.ts",
+    "rule": "hand-narrowed",
+    "kind": "widened",
+    "text": "node: unknown",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/utils.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/\\/activation\\/runs\\/([^/]+)/",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/utils.ts",
+    "rule": "regex",
+    "kind": "String.match",
+    "text": "text.match",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-strategies/src/results/versions.ts",
+    "rule": "any",
+    "kind": "flow",
+    "text": "links.find((l: unknown) => field(l, '@_rel') === TRANSPORT_REL)",
+    "count": 1
+  }
+]

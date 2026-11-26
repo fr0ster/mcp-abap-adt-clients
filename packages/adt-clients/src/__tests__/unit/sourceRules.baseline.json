@@ -1,0 +1,1738 @@
+[
+  {
+    "file": "packages/adt-clients/src/batch/AdtBatchConnection.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "new Promise<IAdtWireResponse>((resolve, reject) => { this.queue.push({ request: { ...request, headers }, stateful, resolve, reject, }); }) as Promise<IAdtWireResponse<T, D>>",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/batch/AdtBatchConnection.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "part.request.params as Record<string, string> | undefined",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/batch/AdtBatchConnection.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "this.connection as IAbapConnection & { getSessionType?: () => Session; getSessionMode?: () => Session; }",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/batch/wire.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "request.params as Record<string, string>",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/batch/wire.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/-/g",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/batch/wire.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/(?:^|\\r?\\n)HTTP\\/1\\.\\d\\s+(\\d{3})\\s*([^\\r\\n]*)\\r?\\n/",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/batch/wire.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/[.*+?^${}()|[\\]\\\\]/g",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/batch/wire.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/\\r?\\n/",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/batch/wire.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/^(?:\\r?\\n)|\\r?\\n\\r?\\n/",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/batch/wire.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/boundary=(?:\"([^\"]+)\"|([^;\\s]+))/i",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/batch/wire.ts",
+    "rule": "regex",
+    "kind": "String.matchAll",
+    "text": "body.matchAll",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/batch/wire.ts",
+    "rule": "regex",
+    "kind": "RegExp",
+    "text": "new RegExp( `(?:^|\\\\r?\\\\n)--${escaped}(--)?[ \\t]*(?:\\\\r?\\\\n|$)`, 'g', )",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/clients/abapGit/structuredExchange.ts",
+    "rule": "any",
+    "kind": "flow",
+    "text": "descriptor.value",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/clients/abapGit/structuredExchange.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "verdict as E",
+    "count": 2
+  },
+  {
+    "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "(options as DeprecatedOptions<IAdtError>).analyse as | IAnalyse<IAdtError> | undefined",
+    "count": 2
+  },
+  {
+    "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "args as IAbapGitExternalRepoArgs",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "args as IAbapGitExternalRepoCredentials",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "args as IAbapGitLinkArgs",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "args as IAbapGitLinkNewArgs",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "options as DeprecatedOptions<IAdtError>",
+    "count": 2
+  },
+  {
+    "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "options as IAbapGitNewFormOptions<Facts<'externalRepoFacts'>>",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "options as IAbapGitNewFormOptions<Facts<'linkedFacts'>>",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "options?.analyse as IAnalyse<E> | undefined",
+    "count": 4
+  },
+  {
+    "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "read as IAbapGitFactsResultStrategy<FactsValue<T, K>, Facts<K>>",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "this.results as Partial< Record<AbapGitFactsSlot, IAbapGitFactsResultStrategy<unknown, never>> >",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/clients/AdtClient.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "new Error( 'AdtClient: the connection is not connected. Call connect() on it before ' + 'requesting a handler — this library does not connect on your behalf.', ) as Error & { code: string }",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/clients/AdtClient.ts",
+    "rule": "predicate",
+    "kind": "is",
+    "text": "connection is IAbapConnection & Pick<ISessionLifecycleAware, 'isConnected'>",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/clients/AdtClientsWS.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "value as TResponse",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/accessControl/AdtAccessControl.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.accessControlName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/accessControl/AdtAccessControl.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/accessControl/AdtAccessControl.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/accessControl/versions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.accessControlName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/appendStructure/AdtAppendStructure.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.appendStructureName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/appendStructure/AdtAppendStructure.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.baseObject as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/appendStructure/AdtAppendStructure.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.description as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/appendStructure/AdtAppendStructure.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.lockHandle as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/appendStructure/AdtAppendStructure.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/appendStructure/versions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.appendStructureName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/authorizationField/AdtAuthorizationField.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.authorizationFieldName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/behaviorDefinition/AdtBehaviorDefinition.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.description as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/behaviorDefinition/AdtBehaviorDefinition.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.implementationType as BehaviorDefinitionImplementationType",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/behaviorDefinition/AdtBehaviorDefinition.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.name as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/behaviorDefinition/AdtBehaviorDefinition.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/behaviorDefinition/AdtBehaviorDefinition.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/behaviorDefinition/update.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "params.name as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/behaviorDefinition/versions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.name as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/behaviorImplementation/AdtBehaviorImplementation.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.className as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/behaviorImplementation/AdtBehaviorImplementation.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/behaviorImplementation/versions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.className as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/class/AdtClass.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.className as string",
+    "count": 11
+  },
+  {
+    "file": "packages/adt-clients/src/core/class/AdtClass.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "config.className as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/class/AdtClass.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/class/AdtClass.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/class/AdtClassMemberBase.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.className as string",
+    "count": 5
+  },
+  {
+    "file": "packages/adt-clients/src/core/class/AdtLocalDefinitions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.className as string",
+    "count": 5
+  },
+  {
+    "file": "packages/adt-clients/src/core/class/AdtLocalDefinitions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.source as string",
+    "count": 2
+  },
+  {
+    "file": "packages/adt-clients/src/core/class/AdtLocalDefinitions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.lockHandle as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/class/AdtLocalMacros.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.className as string",
+    "count": 5
+  },
+  {
+    "file": "packages/adt-clients/src/core/class/AdtLocalMacros.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.source as string",
+    "count": 2
+  },
+  {
+    "file": "packages/adt-clients/src/core/class/AdtLocalMacros.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.lockHandle as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/class/AdtLocalTestClass.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.className as string",
+    "count": 5
+  },
+  {
+    "file": "packages/adt-clients/src/core/class/AdtLocalTestClass.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.source as string",
+    "count": 2
+  },
+  {
+    "file": "packages/adt-clients/src/core/class/AdtLocalTestClass.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.lockHandle as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/class/AdtLocalTypes.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.className as string",
+    "count": 5
+  },
+  {
+    "file": "packages/adt-clients/src/core/class/AdtLocalTypes.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.source as string",
+    "count": 2
+  },
+  {
+    "file": "packages/adt-clients/src/core/class/AdtLocalTypes.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.lockHandle as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/class/create.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "error as HttpError",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/dataElement/AdtDataElement.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.dataElementName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/dataElement/AdtDataElement.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/ddl/AdtDdl.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.ddlName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/ddl/AdtDdl.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/ddl/AdtDdl.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/ddl/versions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.ddlName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/domain/AdtDomain.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.description as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/domain/AdtDomain.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.domainName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/domain/AdtDomain.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/enhancement/AdtEnhancement.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.enhancementName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/enhancement/AdtEnhancement.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.enhancementType as EnhancementType",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/enhancement/AdtEnhancement.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/enhancement/AdtEnhancement.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/enhancement/AdtEnhancement.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "this.lockedTypes.get(name) as EnhancementType",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/enhancement/create.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "error as HttpError",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/enhancement/update.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "args.enhancement_name as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/enhancement/update.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "error as HttpError",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/enhancement/versions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.enhancementName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/enhancement/versions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.enhancementType as EnhancementType",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/featureToggle/AdtFeatureToggle.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "config as IFeatureToggleConfig",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/featureToggle/AdtFeatureToggle.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.featureToggleName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/featureToggle/AdtFeatureToggle.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "source as IFeatureToggleSource",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/featureToggle/xmlBuilder.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "params.package_name as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/functionGroup/AdtFunctionGroup.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "{ function_group_name: name, lock_handle: options?.lockHandle as string, transport_request: config.transportRequest, } as Parameters<typeof updateFunctionGroup>[3]",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/functionGroup/AdtFunctionGroup.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.description as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/functionGroup/AdtFunctionGroup.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.functionGroupName as string",
+    "count": 14
+  },
+  {
+    "file": "packages/adt-clients/src/core/functionGroup/AdtFunctionGroup.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "config.functionGroupName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/functionGroup/AdtFunctionGroup.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.lockHandle as string",
+    "count": 2
+  },
+  {
+    "file": "packages/adt-clients/src/core/functionGroup/AdtFunctionGroup.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.source as string",
+    "count": 2
+  },
+  {
+    "file": "packages/adt-clients/src/core/functionGroup/create.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "error as HttpError",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/functionGroup/update.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "params.function_group_name as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/functionGroup/update.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "params.lock_handle as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/functionInclude/AdtFunctionInclude.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "config as IFunctionIncludeConfig",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/functionInclude/AdtFunctionInclude.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "config.functionGroupName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/functionInclude/AdtFunctionInclude.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.includeName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/functionInclude/AdtFunctionInclude.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/functionInclude/versions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.functionGroupName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/functionInclude/versions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.includeName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/functionModule/AdtFunctionModule.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.description as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/functionModule/AdtFunctionModule.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "config.functionGroupName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/functionModule/AdtFunctionModule.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.functionModuleName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/functionModule/AdtFunctionModule.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.lockHandle as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/functionModule/AdtFunctionModule.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/functionModule/AdtFunctionModule.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/functionModule/versions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.functionGroupName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/functionModule/versions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.functionModuleName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/include/AdtInclude.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.includeName as string",
+    "count": 3
+  },
+  {
+    "file": "packages/adt-clients/src/core/include/AdtInclude.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/include/AdtInclude.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/interface/AdtInterface.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.description as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/interface/AdtInterface.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.interfaceName as string",
+    "count": 12
+  },
+  {
+    "file": "packages/adt-clients/src/core/interface/AdtInterface.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "config.interfaceName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/interface/AdtInterface.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.lockHandle as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/interface/AdtInterface.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/interface/AdtInterface.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/interface/create.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "error as HttpError",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/interface/versions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.interfaceName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/messageClass/AdtMessageClass.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.description as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/messageClass/AdtMessageClass.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.name as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/messageClass/AdtMessageClass.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/messageClass/AdtMessageClassMessage.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.className as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/messageClass/AdtMessageClassMessage.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "this.writeClass(config, true, options, undefined) as Promise< IAdtResponse<T['deleted'], E> >",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/messageClass/lock.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "error as { response?: { status?: number } }",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/messageClass/lock.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "error as { response?: { status?: number }; status?: number }",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/messageClass/lock.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "error as { status?: number }",
+    "count": 2
+  },
+  {
+    "file": "packages/adt-clients/src/core/metadataExtension/AdtMetadataExtension.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.description as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/metadataExtension/AdtMetadataExtension.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.name as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/metadataExtension/AdtMetadataExtension.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/metadataExtension/AdtMetadataExtension.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/metadataExtension/versions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.name as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/package/AdtPackage.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.packageName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/package/AdtPackage.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.superPackage as string",
+    "count": 3
+  },
+  {
+    "file": "packages/adt-clients/src/core/package/AdtPackage.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.lockHandle as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/package/AdtPackage.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/package/create.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "params.master_system as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/program/AdtProgram.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.programName as string",
+    "count": 14
+  },
+  {
+    "file": "packages/adt-clients/src/core/program/AdtProgram.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "config.programName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/program/AdtProgram.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.lockHandle as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/program/AdtProgram.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/program/AdtProgram.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/program/versions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.programName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/scalarFunction/AdtScalarFunction.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.description as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/scalarFunction/AdtScalarFunction.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.scalarFunctionName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/scalarFunction/AdtScalarFunction.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/scalarFunction/AdtScalarFunction.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/scalarFunction/versions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.scalarFunctionName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/scalarFunctionImplementation/AdtScalarFunctionImplementation.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.description as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/scalarFunctionImplementation/AdtScalarFunctionImplementation.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.implementationName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/scalarFunctionImplementation/AdtScalarFunctionImplementation.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "config.scalarFunctionName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/scalarFunctionImplementation/AdtScalarFunctionImplementation.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "source as string",
+    "count": 2
+  },
+  {
+    "file": "packages/adt-clients/src/core/scalarFunctionImplementation/versions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.implementationName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/service/AdtService.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "bindingVariant as ServiceBindingVariant",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/service/AdtService.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.bindingName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/service/AdtService.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.serviceDefinitionName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/service/AdtService.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.serviceName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/service/AdtService.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "config.serviceType as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/service/AdtService.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "description as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/service/AdtService.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/service/AdtService.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "params.serviceType as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/service/AdtService.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "serviceType as 'odatav2' | 'odatav4'",
+    "count": 2
+  },
+  {
+    "file": "packages/adt-clients/src/core/service/AdtService.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "serviceVersion as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/serviceDefinition/AdtServiceDefinition.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.serviceDefinitionName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/serviceDefinition/AdtServiceDefinition.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/serviceDefinition/AdtServiceDefinition.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/serviceDefinition/versions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.serviceDefinitionName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/shared/chain.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "{ ...failure, message: `${failure.message} — and the rollback did not complete, so something this call made may still exist: ${unrolled.join('; ')}`, } as E",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/shared/chain.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "failure as E",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/shared/codeSets.ts",
+    "rule": "predicate",
+    "kind": "is",
+    "text": "code is AdtMetadataReadCode",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/shared/codeSets.ts",
+    "rule": "predicate",
+    "kind": "is",
+    "text": "code is AdtSourceReadCode",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/shared/discovery.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/-/g",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/shared/LockRegistry.ts",
+    "rule": "hand-narrowed",
+    "kind": "widened",
+    "text": "answer: unknown",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/shared/search.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "params.query as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/shared/whereUsed.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/\\bisSelected=\"(?:true|false)\"/",
+    "count": 2
+  },
+  {
+    "file": "packages/adt-clients/src/core/shared/whereUsed.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/\\bname=\"([^\"]*)\"/",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/shared/whereUsed.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/<([A-Za-z][\\w-]*:type)\\b/",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/shared/whereUsed.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/<([A-Za-z][\\w-]*):usageScopeResult\\b([^>]*)>/",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/shared/whereUsed.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/<[A-Za-z][\\w-]*:type\\b[^>]*?\\/>/g",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/shared/whereUsed.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/<\\?xml[^>]*\\?>/",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/shared/whereUsed.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/<\\/([A-Za-z][\\w-]*):usageScopeResult>/",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/shared/whereUsed.ts",
+    "rule": "regex",
+    "kind": "String.match",
+    "text": "tag.match",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/structure/AdtStructure.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.description as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/structure/AdtStructure.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.structureName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/structure/AdtStructure.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/structure/AdtStructure.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/structure/update.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "params.structureName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/structure/versions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.structureName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/table/AdtTable.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.tableName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/table/AdtTable.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/table/AdtTable.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/table/versions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.tableName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/tableSettings/readDocument.ts",
+    "rule": "hand-narrowed",
+    "kind": "widened",
+    "text": "value: unknown",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/tabletype/AdtDdicTableType.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.tableTypeName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/tabletype/AdtDdicTableType.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/tabletype/read.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "error as HttpError",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/tabletype/versions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.tableTypeName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/transformation/AdtTransformation.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.transformationName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/transformation/AdtTransformation.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/transformation/AdtTransformation.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/transformation/versions.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.transformationName as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/transport/AdtRequest.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "config.transportNumber as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/transport/AdtRequest.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options?.source as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/transport/AdtRequest.ts",
+    "rule": "predicate",
+    "kind": "is",
+    "text": "connection is T & IDeferredResponseConnection",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/core/transport/create.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "params.owner as string",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/endpoints/codes.ts",
+    "rule": "predicate",
+    "kind": "is",
+    "text": "code is AdtGroupOnlyCode",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/runtime/atc/run.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "NAMED[ref.objectType] as | ((name: string) => string) | undefined",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/runtime/debugger/abap.ts",
+    "rule": "any",
+    "kind": "flow",
+    "text": "conflictParser.parse(response.data)?.exception?.properties?.entry",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/runtime/debugger/abap.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "( Array.isArray(entries) ? entries : entries ? [entries] : [] ) as Array<{ key?: string; '#text'?: string }>",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/runtime/debugger/abap.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "bp as { condition?: string }",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/runtime/traces/ProfilerDomain.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options as IProfilerTraceDbAccessesOptions | undefined",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/runtime/traces/ProfilerDomain.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options as IProfilerTraceHitListOptions | undefined",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/runtime/traces/ProfilerDomain.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "options as IProfilerTraceStatementsOptions | undefined",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/adtErrors.ts",
+    "rule": "any",
+    "kind": "flow",
+    "text": "parser.parse(xmlData)",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/adtErrors.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "parsed['exc:exception'] as | Record<string, unknown> | undefined",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/adtErrors.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "parser.parse(xmlData) as Record<string, unknown>",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/adtErrors.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "value as Record<string, unknown>",
+    "count": 2
+  },
+  {
+    "file": "packages/adt-clients/src/utils/adtResponse.ts",
+    "rule": "any",
+    "kind": "flow",
+    "text": "descriptor.value",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/adtResponse.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "(verdict === ADT_NO_FAILURE ? { origin: 'connection', message: 'The request did not complete, and carried no answer', } : verdict) as E",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/adtResponse.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "error as IWithResponse",
+    "count": 3
+  },
+  {
+    "file": "packages/adt-clients/src/utils/adtResponse.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "ownValue(cause, 'request') as IWithResponse['request']",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/adtResponse.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "response as IAdtWireResponse",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/adtResponse.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "verdict as E",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/adtResponse.ts",
+    "rule": "hand-narrowed",
+    "kind": "widened",
+    "text": "error: unknown",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/callTimeout.ts",
+    "rule": "any",
+    "kind": "flow",
+    "text": "Reflect.get(target, property, receiver)",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/callTimeout.ts",
+    "rule": "any",
+    "kind": "flow",
+    "text": "value.bind(target)",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/callTimeout.ts",
+    "rule": "cast",
+    "kind": "redundant",
+    "text": "value as IAbapConnection['makeAdtRequest']",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/criticalSection.ts",
+    "rule": "predicate",
+    "kind": "is",
+    "text": "connection is IAbapConnection & ICriticalSection",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/discoveryEndpoints.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "error as { response?: { status?: number } }",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/discoveryEndpoints.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/href=\"([^\"]+)\"/g",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/internalUtils.ts",
+    "rule": "any",
+    "kind": "flow",
+    "text": "value[0]",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/internalUtils.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "e.response as Record<string, unknown>",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/internalUtils.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "error as Record<string, unknown>",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/lockHandle.ts",
+    "rule": "any",
+    "kind": "flow",
+    "text": "parser.parse(answer.data)?.['asx:abap']?.['asx:values']?.DATA ?.LOCK_HANDLE",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/requestTrace.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "answer?.request as IAdtRequestTrace | undefined",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/supportedMediaTypes.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "error as HttpError",
+    "count": 2
+  },
+  {
+    "file": "packages/adt-clients/src/utils/systemInfo.ts",
+    "rule": "any",
+    "kind": "flow",
+    "text": "JSON.parse(value)",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/systemInfo.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "(verdict === ADT_NO_FAILURE ? { origin: 'connection', message: 'The request did not complete, and carried no answer', request, } : verdict) as E",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/systemInfo.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "error as { response?: { status?: number } }",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/systemInfo.ts",
+    "rule": "cast",
+    "kind": "asserts-present",
+    "text": "error as { response?: IAdtWireResponse }",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/systemInfo.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "value as Record<string, unknown>",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/systemInfo.ts",
+    "rule": "cast",
+    "kind": "re-types",
+    "text": "verdict as E",
+    "count": 1
+  },
+  {
+    "file": "packages/adt-clients/src/utils/systemInfo.ts",
+    "rule": "regex",
+    "kind": "literal",
+    "text": "/\\.hana\\.ondemand\\.com/i",
+    "count": 1
+  }
+]
