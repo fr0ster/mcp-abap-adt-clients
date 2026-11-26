@@ -5,6 +5,7 @@ import {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { type AdtHeaderMap, firstOf } from '../headers';
+import { field } from '../parsed';
 import {
   type AdtActivationFacts,
   type AdtActivationRefusal,
@@ -98,15 +99,12 @@ function sessionLostOn(
 function requestOf(
   answer: IAdtWireResponse | undefined,
 ): { method?: string; url?: string } | undefined {
-  const carried = (answer as { request?: { method?: unknown; url?: unknown } })
-    ?.request;
-  const config = (answer as { config?: { method?: unknown; url?: unknown } })
-    ?.config;
-
-  for (const source of [carried, config]) {
-    const method =
-      typeof source?.method === 'string' ? source.method : undefined;
-    const url = typeof source?.url === 'string' ? source.url : undefined;
+  // Both are `unknown` in the contract: whatever the transport put there.
+  for (const source of [answer?.request, answer?.config]) {
+    const sourceMethod = field(source, 'method');
+    const sourceUrl = field(source, 'url');
+    const method = typeof sourceMethod === 'string' ? sourceMethod : undefined;
+    const url = typeof sourceUrl === 'string' ? sourceUrl : undefined;
     if (method || url) return { method, url };
   }
   return undefined;

@@ -1,20 +1,6 @@
 [
   {
     "file": "packages/adt-strategies/src/refusals/analyse.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "answer as { config?: { method?: unknown; url?: unknown } }",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/refusals/analyse.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "answer as { request?: { method?: unknown; url?: unknown } }",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/refusals/analyse.ts",
     "rule": "regex",
     "kind": "literal",
     "text": "/\\/runs\\/[^/]+/",
@@ -67,48 +53,6 @@
     "rule": "predicate",
     "kind": "is",
     "text": "text is AdtTypeCode",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/atc.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "parseXml(answer.data)?.customizing as Node | undefined",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/atc.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "parseXml(answer.data)?.run as Node | undefined",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/atc.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "parseXml(answer.data)?.worklistRun as Node | undefined",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/atc.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "root?.properties as Node | undefined",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/atc.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "run?.infos as Node | undefined",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/atc.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "run?.result as Node | undefined",
     "count": 1
   },
   {
@@ -254,13 +198,6 @@
   {
     "file": "packages/adt-strategies/src/results/traces.ts",
     "rule": "cast",
-    "kind": "re-types",
-    "text": "response?.headers as | Record<string, string | string[] | undefined> | undefined",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/traces.ts",
-    "rule": "cast",
     "kind": "asserts-present",
     "text": "text(entry.id) as string",
     "count": 1
@@ -316,13 +253,6 @@
   },
   {
     "file": "packages/adt-strategies/src/results/traces.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "value as Node",
-    "count": 2
-  },
-  {
-    "file": "packages/adt-strategies/src/results/traces.ts",
     "rule": "predicate",
     "kind": "is",
     "text": "href is string",
@@ -347,20 +277,6 @@
     "rule": "regex",
     "kind": "literal",
     "text": "/abaptraces\\/([A-Za-z0-9]{16,})(?:\\/|$)/",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/transport/parseSearchConfigurations.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "(Array.isArray(value) ? value : [value]) as Record<string, unknown>[]",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/transport/parseSearchConfigurations.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "(parsed['configurations:configurations'] ?? parsed.configurations) as Record<string, unknown> | undefined",
     "count": 1
   },
   {

@@ -38,6 +38,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
+import type { AdtHeaderMap } from '../headers';
 import { field, isElement } from '../parsed';
 import { answeredObject } from './answeredObject';
 
@@ -287,7 +288,7 @@ function presentNode(value: unknown): Node | undefined {
   if (value === undefined || value === null) {
     return undefined;
   }
-  return typeof value === 'object' ? (value as Node) : {};
+  return isElement(value) ? value : {};
 }
 
 /** One node, a list of them, or nothing — always answered as a list. */
@@ -305,7 +306,7 @@ function text(value: unknown): string | undefined {
   }
   // An element with attributes parses to an object whose text is `#text`.
   if (value && typeof value === 'object') {
-    const inner = (value as Node)['#text'];
+    const inner = field(value, '#text');
     return typeof inner === 'string' ? inner : undefined;
   }
   return undefined;
@@ -674,9 +675,7 @@ function readTraceRequests(response: IAdtWireResponse): ITraceRequestEntry[] {
  * `analyse`, which sees the same answer.
  */
 function readProfilerId(response: IAdtWireResponse): string {
-  const headers = response?.headers as
-    | Record<string, string | string[] | undefined>
-    | undefined;
+  const headers: AdtHeaderMap | undefined = response?.headers;
   const location =
     headers?.location ??
     headers?.Location ??

@@ -8,7 +8,13 @@
 
 import type { ITransportSearchConfiguration } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
-import { isElement, parsedText, XML_TEXT_OPTIONS } from '../../parsed';
+import {
+  field,
+  isElement,
+  type ParsedElement,
+  parsedText,
+  XML_TEXT_OPTIONS,
+} from '../../parsed';
 
 // Values as written (`XML_TEXT_OPTIONS`, since 0.28.0): its tag values were
 // coerced by the parser's default, though no reading took one.
@@ -18,9 +24,12 @@ const xmlParser = new XMLParser({
   attributeNamePrefix: '@_',
 });
 
-const asArray = (value: unknown): Record<string, unknown>[] => {
+const asArray = (value: unknown): ParsedElement[] => {
   if (!value) return [];
-  return (Array.isArray(value) ? value : [value]) as Record<string, unknown>[];
+  const list: readonly unknown[] = Array.isArray(value) ? value : [value];
+  // An item that is no element names no configuration and no link: it read
+  // as nothing before and is left out now, with the same result.
+  return list.filter(isElement);
 };
 
 /**
@@ -68,9 +77,11 @@ export function parseSearchConfigurations(
 
   const parsed = parsedText(xmlParser, xml);
   if (!isElement(parsed)) return [];
-  const root = (parsed['configurations:configurations'] ??
-    parsed.configurations) as Record<string, unknown> | undefined;
-  if (!root) {
+  const root =
+    field(parsed, 'configurations:configurations') ??
+    field(parsed, 'configurations');
+  // No element (absent, or text) carries no configuration: `[]`, as before.
+  if (!isElement(root)) {
     return [];
   }
 
