@@ -975,13 +975,6 @@
   {
     "file": "packages/adt-clients/src/core/service/AdtService.ts",
     "rule": "cast",
-    "kind": "redundant",
-    "text": "serviceType as 'odatav2' | 'odatav4'",
-    "count": 2
-  },
-  {
-    "file": "packages/adt-clients/src/core/service/AdtService.ts",
-    "rule": "cast",
     "kind": "asserts-present",
     "text": "serviceVersion as string",
     "count": 1

@@ -929,14 +929,14 @@ export class AdtServiceBinding<
     return params.desiredPublicationState === 'published'
       ? this.publishByServiceType(
           headers,
-          serviceType as 'odatav2' | 'odatav4',
+          serviceType,
           params.bindingName,
           params.timeout,
           service,
         )
       : this.unpublishByServiceType(
           headers,
-          serviceType as 'odatav2' | 'odatav4',
+          serviceType,
           params.bindingName,
           params.timeout,
           service,
