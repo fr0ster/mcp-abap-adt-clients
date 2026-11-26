@@ -43,7 +43,9 @@ changes for consumers.
   Exports, the requests sent, and the results, errors and refusals returned stay as they
   are. The consumer sees only these changes:
   - A caller that omits an object's name, or a source or lock handle a member needs, now
-    gets a compile error.
+    gets a compile error. This holds on the classes of both adt-clients and
+    adt-clients-legacy, whose members take the interfaces' identity types instead of
+    `Partial` configs.
   - A caller that names `E` on a class member without passing `analyse` now gets a compile
     error.
   - A reading of an SAP answer that lacks a field its result type requires now throws.
@@ -54,8 +56,9 @@ changes for consumers.
     `(payload: unknown) => TResponse` that the caller passes. Without a reader it answers
     `unknown`.
   - **C3**: a member's generic answer is typed `E | IAdtError` (in interfaces-adt) on the
-    paths where the library answers with its own error. `analyse` is not called on those
-    paths.
+    paths where the library answers with its own error. `analyse` is called exactly where it
+    is called today: before the fallback on the no-answer path, and not at all on a legacy
+    refusal.
   - **C4**: the abapGit `link` and `checkExternalRepo` forms deprecated since 46.2.0 are
     removed.
   - **C5**: a legacy handler for a type that 7.40 does not serve is a subclass of the modern
