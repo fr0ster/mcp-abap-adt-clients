@@ -26,6 +26,7 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
+import type { AdtHeaderMap } from '../headers';
 import { readInactiveList } from '../inactiveList';
 import {
   at,
@@ -576,7 +577,7 @@ export function extractRunId(location: unknown): string | null {
  * a start without an id means anything is the caller's question.
  */
 export const utilActivationRunId: IResultStrategy<string> = (answer) => {
-  const headers = (answer.headers ?? {}) as XmlRecord;
+  const headers: AdtHeaderMap = answer.headers ?? {};
   const location =
     headers.location ??
     headers.Location ??

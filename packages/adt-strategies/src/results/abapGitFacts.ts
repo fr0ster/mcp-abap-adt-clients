@@ -7,6 +7,7 @@ import type {
   IAbapGitStagedObject,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { AdtHeaderMap } from '../headers';
 import { at, field, listOf } from '../parsed';
 import {
   abapGitBranchInfo,
@@ -232,7 +233,7 @@ const R7_TEXT = 'DEMO STATUS';
  * a value that is not one string (an array) is present and returned as it is.
  */
 function headerOf(answer: IAdtWireResponse, name: string): unknown {
-  const headers = (answer.headers ?? {}) as Record<string, unknown>;
+  const headers: AdtHeaderMap = answer.headers ?? {};
   for (const [key, value] of Object.entries(headers))
     if (key.toLowerCase() === name) return value;
   return undefined;

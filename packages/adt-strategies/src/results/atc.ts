@@ -26,6 +26,7 @@
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
+import type { AdtHeaderMap } from '../headers';
 import { rawOf } from '../result';
 
 const parser = new XMLParser({
@@ -130,7 +131,7 @@ export interface IAtcWaitingRun {
 }
 
 function headerOf(answer: IAdtWireResponse, name: string): string | undefined {
-  const headers = answer.headers as Record<string, unknown> | undefined;
+  const headers: AdtHeaderMap | undefined = answer.headers;
   if (!headers) return undefined;
   const key = Object.keys(headers).find(
     (k) => k.toLowerCase() === name.toLowerCase(),

@@ -4,6 +4,7 @@ import {
   AdtObjectErrorCodes,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { AdtHeaderMap } from '../headers';
 import {
   type AdtActivationFacts,
   type AdtActivationRefusal,
@@ -221,10 +222,7 @@ function analyser(
   return (verdict, answer, context) => {
     if (verdict !== ADT_NO_FAILURE)
       return enrich(verdict, answer, context?.activation);
-    const refusal = read(
-      (answer as { data?: unknown } | undefined)?.data,
-      context?.activation,
-    );
+    const refusal = read(answer?.data, context?.activation);
     return refusal ? asFailure(refusal, answer) : ADT_NO_FAILURE;
   };
 }
@@ -344,7 +342,7 @@ function headerOf(
   answer: IAdtWireResponse | undefined,
   name: string,
 ): string | undefined {
-  const headers = (answer?.headers ?? {}) as Record<string, unknown>;
+  const headers: AdtHeaderMap = answer?.headers ?? {};
   const key = Object.keys(headers).find((k) => k.toLowerCase() === name);
   const value = key ? headers[key] : undefined;
   const first = Array.isArray(value) ? value[0] : value;
@@ -446,7 +444,7 @@ export const analyseUnitTestStart: IAnalyse<IAdtMessageFailure> = (
   answer,
 ) => {
   if (verdict !== ADT_NO_FAILURE) return enrich(verdict, answer);
-  const headers = (answer?.headers ?? {}) as Record<string, unknown>;
+  const headers: AdtHeaderMap = answer?.headers ?? {};
   const header = [
     headers.location,
     headers['content-location'],

@@ -1,5 +1,6 @@
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { AdtHeaderMap } from '../headers';
 
 /** A header's value, whether the transport gave a string or a list of them. */
 function headerText(value: unknown): string {
@@ -23,7 +24,7 @@ function headerText(value: unknown): string {
 export const unitTestRunId: IResultStrategy<string> = (
   answer: IAdtWireResponse,
 ) => {
-  const headers = (answer.headers ?? {}) as Record<string, unknown>;
+  const headers: AdtHeaderMap = answer.headers ?? {};
   const fromHeader =
     headerText(headers.location) ||
     headerText(headers['content-location']) ||
