@@ -177,7 +177,7 @@ export class AdtInterface<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    const name = config.interfaceName as string;
+    const name = config.interfaceName;
     return answering(
       () =>
         createInterface(

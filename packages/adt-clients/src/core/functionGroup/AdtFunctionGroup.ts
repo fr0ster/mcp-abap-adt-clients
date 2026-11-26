@@ -218,7 +218,7 @@ export class AdtFunctionGroup<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    const name = config.functionGroupName as string;
+    const name = config.functionGroupName;
     return answering(
       () =>
         createFunctionGroup(
@@ -376,7 +376,7 @@ export class AdtFunctionGroup<
             function_group_name: name,
             lock_handle: options?.lockHandle as string,
             transport_request: config.transportRequest,
-          } as Parameters<typeof updateFunctionGroup>[3],
+          },
           // The document the caller built, from the options — see
           // `AdtDomain.updateMetadata` for why that is the only channel.
           //

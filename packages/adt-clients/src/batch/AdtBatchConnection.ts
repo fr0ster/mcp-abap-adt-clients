@@ -42,10 +42,7 @@ export class AdtBatchConnection implements IAbapConnection {
     this.session = this.defaultSession;
   }
   private wrappedSession(): Session {
-    const connection = this.connection as IAbapConnection & {
-      getSessionType?: () => Session;
-      getSessionMode?: () => Session;
-    };
+    const connection = this.connection;
     return (
       connection.getSessionType?.() ??
       connection.getSessionMode?.() ??

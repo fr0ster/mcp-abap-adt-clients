@@ -114,7 +114,10 @@ function breakpointTarget(bp: IDebuggerBreakpoint): string {
 
 /** One `<breakpoint>` row; `only` is the validation attribute, or empty. */
 function breakpointRow(bp: IDebuggerBreakpoint, only: string): string {
-  const condition = (bp as { condition?: string }).condition;
+  // Annotated, so the test below does not narrow `bp`: the type allows a
+  // condition on a line breakpoint only, and this is the check for a value
+  // that broke the type.
+  const condition: string | undefined = bp.condition;
   if (condition !== undefined && bp.kind !== 'line') {
     // The type forbids it; a cast can still get here. The server ignores a
     // condition on other kinds, so sending it would arm a breakpoint that stops

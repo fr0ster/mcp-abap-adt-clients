@@ -197,7 +197,7 @@ export class AdtScalarFunctionImplementation<
       () =>
         createScalarFunctionImplementation(connection, options.headers, {
           implementation_name: name,
-          scalar_function_name: config.scalarFunctionName as string,
+          scalar_function_name: config.scalarFunctionName,
           engine_value: config.engineValue,
           package_name: config.packageName,
           transport_request: config.transportRequest,

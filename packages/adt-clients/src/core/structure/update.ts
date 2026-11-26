@@ -24,7 +24,7 @@ export async function upload(
   params: IUpdateStructureParams,
   lockHandle?: string,
 ): Promise<IAdtWireResponse> {
-  const url = `${sourceUri(STRUCTURE.uri(params.structureName as string))}${writeQuery(lockHandle, params.transportRequest)}`;
+  const url = `${sourceUri(STRUCTURE.uri(params.structureName))}${writeQuery(lockHandle, params.transportRequest)}`;
 
   return connection.makeAdtRequest({
     url,

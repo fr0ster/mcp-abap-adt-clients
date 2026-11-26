@@ -326,7 +326,7 @@ export class AdtAbapGitClient<
     return answering(
       () => postPullLink(this.connection, options.headers, args, url),
       this.results.pulled,
-      options?.analyse as IAnalyse<E> | undefined,
+      options?.analyse,
     );
   }
 
@@ -341,7 +341,7 @@ export class AdtAbapGitClient<
     return answering<void, E>(
       () => unlinkRepo(this.connection, args),
       this.results.unlinked,
-      options?.analyse as IAnalyse<E> | undefined,
+      options?.analyse,
     );
   }
 
@@ -352,7 +352,7 @@ export class AdtAbapGitClient<
     return answering(
       () => listRepos(this.connection),
       this.results.repos,
-      options?.analyse as IAnalyse<E> | undefined,
+      options?.analyse,
     );
   }
 
@@ -371,7 +371,7 @@ export class AdtAbapGitClient<
     return answering(
       () => getErrorLog(this.connection, url),
       this.results.errorLog,
-      options?.analyse as IAnalyse<E> | undefined,
+      options?.analyse,
     );
   }
 

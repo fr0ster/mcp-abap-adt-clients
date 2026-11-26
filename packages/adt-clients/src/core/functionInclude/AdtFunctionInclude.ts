@@ -159,7 +159,7 @@ export class AdtFunctionInclude<
     include: string;
   } {
     return {
-      group: config.functionGroupName as string,
+      group: config.functionGroupName,
       include: config.includeName as string,
     };
   }

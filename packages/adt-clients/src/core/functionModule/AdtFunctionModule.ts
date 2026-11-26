@@ -162,7 +162,7 @@ export class AdtFunctionModule<
     module: string;
   } {
     return {
-      group: config.functionGroupName as string,
+      group: config.functionGroupName,
       module: config.functionModuleName as string,
     };
   }

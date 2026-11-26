@@ -211,7 +211,7 @@ export class AdtClass<
           connection,
           options.headers,
           {
-            class_name: config.className as string,
+            class_name: config.className,
             package_name: config.packageName,
             transport_request: config.transportRequest,
             description: config.description,

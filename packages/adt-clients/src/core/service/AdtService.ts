@@ -478,7 +478,7 @@ export class AdtServiceBinding<
     // Checked here, where the config makes it optional, so the params type
     // below can require it: the demand belongs in one place, and a type is the
     // place a caller sees it.
-    const serviceType = config.serviceType as string;
+    const serviceType = config.serviceType;
     const desiredPublicationState = config.desiredPublicationState;
 
     // **V2 needs the service name and version; V4 does not.** Measured — see
@@ -912,7 +912,7 @@ export class AdtServiceBinding<
     // second request. `ODATA_V4_*` and `ODATA_V2_*` binding variants map to the
     // two service types, so a caller that knows its binding knows this, and the
     // params type requires it rather than this function checking again.
-    const serviceType = params.serviceType as string;
+    const serviceType = params.serviceType;
 
     this.logger?.info?.(
       `ServiceBinding ${params.desiredPublicationState}: ${params.bindingName}`,

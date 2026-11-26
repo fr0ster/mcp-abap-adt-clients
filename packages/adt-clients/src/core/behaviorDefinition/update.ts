@@ -63,7 +63,7 @@ export async function update(
     lockHandle?: string;
   },
 ): Promise<IAdtWireResponse> {
-  const url = `${sourceUri(BEHAVIOR_DEFINITION.uri(params.name as string))}${writeQuery(params.lockHandle, params.transportRequest)}`;
+  const url = `${sourceUri(BEHAVIOR_DEFINITION.uri(params.name))}${writeQuery(params.lockHandle, params.transportRequest)}`;
 
   return await connection.makeAdtRequest({
     url,

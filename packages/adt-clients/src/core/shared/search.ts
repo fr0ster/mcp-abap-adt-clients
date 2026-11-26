@@ -21,7 +21,7 @@ export async function searchObjects(
   connection: IAbapConnection,
   params: ISearchObjectsParams,
 ): Promise<IAdtWireResponse> {
-  const encodedQuery = encodeSapObjectName(params.query as string);
+  const encodedQuery = encodeSapObjectName(params.query);
   const maxResults = params.maxResults || 100;
 
   let url = `/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=${encodedQuery}&maxResults=${maxResults}`;

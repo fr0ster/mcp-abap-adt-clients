@@ -228,7 +228,7 @@ export class AdtProgram<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    const name = config.programName as string;
+    const name = config.programName;
     return answering(
       () =>
         createProgram(connection, options.headers, {

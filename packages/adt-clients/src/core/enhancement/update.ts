@@ -53,7 +53,7 @@ export async function update(
 
   const baseUri = getEnhancementUri(
     args.enhancement_type,
-    args.enhancement_name as string,
+    args.enhancement_name,
   );
 
   // Build URL with parameters

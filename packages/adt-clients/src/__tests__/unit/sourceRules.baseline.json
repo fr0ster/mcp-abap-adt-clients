@@ -14,13 +14,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/batch/AdtBatchConnection.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "this.connection as IAbapConnection & { getSessionType?: () => Session; getSessionMode?: () => Session; }",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/batch/wire.ts",
     "rule": "cast",
     "kind": "re-types",
@@ -152,13 +145,6 @@
     "kind": "redundant",
     "text": "options as IAbapGitNewFormOptions<Facts<'linkedFacts'>>",
     "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "options?.analyse as IAnalyse<E> | undefined",
-    "count": 4
   },
   {
     "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
@@ -308,13 +294,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/core/behaviorDefinition/update.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "params.name as string",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/core/behaviorDefinition/versions.ts",
     "rule": "cast",
     "kind": "asserts-present",
@@ -348,13 +327,6 @@
     "kind": "asserts-present",
     "text": "config.className as string",
     "count": 11
-  },
-  {
-    "file": "packages/adt-clients/src/core/class/AdtClass.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "config.className as string",
-    "count": 1
   },
   {
     "file": "packages/adt-clients/src/core/class/AdtClass.ts",
@@ -576,13 +548,6 @@
   {
     "file": "packages/adt-clients/src/core/enhancement/update.ts",
     "rule": "cast",
-    "kind": "redundant",
-    "text": "args.enhancement_name as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/enhancement/update.ts",
-    "rule": "cast",
     "kind": "asserts-present",
     "text": "error as HttpError",
     "count": 1
@@ -623,20 +588,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/core/featureToggle/xmlBuilder.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "params.package_name as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/functionGroup/AdtFunctionGroup.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "{ function_group_name: name, lock_handle: options?.lockHandle as string, transport_request: config.transportRequest, } as Parameters<typeof updateFunctionGroup>[3]",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/core/functionGroup/AdtFunctionGroup.ts",
     "rule": "cast",
     "kind": "asserts-present",
@@ -649,13 +600,6 @@
     "kind": "asserts-present",
     "text": "config.functionGroupName as string",
     "count": 14
-  },
-  {
-    "file": "packages/adt-clients/src/core/functionGroup/AdtFunctionGroup.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "config.functionGroupName as string",
-    "count": 1
   },
   {
     "file": "packages/adt-clients/src/core/functionGroup/AdtFunctionGroup.ts",
@@ -681,13 +625,6 @@
   {
     "file": "packages/adt-clients/src/core/functionGroup/update.ts",
     "rule": "cast",
-    "kind": "redundant",
-    "text": "params.function_group_name as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/functionGroup/update.ts",
-    "rule": "cast",
     "kind": "asserts-present",
     "text": "params.lock_handle as string",
     "count": 1
@@ -697,13 +634,6 @@
     "rule": "cast",
     "kind": "re-types",
     "text": "config as IFunctionIncludeConfig",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/functionInclude/AdtFunctionInclude.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "config.functionGroupName as string",
     "count": 1
   },
   {
@@ -739,13 +669,6 @@
     "rule": "cast",
     "kind": "asserts-present",
     "text": "config.description as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/functionModule/AdtFunctionModule.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "config.functionGroupName as string",
     "count": 1
   },
   {
@@ -828,13 +751,6 @@
   {
     "file": "packages/adt-clients/src/core/interface/AdtInterface.ts",
     "rule": "cast",
-    "kind": "redundant",
-    "text": "config.interfaceName as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/interface/AdtInterface.ts",
-    "rule": "cast",
     "kind": "asserts-present",
     "text": "options?.lockHandle as string",
     "count": 1
@@ -893,13 +809,6 @@
     "rule": "cast",
     "kind": "asserts-present",
     "text": "config.className as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/messageClass/AdtMessageClassMessage.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "this.writeClass(config, true, options, undefined) as Promise< IAdtResponse<T['deleted'], E> >",
     "count": 1
   },
   {
@@ -1003,13 +912,6 @@
   {
     "file": "packages/adt-clients/src/core/program/AdtProgram.ts",
     "rule": "cast",
-    "kind": "redundant",
-    "text": "config.programName as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/program/AdtProgram.ts",
-    "rule": "cast",
     "kind": "asserts-present",
     "text": "options?.lockHandle as string",
     "count": 1
@@ -1087,13 +989,6 @@
   {
     "file": "packages/adt-clients/src/core/scalarFunctionImplementation/AdtScalarFunctionImplementation.ts",
     "rule": "cast",
-    "kind": "redundant",
-    "text": "config.scalarFunctionName as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/scalarFunctionImplementation/AdtScalarFunctionImplementation.ts",
-    "rule": "cast",
     "kind": "asserts-present",
     "text": "source as string",
     "count": 2
@@ -1136,13 +1031,6 @@
   {
     "file": "packages/adt-clients/src/core/service/AdtService.ts",
     "rule": "cast",
-    "kind": "redundant",
-    "text": "config.serviceType as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/service/AdtService.ts",
-    "rule": "cast",
     "kind": "asserts-present",
     "text": "description as string",
     "count": 1
@@ -1158,13 +1046,6 @@
     "file": "packages/adt-clients/src/core/service/AdtService.ts",
     "rule": "cast",
     "kind": "redundant",
-    "text": "params.serviceType as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/service/AdtService.ts",
-    "rule": "cast",
-    "kind": "re-types",
     "text": "serviceType as 'odatav2' | 'odatav4'",
     "count": 2
   },
@@ -1243,13 +1124,6 @@
     "rule": "hand-narrowed",
     "kind": "widened",
     "text": "answer: unknown",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/shared/search.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "params.query as string",
     "count": 1
   },
   {
@@ -1334,13 +1208,6 @@
     "rule": "cast",
     "kind": "asserts-present",
     "text": "source as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/structure/update.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "params.structureName as string",
     "count": 1
   },
   {
@@ -1470,13 +1337,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/runtime/atc/run.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "NAMED[ref.objectType] as | ((name: string) => string) | undefined",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/runtime/debugger/abap.ts",
     "rule": "any",
     "kind": "flow",
@@ -1488,13 +1348,6 @@
     "rule": "cast",
     "kind": "redundant",
     "text": "( Array.isArray(entries) ? entries : entries ? [entries] : [] ) as Array<{ key?: string; '#text'?: string }>",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/runtime/debugger/abap.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "bp as { condition?: string }",
     "count": 1
   },
   {

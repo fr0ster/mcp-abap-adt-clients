@@ -193,9 +193,7 @@ export class AdtMessageClassMessage<
     config: Partial<IMessageClassMessageConfig>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deleted'], E>> {
-    return this.writeClass(config, true, options, undefined) as Promise<
-      IAdtResponse<T['deleted'], E>
-    >;
+    return this.writeClass(config, true, options, undefined);
   }
 
   /**
