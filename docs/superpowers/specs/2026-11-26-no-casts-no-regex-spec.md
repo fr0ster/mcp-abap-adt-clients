@@ -5,12 +5,12 @@ things:
 
 - every site that breaks the goal's two rules;
 - what replaces each group of sites;
-- the owner's decisions D1–D3 and C1–C6;
+- the owner's decisions D1–D3 and C1–C7;
 - the guard test;
 - how equivalence is proved, and the release order.
 
-A replacement keeps behaviour and API exactly, except for D1–D3 and C1–C5, which are the
-owner's decisions. There is no exception list.
+A replacement keeps behaviour and API exactly, except for D1–D3, C1–C5 and C7, which are
+the owner's decisions. There is no exception list.
 
 ## 1. The forbidden forms: one definition
 
@@ -673,7 +673,7 @@ These paths are typed by C3. Every other generic path, where the returned error 
 `analyse`'s own, is typed by the overload and needs no cast. The four other generic
 stand-ins and the abapGit args are C1, C2, C4 and C5.
 
-## 5. Consumer changes C1–C6, as decided
+## 5. Consumer changes C1–C7, as decided
 
 - **C1: `AdtBatchConnection.makeAdtRequest`** (`AdtBatchConnection.ts:70`, cast `:93`).
   `<T, D>` is removed. The signature is the contract's,
@@ -749,6 +749,123 @@ stand-ins and the abapGit args are C1, C2, C4 and C5.
   **The C3 inventory** includes all 20 types' operations, typed `E | IAdtError`, since each
   answers the library's refusal under a generic call.
 - **C6: type predicates.** See section 1, P, and the replacements listed under section 2, P.
+
+- **C7: one endpoint, one method.** The owner's words: «Не мають на рівні
+  adt-clients самі ставити локи як не передано локхендл, оце як раз порушення
+  правила один метод один ендпойнт.»
+
+  A member sends one request. It never locks, unlocks or chains another
+  endpoint for itself: lock, write and unlock are separate members, and the
+  caller composes them. interfaces-adt 32.0.0 carries the contracts
+  (`IAdtLockedWrite`, `IAdtLockFreeUpdatable`, `IAdtLockFreeMetadataUpdatable`,
+  `IAdtMessageClassMessageLockable`, `IAdtMessageClassMessageWritable`).
+
+  **The inventory** covers both packages, tests excluded. It was found by
+  reading every public member's call graph down to `makeAdtRequest`, and by the
+  AST scan for `lock*`/`unlock*` calls made from any other function.
+
+  - **No member locks when no handle is given.** No `update` or
+    `updateMetadata` branches on a missing `lockHandle` to lock for itself, in
+    either package. A missing handle is sent as nothing:
+    - `functionGroup/update.ts:38`, `featureToggle/update.ts:27` and
+      `featureToggle/updateSource.ts:23` drop the parameter;
+    - `program/update.ts:25` sends `lockHandle=undefined`.
+
+    So the change here is the type: `lockHandle` becomes required wherever a
+    member sends it, and a call without one is a compile error. The members
+    above then always send the handle they are given.
+  - **The two writes that take no lock** move to the lock-free atoms, with no
+    `lockHandle` at all:
+    - `AdtService.update` (`service/AdtService.ts:458`, the publication
+      `POST …/publishjobs`), as `IAdtLockFreeUpdatable<
+      IServiceBindingPublicationConfig, …>`;
+    - `AdtRequest.updateMetadata` (`transport/AdtRequest.ts:307`), as
+      `IAdtLockFreeMetadataUpdatable`.
+  - **The one lock chain is split.** `AdtMessageClassMessage.create`,
+    `update` and `delete` (`messageClass/AdtMessageClassMessage.ts:163, 177,
+    192`) run `writeClass` (`:209`), and `messageClass/lock.ts:86` calls that
+    "the approved exception to one member, one request". Today the chain is:
+    1. GET the class source (working area);
+    2. LOCK_MSG on a stateful session (`lockMessageIfGranted`; a 403 is
+       swallowed);
+    3. LOCK the class for the message (`lockClassForMessageOrPlain`; a 403
+       falls back to the plain class LOCK);
+    4. PUT the class document on a stateless session;
+    5. UNLOCK the class, then UNLOCK_ALL on the message, both stateful.
+
+    It becomes four members of the message handler, one request each:
+    - `lockMessage` (LOCK_MSG);
+    - `lockClassForMessage` (LOCK with `msgNo` and `onSave=X`);
+    - `write` (the PUT, given `classDocument`, `classLockHandle` and
+      `messageLockHandle`; `remove: true` for a deletion);
+    - `unlockMessages` (UNLOCK_ALL).
+
+    The class's own `lock`, `read` and `unlock` stay the message class's
+    members. Neither 403 fallback stays in the library: they become steps of
+    the caller's recipe. The recipe keeps the session rule the code comments
+    record: locks and unlocks on the stateful session, the PUT stateless, and
+    the class unlocked before the message. It goes into the README, the
+    migration note and the mcp-abap-adt follow-up (section 8).
+    `lockClassForMessageOrPlain` and `lockMessageIfGranted` leave.
+  - **The stale "Without it, this locks…" doc comments**, which describe a
+    self-locking chain the code does not have, are corrected at all 20 sites,
+    each a "With `options.lockHandle` the caller holds the lock and owns the
+    chain…" block in `core/`:
+    - `tabletype/AdtDdicTableType.ts:218`, `functionModule/AdtFunctionModule.ts:291`,
+      `functionInclude/AdtFunctionInclude.ts:300`,
+      `functionGroup/AdtFunctionGroup.ts:352`,
+      `serviceDefinition/AdtServiceDefinition.ts:266`,
+      `metadataExtension/AdtMetadataExtension.ts:272`, `program/AdtProgram.ts:306`;
+    - `transformation/AdtTransformation.ts:274`, `domain/AdtDomain.ts:222`,
+      `interface/AdtInterface.ts:252`, `scalarFunction/AdtScalarFunction.ts:267`,
+      `accessControl/AdtAccessControl.ts:264`, `table/AdtTable.ts:265`;
+    - `scalarFunctionImplementation/AdtScalarFunctionImplementation.ts:296`,
+      `behaviorDefinition/AdtBehaviorDefinition.ts:297`,
+      `dataElement/AdtDataElement.ts:224`, `structure/AdtStructure.ts:264`,
+      `enhancement/AdtEnhancement.ts:381`, `ddl/AdtDdl.ts:268`,
+      `authorizationField/AdtAuthorizationField.ts:218`.
+  - **The other multi-request members**, listed and not changed here. The owner
+    rules on them later.
+    - Every `activate`, plus `AdtUtils.activateObjects` and
+      `AdtClass.activateTestClasses`, through `activationExchange`
+      (`utils/activationUtils.ts:321–357`). When an activation answers with
+      no stated outcome, it reads the inactive objects (`fetchInactiveObjects`,
+      `:332`) as a second request. The 28 members:
+      - `accessControl/AdtAccessControl.ts:394`, `appendStructure/AdtAppendStructure.ts:368`,
+        `authorizationField/AdtAuthorizationField.ts:324`,
+        `behaviorDefinition/AdtBehaviorDefinition.ts:420`,
+        `class/AdtClassMemberBase.ts:183`, `class/AdtClass.ts:433`,
+        `behaviorImplementation/AdtBehaviorImplementation.ts:408`;
+      - `dataElement/AdtDataElement.ts:318`, `ddl/AdtDdl.ts:393`,
+        `domain/AdtDomain.ts:324`, `enhancement/AdtEnhancement.ts:482`,
+        `featureToggle/AdtFeatureToggle.ts:386`,
+        `functionGroup/AdtFunctionGroup.ts:445`,
+        `functionInclude/AdtFunctionInclude.ts:430`;
+      - `functionModule/AdtFunctionModule.ts:419`, `include/AdtInclude.ts:442`,
+        `interface/AdtInterface.ts:377`,
+        `metadataExtension/AdtMetadataExtension.ts:395`,
+        `program/AdtProgram.ts:437`, `scalarFunction/AdtScalarFunction.ts:397`,
+        `scalarFunctionImplementation/AdtScalarFunctionImplementation.ts:430`;
+      - `service/AdtService.ts:690`, `serviceDefinition/AdtServiceDefinition.ts:396`,
+        `shared/AdtUtils.ts:596`, `structure/AdtStructure.ts:389`,
+        `table/AdtTable.ts:390`, `tabletype/AdtDdicTableType.ts:314` and
+        `transformation/AdtTransformation.ts:404`.
+    - `AdtTableSettings.patchMetadata` (`tableSettings/AdtTableSettings.ts:303`)
+      reads and writes in one member, as interfaces-adt decision 51 approved.
+  - **Reached by the call graph, and not chains as far as read.**
+    `AdtService.update`, `ProfilerDomain.read` and the two tracker locks were
+    read in the code. The three `check`/`run` members are inference from the
+    call graph. The plan's one-request tests settle every one of them:
+    - `AdtService.update` and `ProfilerDomain.read` choose one endpoint per
+      call;
+    - `AdtFunctionModule.lock` and `AdtFunctionInclude.lock` register the
+      unlock with the tracker, which sends it only on `unlockAll()`;
+    - `AdtDomain.check`, `AdtDataElement.check` and `ClassTestRunner.run`
+      choose one of two endpoints;
+    - the abapGit `link` and `checkExternalRepo` choose between their old and
+      new forms, and C4 removes the old one.
+
+    Legacy: the scan found no chain and no self-lock.
 
 ## 6. The guard test
 
@@ -866,6 +983,23 @@ is part of the rule. The existing `noRegexInDocumentPatches.test.ts` stays.
     (`isAbsentOnLegacy`) and `legacyMemberInventory.test.ts:293–305`.
   - **C6**: each replaced predicate's callers get the same narrowing results on the same
     inputs.
+  - **C7**, intended-change tests, each failing against the old code first:
+    - with a recording connection, each of the four message members sends
+      exactly one request: `lockMessage` one LOCK_MSG POST,
+      `lockClassForMessage` one LOCK POST with `msgNo` and `onSave=X`, `write`
+      one PUT carrying both handles, and `unlockMessages` one UNLOCK_ALL
+      POST. Against the old code, `update` sends six;
+    - the recipe composed from them sends the same requests in the same order
+      and sessions as the old chain did. The old chain's recording is the
+      oracle;
+    - type checks that a write without `lockHandle` is refused, that a
+      lock-free write refuses one, and that the message's `create`, `update`
+      and `delete` are gone;
+    - for the members that dropped an absent handle
+      (`functionGroup/update.ts:38`, `featureToggle/update.ts:27`,
+      `featureToggle/updateSource.ts:23`), the request now always carries the
+      handle given.
+
 - **Type checks**: test-only `*.typecheck.ts` files use `@ts-expect-error`. They live under
   `src/__tests__/` of adt-clients, where `tsconfig.test.json` (`src/**/*`, and adt-strategies'
   `src`) includes them, and of adt-clients-legacy (its own `tsconfig.test.json`). Both run in
@@ -976,6 +1110,12 @@ The release gate is the root `npm run check`.
   for a typed answer; narrow `E | IAdtError` where a member now answers it; move from the
   old abapGit form to the new one; and stop relying on an absent legacy handler not being
   an instance of its modern class.
+  It also covers C7: pass `lockHandle` to every write; move the binding's
+  publication and the transport's document write to the lock-free atoms; and
+  compose a message's write from `lockMessage`, `lockClassForMessage`, the
+  class's `read`, `write`, the class's `unlock` and `unlockMessages`, with the
+  locks and unlocks on the stateful session and the PUT stateless. The same
+  recipe goes into the mcp-abap-adt follow-up in the PR description.
 - **Where each package's note ships.**
   - adt-clients: `docs/usage/MIGRATION-<major>.md`.
   - adt-clients-legacy: a migration section in its README, and `docs/LEGACY.md`.
