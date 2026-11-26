@@ -73,7 +73,9 @@ finds joins its package's stage (step 12).
 
 ## Stage 1: interfaces-adt (its own repository, its own PR)
 
-**Scope**: spec D1, C3, and the interfaces-adt half of C4.
+**Scope**: spec D1, C3, the interfaces-adt half of C4, and the C7 contracts: the
+required `lockHandle`, the lock-free write atoms and the message class message's members.
+interfaces-adt PR #201 carries them.
 
 1. **Open the PR.** In `mcp-abap-adt-interfaces`, in a worktree on a new branch, open one
    PR. It links #304 and PR #333 and quotes the decided text of D1, C3 and C4 from the spec.
@@ -305,6 +307,48 @@ upgrade.
     - type checks for each such path;
     - a spy showing that `analyse` is called exactly as before: once, with the verdict and
       `undefined`, on the no-answer path, before the library's fallback.
+43a. **C7: the lock-free writes.** `AdtService.update` implements
+     `IAdtLockFreeUpdatable<IServiceBindingPublicationConfig, …>`, and
+     `AdtRequest.updateMetadata` implements `IAdtLockFreeMetadataUpdatable`.
+     Type checks first, failing against the old code: a lock handle is refused
+     on both. The request each sends is unchanged, and an equivalence test
+     records it before and after.
+43b. **C7: the lock handle is required.** Every other write takes the options
+     with `lockHandle: string`, family by family.
+     - Intended-change type checks first: a write without a handle is refused.
+     - An equivalence test for the request each sends with a handle.
+     - An intended-change test for the three that dropped an absent handle
+       (`functionGroup/update.ts:38`, `featureToggle/update.ts:27`,
+       `featureToggle/updateSource.ts:23`): the URL now always carries the
+       handle given.
+43c. **C7: the message class message is split** (spec section 5, C7). Tests
+     come first.
+     - **Intended-change, failing against the old code:** with a recording
+       connection, `lockMessage`, `lockClassForMessage`, `write` and
+       `unlockMessages` each send exactly one request. Today `update` sends
+       six. Type checks also show that the message's `create`, `update` and
+       `delete` are gone.
+     - **Equivalence:** the old chain is recorded once as the oracle: the
+       requests, their order and the session type of each. The caller's recipe,
+       composed from the new members and the class's `lock`, `read` and
+       `unlock`, sends the same sequence, the 403 fallbacks included, each
+       played by the recording connection.
+
+     Then implement the four members over `lockMessage`,
+     `lockClassForMessage`, the PUT and `unlockAllMessages`, and remove
+     `writeClass`, `lockMessageIfGranted` and `lockClassForMessageOrPlain`.
+     `write` builds the body from the given `classDocument` with the message
+     upserted or removed and both handles, as `writeClass` built it, with the
+     same equivalence test over the recorded message class documents.
+43d. **C7: the stale doc comments.** Correct the 20 "With `options.lockHandle`
+     the caller holds the lock and owns the chain…" blocks listed in spec
+     section 5, C7: the write is one request under the caller's lock. This is
+     a comment change, so `dist` is byte-identical.
+43e. **C7: the other multi-request members stay.** `activate` with its
+     inactive-objects read and `AdtTableSettings.patchMetadata` are not
+     changed. Each gets a test that pins how many requests it sends today, so a
+     later decision by the owner starts from a measured baseline.
+
 44. **Public surface.** Compare strategies' `.d.ts` with step 14's snapshot again, now after
     its interfaces-adt upgrade in step 40. The only differences allowed are the
     interfaces-adt types it uses or re-exports. Then compare clients' `.d.ts` with step 26's
@@ -322,7 +366,11 @@ upgrade.
     - every README and `docs/usage/` example whose call changed, compiled through
       `tsconfig.test.json`;
     - the README sections on identities, `analyse` and error typing, batches, WebSocket and
-      abapGit.
+      abapGit;
+    - C7: the README section on writes, which says the lock is the caller's, the lock-free
+      writes, and the message class message recipe. The recipe is the locks on the
+      stateful session, the class read, the write stateless, then the class unlocked
+      before the message. All of it goes in the migration note too.
 48. **Stage review.** Push, check CI, then run the external review.
 
 ## Stage 5: adt-clients-legacy
@@ -415,7 +463,9 @@ it, and this stage finishes the rest.
     served is reported by name (exit 2), and re-running publishes only what is missing.
 67. **Clean install.** Install each of the three from the registry into an empty directory
     outside the repository, to prove it installs.
-68. **Hand-over.** Report the published versions and the migration notes for mcp-abap-adt,
+68. **Hand-over.** The PR description carries the mcp-abap-adt follow-up for C7: its
+    message tools compose the message class message recipe, and every write passes the
+    lock handle it holds. Report the published versions and the migration notes for mcp-abap-adt,
     which takes the new majors in its own work.
 
 ## Decisions this plan rests on
@@ -431,4 +481,7 @@ it, and this stage finishes the rest.
   adt-clients-legacy ship majors. interfaces-adt follows its own versioning.
 - **The guard comes first**, with a baseline that refuses any new finding, so every later
   step is measured by the same definition the inventory used.
+- **One endpoint, one method (C7).** A member sends one request. The message class
+  message's chain is split into members the caller composes, and the multi-request members
+  the owner has not ruled on stay as they are, pinned by tests.
 - **No exception list.** A site the guard finds is fixed in the code.
