@@ -12,6 +12,7 @@ import {
   leafText,
   listOf,
   type ParsedElement,
+  parsedOrNothing,
 } from '../parsed';
 import { type AdtSourcePosition, readSourceReference } from '../sourcePosition';
 
@@ -257,12 +258,8 @@ export interface IAdtRootElement {
 export function readRootElement(document: unknown): IAdtRootElement | null {
   if (typeof document !== 'string') return null;
   if (XMLValidator.validate(document) !== true) return null;
-  let parsed: unknown;
-  try {
-    parsed = namespacedParser.parse(document);
-  } catch {
-    return null;
-  }
+  // A parser that throws reads as nothing, which is no element.
+  const parsed = parsedOrNothing(namespacedParser, document);
   if (!isElement(parsed)) return null;
   const names = Object.keys(parsed).filter(
     (key) => !key.startsWith('?') && !key.startsWith('#'),

@@ -1,33 +1,5 @@
 [
   {
-    "file": "packages/adt-strategies/src/parsed.ts",
-    "rule": "any",
-    "kind": "flow",
-    "text": "parser.parse(text)",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/refusals/analyse.ts",
-    "rule": "any",
-    "kind": "flow",
-    "text": "[ headers.location, headers['content-location'], headers['sap-adt-location'], ] .map((v) => (Array.isArray(v) ? v[0] : v)) .find((v) => typeof v === 'string' && /\\/runs\\/[^/]+/.test(v))",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/refusals/analyse.ts",
-    "rule": "any",
-    "kind": "flow",
-    "text": "v[0]",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/refusals/analyse.ts",
-    "rule": "any",
-    "kind": "flow",
-    "text": "value[0]",
-    "count": 1
-  },
-  {
     "file": "packages/adt-strategies/src/refusals/analyse.ts",
     "rule": "cast",
     "kind": "re-types",
@@ -53,13 +25,6 @@
     "rule": "regex",
     "kind": "literal",
     "text": "/<aunit:run[^>]*uri=\"[^\"]*\\/runs\\/[^/\"]+/",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/refusals/read.ts",
-    "rule": "any",
-    "kind": "flow",
-    "text": "namespacedParser.parse(document)",
     "count": 1
   },
   {
@@ -98,38 +63,10 @@
     "count": 1
   },
   {
-    "file": "packages/adt-strategies/src/results/abapGit.ts",
-    "rule": "any",
-    "kind": "flow",
-    "text": "documentParser.parse(body)",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/answeredObject.ts",
-    "rule": "any",
-    "kind": "flow",
-    "text": "entry.codes",
-    "count": 1
-  },
-  {
     "file": "packages/adt-strategies/src/results/answeredObject.ts",
     "rule": "predicate",
     "kind": "is",
     "text": "text is AdtTypeCode",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/atc.ts",
-    "rule": "any",
-    "kind": "flow",
-    "text": "parser.parse(body)",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/atc.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "parser.parse(body) as Node",
     "count": 1
   },
   {
@@ -186,20 +123,6 @@
     "rule": "regex",
     "kind": "literal",
     "text": "/\\/+$/",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/featureToggle.ts",
-    "rule": "any",
-    "kind": "flow",
-    "text": "JSON.parse(data)",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/traces.ts",
-    "rule": "any",
-    "kind": "flow",
-    "text": "parser.parse(body)",
     "count": 1
   },
   {
@@ -331,22 +254,8 @@
   {
     "file": "packages/adt-strategies/src/results/traces.ts",
     "rule": "cast",
-    "kind": "redundant",
-    "text": "parser.parse(body) as Node",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/traces.ts",
-    "rule": "cast",
     "kind": "re-types",
     "text": "response?.headers as | Record<string, string | string[] | undefined> | undefined",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/traces.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "root as Node",
     "count": 1
   },
   {
@@ -484,13 +393,6 @@
   },
   {
     "file": "packages/adt-strategies/src/results/utils.ts",
-    "rule": "any",
-    "kind": "flow",
-    "text": "value[0]",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/utils.ts",
     "rule": "regex",
     "kind": "literal",
     "text": "/\\/activation\\/runs\\/([^/]+)/",
@@ -501,13 +403,6 @@
     "rule": "regex",
     "kind": "String.match",
     "text": "text.match",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/versions.ts",
-    "rule": "any",
-    "kind": "flow",
-    "text": "links.find((l: unknown) => field(l, '@_rel') === TRANSPORT_REL)",
     "count": 1
   }
 ]

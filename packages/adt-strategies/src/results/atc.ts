@@ -27,6 +27,7 @@ import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 import type { AdtHeaderMap } from '../headers';
+import { isElement } from '../parsed';
 import { rawOf } from '../result';
 
 const parser = new XMLParser({
@@ -43,7 +44,10 @@ type Node = Record<string, unknown>;
 function parseXml(body: unknown): Node | null {
   if (typeof body !== 'string' || body.trim() === '') return null;
   try {
-    return parser.parse(body) as Node;
+    const parsed: unknown = parser.parse(body);
+    // Not an element (a parser's text for a body with no root) carries none
+    // of what is read here, as `null` does.
+    return isElement(parsed) ? parsed : null;
   } catch {
     // A body that is not XML is a body that carries none of what is looked for
     // here, and reads as such — the caller's analyse sees the same answer.

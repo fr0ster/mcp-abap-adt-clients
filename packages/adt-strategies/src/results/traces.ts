@@ -38,6 +38,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
+import { field, isElement } from '../parsed';
 import { answeredObject } from './answeredObject';
 
 /**
@@ -267,9 +268,9 @@ function rootOf(response: IAdtWireResponse, rootName: string): Node {
     return {};
   }
   try {
-    const parsed = parser.parse(body) as Node;
-    const root = parsed?.[rootName];
-    return root && typeof root === 'object' ? (root as Node) : {};
+    const parsed: unknown = parser.parse(body);
+    const root = field(parsed, rootName);
+    return isElement(root) ? root : {};
   } catch {
     return {};
   }

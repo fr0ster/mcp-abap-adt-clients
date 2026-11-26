@@ -26,7 +26,7 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
-import type { AdtHeaderMap } from '../headers';
+import { type AdtHeaderMap, firstOf } from '../headers';
 import { readInactiveListText } from '../inactiveList';
 import {
   at,
@@ -550,7 +550,8 @@ export const utilWhereUsedReferences: IResultStrategy<IWhereUsedListResult> = (
 
 /** A header's value, whether the transport gave a string or a list of them. */
 function headerText(value: unknown): string | undefined {
-  if (Array.isArray(value)) return value.length ? String(value[0]) : undefined;
+  if (Array.isArray(value))
+    return value.length ? String(firstOf(value)) : undefined;
   if (value === undefined || value === null || typeof value === 'object') {
     return undefined;
   }

@@ -61,7 +61,8 @@ function json(data: unknown): unknown {
   // library runs a result strategy outside its catch for that reason. In
   // fixed words: `JSON.parse`'s message quotes the body (0.28.0).
   try {
-    return JSON.parse(data);
+    const parsed: unknown = JSON.parse(data);
+    return parsed;
   } catch {
     throw new Error(FEATURE_TOGGLE_REFUSAL);
   }

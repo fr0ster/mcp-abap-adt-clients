@@ -4,7 +4,7 @@ import {
   AdtObjectErrorCodes,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
-import type { AdtHeaderMap } from '../headers';
+import { type AdtHeaderMap, firstOf } from '../headers';
 import {
   type AdtActivationFacts,
   type AdtActivationRefusal,
@@ -345,7 +345,7 @@ function headerOf(
   const headers: AdtHeaderMap = answer?.headers ?? {};
   const key = Object.keys(headers).find((k) => k.toLowerCase() === name);
   const value = key ? headers[key] : undefined;
-  const first = Array.isArray(value) ? value[0] : value;
+  const first = Array.isArray(value) ? firstOf(value) : value;
   return typeof first === 'string' ? first : undefined;
 }
 
@@ -450,7 +450,7 @@ export const analyseUnitTestStart: IAnalyse<IAdtMessageFailure> = (
     headers['content-location'],
     headers['sap-adt-location'],
   ]
-    .map((v) => (Array.isArray(v) ? v[0] : v))
+    .map((v) => (Array.isArray(v) ? firstOf(v) : v))
     .find((v) => typeof v === 'string' && /\/runs\/[^/]+/.test(v));
   const body = typeof answer?.data === 'string' ? answer.data : '';
   const inBody = /<aunit:run[^>]*uri="[^"]*\/runs\/[^/"]+/.test(body);

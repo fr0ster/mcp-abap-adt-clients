@@ -219,7 +219,8 @@ export function ownText(value: unknown): string | undefined {
  */
 export function parsedOrNothing(parser: XMLParser, text: string): unknown {
   try {
-    return parser.parse(text);
+    const parsed: unknown = parser.parse(text);
+    return parsed;
   } catch {
     return undefined;
   }

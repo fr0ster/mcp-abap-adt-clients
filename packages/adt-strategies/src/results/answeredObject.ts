@@ -20,7 +20,9 @@ import {
 /** Every code of every table. */
 const CODES: ReadonlySet<string> = new Set(
   [ADT_TYPES_ONPREM, ADT_TYPES_CLOUD, ADT_TYPES_BASIS_740].flatMap((table) =>
-    Object.values(table).flatMap((entry) => Object.keys(entry.codes)),
+    Object.values<{ readonly codes: object }>(table).flatMap((entry) =>
+      Object.keys(entry.codes),
+    ),
   ),
 );
 

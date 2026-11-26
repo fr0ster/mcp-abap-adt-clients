@@ -12,3 +12,12 @@ export type AdtHeaderValue = IAdtWireResponse['headers'][string];
 
 /** An answer's headers, read by name. */
 export type AdtHeaderMap = Readonly<Record<string, AdtHeaderValue>>;
+
+/**
+ * A list's first item, as the `unknown` a list from outside holds. A header
+ * the transport gave as a list is read by its first value; `Array.isArray` on
+ * such a value yields `any[]`, and this keeps its item out of `any`.
+ */
+export function firstOf(list: readonly unknown[]): unknown {
+  return list[0];
+}
