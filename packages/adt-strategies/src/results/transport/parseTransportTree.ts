@@ -33,7 +33,8 @@ const NON_CONTAINER_NAMES = new Set(['task', 'link', 'long_desc']);
 /** The elements of a parsed value that may be one or several. */
 const elements = (value: unknown): ParsedElement[] =>
   listOf(value).filter(
-    (item): item is ParsedElement => isElement(item) && !Array.isArray(item),
+    (item: unknown): item is ParsedElement =>
+      isElement(item) && !Array.isArray(item),
   );
 
 /** Element name with the namespace prefix stripped: "tm:request" -> "request". */

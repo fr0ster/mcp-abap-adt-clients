@@ -769,7 +769,7 @@ export function readDeletionRefusal(document: unknown): AdtRefusal | null {
           t100: t100FromLongtext(field(message, 'link')),
         };
       })
-      .filter((m): m is AdtMessage => m !== null);
+      .filter((m) => m !== null);
 
     // Only an `E` SAP actually typed overturns an explicit "true". An untyped
     // message reads as `E` by default, which is right for explaining a refusal
@@ -834,7 +834,7 @@ function t100FromLongtext(link: unknown): AdtMessage['t100'] {
     const params = new URLSearchParams(unescapedAmpersands(query));
     const values = [1, 2, 3, 4]
       .map((n) => params.get(`msgv${n}`))
-      .filter((v): v is string => v !== null);
+      .filter((v) => v !== null);
     return {
       id: decodeURIComponent(key.id),
       no: decodeURIComponent(key.no),

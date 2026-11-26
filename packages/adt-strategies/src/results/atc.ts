@@ -59,9 +59,8 @@ function parseXml(body: unknown): Node | null {
 /** Elements that appear once are objects and many times are arrays. */
 function asArray(value: unknown): Node[] {
   if (value === undefined || value === null) return [];
-  return (Array.isArray(value) ? value : [value]).filter(
-    (v): v is Node => typeof v === 'object' && v !== null,
-  );
+  const list: readonly unknown[] = Array.isArray(value) ? value : [value];
+  return list.filter(isElement);
 }
 
 function text(value: unknown): string | undefined {

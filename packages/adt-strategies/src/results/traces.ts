@@ -659,8 +659,9 @@ function readTraceRequests(response: IAdtWireResponse): ITraceRequestEntry[] {
       const executions = presentNode(extended.executions);
       const traceUri = asList(entry.link)
         .filter((link) => (attr(link, 'rel') ?? '').endsWith('/tracefile'))
-        .map((link) => attr(link, 'href'))
-        .find((href): href is string => Boolean(href));
+        // An empty href is none, as before: `|| undefined` drops it.
+        .map((link) => attr(link, 'href') || undefined)
+        .find((href) => href !== undefined);
 
       return {
         id: required(text(entry.id), 'request.id'),
