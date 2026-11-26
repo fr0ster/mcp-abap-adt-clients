@@ -1,0 +1,97 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`each profiler view reaches its endpoint with its options dbAccesses with {"withSystemEvents":true} 1`] = `
+{
+  "ok": true,
+  "sent": [
+    {
+      "headers": {
+        "Accept": "application/xml",
+      },
+      "method": "GET",
+      "timeout": 0,
+      "url": "/sap/bc/adt/runtime/traces/abaptraces/TRACEID0123456789/dbAccesses?withSystemEvents=true",
+    },
+  ],
+}
+`;
+
+exports[`each profiler view reaches its endpoint with its options dbAccesses with undefined 1`] = `
+{
+  "ok": true,
+  "sent": [
+    {
+      "headers": {
+        "Accept": "application/xml",
+      },
+      "method": "GET",
+      "timeout": 0,
+      "url": "/sap/bc/adt/runtime/traces/abaptraces/TRACEID0123456789/dbAccesses",
+    },
+  ],
+}
+`;
+
+exports[`each profiler view reaches its endpoint with its options hitlist with {"withSystemEvents":true} 1`] = `
+{
+  "ok": true,
+  "sent": [
+    {
+      "headers": {
+        "Accept": "application/xml",
+      },
+      "method": "GET",
+      "timeout": 0,
+      "url": "/sap/bc/adt/runtime/traces/abaptraces/TRACEID0123456789/hitlist?withSystemEvents=true",
+    },
+  ],
+}
+`;
+
+exports[`each profiler view reaches its endpoint with its options hitlist with undefined 1`] = `
+{
+  "ok": true,
+  "sent": [
+    {
+      "headers": {
+        "Accept": "application/xml",
+      },
+      "method": "GET",
+      "timeout": 0,
+      "url": "/sap/bc/adt/runtime/traces/abaptraces/TRACEID0123456789/hitlist",
+    },
+  ],
+}
+`;
+
+exports[`each profiler view reaches its endpoint with its options statements with {"id":3,"withDetails":true,"autoDrillDownThreshold":5,"withSystemEvents":false} 1`] = `
+{
+  "ok": true,
+  "sent": [
+    {
+      "headers": {
+        "Accept": "application/vnd.sap.adt.runtime.traces.abaptraces.aggcalltree+xml, application/xml",
+      },
+      "method": "GET",
+      "timeout": 0,
+      "url": "/sap/bc/adt/runtime/traces/abaptraces/TRACEID0123456789/statements?id=3&withDetails=true&autoDrillDownThreshold=5&withSystemEvents=false",
+    },
+  ],
+}
+`;
+
+exports[`each profiler view reaches its endpoint with its options statements with undefined 1`] = `
+{
+  "ok": true,
+  "sent": [
+    {
+      "headers": {
+        "Accept": "application/vnd.sap.adt.runtime.traces.abaptraces.aggcalltree+xml, application/xml",
+      },
+      "method": "GET",
+      "timeout": 0,
+      "url": "/sap/bc/adt/runtime/traces/abaptraces/TRACEID0123456789/statements",
+    },
+  ],
+}
+`;

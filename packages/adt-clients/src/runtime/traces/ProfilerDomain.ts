@@ -154,39 +154,23 @@ export class Profiler<
   }
 
   /**
-   * The request for a view.
-   *
-   * One place that knows which URL and which options a view sends.
+   * The request for each view: one place that knows which URL and which
+   * options a view sends. Typed per view, so a view's options reach its
+   * request as they are, with no cast.
    */
-  private async viewResponse<K extends keyof IProfilerViews<T>>(
-    traceId: string,
-    view: K,
-    options: unknown,
-  ): Promise<IAdtWireResponse> {
-    switch (view) {
-      case 'hitlist':
-        return getTraceHitList(
-          this.connection,
-          traceId,
-          options as IProfilerTraceHitListOptions | undefined,
-        );
-      case 'statements':
-        return getTraceStatements(
-          this.connection,
-          traceId,
-          options as IProfilerTraceStatementsOptions | undefined,
-        );
-      case 'dbAccesses':
-        return getTraceDbAccesses(
-          this.connection,
-          traceId,
-          options as IProfilerTraceDbAccessesOptions | undefined,
-        );
-      default:
-        // Unreachable through the typed surface; reachable from JavaScript.
-        throw new Error(`Unknown trace view: ${String(view)}`);
-    }
-  }
+  private readonly handlers: {
+    readonly [K in keyof IProfilerViews<T>]: (
+      traceId: string,
+      options: ViewOptions<IProfilerViews<T>, K> | undefined,
+    ) => Promise<IAdtWireResponse>;
+  } = {
+    hitlist: (traceId, options) =>
+      getTraceHitList(this.connection, traceId, options),
+    statements: (traceId, options) =>
+      getTraceStatements(this.connection, traceId, options),
+    dbAccesses: (traceId, options) =>
+      getTraceDbAccesses(this.connection, traceId, options),
+  };
 
   /**
    * What is inside one trace.
@@ -207,11 +191,15 @@ export class Profiler<
     // caller error, and classified inside `answering` it would come back as
     // `origin: 'connection'` — advice to check the network over a name the
     // compiler already refuses.
-    if (view !== 'hitlist' && view !== 'statements' && view !== 'dbAccesses') {
+    if (!Object.hasOwn(this.handlers, view)) {
       throw new Error(`Unknown trace view: ${String(view)}`);
     }
+    const handler: (
+      traceId: string,
+      options: ViewOptions<IProfilerViews<T>, K> | undefined,
+    ) => Promise<IAdtWireResponse> = this.handlers[view];
     return answering(
-      () => this.viewResponse(traceId, view, options),
+      () => handler(traceId, options),
       this.results[view],
       options?.analyse,
     );

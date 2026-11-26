@@ -1274,27 +1274,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/runtime/traces/ProfilerDomain.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "options as IProfilerTraceDbAccessesOptions | undefined",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/runtime/traces/ProfilerDomain.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "options as IProfilerTraceHitListOptions | undefined",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/runtime/traces/ProfilerDomain.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "options as IProfilerTraceStatementsOptions | undefined",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/utils/activationUtils.ts",
     "rule": "predicate",
     "kind": "is",
