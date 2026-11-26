@@ -203,13 +203,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-strategies/src/results/featureToggle.ts",
-    "rule": "hand-narrowed",
-    "kind": "widened",
-    "text": "node: unknown",
-    "count": 1
-  },
-  {
     "file": "packages/adt-strategies/src/results/traces.ts",
     "rule": "any",
     "kind": "flow",
@@ -462,20 +455,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-strategies/src/results/transport/document.ts",
-    "rule": "hand-narrowed",
-    "kind": "widened",
-    "text": "node: unknown",
-    "count": 2
-  },
-  {
-    "file": "packages/adt-strategies/src/results/transport/parseObjectEntries.ts",
-    "rule": "hand-narrowed",
-    "kind": "widened",
-    "text": "node: unknown",
-    "count": 1
-  },
-  {
     "file": "packages/adt-strategies/src/results/transport/parseSearchConfigurations.ts",
     "rule": "cast",
     "kind": "redundant",
@@ -536,13 +515,6 @@
     "rule": "any",
     "kind": "flow",
     "text": "value[0]",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/utils.ts",
-    "rule": "hand-narrowed",
-    "kind": "widened",
-    "text": "node: unknown",
     "count": 1
   },
   {

@@ -185,6 +185,20 @@ const cases = [
     [],
   ],
   [
+    'N: a local reader handing an unknown on to a boundary reader, allowed',
+    {
+      'parsed.ts':
+        "export function field(v: unknown, k: string): unknown { return typeof v === 'object' && v !== null ? Reflect.get(v, k) : undefined; }",
+      'a.ts':
+        "import { field } from './parsed';\nfunction text(node: unknown): unknown { return field(node, 'a'); }\nexport const x = text({ a: 1 });",
+    },
+    [],
+    (dir) => ({
+      boundaryModules: [`${dir.split(path.sep).join('/')}/src/parsed.ts`],
+      readerModules: [],
+    }),
+  ],
+  [
     'N: a typed value handed to a boundary reader, allowed',
     {
       'parsed.ts':

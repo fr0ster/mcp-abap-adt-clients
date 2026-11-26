@@ -11,8 +11,11 @@
 //      that is neither the initializer of a declaration annotated `unknown`
 //      nor an argument to a parameter declared `unknown` (any-flow);
 // - N  a hand-narrowed contract value: an `unknown` binding reached by a value
-//      whose type is neither `unknown` nor `any` (a widening), and narrowed by
-//      hand. A boundary reader's own parameters are exempt;
+//      whose type is neither `unknown` nor `any` (a widening; judged by that
+//      value's binding's declared type, or its initializer's), and narrowed by
+//      hand with `typeof`, `instanceof`, `in`, `Array.isArray` or equality with
+//      a literal. Handing it to a boundary reader is not narrowing. A boundary
+//      reader's own parameters are exempt;
 // - R  a regular expression: a literal, a reference to `RegExp`, a reference to
 //      `String.prototype.match`, `matchAll` or `search`, a reference to
 //      `Symbol.match`/`matchAll`/`replace`/`search`/`split`, and a call or
@@ -364,15 +367,6 @@ function findForbidden(
         node.arguments[0]
       ) {
         narrowed = narrowedBinding(node.arguments[0]);
-      } else if (ts.isCallExpression(node)) {
-        // A call to a boundary reader narrows what it is handed.
-        const declaration = checker.getResolvedSignature(node)?.declaration;
-        const target = declaration?.getSourceFile?.();
-        if (target && inList(path.resolve(target.fileName), boundaryModules)) {
-          for (const arg of node.arguments) {
-            narrowed = narrowed ?? narrowedBinding(arg);
-          }
-        }
       }
       if (narrowed && !reportedN.has(narrowed)) {
         reportedN.add(narrowed);
