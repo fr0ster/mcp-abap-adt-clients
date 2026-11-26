@@ -72,7 +72,7 @@ caller's to compose. Nothing else changes for consumers.
     compile error. The two writes that take no lock (a service binding's publication, a
     transport request's document) refuse one. A message class message's `create`,
     `update` and `delete`, which locked and unlocked for themselves, become `lockMessage`,
-    `lockClassForMessage`, `write` and `unlockMessages`, each one request. The caller
+    `lockClassForMessage`, `update` and `unlockMessages`, each one request. The caller
     composes them with the class's `lock`, `read` and `unlock`, keeping the locks on the
     stateful session and the write stateless.
   - A migration note in each breaking package says what a caller on the old contract must

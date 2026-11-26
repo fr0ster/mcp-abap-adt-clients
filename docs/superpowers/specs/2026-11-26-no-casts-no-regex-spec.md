@@ -758,7 +758,7 @@ stand-ins and the abapGit args are C1, C2, C4 and C5.
   endpoint for itself: lock, write and unlock are separate members, and the
   caller composes them. interfaces-adt 32.0.0 carries the contracts
   (`IAdtLockedWrite`, `IAdtLockFreeUpdatable`, `IAdtLockFreeMetadataUpdatable`,
-  `IAdtMessageClassMessageLockable`, `IAdtMessageClassMessageWritable`).
+  `IAdtMessageClassMessageLockable`, `IAdtMessageClassMessageUpdatable`).
 
   **The inventory** covers both packages, tests excluded. It was found by
   reading every public member's call graph down to `makeAdtRequest`, and by the
@@ -796,13 +796,21 @@ stand-ins and the abapGit args are C1, C2, C4 and C5.
     It becomes four members of the message handler, one request each:
     - `lockMessage` (LOCK_MSG);
     - `lockClassForMessage` (LOCK with `msgNo` and `onSave=X`);
-    - `write` (the PUT, given `classDocument`, `classLockHandle` and
-      `messageLockHandle`; `remove: true` for a deletion);
+    - `update` (the PUT of the class document, given `classDocument`,
+      `classLockHandle` and `messageLockHandle`; an upsert requires `msgtext`,
+      and `removeMessage: true` removes the message from the document);
     - `unlockMessages` (UNLOCK_ALL).
 
     The class's own `lock`, `read` and `unlock` stay the message class's
-    members. Neither 403 fallback stays in the library: they become steps of
-    the caller's recipe. The recipe keeps the session rule the code comments
+    members. The variant tables list `lockMessage`, `lockClassForMessage`,
+    `update` and `unlockMessages` for `MSAG/NN` in place of `create` and
+    `delete` (interfaces-adt 32.0.0). Neither 403 fallback stays in the
+    library: they become steps of the caller's recipe. The old code did not
+    tell a system that grants no message lock from another user's lock, and
+    the recipe says so; the caller reads the refusal before it falls back. The
+    recipe also gives the locks up on every way out: `unlockMessages` after a
+    failed class lock, and the class unlock and then `unlockMessages` after a
+    failed read or `update`, as the old chain's scope ends did. The recipe keeps the session rule the code comments
     record: locks and unlocks on the stateful session, the PUT stateless, and
     the class unlocked before the message. It goes into the README, the
     migration note and the mcp-abap-adt follow-up (section 8).
@@ -986,15 +994,16 @@ is part of the rule. The existing `noRegexInDocumentPatches.test.ts` stays.
   - **C7**, intended-change tests, each failing against the old code first:
     - with a recording connection, each of the four message members sends
       exactly one request: `lockMessage` one LOCK_MSG POST,
-      `lockClassForMessage` one LOCK POST with `msgNo` and `onSave=X`, `write`
+      `lockClassForMessage` one LOCK POST with `msgNo` and `onSave=X`, `update`
       one PUT carrying both handles, and `unlockMessages` one UNLOCK_ALL
       POST. Against the old code, `update` sends six;
     - the recipe composed from them sends the same requests in the same order
       and sessions as the old chain did. The old chain's recording is the
       oracle;
     - type checks that a write without `lockHandle` is refused, that a
-      lock-free write refuses one, and that the message's `create`, `update`
-      and `delete` are gone;
+      lock-free write refuses one, that the message's `create` and `delete`
+      are gone, and that its `update` requires both handles, the class
+      document and, for an upsert, `msgtext`;
     - for the members that dropped an absent handle
       (`functionGroup/update.ts:38`, `featureToggle/update.ts:27`,
       `featureToggle/updateSource.ts:23`), the request now always carries the
@@ -1113,7 +1122,7 @@ The release gate is the root `npm run check`.
   It also covers C7: pass `lockHandle` to every write; move the binding's
   publication and the transport's document write to the lock-free atoms; and
   compose a message's write from `lockMessage`, `lockClassForMessage`, the
-  class's `read`, `write`, the class's `unlock` and `unlockMessages`, with the
+  class's `read`, `update`, the class's `unlock` and `unlockMessages`, with the
   locks and unlocks on the stateful session and the PUT stateless. The same
   recipe goes into the mcp-abap-adt follow-up in the PR description.
 - **Where each package's note ships.**

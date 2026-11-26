@@ -324,10 +324,14 @@ upgrade.
 43c. **C7: the message class message is split** (spec section 5, C7). Tests
      come first.
      - **Intended-change, failing against the old code:** with a recording
-       connection, `lockMessage`, `lockClassForMessage`, `write` and
+       connection, `lockMessage`, `lockClassForMessage`, `update` and
        `unlockMessages` each send exactly one request. Today `update` sends
-       six. Type checks also show that the message's `create`, `update` and
-       `delete` are gone.
+       six. Type checks also show that the message's `create` and `delete`
+       are gone, and that its `update` requires both handles, the class
+       document and, for an upsert, `msgtext`.
+     - **The recipe's cleanup:** with a recording connection that refuses the
+       class lock, then the read, then the `update` in turn, the recipe gives
+       up exactly the locks it took, in the old chain's order.
      - **Equivalence:** the old chain is recorded once as the oracle: the
        requests, their order and the session type of each. The caller's recipe,
        composed from the new members and the class's `lock`, `read` and
@@ -337,7 +341,7 @@ upgrade.
      Then implement the four members over `lockMessage`,
      `lockClassForMessage`, the PUT and `unlockAllMessages`, and remove
      `writeClass`, `lockMessageIfGranted` and `lockClassForMessageOrPlain`.
-     `write` builds the body from the given `classDocument` with the message
+     `update` builds the body from the given `classDocument` with the message
      upserted or removed and both handles, as `writeClass` built it, with the
      same equivalence test over the recorded message class documents.
 43d. **C7: the stale doc comments.** Correct the 20 "With `options.lockHandle`
