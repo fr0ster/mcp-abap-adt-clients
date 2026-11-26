@@ -153,6 +153,22 @@ const cases = [
     ['hand-narrowed/widened'],
   ],
   [
+    'N: an unknown parameter checked and handed on, allowed',
+    {
+      'a.ts':
+        "function g(v: unknown) { return typeof v === 'string'; }\nexport function f(v: unknown) { if (v === undefined) return false; return g(v); }",
+    },
+    [],
+  ],
+  [
+    'N: an unannotated const from an unknown reading, allowed',
+    {
+      'a.ts':
+        "declare function read(): unknown;\nfunction g(v: unknown) { return typeof v === 'string'; }\nexport function f() { const v = read(); if (v === null) return false; return g(v); }",
+    },
+    [],
+  ],
+  [
     'N: a catch variable narrowed, allowed',
     {
       'a.ts':

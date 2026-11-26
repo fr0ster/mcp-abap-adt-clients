@@ -179,7 +179,33 @@ function findForbidden(
         : symbol;
     return target?.valueDeclaration;
   };
-  const typed = (expr) => !isLoose(checker.getTypeAtLocation(expr));
+  // A binding's own declared type decides, not the type control flow narrowed
+  // it to: an `unknown` parameter checked with `typeof` and handed on is still
+  // the value from outside it was.
+  const typed = (expr) => {
+    if (ts.isIdentifier(expr)) {
+      const symbol = checker.getSymbolAtLocation(expr);
+      const declaration = symbol?.valueDeclaration;
+      if (
+        declaration &&
+        (ts.isParameter(declaration) ||
+          ts.isVariableDeclaration(declaration)) &&
+        declaration.type
+      ) {
+        return !isLoose(checker.getTypeFromTypeNode(declaration.type));
+      }
+      // An unannotated `const` has its initializer's type.
+      if (
+        declaration &&
+        ts.isVariableDeclaration(declaration) &&
+        !declaration.type &&
+        declaration.initializer
+      ) {
+        return !isLoose(checker.getTypeAtLocation(declaration.initializer));
+      }
+    }
+    return !isLoose(checker.getTypeAtLocation(expr));
+  };
 
   for (const sf of files) {
     const boundary = inList(sf.fileName, boundaryModules);

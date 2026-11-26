@@ -1379,13 +1379,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/core/tableSettings/readDocument.ts",
-    "rule": "hand-narrowed",
-    "kind": "widened",
-    "text": "value: unknown",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/core/tabletype/AdtDdicTableType.ts",
     "rule": "cast",
     "kind": "asserts-present",
