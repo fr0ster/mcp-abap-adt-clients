@@ -219,6 +219,28 @@ upgrade.
     negative check it becomes and the new-form coverage it keeps. Nothing is removed yet:
     the class implements `IAdtAbapGitClient` of the current interfaces-adt, which still
     declares the old overloads, so removing them now would not compile.
+
+    The list (found by the old-form types and a search for `remoteUser`,
+    `remotePassword`, `linkRepo`, `abapGitExternalRepo` and the `linked` /
+    `externalRepo` slots). `pull`'s deprecated form stays: C4 names only `link`
+    and `checkExternalRepo`, and interfaces-adt 32 keeps `pull`'s.
+    - `typechecks/exact/abapGitResults46.ts`: `checkExternalRepo` and `link`
+      with `remoteUser` (lines 45–58), the `externalRepo` slot (29), and the
+      `remoteUser`-with-`credentials` mix (71–74). Becomes: each old-form call
+      under `@ts-expect-error`, the slot refused by the result set's type; the
+      `pull`, `unlink`, `getErrorLog` and `listRepos` lines keep their checks.
+    - `unit/abapGitEntryPacked.test.ts`: the packed declarations' `link` and
+      `checkExternalRepo` with `remoteUser` (48, 50), the `externalRepo` slot
+      (41) and the 46.1.0 signature extraction (`IAbapGitLinkArgs`,
+      `IAbapGitExternalRepoCredentials`). Becomes: the same calls refused
+      against the packed tarball; the new-form `link` (84) and the other
+      members stay as the coverage.
+    - `unit/clients/abapGit/deprecatedForms46.test.ts`: the request and answer
+      of old-form `link` (24–57) and `checkExternalRepo` (91–118). Becomes: a
+      type check that each is refused; `pull`, `listRepos`, `unlink`,
+      `getErrorLog` and the failure case keep their request tests.
+    - `unit/clients/abapGit/credentialWire.test.ts`: reads the new forms only
+      (it asserts `remoteUser` is absent from their bodies); unchanged.
 29. **AbapGit slot lookup, type-only.** The results map is typed per slot. `dist` is
     byte-identical.
 30. **C1.**
