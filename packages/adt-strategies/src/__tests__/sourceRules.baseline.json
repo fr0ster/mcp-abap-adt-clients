@@ -28,13 +28,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-strategies/src/results/atc.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/\\/+$/",
-    "count": 1
-  },
-  {
     "file": "packages/adt-strategies/src/results/traces.ts",
     "rule": "predicate",
     "kind": "is",

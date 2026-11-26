@@ -179,3 +179,10 @@ export function messageClassKey(
 export function unescapedAmpersands(text: string): string {
   return text.replaceAll('&amp;', '&');
 }
+
+/** `text.replace(/\/+$/, '')`: the text without the `/` characters it ends in. */
+export function withoutTrailingSlashes(text: string): string {
+  let end = text.length;
+  while (end > 0 && text.charAt(end - 1) === '/') end--;
+  return text.slice(0, end);
+}

@@ -29,6 +29,7 @@ import { XMLParser } from 'fast-xml-parser';
 import type { AdtHeaderMap } from '../headers';
 import { at, field, isElement } from '../parsed';
 import { rawOf } from '../result';
+import { withoutTrailingSlashes } from '../scan';
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -69,7 +70,7 @@ function text(value: unknown): string | undefined {
 
 /** The last path segment of a URI, ignoring trailing slashes. */
 function lastSegment(uri: string): string | undefined {
-  return uri.replace(/\/+$/, '').split('/').pop() || undefined;
+  return withoutTrailingSlashes(uri).split('/').pop() || undefined;
 }
 
 /** What the run resource says about a run in progress or done. */
