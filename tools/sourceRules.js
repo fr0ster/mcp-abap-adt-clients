@@ -51,10 +51,12 @@ const READER_MODULES = [
   'packages/adt-strategies/src/results/',
   'packages/adt-strategies/src/refusals/',
   'packages/adt-clients/src/utils/ownValue.ts',
-  // adt-clients' readers of parsed XML from SAP's answers
+  // adt-clients' readers of parsed XML from SAP's answers. They only read; a
+  // module that also sends a request (`utils/activationUtils.ts`, the inactive
+  // objects) is not one, and its reading lives in a module of its own.
   'packages/adt-clients/src/core/messageClass/xml.ts',
   'packages/adt-clients/src/core/tableSettings/readDocument.ts',
-  'packages/adt-clients/src/utils/activationUtils.ts',
+  'packages/adt-clients/src/utils/activationReading.ts',
 ];
 
 const STRING_REGEX_METHODS = new Set(['match', 'matchAll', 'search']);

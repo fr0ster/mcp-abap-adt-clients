@@ -96,7 +96,12 @@ two things hold:
 - the narrowed parameter is from outside under N's provenance rule.
 
 The list of reader modules is fixed in `tools/sourceRules.js`, next to the boundary
-readers.
+readers. The owner decided its adt-clients entries: `core/messageClass/xml.ts` and
+`core/tableSettings/readDocument.ts`, because they only read SAP's answer. A reader that
+also sends a request is not one: `utils/activationUtils.ts` reads the inactive objects as a
+second request. Its reading of the answer therefore moves to a module of its own,
+`utils/activationReading.ts`. That module is pure reading, is on the list instead, and has
+an oracle test over SAP's recorded activation answers.
 
 Not counted: comments (JSDoc examples), and inferred predicates (TypeScript 5.5 and later),
 which the compiler proves.

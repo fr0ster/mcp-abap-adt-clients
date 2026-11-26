@@ -274,6 +274,13 @@ upgrade.
     - `replaceAll('-', '')` at both sites.
 39. **P.** Replace the six typed predicates (spec section 2, P), each after a test of its
     callers' narrowing results. The guard checks the other three.
+39a. **The activation reading moves out** (the owner's decision on the reader list). The
+     reading half of `utils/activationUtils.ts` — the parse of the activation answer, its
+     predicate over the parsed `unknown` included — moves to
+     `utils/activationReading.ts`, which only reads and is on the reader list. An oracle
+     test comes first, over every recorded activation answer in `corpus/adt/answers/`
+     (`activation-*`). The move is equivalence: the reading gives what the old code gave.
+     `activationUtils.ts` keeps the request and the inactive-objects read.
 
 **Part B is the upgrade, then the contract work.**
 
