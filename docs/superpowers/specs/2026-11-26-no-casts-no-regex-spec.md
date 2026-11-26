@@ -582,6 +582,16 @@ become required, and only on the capabilities named:
 The remaining 29 casts are covered under "What D1 does not require" below, so
 144 + 52 + 12 + 29 = 237.
 
+**The members' own parameters.** The members of adt-clients and adt-clients-legacy still
+declare their configs as `Partial<I…Config>`: 455 parameter sites in 54 files in
+adt-clients, and 39 in adt-clients-legacy (for example `AdtClassLegacy.ts:54`). By method
+bivariance such a member accepts the interface's narrower identity, so the field stays
+optional inside it. Each of these parameters therefore takes the interface's identity type
+or the required options type, and only then is the K2 cast deleted, because the field is
+`string`. The class's declaration narrows with it, which is D1's consumer impact. The
+emitted JavaScript of those sites does not change. K2 by package: adt-clients 217,
+adt-clients-legacy 20.
+
 **What D1 does not require.** These fields are not names, sources or lock handles, so D1
 does not cover them. Making them required would be a consumer change the goal does not
 name:
@@ -635,8 +645,9 @@ Optional fields are read with no cast.
 
 Every member implementation of the form `<E extends IAdtError = IAdtError>(…, options?:
 …<E>)` gets the interfaces' two overloads: a generic one that requires `analyse`, and a
-plain one. That is 703 signatures in 86 files, plus the shared helpers that take the same
-pair: `answering`, `answeringExchange`, `answeringActivation`, `systemInfo`'s answer,
+plain one. That is 703 signatures in 86 files. By package, adt-clients has 598 in 63
+files, and adt-clients-legacy has 105 in 23, which covers every legacy override, refusing or
+not (such as `ClassTestRunnerLegacy.ts:43`). The shared helpers take the same pair: `answering`, `answeringExchange`, `answeringActivation`, `systemInfo`'s answer,
 `chain`, the abapGit facts exchange and the legacy refusals.
 
 **Overloads alone do not make these sound.** TypeScript accepts an implementation whose
@@ -644,8 +655,9 @@ return type the overload's return type is merely assignable to. A body that retu
 library's `IAdtError` under the generic overload is therefore still the lie the cast was.
 These paths do that even when `analyse` is given:
 
-- `adtResponse.ts:516–522`, `systemInfo.ts:194` and `structuredExchange.ts:197`: `analyse`
-  cleared the verdict, but no answer came back, so the library's own verdict stands.
+- `adtResponse.ts:502–522`, `systemInfo.ts:185–194` and `structuredExchange.ts:189–197`:
+  `analyse` is called first, with the verdict and the answer (`undefined` when none came).
+  When it clears the verdict and no answer came back, the library's own verdict stands.
 - `chain.ts:183, 191`: a step answered without a strategy, so its failure is an
   `IAdtError`. The rollback message is added to it.
 - The legacy refusals (`refusalLegacy.ts:6`): by design, no request is sent and `analyse`
@@ -676,10 +688,14 @@ stand-ins and the abapGit args are C1, C2, C4 and C5.
   `analyse` given answers `IAdtResponse<T, E | IAdtError>`. Those paths are the no-answer
   verdict (`answering`, `answeringExchange`, `systemInfo`, the abapGit facts exchange,
   which gives `E | IAbapGitStructuredError`), a chain whose step answered without a
-  strategy, and the legacy refusals. `analyse` is not called on these paths, as today. The
-  helpers return that union with no cast. The members on paths that only ever return
+  strategy, and the legacy refusals. `analyse` is called exactly where it is called today.
+  On the no-answer path it runs first, with `undefined` for the answer, and the library's
+  verdict is the fallback when it clears. A legacy refusal never calls it. The helpers
+  return that union with no cast, and the members on paths that only ever return
   `analyse`'s error keep `IAdtResponse<T, E>`. The interfaces-adt PR settles which members
-  are which, from the helper each member calls.
+  are which. The list is drawn from the helper each member calls, in adt-clients **and** in
+  adt-clients-legacy, whose refusals and overrides decide it as much as the modern members
+  do.
 - **C4: the old abapGit form is removed.** Removed: the `@deprecated` overloads of `link` and
   `checkExternalRepo` (args with `remoteUser` and `remotePassword`, `DeprecatedOptions`), the
   old-form request builders they alone reach (`linkRepo` and the old external-repo check),
@@ -777,7 +793,9 @@ is part of the rule. The existing `noRegexInDocumentPatches.test.ts` stays.
     reader that throws rejects that request only, and the next request on the same id
     settles normally.
   - **C3**: type checks that the no-answer path, a chain step and a legacy refusal are typed
-    `E | IAdtError`, and that `analyse` is not called there (a spy sees no call).
+    `E | IAdtError`. A spy shows that `analyse` sees exactly the calls it saw before the
+    change: one call with the verdict and `undefined` on the no-answer path, and none on a
+    legacy refusal.
   - **C4**: type checks that the old-form calls are refused. The new form's existing tests
     stay green.
   - **C5**: each legacy absent handler answers the refusal, sends no request (a recording
@@ -836,7 +854,17 @@ is part of the rule. The existing `noRegexInDocumentPatches.test.ts` stays.
 
 **Order.** interfaces-adt goes first, in its own repository and its own PR, released in its
 own versioning and published. Then adt-strategies, adt-clients and adt-clients-legacy follow,
-in `publishOrder`, each one after the one before it is published. Each raises its
+in `publishOrder`. They are published the way `tools/publish-changed.js` works:
+
+- all three are tagged at the merge commit;
+- one `npm run release:publish` runs `npm run check` once, then publishes every pending
+  package in `publishOrder` (strategies, clients, legacy);
+- at the end it verifies that the registry serves each version.
+
+Its guard requires a tag at HEAD for every pending package (`publish-changed.js:303` and
+after), so the three are not tagged one by one. The dependency order comes from
+`publishOrder`. Inside the repository the check builds through the workspace siblings,
+which is the standing exception. Each package raises its
 `@mcp-abap-adt/interfaces-adt` range to the published version, resolved from the npm
 registry. No `file:`, `link:` or workspace link to interfaces-adt is used. After each
 install, the lockfile is checked: interfaces-adt must resolve from the registry and must not
@@ -850,12 +878,14 @@ be `"link": true`.
 - **interfaces-adt**: its own versioning.
 - **mcp-abap-adt**: takes the new majors deliberately, outside this task.
 
-Before each tag:
+Before tagging:
 
-- every range resolves on the registry;
-- the only `"link": true` entries are the repository's own workspace siblings;
-- after publishing, a clean install from the registry, outside the repository, proves the
-  package installs.
+- every third-party and interfaces-adt range resolves on the registry, and each
+  workspace-sibling range names the version this release publishes;
+- the only `"link": true` entries are the repository's own workspace siblings.
+
+After the publish run, a clean install of each of the three from the registry, outside the
+repository, proves it installs.
 
 The release gate is the root `npm run check`.
 
