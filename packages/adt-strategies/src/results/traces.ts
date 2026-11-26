@@ -312,6 +312,17 @@ function text(value: unknown): string | undefined {
   return undefined;
 }
 
+/**
+ * A field the result type requires, or a throw naming it (D2 of #304): an
+ * answer that lacks one is no reading of that type, and a field read as
+ * `undefined` under a type that says `string` was the lie the cast told. What a
+ * reading's throw becomes is the caller's, as for every reading.
+ */
+function required<T>(value: T | undefined, name: string): T {
+  if (value === undefined) throw new Error(`traces: ${name} is missing`);
+  return value;
+}
+
 function attr(node: Node | undefined, name: string): string | undefined {
   const value = node?.[`@_${name}`];
   return typeof value === 'string' ? value : undefined;
@@ -379,8 +390,8 @@ function timing(node: unknown): ITraceTiming | undefined {
     return undefined;
   }
   return {
-    time: attrNum(t, 'time') as number,
-    percentage: attrNum(t, 'percentage') as number,
+    time: required(attrNum(t, 'time'), 'timing.time'),
+    percentage: required(attrNum(t, 'percentage'), 'timing.percentage'),
   };
 }
 
@@ -488,37 +499,56 @@ function readTraceEntries(response: IAdtWireResponse): IAbapTraceEntry[] {
       const stateNode = presentNode(ext.state);
 
       return {
-        id: (ID_IN_URI.exec(idText)?.[1] ??
-          ID_IN_URI.exec(selfHref)?.[1]) as string,
-        recordedAt: (text(entry.published) ?? text(entry.updated)) as string,
+        id: required(
+          ID_IN_URI.exec(idText)?.[1] ?? ID_IN_URI.exec(selfHref)?.[1],
+          'id',
+        ),
+        recordedAt: required(
+          text(entry.published) ?? text(entry.updated),
+          'recordedAt',
+        ),
         uri: idText || selfHref || undefined,
 
         // `atom:author/atom:name` carries the same name and is the fallback the
         // feed itself offers.
-        user: (text(ext.user) ??
-          text(presentNode(entry.author)?.name)) as string,
-        objectName: text(ext.objectName) as string,
+        user: required(
+          text(ext.user) ?? text(presentNode(entry.author)?.name),
+          'user',
+        ),
+        objectName: required(text(ext.objectName), 'objectName'),
         state: {
-          value: attr(stateNode, 'value') as string,
-          text: attr(stateNode, 'text') as string,
+          value: required(attr(stateNode, 'value'), 'state.value'),
+          text: required(attr(stateNode, 'text'), 'state.text'),
         },
-        expiresAt: text(ext.expiration) as string,
+        expiresAt: required(text(ext.expiration), 'expiresAt'),
 
-        system: text(ext.system) as string,
+        system: required(text(ext.system), 'system'),
         // Codes, not counts. A client is `010` and an instance is `00`; the
         // leading zero is significant and `Number('010')` destroys it
         // irreversibly. Only what is actually counted is a number below.
-        client: text(ext.client) as string,
-        host: text(ext.host) as string,
+        client: required(text(ext.client), 'client'),
+        host: required(text(ext.host), 'host'),
 
-        size: numberOf(text(ext.size)) as number,
-        runtime: numberOf(text(ext.runtime)) as number,
-        runtimeABAP: numberOf(text(ext.runtimeABAP)) as number,
-        runtimeSystem: numberOf(text(ext.runtimeSystem)) as number,
-        runtimeDatabase: numberOf(text(ext.runtimeDatabase)) as number,
+        size: required(numberOf(text(ext.size)), 'size'),
+        runtime: required(numberOf(text(ext.runtime)), 'runtime'),
+        runtimeABAP: required(numberOf(text(ext.runtimeABAP)), 'runtimeABAP'),
+        runtimeSystem: required(
+          numberOf(text(ext.runtimeSystem)),
+          'runtimeSystem',
+        ),
+        runtimeDatabase: required(
+          numberOf(text(ext.runtimeDatabase)),
+          'runtimeDatabase',
+        ),
 
-        isAggregated: booleanOf(text(ext.isAggregated)) as boolean,
-        amdpFileSize: numberOf(text(ext.amdpFileSize)) as number,
+        isAggregated: required(
+          booleanOf(text(ext.isAggregated)),
+          'isAggregated',
+        ),
+        amdpFileSize: required(
+          numberOf(text(ext.amdpFileSize)),
+          'amdpFileSize',
+        ),
       };
     },
   );
@@ -531,9 +561,9 @@ function programRef(node: unknown): ITraceProgramRef | undefined {
     return undefined;
   }
   return {
-    name: attr(ref, 'name') as string,
+    name: required(attr(ref, 'name'), 'program.name'),
     ...answeredObject(attr(ref, 'type') ?? ''),
-    uri: attr(ref, 'uri') as string,
+    uri: required(attr(ref, 'uri'), 'program.uri'),
     context: attr(ref, 'context'),
     byteCodeOffset: attrNum(ref, 'byteCodeOffset'),
     objectReferenceQuery: attr(ref, 'objectReferenceQuery'),
@@ -545,7 +575,7 @@ function readHitList(response: IAdtWireResponse): IAbapTraceHitList {
     entries: asList(rootOf(response, 'hitlist').entry).map(
       (row): IAbapTraceHitListEntry => ({
         topDownIndex: attrNum(row, 'topDownIndex'),
-        index: attrNum(row, 'index') as number,
+        index: required(attrNum(row, 'index'), 'hitlist.index'),
         hitCount: attrNum(row, 'hitCount'),
         stackCount: attrNum(row, 'stackCount'),
         recursionDepth: attrNum(row, 'recursionDepth'),
@@ -563,8 +593,8 @@ function readStatements(response: IAdtWireResponse): IAbapTraceStatements {
   return {
     statements: asList(rootOf(response, 'statements').statement).map(
       (row): IAbapTraceStatement => ({
-        id: attr(row, 'id') as string,
-        index: attrNum(row, 'index') as number,
+        id: required(attr(row, 'id'), 'statement.id'),
+        index: required(attrNum(row, 'index'), 'statement.index'),
         callLevel: attrNum(row, 'callLevel'),
         text: attr(row, 'text'),
         variable: attr(row, 'variable'),
@@ -598,7 +628,7 @@ function readDbAccesses(response: IAdtWireResponse): IAbapTraceDbAccesses {
   return {
     accesses: asList(rootOf(response, 'dbAccesses').dbAccess).map(
       (row): IAbapTraceDbAccess => ({
-        index: attrNum(row, 'index') as number,
+        index: required(attrNum(row, 'index'), 'dbAccess.index'),
         tableName: attr(row, 'tableName'),
         statement: attr(row, 'statement'),
         type: attr(row, 'type'),
@@ -619,8 +649,8 @@ function readDbAccesses(response: IAdtWireResponse): IAbapTraceDbAccesses {
  */
 function readCatalogue(response: IAdtWireResponse): ITraceCatalogueItem[] {
   return asList(rootOf(response, 'namedItemList').namedItem).map((item) => ({
-    name: text(item.name) as string,
-    description: text(item.description) as string,
+    name: required(text(item.name), 'catalogue.name'),
+    description: required(text(item.description), 'catalogue.description'),
   }));
 }
 
@@ -641,7 +671,7 @@ function readTraceRequests(response: IAdtWireResponse): ITraceRequestEntry[] {
         .find((href): href is string => Boolean(href));
 
       return {
-        id: text(entry.id) as string,
+        id: required(text(entry.id), 'request.id'),
         index: numberOf(text(extended.requestIndex)),
         description: text(extended.description),
         expiresAt: text(extended.expires),
