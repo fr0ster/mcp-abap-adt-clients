@@ -2506,8 +2506,8 @@ await profiler.delete(newest.id);
 trace entry or a view row that lacks a field its result type requires — an
 entry's `id`, a row's `index`, a timing's `time` — throws
 `traces: <field> is missing`, and the throw surfaces from `list` or `read` as
-itself, not as a failure. Every recorded trace document carries every such
-field ([ERRATA.md](ERRATA.md#a-trace-document-that-lacks-a-field-its-reading-requires)).
+itself, not as a failure. What is measured of these fields, and what is not,
+is in [ERRATA.md](ERRATA.md#a-trace-document-that-lacks-a-field-its-reading-requires).
 
 Configuring and scheduling live on the executors:
 

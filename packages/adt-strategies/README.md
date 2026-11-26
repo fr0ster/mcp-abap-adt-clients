@@ -312,8 +312,11 @@ and `percentage`; a program reference's `name` and `uri`; a catalogue item's
 `traces: <field> is missing` (`traces: state.value is missing`,
 `traces: hitlist.index is missing`, …) when the answer lacks one. Before,
 such a field read as `undefined` under a type that said `string` or `number`.
-Every recorded trace document carries every one of these fields; an optional
-field absent from the answer is still absent from the reading.
+The on-premise trace feed the reading was transcribed from carries every one
+of these fields in each of its sixty entries; the other documents and the
+cloud's answers are not in the corpus, so that they always carry them is not
+measured. An optional field absent from the answer is still absent from the
+reading.
 
 **Values are text as written** (0.28.0, every util and transport reading): no
 tag or attribute is coerced to a number (`007` stays `007`, a position

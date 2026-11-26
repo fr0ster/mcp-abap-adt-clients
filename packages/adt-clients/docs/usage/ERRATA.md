@@ -200,10 +200,11 @@ other node SAP lists — one without its name, technical name or URI in
 
 ## A trace document that lacks a field its reading requires
 
-**Symptom.** None measured: every recorded trace document — the trace feed,
-the hit list, the statements, the database accesses, the two catalogues and
-the stored requests — carries every field its reading's result type
-requires.
+**Symptom.** None measured. The on-premise trace feed the reading was
+transcribed from carries every field its result type requires, in each of its
+sixty entries; the hit list, the statements, the database accesses, the two
+catalogues, the stored requests and every cloud answer are not in the corpus,
+so that SAP always sends these fields is not measured either.
 
 **What the readings did.** Before `@mcp-abap-adt/adt-strategies` 0.29.0, a
 field the answer did not carry read as `undefined` under a type that said

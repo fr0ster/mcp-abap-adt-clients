@@ -30,8 +30,10 @@ readings.
   `profilerDbAccesses`, `traceSchedulingTypes` and `traceSchedulingRequests`
   throw `traces: <field> is missing` for an answer that lacks a field their
   result type requires; before, the field read as `undefined` under a type
-  that said `string` or `number`. Every recorded trace document carries every
-  such field. See the README's "Migrating to 0.29.0".
+  that said `string` or `number`. The on-premise trace feed the reading was
+  transcribed from carries every such field; the other documents and the
+  cloud's answers are not recorded, so that SAP always sends them is not
+  measured. See the README's "Migrating to 0.29.0".
 
 ### Changed
 
