@@ -40,6 +40,7 @@ import {
   XML_TEXT_OPTIONS,
 } from '../parsed';
 import { rawOf } from '../result';
+import { runIdAfter } from '../scan';
 import { answeredObject } from './answeredObject';
 
 type XmlRecord = Record<string, unknown>;
@@ -565,8 +566,7 @@ function headerText(value: unknown): string | undefined {
 export function extractRunId(location: unknown): string | null {
   const text = headerText(location);
   if (!text) return null;
-  const match = text.match(/\/activation\/runs\/([^/]+)/);
-  return match ? match[1] : null;
+  return runIdAfter(text, '/activation/runs/') ?? null;
 }
 
 /**

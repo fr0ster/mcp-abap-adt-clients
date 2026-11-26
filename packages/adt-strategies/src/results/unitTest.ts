@@ -1,6 +1,7 @@
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { AdtHeaderMap, AdtHeaderValue } from '../headers';
+import { runIdAfter } from '../scan';
 
 /** A header's value, whether the transport gave a string or a list of them. */
 function headerText(value: AdtHeaderValue): string {
@@ -32,16 +33,16 @@ export const unitTestRunId: IResultStrategy<string> = (
     headerText(headers.location) ||
     headerText(headers['content-location']) ||
     headerText(headers['sap-adt-location']);
-  const inHeader = /\/runs\/([^/]+)/.exec(fromHeader);
-  if (inHeader) return inHeader[1];
+  const inHeader = runIdAfter(fromHeader, '/runs/');
+  if (inHeader !== undefined) return inHeader;
 
   const data = answer.data;
   if (typeof data === 'string') {
     const uri =
       /<aunit:run[^>]*uri="([^"]+)"/.exec(data)?.[1] ??
       /uri="([^"]+)"/.exec(data)?.[1];
-    const inBody = /\/runs\/([^/]+)/.exec(uri ?? '');
-    if (inBody) return inBody[1];
+    const inBody = runIdAfter(uri ?? '', '/runs/');
+    if (inBody !== undefined) return inBody;
   }
   return '';
 };

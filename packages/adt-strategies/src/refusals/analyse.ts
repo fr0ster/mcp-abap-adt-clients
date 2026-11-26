@@ -6,6 +6,7 @@ import {
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { type AdtHeaderMap, firstOf } from '../headers';
 import { field } from '../parsed';
+import { runIdAfter } from '../scan';
 import {
   type AdtActivationFacts,
   type AdtActivationRefusal,
@@ -449,7 +450,9 @@ export const analyseUnitTestStart: IAnalyse<IAdtMessageFailure> = (
     headers['sap-adt-location'],
   ]
     .map((v) => (Array.isArray(v) ? firstOf(v) : v))
-    .find((v) => typeof v === 'string' && /\/runs\/[^/]+/.test(v));
+    .find(
+      (v) => typeof v === 'string' && runIdAfter(v, '/runs/') !== undefined,
+    );
   const body = typeof answer?.data === 'string' ? answer.data : '';
   const inBody = /<aunit:run[^>]*uri="[^"]*\/runs\/[^/"]+/.test(body);
   if (header || inBody) return ADT_NO_FAILURE;

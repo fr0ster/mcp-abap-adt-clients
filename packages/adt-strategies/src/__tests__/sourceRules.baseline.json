@@ -3,13 +3,6 @@
     "file": "packages/adt-strategies/src/refusals/analyse.ts",
     "rule": "regex",
     "kind": "literal",
-    "text": "/\\/runs\\/[^/]+/",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/refusals/analyse.ts",
-    "rule": "regex",
-    "kind": "literal",
     "text": "/<aunit:run[^>]*uri=\"[^\"]*\\/runs\\/[^/\"]+/",
     "count": 1
   },
@@ -108,13 +101,6 @@
     "file": "packages/adt-strategies/src/results/unitTest.ts",
     "rule": "regex",
     "kind": "literal",
-    "text": "/\\/runs\\/([^/]+)/",
-    "count": 2
-  },
-  {
-    "file": "packages/adt-strategies/src/results/unitTest.ts",
-    "rule": "regex",
-    "kind": "literal",
     "text": "/<aunit:run[^>]*uri=\"([^\"]+)\"/",
     "count": 1
   },
@@ -123,20 +109,6 @@
     "rule": "regex",
     "kind": "literal",
     "text": "/uri=\"([^\"]+)\"/",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/utils.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/\\/activation\\/runs\\/([^/]+)/",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/utils.ts",
-    "rule": "regex",
-    "kind": "String.match",
-    "text": "text.match",
     "count": 1
   }
 ]
