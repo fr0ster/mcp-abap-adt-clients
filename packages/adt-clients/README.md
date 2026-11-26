@@ -232,6 +232,7 @@ npm install @mcp-abap-adt/adt-clients
    - Stable runtime operations for traces, dumps, logs, feeds, ATC check runs, and more
    - Factory accessors: `getProfiler()`, `getCrossTrace()`, `getSt05Trace()`, `getApplicationLog()`, `getAtc()`, `getAtcLog()`, `getDdicActivation()`, `getDumps()`, `getFeeds()`, `getSystemMessages()`, `getGatewayErrorLog()`
    - Each takes an optional result set (`getProfiler({ ...profilerDocuments, list: profilerTraceEntries })`) and builds a fresh implementation per call — nothing is cached, so one caller's readings never become another's
+   - The trace readings of `@mcp-abap-adt/adt-strategies` (0.29.0) throw `traces: <field> is missing` for an answer that lacks a field their result type requires, and the throw surfaces as itself — see [Profiler Traces](docs/usage/CLIENT_API_REFERENCE.md#profiler-traces)
    - `getAtc()` runs ATC checks; `getAtcLog()` reads the execution and check-failure logs. Same subject, different resources — see [ATC check runs](docs/usage/CLIENT_API_REFERENCE.md#atc-check-runs)
 
 3. **AdtExecutor**

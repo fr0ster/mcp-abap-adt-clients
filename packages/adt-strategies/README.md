@@ -298,7 +298,22 @@ report something that does not exist: `transportTree` (no `tm:root`, or a root
 that carries nothing), `transportCreated` (no `tm:root`, or no number),
 `transportItem` (not the request or task asked for) and, since 0.28.0,
 `utilInactiveObjects` (neither inactive-list form — an activation is confirmed
-off it). `adt-clients` lets a reading's exception surface as itself.
+off it) and, since 0.29.0, the trace readings (below). `adt-clients` lets a
+reading's exception surface as itself.
+
+**A trace reading throws on a missing required field** (since 0.29.0).
+`profilerTraceEntries`, `profilerHitList`, `profilerStatements`,
+`profilerDbAccesses`, `traceSchedulingTypes` and `traceSchedulingRequests` read
+each field their result type requires — a trace entry's id, time, user,
+object, state, expiry, system, client, host, sizes, runtimes and
+`isAggregated`; a row's `index` (and a statement's `id`); a timing's `time`
+and `percentage`; a program reference's `name` and `uri`; a catalogue item's
+`name` and `description`; a stored request's `id` — and throw
+`traces: <field> is missing` (`traces: state.value is missing`,
+`traces: hitlist.index is missing`, …) when the answer lacks one. Before,
+such a field read as `undefined` under a type that said `string` or `number`.
+Every recorded trace document carries every one of these fields; an optional
+field absent from the answer is still absent from the reading.
 
 **Values are text as written** (0.28.0, every util and transport reading): no
 tag or attribute is coerced to a number (`007` stays `007`, a position
@@ -312,6 +327,18 @@ reference, packages included, with `kind`; `utilNodeContents` each object's
 technical name or URI in `incompleteObjects`, the field it lacks absent, and
 each node SAP could not load as `notLoaded` (none of SAP's text); `utilNamedItems` an absent
 description absent.
+
+## Migrating to 0.29.0
+
+- **A trace reading can throw.** A trace reading (above) given an answer that
+  lacks a field its result type requires throws `traces: <field> is missing`
+  instead of answering the field as `undefined`. A caller who read such a
+  field and tested it for `undefined` catches the throw instead; through
+  `adt-clients` it surfaces from the member call as itself. A caller that
+  wants the old reading of a partial document supplies its own result
+  strategy for that slot.
+- Nothing else of the public surface changed: the declarations
+  (`dist/index.d.ts`) are those of 0.28.3.
 
 ## How the defaults are justified
 

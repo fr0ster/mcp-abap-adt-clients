@@ -2502,6 +2502,13 @@ if (hitList.ok && dbAccesses.ok) {
 await profiler.delete(newest.id);
 ```
 
+**A reading throws on a missing required field** (adt-strategies 0.29.0): a
+trace entry or a view row that lacks a field its result type requires — an
+entry's `id`, a row's `index`, a timing's `time` — throws
+`traces: <field> is missing`, and the throw surfaces from `list` or `read` as
+itself, not as a failure. Every recorded trace document carries every such
+field ([ERRATA.md](ERRATA.md#a-trace-document-that-lacks-a-field-its-reading-requires)).
+
 Configuring and scheduling live on the executors:
 
 ```typescript

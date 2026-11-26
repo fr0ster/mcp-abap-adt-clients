@@ -198,6 +198,25 @@ the package walks).
 other node SAP lists — one without its name, technical name or URI in
 `incompleteObjects`, the field it lacks absent.
 
+## A trace document that lacks a field its reading requires
+
+**Symptom.** None measured: every recorded trace document — the trace feed,
+the hit list, the statements, the database accesses, the two catalogues and
+the stored requests — carries every field its reading's result type
+requires.
+
+**What the readings did.** Before `@mcp-abap-adt/adt-strategies` 0.29.0, a
+field the answer did not carry read as `undefined` under a type that said
+`string` or `number` (a trace entry's `id`, a row's `index`, a timing's
+`time`, …), so a caller trusting the type met `undefined` where none was
+declared.
+
+**What they do now.** `profilerTraceEntries`, `profilerHitList`,
+`profilerStatements`, `profilerDbAccesses`, `traceSchedulingTypes` and
+`traceSchedulingRequests` throw `traces: <field> is missing` naming the field
+(`traces: state.value is missing`, `traces: hitlist.index is missing`). The
+throw surfaces from the member call as itself, as every reading's does.
+
 ## abapGit: what an answer says
 
 Read from SAP's handler code (onprem `ZCL_ABAPGIT_RES_*`, cloud
