@@ -40,6 +40,7 @@ import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 import type { AdtHeaderMap } from '../headers';
 import { field, isElement } from '../parsed';
+import { leapSecondParts, subMilliDigits, traceIdIn } from '../scan';
 import { answeredObject } from './answeredObject';
 
 /**
@@ -395,14 +396,6 @@ function timing(node: unknown): ITraceTiming | undefined {
   };
 }
 
-const ID_IN_URI = /abaptraces\/([A-Za-z0-9]{16,})(?:\/|$)/;
-
-/** The fractional digits beyond the millisecond, or '' when there are none. */
-const SUB_MILLI = /\.(\d+)/;
-
-/** Seconds field of `60` — the leap second, which POSIX time cannot hold. */
-const LEAP_SECOND = /^(.*T\d{2}:\d{2}:)60(\D.*)?$/;
-
 /**
  * Milliseconds, with the one legal form `Date.parse` refuses.
  *
@@ -420,9 +413,10 @@ function millisOf(raw: string): number {
   if (!Number.isNaN(direct)) {
     return direct;
   }
-  const leap = LEAP_SECOND.exec(raw);
+  // Seconds field of `60` — the leap second, which POSIX time cannot hold.
+  const leap = leapSecondParts(raw);
   if (leap) {
-    const asFiftyNine = Date.parse(`${leap[1]}59${leap[2] ?? ''}`);
+    const asFiftyNine = Date.parse(`${leap.head}59${leap.tail ?? ''}`);
     if (!Number.isNaN(asFiftyNine)) {
       return asFiftyNine + 1000;
     }
@@ -468,8 +462,9 @@ export function compareRecordedAt(
   }
 
   // Same millisecond: only digits `Date.parse` discarded can separate them.
-  const leftSub = SUB_MILLI.exec(a.recordedAt)?.[1].slice(3) ?? '';
-  const rightSub = SUB_MILLI.exec(b.recordedAt)?.[1].slice(3) ?? '';
+  // The fractional digits beyond the millisecond, or '' when there are none.
+  const leftSub = subMilliDigits(a.recordedAt)?.slice(3) ?? '';
+  const rightSub = subMilliDigits(b.recordedAt)?.slice(3) ?? '';
   const width = Math.max(leftSub.length, rightSub.length);
   return leftSub.padEnd(width, '0').localeCompare(rightSub.padEnd(width, '0'));
 }
@@ -488,7 +483,7 @@ function readTraceEntries(response: IAdtWireResponse): IAbapTraceEntry[] {
       const selfHref =
         asList(entry.link)
           .map((link) => attr(link, 'href') ?? '')
-          .find((href) => ID_IN_URI.test(href)) ?? '';
+          .find((href) => traceIdIn(href) !== undefined) ?? '';
 
       // Under `trc:extendedData`, and only there. The reader used to look on
       // the entry as well, because which of the two nestings was real had never
@@ -499,10 +494,7 @@ function readTraceEntries(response: IAdtWireResponse): IAbapTraceEntry[] {
       const stateNode = presentNode(ext.state);
 
       return {
-        id: required(
-          ID_IN_URI.exec(idText)?.[1] ?? ID_IN_URI.exec(selfHref)?.[1],
-          'id',
-        ),
+        id: required(traceIdIn(idText) ?? traceIdIn(selfHref), 'id'),
         recordedAt: required(
           text(entry.published) ?? text(entry.updated),
           'recordedAt',

@@ -35,27 +35,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-strategies/src/results/traces.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/\\.(\\d+)/",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/traces.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/^(.*T\\d{2}:\\d{2}:)60(\\D.*)?$/",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/traces.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/abaptraces\\/([A-Za-z0-9]{16,})(?:\\/|$)/",
-    "count": 1
-  },
-  {
     "file": "packages/adt-strategies/src/results/transport/parseTransportTree.ts",
     "rule": "predicate",
     "kind": "is",

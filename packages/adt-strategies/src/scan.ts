@@ -186,3 +186,96 @@ export function withoutTrailingSlashes(text: string): string {
   while (end > 0 && text.charAt(end - 1) === '/') end--;
   return text.slice(0, end);
 }
+
+function isAsciiDigit(c: string): boolean {
+  return c.length === 1 && allDigits(c);
+}
+
+function isAsciiAlphanumeric(c: string): boolean {
+  const code = c.charCodeAt(0);
+  return (
+    (code >= 0x30 && code <= 0x39) ||
+    (code >= 0x41 && code <= 0x5a) ||
+    (code >= 0x61 && code <= 0x7a)
+  );
+}
+
+const ABAPTRACES = 'abaptraces/';
+
+/**
+ * `/abaptraces\/([A-Za-z0-9]{16,})(?:\/|$)/`: after the leftmost
+ * `abaptraces/` that works, the whole run of ASCII letters and digits — at
+ * least 16, and followed by `/` or the end. A shorter part of the run is
+ * followed by another letter or digit, so backtracking finds nothing more.
+ */
+export function traceIdIn(uri: string): string | undefined {
+  let at = uri.indexOf(ABAPTRACES);
+  while (at !== -1) {
+    const from = at + ABAPTRACES.length;
+    let end = from;
+    while (end < uri.length && isAsciiAlphanumeric(uri.charAt(end))) end++;
+    if (end - from >= 16 && (end === uri.length || uri.charAt(end) === '/'))
+      return uri.slice(from, end);
+    at = uri.indexOf(ABAPTRACES, at + 1);
+  }
+  return undefined;
+}
+
+/** `/\.(\d+)/`: the digits after the first `.` that one or more follow. */
+export function subMilliDigits(text: string): string | undefined {
+  let at = text.indexOf('.');
+  while (at !== -1) {
+    let end = at + 1;
+    while (end < text.length && isAsciiDigit(text.charAt(end))) end++;
+    if (end > at + 1) return text.slice(at + 1, end);
+    at = text.indexOf('.', at + 1);
+  }
+  return undefined;
+}
+
+/** The line terminators a regex `.` does not match. */
+function hasLineTerminator(text: string): boolean {
+  return (
+    text.includes('\n') ||
+    text.includes('\r') ||
+    text.includes(' ') ||
+    text.includes(' ')
+  );
+}
+
+/** Whether `Tdd:dd:60` stands at `at`. */
+function leapSecondAt(text: string, at: number): boolean {
+  const digitsAt = [1, 2, 4, 5];
+  return (
+    text.charAt(at) === 'T' &&
+    digitsAt.every((i) => isAsciiDigit(text.charAt(at + i))) &&
+    text.charAt(at + 3) === ':' &&
+    text.charAt(at + 6) === ':' &&
+    text.startsWith('60', at + 7)
+  );
+}
+
+/**
+ * `/^(.*T\d{2}:\d{2}:)60(\D.*)?$/`: the last `T` (the greedy `.*`) such that
+ * no line terminator precedes it, `dd:dd:60` follows, and then either the end
+ * or a non-digit and a rest with no line terminator. `head` is up to the
+ * seconds' `:`, `tail` what follows the `60` (absent when nothing does).
+ */
+export function leapSecondParts(
+  text: string,
+): { head: string; tail: string | undefined } | undefined {
+  for (
+    let at = text.lastIndexOf('T');
+    at !== -1;
+    at = text.lastIndexOf('T', at - 1)
+  ) {
+    if (leapSecondAt(text, at) && !hasLineTerminator(text.slice(0, at))) {
+      const rest = text.slice(at + 9);
+      if (rest === '') return { head: text.slice(0, at + 7), tail: undefined };
+      if (!isAsciiDigit(rest.charAt(0)) && !hasLineTerminator(rest.slice(1)))
+        return { head: text.slice(0, at + 7), tail: rest };
+    }
+    if (at === 0) break;
+  }
+  return undefined;
+}
