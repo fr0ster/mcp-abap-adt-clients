@@ -27,7 +27,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import type { AdtHeaderMap } from '../headers';
-import { readInactiveList } from '../inactiveList';
+import { readInactiveListText } from '../inactiveList';
 import {
   at,
   field,
@@ -476,7 +476,7 @@ export const INACTIVE_OBJECTS_REFUSAL =
 export const utilInactiveObjects: IResultStrategy<IInactiveObjectsResponse> = (
   answer,
 ) => {
-  const listed = readInactiveList(rawOf(answer));
+  const listed = readInactiveListText(rawOf(answer));
   if (listed === null) throw new Error(INACTIVE_OBJECTS_REFUSAL);
   return {
     objects: listed.map(({ name, type, uri, parentUri }) => ({

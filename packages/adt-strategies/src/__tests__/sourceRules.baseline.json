@@ -1,12 +1,5 @@
 [
   {
-    "file": "packages/adt-strategies/src/inactiveList.ts",
-    "rule": "hand-narrowed",
-    "kind": "widened",
-    "text": "document: unknown",
-    "count": 1
-  },
-  {
     "file": "packages/adt-strategies/src/parsed.ts",
     "rule": "any",
     "kind": "flow",
@@ -448,13 +441,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-strategies/src/results/transport/document.ts",
-    "rule": "hand-narrowed",
-    "kind": "widened",
-    "text": "element: unknown",
-    "count": 1
-  },
-  {
     "file": "packages/adt-strategies/src/results/transport/parseSearchConfigurations.ts",
     "rule": "cast",
     "kind": "redundant",
@@ -473,20 +459,6 @@
     "rule": "predicate",
     "kind": "is",
     "text": "item is ParsedElement",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/unitTest.ts",
-    "rule": "any",
-    "kind": "flow",
-    "text": "value[0]",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/unitTest.ts",
-    "rule": "hand-narrowed",
-    "kind": "widened",
-    "text": "value: unknown",
     "count": 1
   },
   {

@@ -205,7 +205,19 @@ function flatList(root: IChild): IListedInactiveObject[] | null {
 export function readInactiveList(
   document: unknown,
 ): IListedInactiveObject[] | null {
-  if (typeof document !== 'string' || document.trim() === '') return null;
+  if (typeof document !== 'string') return null;
+  return readInactiveListText(document);
+}
+
+/**
+ * {@link readInactiveList} for a document already known to be text — what a
+ * caller holding the answer's raw text passes, so the text is not handed back
+ * through `unknown`.
+ */
+export function readInactiveListText(
+  document: string,
+): IListedInactiveObject[] | null {
+  if (document.trim() === '') return null;
   if (XMLValidator.validate(document) !== true) return null;
   const parsed = parsedText(parser, document);
   if (!isElement(parsed) || Array.isArray(parsed)) return null;

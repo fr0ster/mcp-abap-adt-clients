@@ -1,10 +1,13 @@
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
-import type { AdtHeaderMap } from '../headers';
+import type { AdtHeaderMap, AdtHeaderValue } from '../headers';
 
 /** A header's value, whether the transport gave a string or a list of them. */
-function headerText(value: unknown): string {
-  if (Array.isArray(value)) return value.length ? String(value[0]) : '';
+function headerText(value: AdtHeaderValue): string {
+  if (Array.isArray(value)) {
+    const first: unknown = value[0];
+    return value.length ? String(first) : '';
+  }
   return typeof value === 'string' ? value : '';
 }
 
