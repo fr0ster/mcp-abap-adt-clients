@@ -130,3 +130,52 @@ export function isT100ValueKey(key: string): boolean {
     allDigits(key.slice(T100_VALUE.length))
   );
 }
+
+/**
+ * One code unit folded as a non-Unicode `/i` regex folds it (ECMAScript
+ * `Canonicalize`): its upper case when that is one code unit, except that a
+ * non-ASCII character never folds to an ASCII one.
+ */
+function folded(c: string): string {
+  const upper = c.toUpperCase();
+  if (upper.length !== 1) return c;
+  if (c.charCodeAt(0) >= 128 && upper.charCodeAt(0) < 128) return c;
+  return upper;
+}
+
+/** Whether `literal` stands at `at`, compared as `/i` compares. */
+function foldedAt(text: string, at: number, literal: string): boolean {
+  if (at + literal.length > text.length) return false;
+  for (let i = 0; i < literal.length; i++)
+    if (folded(text.charAt(at + i)) !== folded(literal.charAt(i))) return false;
+  return true;
+}
+
+const MESSAGE_CLASS = '/messageclass/';
+const MESSAGES = '/messages/';
+
+/**
+ * `/\/messageclass\/([^/]+)\/messages\/([^/?]+)/i`: from the leftmost
+ * `/messageclass/` (folded) that one id segment, `/messages/` (folded) and a
+ * non-empty number free of `/` and `?` follow — the two still encoded.
+ */
+export function messageClassKey(
+  href: string,
+): { id: string; no: string } | undefined {
+  for (let at = 0; at + MESSAGE_CLASS.length <= href.length; at++) {
+    if (!foldedAt(href, at, MESSAGE_CLASS)) continue;
+    const idFrom = at + MESSAGE_CLASS.length;
+    const idEnd = runEnd(href, idFrom, '/');
+    if (idEnd === idFrom || !foldedAt(href, idEnd, MESSAGES)) continue;
+    const noFrom = idEnd + MESSAGES.length;
+    const noEnd = runEnd(href, noFrom, '/?');
+    if (noEnd > noFrom)
+      return { id: href.slice(idFrom, idEnd), no: href.slice(noFrom, noEnd) };
+  }
+  return undefined;
+}
+
+/** `text.replace(/&amp;/g, '&')`. */
+export function unescapedAmpersands(text: string): string {
+  return text.replaceAll('&amp;', '&');
+}

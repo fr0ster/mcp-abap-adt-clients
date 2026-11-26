@@ -14,20 +14,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-strategies/src/refusals/read.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/\\/messageclass\\/([^/]+)\\/messages\\/([^/?]+)/i",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/refusals/read.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/&amp;/g",
-    "count": 1
-  },
-  {
     "file": "packages/adt-strategies/src/results/answeredObject.ts",
     "rule": "predicate",
     "kind": "is",

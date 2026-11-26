@@ -14,7 +14,7 @@ import {
   type ParsedElement,
   parsedOrNothing,
 } from '../parsed';
-import { isT100ValueKey } from '../scan';
+import { isT100ValueKey, messageClassKey, unescapedAmpersands } from '../scan';
 import { type AdtSourcePosition, readSourceReference } from '../sourcePosition';
 
 /**
@@ -828,16 +828,16 @@ function t100FromLongtext(link: unknown): AdtMessage['t100'] {
   for (const candidate of asArray(link)) {
     const href = field(candidate, '@href');
     if (typeof href !== 'string') continue;
-    const key = /\/messageclass\/([^/]+)\/messages\/([^/?]+)/i.exec(href);
+    const key = messageClassKey(href);
     if (!key) continue;
     const query = href.includes('?') ? href.slice(href.indexOf('?') + 1) : '';
-    const params = new URLSearchParams(query.replace(/&amp;/g, '&'));
+    const params = new URLSearchParams(unescapedAmpersands(query));
     const values = [1, 2, 3, 4]
       .map((n) => params.get(`msgv${n}`))
       .filter((v): v is string => v !== null);
     return {
-      id: decodeURIComponent(key[1]),
-      no: decodeURIComponent(key[2]),
+      id: decodeURIComponent(key.id),
+      no: decodeURIComponent(key.no),
       values: values.length ? values : undefined,
     };
   }
