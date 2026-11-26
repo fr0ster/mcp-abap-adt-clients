@@ -28,13 +28,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-strategies/src/refusals/read.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/^T100KEY-V\\d+$/",
-    "count": 1
-  },
-  {
     "file": "packages/adt-strategies/src/results/answeredObject.ts",
     "rule": "predicate",
     "kind": "is",

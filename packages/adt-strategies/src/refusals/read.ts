@@ -14,6 +14,7 @@ import {
   type ParsedElement,
   parsedOrNothing,
 } from '../parsed';
+import { isT100ValueKey } from '../scan';
 import { type AdtSourcePosition, readSourceReference } from '../sourcePosition';
 
 /**
@@ -322,7 +323,7 @@ export function readExceptionRefusal(document: unknown): AdtRefusal | null {
   const id = properties.get('T100KEY-ID');
   const no = properties.get('T100KEY-NO');
   const values = [...properties.entries()]
-    .filter(([key]) => /^T100KEY-V\d+$/.test(key))
+    .filter(([key]) => isT100ValueKey(key))
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([, value]) => value);
   const text =

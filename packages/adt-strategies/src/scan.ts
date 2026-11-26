@@ -110,3 +110,23 @@ export function aunitRunUriHasRunId(text: string): boolean {
     }
   return false;
 }
+
+/** Whether every character is one of the ASCII digits `\d` names. */
+function allDigits(text: string): boolean {
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if (c < 0x30 || c > 0x39) return false;
+  }
+  return true;
+}
+
+const T100_VALUE = 'T100KEY-V';
+
+/** `/^T100KEY-V\d+$/.test`: `T100KEY-V` and then one or more ASCII digits. */
+export function isT100ValueKey(key: string): boolean {
+  return (
+    key.startsWith(T100_VALUE) &&
+    key.length > T100_VALUE.length &&
+    allDigits(key.slice(T100_VALUE.length))
+  );
+}
