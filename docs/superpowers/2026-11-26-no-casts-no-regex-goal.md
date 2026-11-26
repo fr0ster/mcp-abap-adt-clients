@@ -17,15 +17,21 @@ true instead. In `@mcp-abap-adt/interfaces-adt`, `AdtObjectIdentity` requires th
 own name, and also the source and the lock handle where a member needs them. The classes
 declare the two overloads their interfaces declare, so a caller who names the error type
 `E` also passes `analyse`. A reading of SAP's answer that lacks a field its result type
-requires throws, as the table-settings readings already do. Nothing else changes for
-consumers.
+requires throws, as the table-settings readings already do. Where the library answers with
+its own error (no answer came back, a chain step, a legacy refusal), the type says so:
+`E | IAdtError`. The last generic stand-ins go: the batch connection's `<T, D>` and the
+WebSocket client's caller-chosen response type. The abapGit forms deprecated since 46.2.0
+also go, and the legacy package's absent handlers become refusing subclasses. Nothing else
+changes for consumers.
 
 ## Invariants
 
 - **Static typing first.** No `as` cast in production `src` (`as const` excepted), no
   `any`, and no `unknown` narrowed by hand where a contract types the value. A runtime check
   remains only where the compiler cannot see the value: data from outside the type system,
-  such as network answers, parsed XML or JSON, and files.
+  such as network answers, parsed XML or JSON, and files. A user-defined type predicate is
+  allowed only in a reader of such data. Anywhere else it counts as a cast. There is no
+  exception list.
 - **No regular expressions in production code.** No regex literal, no `RegExp`, and no API
   called with one, in production `src`. Linear string code, a scanner, or the platform or
   XML parser does the work instead.
@@ -33,16 +39,29 @@ consumers.
   cast, `any`, hand-narrowed contract value or regular expression in production `src`. It
   is shown to be load-bearing: reintroducing each forbidden form turns it red. The guard and
   the inventory share one definition of the forbidden forms.
-- **Every public API and every answer stays the same, except for D1–D3.** Exports, the
-  requests sent, and the results, errors and refusals returned stay as they are. The
-  consumer sees only these three changes (the spec's D1–D3), plus any further change the
-  owner approves by name:
+- **Every public API and every answer stays the same, except for D1–D3 and C1–C5.**
+  Exports, the requests sent, and the results, errors and refusals returned stay as they
+  are. The consumer sees only these changes:
   - A caller that omits an object's name, or a source or lock handle a member needs, now
     gets a compile error.
   - A caller that names `E` on a class member without passing `analyse` now gets a compile
     error.
   - A reading of an SAP answer that lacks a field its result type requires now throws.
     Before, it returned `undefined` under a type that said otherwise.
+  - **C1**: `AdtBatchConnection.makeAdtRequest` has no `<T, D>`. It answers
+    `IAdtWireResponse`, as `IAbapConnection` declares.
+  - **C2**: `AdtClientsWS.request` answers a typed `TResponse` only through a reader
+    `(payload: unknown) => TResponse` that the caller passes. Without a reader it answers
+    `unknown`.
+  - **C3**: a member's generic answer is typed `E | IAdtError` (in interfaces-adt) on the
+    paths where the library answers with its own error. `analyse` is not called on those
+    paths.
+  - **C4**: the abapGit `link` and `checkExternalRepo` forms deprecated since 46.2.0 are
+    removed.
+  - **C5**: a legacy handler for a type that 7.40 does not serve is a subclass of the modern
+    handler that overrides every member with the refusal. It is now `instanceof` that class.
+  - A migration note in each breaking package says what a caller on the old contract must
+    do for each of these changes.
 - **Behaviour is proved unchanged, in the way the change allows.**
   - A **type-only** change (a cast deleted, an annotation, an overload) leaves the emitted
     JavaScript byte-identical, and the build output before and after shows it.
@@ -54,8 +73,13 @@ consumers.
   its own repository, released in its own versioning and published first. The packages
   here then depend on that published version from the npm registry only, never through a
   local link.
-- **Patch or minor releases here.** adt-strategies, adt-clients and adt-clients-legacy ship
-  as patch or minor versions, in the repository's publish order, with no major.
+- **Releases.** These go out in the repository's publish order, after interfaces-adt:
+  - **adt-clients and adt-clients-legacy** ship as breaking releases (majors).
+  - **adt-strategies** breaks too, so it is not a patch. Its trace readings are public
+    exports, and D2 makes them throw where they returned an object. Its interfaces-adt range
+    also crosses that package's breaking release. It ships as a breaking 0.x release.
+  - **interfaces-adt** follows its own versioning.
+  - **mcp-abap-adt** takes the new majors deliberately, in its own work.
 
 ## Out of scope
 
