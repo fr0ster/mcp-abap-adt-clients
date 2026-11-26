@@ -32,15 +32,15 @@ export function withCallTimeout(
 
   return new Proxy(connection, {
     get(target, property, receiver) {
-      const value = Reflect.get(target, property, receiver);
+      const value: unknown = Reflect.get(target, property, receiver);
       if (typeof value !== 'function') return value;
-      if (property !== 'makeAdtRequest') return value.bind(target);
+      if (property !== 'makeAdtRequest') {
+        const bound: unknown = value.bind(target);
+        return bound;
+      }
 
       return (request: Parameters<IAbapConnection['makeAdtRequest']>[0]) =>
-        (value as IAbapConnection['makeAdtRequest']).call(target, {
-          ...request,
-          timeout,
-        });
+        target.makeAdtRequest({ ...request, timeout });
     },
   });
 }
