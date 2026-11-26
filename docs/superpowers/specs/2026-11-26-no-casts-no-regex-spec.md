@@ -1,35 +1,98 @@
 # Spec: no casts and no regular expressions in production code
 
-The goal is `docs/superpowers/2026-11-26-no-casts-no-regex-goal.md`. This spec lists every
-site that breaks the goal's two rules. It says what replaces each group of sites, how the
-guard test finds the forbidden forms, how unchanged behaviour is proved, and the release
-order. Section 4 records the owner's decisions on the sites where a contract had to be
-made true.
+The goal is `docs/superpowers/2026-11-26-no-casts-no-regex-goal.md`. This spec covers six
+things:
 
-## 1. How the inventory was taken
+- every site that breaks the goal's two rules;
+- what replaces each group of sites;
+- the owner's decisions D1–D3;
+- the consumer changes that are still for the owner to decide (section 5);
+- the guard test;
+- how equivalence is proved, and the release order.
 
-The inventory covers the production `src` of `packages/adt-strategies`,
+A replacement keeps behaviour and API exactly. Where it cannot, the spec says so and lists
+it in section 5. It does not decide those cases itself.
+
+## 1. The forbidden forms: one definition
+
+The inventory (section 2) and the guard (section 6) use the same definition. The plan's
+first step implements it once, in `tools/sourceRules.js`, and takes the inventory again with
+that module. Any difference from section 2 is reported before anything else changes.
+
+**Scope.** The definition reads the production `src` of `packages/adt-strategies`,
 `packages/adt-clients` and `packages/adt-clients-legacy`: every `.ts` file outside
-`__tests__`, without `*.test.ts` or `*.d.ts`. Line numbers are those of the base this branch
-started from. Each package was read with the TypeScript compiler API, as a program built from
-its own `tsconfig.json`, so the type checker could classify what it found:
+`__tests__`, without `*.test.ts` or `*.d.ts`. Each package is read as a TypeScript program
+built from its own `tsconfig.json`, so that every rule below can ask the type checker.
 
-- **A cast** is an `AsExpression` whose type is not `const`, or a `<T>x` type assertion.
-  An import or export alias (`import { a as b }`) is not a cast and is not counted. Each cast
-  was classified by the checker. It is *redundant* when the expression's type is already
-  assignable to the target. It *asserts presence* when only `undefined` stands between them.
-  Otherwise it *re-types* the value.
-- **`any`** means two things. One is the `any` keyword written in the source. The other is
-  an `any` that enters the code from a dependency's declaration, such as `XMLParser.parse`,
-  `JSON.parse` or `Reflect.get`, and is used without being bound to `unknown` first.
-- **A hand-narrowed contract value** is a parameter declared `unknown` and then narrowed by
-  hand (`typeof`, `Array.isArray`, a field reader), where every call site passes a value the
-  type system already types. Parameters that receive thrown values, parsed documents or a
-  field that a contract itself types `unknown` are not counted.
-- **A regular expression** is a regex literal, or `RegExp` called or constructed. Regexes
-  inside comments (JSDoc examples) are not code and are not counted.
+**C — cast.** Every node of these kinds counts once, even when several share a line:
 
-The scan found no `@ts-ignore`, `@ts-expect-error` or non-null `!` in production `src`.
+- an `AsExpression` whose type node is not `const`;
+- a `TypeAssertionExpression` (`<T>x`).
+
+An import or export alias (`import { a as b }`) is a different node and does not count, and
+neither does `satisfies`. The checker sorts each cast into a kind (K1–K8, section 2) by
+comparing the expression's type with the target type.
+
+**Y — `any`.** Two forms count:
+
+- an `AnyKeyword` in any type position;
+- **any-flow**: an expression the checker types `any` (a dependency's `parse`, `JSON.parse`,
+  `Reflect.get`, `Function.prototype.bind`, …) that is not either
+  - the initializer of a declaration annotated `unknown`, or
+  - an argument to a parameter declared `unknown`.
+
+  Any other use counts: a property read on it, a return, an argument to a typed parameter,
+  an assignment.
+
+**N — hand-narrowed contract value.** This form is defined by provenance, not by counting
+call sites:
+
+- A binding declared `unknown` (a parameter or a variable) is **from outside** when each
+  value that reaches it is itself from outside. A value is from outside when it is one of:
+  - a catch variable;
+  - a promise's rejection reason;
+  - a dependency's `any` bound per Y;
+  - a member that a dependency's declaration types `unknown` (`IAdtWireResponse.data`,
+    `IHttpWireResponse.request` and `config`, …);
+  - a parameter of a boundary reader (below).
+- A value whose static type is not `unknown` or `any` and that reaches an `unknown` binding
+  is a **widening**. The checker follows these flows: argument to parameter, initializer,
+  assignment, return, and property of an object literal.
+- **N counts** a narrowing construct (`typeof`, `instanceof`, `in`, `Array.isArray`,
+  equality with a literal, a call to a reader of a boundary module) applied to a binding
+  reached by a widening. That covers mixed callers, exported functions and locally widened
+  bindings alike. A binding reached only from outside is not counted.
+- **Boundary readers** are the modules whose job is to read values from outside:
+  `adt-strategies/src/parsed.ts` and the property readers of section 3.5. Their own
+  `unknown` parameters are from outside by definition, so a typed value passed to them is
+  not a widening. The list is part of the rule, fixed in `tools/sourceRules.js`, and each
+  entry names the outside data it reads. It changes only with the owner's approval. It is
+  not an exception list: nothing in it is a cast, an `any` or a regex.
+
+**R — regular expression.** These forms count, found by symbol and type, not by spelling:
+
+- a `RegularExpressionLiteral`;
+- any expression whose type is `RegExp` or derives from it (a value from a dependency, an
+  alias, a computed access);
+- any reference that resolves to the `RegExp` constructor or to a member of the `RegExp`
+  interface;
+- any reference, called or not, that resolves to the lib declaration of
+  `String.prototype.match`, `matchAll` or `search`. Each of these turns a string argument
+  into a regex, whatever the receiver's type: `string`, a literal, a union, a method
+  reference, or `s['match']`;
+- any reference to `Symbol.match`, `Symbol.matchAll`, `Symbol.replace`, `Symbol.search` or
+  `Symbol.split`.
+
+`replace`, `replaceAll` and `split` called with a string count only when an argument is
+typed `RegExp`, which the second form above already catches.
+
+**P — explicit type predicate.** A user-defined `x is T` or `asserts x is T` is an assertion
+the compiler does not check, just as a cast is not checked. The owner's rule names `as`
+casts. Whether predicates also count is put to the owner (section 5, C6). Until then they
+are listed here and counted, but not refused.
+
+Not counted: comments (JSDoc examples), and inferred predicates (TypeScript 5.5 and later),
+which the compiler proves.
 
 ## 2. Inventory
 
@@ -43,21 +106,29 @@ The scan found no `@ts-ignore`, `@ts-expect-error` or non-null `!` in production
 | K6 cast on a hand-narrowed contract value | 0 | 3 | 0 | 3 |
 | K7 cast narrowing a typed union by hand | 0 | 4 | 0 | 4 |
 | K8 cast completing an object's type | 0 | 1 | 0 | 1 |
-| **Casts** | **52** | **301** | **52** | **405** |
-| `any` keyword | 0 | 0 | 0 | 0 |
-| A — `any` from a dependency, used untyped | 9 | 9 | 1 | 19 |
-| U — hand-narrowed `unknown` parameter | 5 | 1 | 0 | 6 |
+| **C — casts** | **52** | **301** | **52** | **405** |
+| Y — `any` keyword | 0 | 0 | 0 | 0 |
+| Y — any-flow | 9 | 9 | 1 | 19 |
+| N — hand-narrowed (known so far) | 5 | 1 | 0 | 6 |
 | R — regular expression | 14 | 18 | 0 | 32 |
+| P — explicit type predicate | 8 | 9 | 0 | 17 |
+
+In the per-site lists, a line holding several casts is marked `(×n)`. The lists account for
+all 405 casts. The scan found no `@ts-ignore`, `@ts-expect-error`, non-null `!` or definite
+assignment `!:` in production `src`. Line numbers are those of the base this branch started
+from. The regex count covers the 32 regex-producing nodes. The three `match`/`matchAll`
+calls that consume them (`whereUsed.ts:67`, `utils.ts:566`, `wire.ts:72`) sit on lines
+already listed.
 
 ### K1 — redundant casts
 
 The expression's type is already assignable to the target type. Some of these casts are
-no-ops (`string as string`, `IAnalyse<E> | undefined` cast to itself). Others widen a value:
-a contract's header map cast to `Record<string, unknown>`, a parser's `any` cast to `Node`.
+no-ops. Others widen a value: a contract's header map cast to `Record<string, unknown>`, or a
+parser's `any` cast to `Node`.
 
 - `adt-clients-legacy/src/core/functionModule/AdtFunctionModuleLegacy.ts`: 58, 116
 - `adt-clients/src/batch/AdtBatchConnection.ts`: 45
-- `adt-clients/src/clients/AdtAbapGitClient.ts`: 226, 292, 295, 302, 329, 344, 355, 374, 416, 424, 427
+- `adt-clients/src/clients/AdtAbapGitClient.ts`: 226, 292, 295, 302 (×2), 329, 344, 355, 374, 416, 424, 427 (×2)
 - `adt-clients/src/core/behaviorDefinition/update.ts`: 66
 - `adt-clients/src/core/class/AdtClass.ts`: 214
 - `adt-clients/src/core/enhancement/update.ts`: 56
@@ -88,14 +159,9 @@ a contract's header map cast to `Record<string, unknown>`, a parser's `any` cast
 
 ### K2 — a caller's optional field asserted present
 
-The members take `AdtObjectIdentity<TConfig, TParent>`, which is interfaces-adt's
-`Partial<TConfig>` with the parent required. They then cast the name, the source or the lock
-handle to `string`. With the field absent, the request goes to a URL holding `undefined`, or
-a string method throws inside the exchange. This group also holds `Partial<…Config>` cast to
-the full config (`AdtFeatureToggle.ts:283`, `AdtFunctionInclude.ts:314`), a string-union
-option cast to its union (`EnhancementType`, `BehaviorDefinitionImplementationType`,
-`ServiceBindingVariant`, `IFeatureToggleSource`), and a `Map.get` asserted present
-(`AdtEnhancement.ts:158`).
+The members take `AdtObjectIdentity<TConfig, TParent>`, which is interfaces-adt's `Partial`
+with the parents required. They then cast a field to `string` or to its union. The fields
+and their members are listed in section 4, D1.
 
 - `adt-clients-legacy/src/core/class/AdtClassLegacy.ts`: 57, 113
 - `adt-clients-legacy/src/core/class/AdtLocalDefinitionsLegacy.ts`: 40
@@ -134,9 +200,9 @@ option cast to its union (`EnhancementType`, `BehaviorDefinitionImplementationTy
 - `adt-clients/src/core/functionGroup/AdtFunctionGroup.ts`: 151, 168, 187, 231, 261, 285, 306, 339, 340, 341, 367, 377, 386, 408, 432, 458, 483, 500, 521
 - `adt-clients/src/core/functionGroup/update.ts`: 37
 - `adt-clients/src/core/functionInclude/AdtFunctionInclude.ts`: 163, 314, 366
-- `adt-clients/src/core/functionInclude/versions.ts`: 27
+- `adt-clients/src/core/functionInclude/versions.ts`: 27 (×2)
 - `adt-clients/src/core/functionModule/AdtFunctionModule.ts`: 166, 216, 319, 320, 356
-- `adt-clients/src/core/functionModule/versions.ts`: 27
+- `adt-clients/src/core/functionModule/versions.ts`: 27 (×2)
 - `adt-clients/src/core/include/AdtInclude.ts`: 72, 134, 152, 341, 375
 - `adt-clients/src/core/interface/AdtInterface.ts`: 146, 190, 220, 241, 267, 282, 283, 315, 316, 340, 364, 390, 415, 438, 457, 478
 - `adt-clients/src/core/interface/versions.ts`: 22
@@ -176,14 +242,13 @@ which are `string | undefined` or `number | undefined`, to the required fields o
 
 ### K4 — a generic the code cannot produce
 
-- The verdict `E`. When no `analyse` is given, the library's own `IAdtError` is cast to the
-  caller's `E`: in `answering`, in `systemInfo`, in `chain`, in the abapGit exchange, and in
-  every legacy refusal.
-- `AdtBatchConnection.makeAdtRequest<T, D>`: the class's own generic is wider than
-  `IAbapConnection.makeAdtRequest`, which is not generic.
-- `AdtAbapGitClient`'s result-slot lookup.
-- `AdtClientsWS.request`'s caller-chosen `TResponse` over a WebSocket payload.
-- `absentOnLegacy<T>`, which builds a `T` from a record of refusing handlers.
+- **The verdict `E`** (37 casts): the library's own `IAdtError` is cast to the caller's `E`.
+  This happens in `answering`, `systemInfo`, `chain`, the abapGit exchange and every legacy
+  refusal.
+- **`AdtBatchConnection.makeAdtRequest<T, D>`** (`AdtBatchConnection.ts:70`, cast at `:93`).
+- **`AdtAbapGitClient`'s result-slot lookup** (`:231`).
+- **`AdtClientsWS.request`'s caller-chosen `TResponse`** (`:126`).
+- **`absentOnLegacy<T>`** (`absentOnLegacy.ts:77`).
 
 - `adt-clients-legacy/src/clients/absentOnLegacy.ts`: 77
 - `adt-clients-legacy/src/core/ddl/AdtDdlLegacy.ts`: 86
@@ -206,8 +271,7 @@ which are `string | undefined` or `number | undefined`, to the required fields o
 
 These are thrown values cast to `HttpError`, `IWithResponse` or `{ response?: { status } }`;
 parsed XML or JSON cast to `Node` or `Record<string, unknown>`; and contract fields typed
-`unknown` (`IHttpWireResponse.request` and `config`, a batch part's `params`) cast to a
-shape.
+`unknown` cast to a shape.
 
 - `adt-clients/src/batch/AdtBatchConnection.ts`: 112
 - `adt-clients/src/batch/wire.ts`: 39
@@ -233,15 +297,12 @@ shape.
 ### K6 — a hand-narrowed contract value, with its casts
 
 `ProfilerDomain.viewResponse(traceId, view, options: unknown)` gets typed
-`ViewOptions<IProfilerViews<T>, K>` from its one caller and casts `options` once per view.
+`ViewOptions<IProfilerViews<T>, K>` from its one caller (`:214`) and casts `options` once
+per view.
 
 - `adt-clients/src/runtime/traces/ProfilerDomain.ts`: 171, 177, 183
 
 ### K7 — a typed union narrowed by hand
-
-- `AdtAbapGitClient.ts:285, 409`: `IAbapGitLinkArgs | IAbapGitLinkNewArgs` is cast to one
-  member after a test on `options.credentials`, not on the args themselves.
-- `AdtService.ts:932, 939`: a `string` is cast to `'odatav2' | 'odatav4'`.
 
 - `adt-clients/src/clients/AdtAbapGitClient.ts`: 285, 409
 - `adt-clients/src/core/service/AdtService.ts`: 932, 939
@@ -250,7 +311,7 @@ shape.
 
 - `adt-clients/src/clients/AdtClient.ts`: 320
 
-### A — `any` from a dependency, used untyped
+### Y — any-flow
 
 - adt-strategies: `parsed.ts:222`, `refusals/analyse.ts:450`, `refusals/read.ts:226, 262`,
   `results/abapGit.ts:258`, `results/atc.ts:45`, `results/featureToggle.ts:64`,
@@ -260,17 +321,16 @@ shape.
   `utils/callTimeout.ts:35, 37`, `utils/lockHandle.ts:36`, `utils/systemInfo.ts:61`
 - adt-clients-legacy: `clients/absentOnLegacy.ts:32`
 
-### U — hand-narrowed `unknown` parameters
+### N — hand-narrowed (known so far)
 
-- adt-strategies: `results/tableSettings.ts:86` (`text`) and `:96` (`attribute`). Every call
-  passes a `ParsedElement`.
-- adt-strategies: `results/abapGitFacts.ts:242` (`isTextPlain`), `results/unitTest.ts:5` and
-  `results/utils.ts:551` (`headerText`). They receive a contract header value
-  (`IHttpHeaderValue`), which reaches them as `unknown` only through a K1 cast.
-- adt-clients: `runtime/traces/ProfilerDomain.ts:164` (`viewResponse`'s `options`; see K6).
+- adt-strategies:
+  - `results/tableSettings.ts:86, 96`, where every call passes a `ParsedElement`;
+  - `results/abapGitFacts.ts:242`, `results/unitTest.ts:5` and `results/utils.ts:551`,
+    which receive a contract header value (`IHttpHeaderValue`) widened by a K1 cast.
+- adt-clients: `runtime/traces/ProfilerDomain.ts:164`.
 
-Once the K1 widening casts are removed, more parameters will fall under this rule. The
-guard's U rule (section 5) finds them, and the plan re-runs the inventory after K1.
+The provenance rule finds more once it runs on the whole program. The plan's first step
+lists them, and each one gets the K6/N treatment.
 
 ### R — regular expressions
 
@@ -286,348 +346,480 @@ guard's U rule (section 5) finds them, and the plan re-runs the inventory after 
 - `adt-strategies/src/results/unitTest.ts`: 31, 37, 38, 39
 - `adt-strategies/src/results/utils.ts`: 566
 
+### P — explicit type predicates
+
+- adt-strategies: `refusals/read.ts:774, 839`, `results/answeredObject.ts:27`,
+  `results/atc.ts:57`, `results/traces.ts:639`, `results/transport/parseTransportTree.ts:36`,
+  and two predicates over `unknown`.
+- adt-clients: `clients/AdtClient.ts:225`, `core/shared/codeSets.ts:93, 98`,
+  `core/transport/AdtRequest.ts:93`, `endpoints/codes.ts:121`,
+  `utils/criticalSection.ts:35`, and three predicates over `unknown`.
+
 ## 3. Replacements
 
-### K1
+### 3.1 K1
 
 The cast is deleted. Where the code needs the wider view, the binding is declared with the
-wider type: an annotation, not a cast. This applies to a header map read as
-`Record<string, IHttpHeaderValue>`, for example. A cast of a parser's `any` is handled under
-A.
+wider type: an annotation, not a cast. This change is type-only.
 
-### K2, K3, K4
+### 3.2 K2, K3, K4
 
-These follow the decisions in section 4: D1 for K2, D2 for K3, and D3 for K4 and the abapGit
-K7 casts.
+These follow D1, D2 and D3 (section 4) and the open cases of section 5.
 
-### K5 — a typed reader, and the runtime check it carries
+### 3.3 K6 and N
 
-These values come from outside the type system, so a runtime check stays here. It moves out
-of the cast and into a reader:
+The parameter takes the type its callers pass: `ParsedElement` for the `tableSettings`
+readers, and `IHttpHeaderValue | undefined` for the header readers.
 
-- **Thrown values and `unknown` contract fields** are read with one shared set of property
-  readers in adt-clients. They grow from `ownValue(holder, key)` (`utils/adtResponse.ts:110`)
-  into `ownValue`, `ownRecord`, `ownString` and `ownNumber`. Each takes `unknown` and returns
-  the typed value or `undefined`. A status is read as `ownNumber(ownValue(error,
-  'response'), 'status')`. `HttpError`, `IWithResponse` and the inline shapes are no longer
-  asserted. Each is a value the readers return, built from what was found.
-- **Parsed XML in adt-strategies** is read with `parsed.ts`'s readers (`isElement`, `field`,
-  `at`, `listOf`, `leafText`). A `Node` cast becomes an `isElement` test that yields
-  `ParsedElement`. The ad hoc `Node` aliases in `atc.ts` and `traces.ts` go.
-- **Parsed XML or JSON in adt-clients** (`adtErrors.ts`, `systemInfo.ts`, the batch part's
-  `params`) uses the same property readers.
-- **`analyse.ts:100, 102`** reads `answer?.request` and `answer?.config` as their contract
-  types them (`unknown`, `D = unknown`), then reads `method` and `url` with the readers.
-- **`traces.ts:676`** reads the contract's header map as typed. Its value type is
-  `IHttpHeaderValue`, not a cast record.
+`ProfilerDomain` uses TypeScript's correlated-union form, which compiles under `strict` in a
+reduced model of these types (measured with this repository's `tsc`):
 
-### K6 and U
+- a handler map typed per view, `{ [K in keyof IProfilerViews<T>]: (options:
+  ViewOptions<IProfilerViews<T>, K>) => Promise<IAdtWireResponse> }`;
+- the call is `const handler: (options: ViewOptions<…, K>) => … = this.handlers[view]`.
 
-The parameter takes the type its callers already pass: `ParsedElement` for the
-`tableSettings` readers, `IHttpHeaderValue | undefined` for the header readers.
-`viewResponse` is typed per view. Its options become `ViewOptions<IProfilerViews<T>, K>`,
-selected in each branch through a map from view to options type (`ProfilerViewOptions[K]`),
-so the switch narrows them with no cast.
+A switch over a separate `view: K` does not narrow `options` (also measured), so the switch
+goes. JavaScript callers that pass an unknown view keep today's error:
+`Object.hasOwn(handlers, view)` is tested first, and on `false` the same
+`Unknown trace view: …` is thrown. The runtime changes, so section 7 proves it.
 
-### K7
+### 3.4 K7 and K8
 
-- **abapGit args** (`AdtAbapGitClient.ts:285, 409`): `IAbapGitLinkArgs` and
-  `IAbapGitLinkNewArgs` (and the two external-repo shapes) differ only in
-  `remoteUser?: string` versus `remoteUser?: never`. Nothing in the args lets the compiler
-  narrow the union. Only the overloads tie a shape to `options.credentials`, and the
-  implementation signature cannot see that link. It is resolved under D3.
-- **`AdtService` service type**: the value is read from `params.serviceType`, which is
-  already `'odatav2' | 'odatav4'` (see the K1 entries at `AdtService.ts:481, 915`). Without
-  the earlier widening to `string`, no cast is left.
+- **`AdtService.ts:932, 939`**: the K1 widenings at `:481` and `:915` go, so `serviceType`
+  keeps its `'odatav2' | 'odatav4'` type and no cast is left. This change is type-only.
+- **`AdtAbapGitClient.ts:285, 409`**: see section 5, C4. No typed correlation of args and
+  options exists without a predicate or an API change. Measured: a rest-tuple
+  implementation does not narrow on `options.credentials`, because `credentials` is not a
+  literal discriminant.
+- **`AdtClient.ts:320`** (K8): `Object.assign(new Error(…), { code })`, whose type is the
+  intersection. The thrown object stays an `Error` with an own enumerable `code`, as the
+  cast-then-assign produced. Section 7 shows its shape.
 
-### K8
+### 3.5 K5 — readers that keep each site's access policy
 
-`AdtClient.ts:320`: the error is built as `Object.assign(new Error(…), { code })`, whose type
-is the intersection. The thrown object is the same as today: an `Error` with an own `code`.
+These values come from outside, so a runtime check stays. It moves into typed readers in
+adt-clients (`utils/ownValue.ts`) and adt-strategies (`parsed.ts`). Today's code uses two
+access policies, and both are kept, each where it is used now:
 
-### A
+- **`ownValue(holder, key)`** (`adtResponse.ts:110`, as it stands): own data properties
+  only, no inherited property and no accessor. It is used only where `ownValue` is used
+  today.
+- **`propertyOf(holder, key): unknown`**: the same as today's direct read `holder?.key`,
+  inherited properties and getters included. It returns `undefined` for `null`,
+  `undefined` and primitives, as a direct read does for the keys read here (`response`,
+  `status`, `data`, `request`, `config`, `params`). It reads with `Reflect.get` bound to
+  `unknown` for objects and functions. It is used at every K5 site that reads directly
+  today:
+  - `class/create.ts:110`, `enhancement/create.ts:100`, `enhancement/update.ts:91`,
+    `functionGroup/create.ts:96`, `interface/create.ts:90` and `tabletype/read.ts:43`;
+  - `messageClass/lock.ts:127, 128, 163, 164`;
+  - `discoveryEndpoints.ts:61`;
+  - `systemInfo.ts:40, 150`;
+  - `supportedMediaTypes.ts:45, 74`;
+  - `internalUtils.ts:78, 82`;
+  - `adtResponse.ts:322, 330, 493`;
+  - `requestTrace.ts:57`.
+- On top of either policy, `asNumber`, `asString` and `asRecord` return the value only when
+  `typeof` matches, or `undefined` otherwise. That is the check the consuming code already
+  applies after the cast (for example `typeof status === 'number'`). Where a site uses the
+  value without such a check today, it keeps using the `unknown` as it did.
+- **Parsed XML** (`atc.ts`, `traces.ts`, `parseSearchConfigurations.ts`, `adtErrors.ts`,
+  `systemInfo.ts:69`): `parsed.ts`'s `isElement`, `field` and `listOf`. These read own
+  properties of a parser's plain object, the same values as today.
+- **`analyse.ts:100, 102`**: `propertyOf(answer, 'request')` and
+  `propertyOf(answer, 'config')`, then `propertyOf(…, 'method' | 'url')`.
+- **`wire.ts:39`, `AdtBatchConnection.ts:112`**: the request's `params`, read as its
+  contract types it. A non-record keeps today's path.
 
-Every `any` from a dependency is bound to `unknown` at its first use:
-`const parsed: unknown = parser.parse(…)`, as `refusals/read.ts:226` already does. It is then
-read with the typed readers above. Three cases differ:
+### 3.6 Y — any-flow
 
-- `callTimeout.ts` (`Reflect.get` and `bind` inside a Proxy) is rewritten as an object that
-  forwards each `IAbapConnection` member by name. A Proxy of `any` is no longer needed.
-- `absentOnLegacy.ts:32` (`Object.getPrototypeOf`) binds to `object | null`.
-- `versions.ts:33` types the callback's parameter from the list, not as `unknown`.
+Every `any` from a dependency is bound to `unknown` at its first use, as
+`refusals/read.ts:226` already does, and is then read with the readers above. These changes
+are type-only, except as noted:
 
-### R — what replaces each regex
+- **`callTimeout.ts:35, 37, 40`**: the Proxy stays.
+  - `const value: unknown = Reflect.get(target, property, receiver)`.
+  - `typeof value !== 'function'` returns it.
+  - Otherwise `const bound: unknown = value.bind(target)` is returned.
+  - For `makeAdtRequest`, the trap returns `(request) => target.makeAdtRequest({ ...request,
+    timeout })`, which is the same call the cast value made on an ordinary connection.
 
-adt-strategies cannot import adt-clients, so it gets its own small plain-code helpers, and
-adt-clients gets its own.
+  Section 7 proves forwarding.
+- **`absentOnLegacy.ts:32`**: `Object.getPrototypeOf` is bound to `object | null`.
+- **`versions.ts:33`**: the callback's parameter is typed from the list.
 
-- **The run id after `/runs/`.** This covers `analyse.ts:456`, `unitTest.ts:31, 39` and
-  `utils.ts:566` (`/activation/runs/`). One helper, `segmentAfter(text, marker)`, finds the
-  marker with `indexOf` and takes the text up to the next `/` (or `"` where the regex
-  excluded it).
-- **The `aunit:run` uri inside a body** (`analyse.ts:458`, `unitTest.ts:37, 38`). The body
-  is read with the strategies' XML parser, and the uri is the root `aunit:run`'s `@uri`.
-  The regex took the first matching tag anywhere. Section 6 compares the two on every
-  recorded run, and any difference is reported before the site changes.
-- **`T100KEY-V<digits>`** (`read.ts:328`): `startsWith('T100KEY-V')` and an all-digits
-  test on the rest, which must not be empty.
-- **The message class longtext link** (`read.ts:833`): the path is cut at the first `?`,
-  split on `/`, and searched case-insensitively for `messageclass` followed by two segments
-  and then `messages`. `&amp;` (`:836`) becomes `replaceAll('&amp;', '&')`.
-- **Trailing slashes** (`atc.ts:67`): a loop that drops the last character while it is `/`.
-- **Trace ids and times** (`traces.ts:385, 388, 391`). A scanner finds `abaptraces/`, takes
-  a run of `[A-Za-z0-9]` of at least 16 characters, and requires `/` or the end after it. The
-  sub-millisecond digits are read after the first `.`. The leap second is found by
-  locating `T`, checking `hh:mm:` digit by digit, then `60`, then a non-digit or the end.
-- **`replace(/-/g, '')`** (`batch/wire.ts:8`, `core/shared/discovery.ts:24`) becomes
-  `replaceAll('-', '')`.
-- **The multipart batch answer** (`batch/wire.ts:55–94`):
-  - The `boundary` is read by a Content-Type parameter reader: split on `;`, trim, match
-    the key case-insensitively, unquote a quoted value.
-  - A line scanner over the body finds the delimiter lines: a line that is exactly
-    `--<boundary>` or `--<boundary>--`, followed by optional spaces or tabs and a line end,
-    after `\n` or `\r\n` or at the start.
-  - The inner status line is the first line starting `HTTP/1.` followed by one digit, then
-    whitespace and three digits.
-  - The header block ends at the first empty line, keeping today's rule for a part that
-    starts with a line break.
-  - Header lines are split on `\n`, with a trailing `\r` removed.
-  - No `escapeRegExp` is needed, because nothing builds a pattern.
-- **The where-used scope** (`core/shared/whereUsed.ts:64–99, 258–260`) is edited through
-  adt-clients' own document scanner (`utils/documentEdit.ts`: `scanDocument`, `childAt`,
-  `applySplices`), as the metadata patches do:
-  - every element whose local name is `type` gets its `isSelected` attribute set or
-    inserted, read by name wherever it sits;
-  - the root `*:usageScopeResult` is renamed to `*:scope` by splicing its open and close
-    tag names, keeping its prefix and attributes;
-  - the XML declaration is dropped by slicing before the root.
+### 3.7 R — exact scanners, one per pattern
 
-  The scanner refuses a document that is not well formed, where the regex rewrote whatever
-  it found. This happens only on a malformed scope answer, and the plan states it in the
-  member's errata.
-- **Discovery hrefs** (`utils/discoveryEndpoints.ts:47`): the discovery document is parsed,
-  and every `@href` on any element is collected in document order. That is the set the
-  regex collected on a well-formed document.
-- **The cloud host test** (`utils/systemInfo.ts:222`):
-  `baseUrl.toLowerCase().includes('.hana.ondemand.com')`. This is the same test as the
-  unanchored, case-insensitive regex.
+Each regex is replaced by plain linear string code. The code reproduces that regex's exact
+semantics on every input: leftmost match, greedy backtracking, `\b`, `/i` and global
+non-overlap. It is not a parser and not a "close enough" reading. For `/i`, the scanners
+compare with the regex's own folding: ECMAScript's non-Unicode `Canonicalize`, a
+character's single-character upper case, where a non-ASCII character never folds to ASCII.
+Each scanner's behaviour on adversarial input is pinned by the differential test of
+section 7.
+
+adt-strategies gets its own helpers, because it cannot import adt-clients.
+
+- **`/\/runs\/([^/]+)/`**, at `unitTest.ts:31, 39` and `utils.ts:566`
+  (`/activation/runs/`), and the same test without capture at `analyse.ts:456`. Take the
+  first `/runs/` that one or more non-`/` characters follow, and those characters are the
+  id. Otherwise look at the next occurrence.
+- **`/<aunit:run[^>]*uri="([^"]+)"/`**, at `unitTest.ts:37` and `analyse.ts:458` (there
+  with `uri="[^"]*\/runs\/[^/"]+`). Go through each `<aunit:run` left to right. Within it,
+  up to the first `>`, take the **last** `uri="` (the greedy `[^>]*`) that a non-empty run
+  of non-`"` characters and a closing `"` follow. That run may cross a `>`, as `[^"]` does.
+  Then backtrack to earlier `uri="` occurrences as the regex would.
+- **The fallback `/uri="([^"]+)"/`** (`unitTest.ts:38`): the first `uri="` that a non-empty
+  value and `"` follow, in any element. That is why `<run uri="/runs/123"/>` still yields
+  `123`. The three steps keep their order: header, then `aunit:run`, then any `uri`.
+- **`/^T100KEY-V\d+$/`** (`read.ts:328`): `startsWith('T100KEY-V')`, and the rest is one or
+  more ASCII digits.
+- **`/\/messageclass\/([^/]+)\/messages\/([^/?]+)/i`** (`read.ts:833`): the leftmost
+  `/messageclass/` (folded), then **one** non-empty segment of non-`/` characters (the id),
+  then `/messages/` (folded), then a non-empty run of characters that are neither `/` nor
+  `?` (the number). When a later part fails, the next `/messageclass/` is tried. Both
+  captures are decoded as today.
+- **`/&amp;/g`** (`read.ts:836`): `replaceAll('&amp;', '&')`.
+- **`/\/+$/`** (`atc.ts:67`): drop trailing `/` characters.
+- **`ID_IN_URI`** (`traces.ts:385`): the leftmost `abaptraces/` that 16 or more
+  `[A-Za-z0-9]` characters follow, greedy, then `/` or the end. The regex backtracks the
+  run, so the scanner does too: it takes the longest run that is still followed by `/` or
+  the end, never shorter than 16.
+- **`SUB_MILLI`** (`traces.ts:388`): the first `.` that one or more digits follow, and
+  those digits.
+- **`LEAP_SECOND`** (`traces.ts:391`): the greedy `^(.*T\d{2}:\d{2}:)60(\D.*)?$`, which
+  takes the **last** `T` such that `dd:dd:60` follows and then either the end or a
+  non-digit and the rest. No line terminator may sit before it, since `.` excludes line
+  terminators. The scanner keeps both captures.
+- **`/-/g`** (`wire.ts:8`, `discovery.ts:24`): `replaceAll('-', '')`.
+- **The multipart reader** (`wire.ts:55, 61, 65, 78, 88, 94`):
+  - **boundary**: the leftmost case-folded `boundary=`, then either a quoted non-empty
+    value or a non-empty run of characters that are neither `;` nor ECMAScript whitespace
+    (`\s` as defined, not ASCII-only);
+  - **delimiter lines**: from the start or after `\n` or `\r\n`, `--` and the boundary text
+    compared literally (no escaping is needed, because no pattern is built), then an
+    optional `--`, then spaces or tabs, then `\r\n`, `\n` or the end. The search goes left
+    to right without overlap, as `matchAll` does;
+  - **inner status line**: the first `HTTP/1.` + one digit + whitespace (`\s+`) + three
+    digits + whitespace (`\s*`) + the rest of the line, from the start or after a line
+    break;
+  - **header and body split**: a line break at the very start, else the first blank line;
+  - **header lines**: split on `\n`, with a trailing `\r` removed.
+- **The where-used scope** (`whereUsed.ts:64–99`). The rewrite stays as it is: a raw-text
+  scanner, not the document scanner.
+  - It finds each `<` + letter + `[\w-]*` + `:type`, followed by a `\b` (a non-word
+    character or the end). The lazy `[^>]*?` follows, then the `/>` closest to it. These
+    are prefixed, self-closing `type` tags only, as today.
+  - In each tag, it takes the first `name="…"` preceded by a word boundary.
+  - It tests and replaces the first `isSelected="true"` or `isSelected="false"` preceded by
+    a word boundary.
+  - Where there is none, it inserts the attribute after the tag name, as today.
+  - A malformed document is rewritten exactly as the regexes rewrite it. No new refusal
+    appears.
+- **The scope rewrap** (`whereUsed.ts:258–260`): remove the first `<?xml` … `?>`, with no
+  `>` between them. Rename the first `<prefix:usageScopeResult` + `\b` + attributes + `>`,
+  and the first `</prefix:usageScopeResult>`, with each prefix read as
+  `[A-Za-z][\w-]*`.
+- **Discovery hrefs** (`discoveryEndpoints.ts:47`): a raw-text scan for every `href="` with
+  no word boundary required, as in the regex, so `xhref="` also matches. The value runs to
+  the next `"`. An empty value is skipped and the search resumes one character later, which
+  is `exec`'s behaviour after a failed attempt. The raw text is kept as it is, entity
+  spellings included, and the result is filtered to values starting with `/`, as today.
+- **The cloud host test** (`systemInfo.ts:222`): a folded, unanchored search for
+  `.hana.ondemand.com`.
 
 ## 4. Decisions
 
-### D1 — K2: the identity requires the name (237 casts)
+### D1 — K2: required fields, enumerated
 
-The contract is made true in `@mcp-abap-adt/interfaces-adt`, in a PR of its own in that
-repository:
+interfaces-adt changes in its own PR, published first (section 8). Exactly these fields
+become required, and only on the capabilities named:
 
-- **The object's own name becomes required.** `AdtObjectIdentity` takes the config's name
-  key as well as its parent keys. The name and the parents are required, and every other
-  field stays optional. Each capability interface (`IAdtReadable`, `IAdtUpdatable`,
-  `IAdtLockable`, `IAdtEnhancementHost` and the rest) names the key it requires. The
-  interfaces-adt PR settles the exact parameter shape.
-- **The source and the lock handle become required where a member needs them.** Today
-  `IAdtOperationOptions` declares both as optional for every member. A member that sends a
-  source or a lock handle, such as an update, an upload or an unlock, takes an options type
-  that requires them. Every other member keeps the optional form.
-- **The union-typed options** (`enhancementType`, `implementationType`, `bindingVariant`,
-  the feature toggle's source) become required on the capabilities that send them.
-- **The two `Partial` configs cast to full ones** (`AdtFeatureToggle.ts:283`,
-  `AdtFunctionInclude.ts:314`) take the full config type where their member sends every
-  field.
-- **`AdtEnhancement.ts:158`** (`Map.get` cast to `EnhancementType`) reads the lock-time type
-  from the map and checks it. If no type was recorded, the member's own identity supplies
-  it, and that identity now requires it.
+1. **The object's own name**, on every capability that addresses one object:
+   `className`, `interfaceName`, `programName`, `functionGroupName` (the group's own),
+   `functionModuleName`, `includeName`, `ddlName`, `name` (message class, generic),
+   `accessControlName`, `appendStructureName`, `enhancementName`, `scalarFunctionName`,
+   `implementationName`, `structureName`, `tableName`, `tableTypeName`,
+   `transformationName`, `authorizationFieldName`, `dataElementName`, `domainName`,
+   `featureToggleName`, `packageName` (the package's own), `bindingName`,
+   `serviceDefinitionName` (its own), `transportNumber` (the request's own). These are 144
+   of the 237 casts, including the parent names (`functionGroupName` on a module or
+   include, `className` on a local class). Those are already required where the capability
+   names them as `TParent`, and they become required where it does not but the member
+   sends them.
+2. **`source`**, on these members only. Each sends a source.
+   - `update`, for every source-carrying type: `options.source`, 20 casts, counting
+     `options?.source` and the local `source` read from it.
+   - `updateMetadata`, where the metadata document travels as `options.source`: 24 casts,
+     one per type, from `AdtAccessControl.ts:330` to `AdtRequest.ts:325`.
+   - `validate` and `check` of the four local class includes (`AdtLocal*.ts:108/109,
+     222/223`): `config.source`, 8 casts.
 
-In adt-clients and adt-clients-legacy, each K2 cast is then deleted, because the field's type
-is already `string`. The emitted JavaScript of those sites does not change.
+   That is 52 casts in all.
+3. **`lockHandle`**, on `update` (9 casts) and `updateMetadata` (2), as
+   `options.lockHandle`, and in the internal `updateFunctionGroup` params
+   (`functionGroup/update.ts:37`, which then follows from the member's option): 12 casts.
 
-**Consumer impact.** A caller that omits the name, or a source or lock handle a member needs,
-now gets a compile error. Before, the request went to a URL holding `undefined`. A
-JavaScript caller that omits the name sends the same request as before.
+The remaining 29 casts are covered under "What D1 does not require" below, so
+144 + 52 + 12 + 29 = 237.
 
-**Order.** interfaces-adt is released first, in its own versioning. adt-strategies,
-adt-clients and adt-clients-legacy then raise their `@mcp-abap-adt/interfaces-adt` range to
-that published version, which resolves from the npm registry. No `file:`, `link:` or
-workspace link to interfaces-adt is used at any point, and after the install the lockfile is
-checked: interfaces-adt must resolve from the registry and must not be `"link": true`.
-Nothing in this repository builds against an unpublished interfaces-adt.
+**What D1 does not require.** These fields are not names, sources or lock handles, so D1
+does not cover them. Making them required would be a consumer change the goal does not
+name:
+
+- `description` (11);
+- `superPackage` (3);
+- `baseObject`;
+- `implementationType`;
+- `enhancementType` (2, plus the `Map.get` at `AdtEnhancement.ts:158`);
+- `serviceName` and `serviceVersion`, and `serviceDefinitionName` as a binding's
+  referenced definition;
+- `bindingVariant`;
+- `master_system`;
+- `owner`;
+- the feature toggle's `source` (`IFeatureToggleSource`);
+- the full-config casts at `AdtFeatureToggle.ts:283` and `AdtFunctionInclude.ts:314`.
+
+These are 29 casts.
+
+Each of these keeps its behaviour with no cast and no new requirement. The internal function
+that receives the field takes the type the contract gives it (`string | undefined`, or the
+union with `undefined`). Where a builtin needed a `string` and received `undefined`
+implicitly, the conversion becomes explicit with the same result. For example,
+`encodeURIComponent(v)` with `v` undefined gives `'undefined'`, and so does
+``encodeURIComponent(`${v}`)``, and a query parameter object keeps the `undefined` it held.
+Every one of these sites is a runtime change and gets the oracle test of section 7.
+
+`AdtEnhancement.ts:158` needs a different fix. The release callback receives only `name` and
+`lockHandle` (`LockRegistry.ts:143`), so the enhancement type is carried with the lock
+instead:
+
+- `createLockTracker` takes a per-lock datum (`track(name, handle, datum)`), and the
+  release receives it (`unlock(name, handle, datum)`). The other trackers pass `undefined`.
+- `AdtEnhancement.lock` passes the type it locked with (`:553`). That is the value
+  `lockedTypes` held, since the map is set right before `track` and is never deleted. The
+  map goes.
+
+The request sent is the same, and section 7 proves it.
+
+**Consumer impact**, the goal's first change: a caller that omits one of the fields in 1–3
+gets a compile error.
 
 ### D2 — K3: a reading throws on a missing required field (28 casts)
 
-The trace readers in `results/traces.ts` read each field the result type requires with a
-reader that throws when the field is absent, naming it (`trc:… is missing`). This is the form
-the table-settings readers use (`results/tableSettings.ts`, `text` and `attribute`). What a
-reading's throw becomes in `answering` is unchanged.
+The trace readers read each field the result type requires with a reader that throws a
+`trc:… is missing` error naming it, in the form of `tableSettings.ts:86, 96`. Numbers and the
+boolean throw when absent. What a reading's throw becomes in `answering` is unchanged.
+Optional fields are read with no cast.
 
-- Optional result fields keep their `?? undefined` reads, with no cast.
-- Numbers (`numberOf`, `attrNum`) and the boolean (`booleanOf`) throw when absent or
-  unreadable. They return their number or boolean typed, with no cast.
+### D3 — K4: the declared overloads, and what they cannot cover alone
 
-The answer changes only for a feed that lacks a required field. Every recorded feed carries
-all of them (section 6).
+Every member implementation of the form `<E extends IAdtError = IAdtError>(…, options?:
+…<E>)` gets the interfaces' two overloads: a generic one that requires `analyse`, and a
+plain one. That is 703 signatures in 86 files, plus the shared helpers that take the same
+pair: `answering`, `answeringExchange`, `answeringActivation`, `systemInfo`'s answer,
+`chain`, the abapGit facts exchange and the legacy refusals.
 
-### D3 — K4 and the abapGit K7 casts: the declared overloads (43 casts)
+**Overloads alone do not make these sound.** TypeScript accepts an implementation whose
+return type the overload's return type is merely assignable to. A body that returns the
+library's `IAdtError` under the generic overload is therefore still the lie the cast was.
+These paths do that even when `analyse` is given:
 
-**The verdict `E` (37 casts).** Every member implementation of the form
-`<E extends IAdtError = IAdtError>(…, options?: …<E>)` declares the two overloads its
-interface declares:
+- `adtResponse.ts:516–522`, `systemInfo.ts:194` and `structuredExchange.ts:197`: `analyse`
+  cleared the verdict, but no answer came back, so the library's own verdict stands.
+- `chain.ts:183, 191`: a step answered without a strategy, so its failure is an
+  `IAdtError`. The rollback message is added to it.
+- The legacy refusals (`refusalLegacy.ts:6`): by design, no request is sent and `analyse`
+  is not called.
 
-- a generic one whose options require `analyse: IAnalyse<E>`;
-- a plain one returning `IAdtResponse<T>`.
+None of them can be typed `E` without either calling `analyse` where it is not called
+today, or changing what the generic answer's type says. That is C3 in section 5. Every
+other generic path, where the returned error is `analyse`'s own, is typed by the overload
+and needs no cast.
 
-The implementation signature returns `IAdtResponse<T, IAdtError>`. That covers 703
-signatures in 86 files, plus the shared helpers: `answering`, `answeringExchange`,
-`answeringActivation`, `systemInfo`'s answer, `chain`, the abapGit facts exchange, and the
-legacy refusals (`legacyRefusal`, `refusalLegacy.ts`, `AdtPackageLegacy`,
-`AdtRequestLegacy`, the legacy runners). Each helper takes the same pair. With `analyse`
-given, its `E` comes from `analyse`. Without it, the helper returns the library's
-`IAdtError`. No cast is left. The emitted JavaScript does not change, because overloads are
-erased. A caller that names `E` and passes no `analyse` gets a compile error.
+The four other generic stand-ins and the abapGit args go the way D3 goes, with no exception
+list. Each one's typed form is a consumer change, so they are C1, C2, C4 and C5 in section 5.
 
-**The other generic stand-ins (4 casts) go the same way.** There is no exception list:
+## 5. Consumer changes for the owner to decide
 
-- **`AdtBatchConnection.makeAdtRequest`** declares the contract's non-generic signature,
-  `(options) => Promise<IAdtWireResponse>`. The `<T, D>` parameters go.
-- **`AdtClientsWS.request`**: the `TResponse` that only the caller claimed goes. The caller
-  passes a reader `(payload: unknown) => TResponse`, and the default reading is the payload
-  as `unknown`. The reader sits on the same overload pair: `request(…)` answers `unknown`,
-  and `request(…, { read })` answers `TResponse`.
-- **`AdtAbapGitClient`'s slot lookup**: the results become a map typed per slot
-  (`{ [K in AbapGitFactsSlot]?: IAbapGitFactsResultStrategy<FactsValue<T, K>, Facts<K>> }`),
-  so the lookup is typed by its key.
-- **`absentOnLegacy<T>`**: each legacy factory builds its refusing handler as a class that
-  `extends` the modern handler and overrides every member with the refusal. This is the
-  legacy package's own rule. The record-plus-cast goes.
+Each of these is a change the goal does not yet name. The spec lists the options and does
+not choose.
 
-**The abapGit args (2 casts).** The new form (`IAbapGitLinkNewArgs`,
-`IAbapGitExternalRepoArgs`) and the old form (`IAbapGitLinkArgs`,
-`IAbapGitExternalRepoCredentials`) reach separate private implementations. Each public
-overload calls its own implementation directly, so the implementation signature is no
-longer a union of the two.
+| # | Site | Why there is no exact typed form | Options |
+|---|---|---|---|
+| C1 | `AdtBatchConnection.makeAdtRequest<T = unknown, D = unknown>` (`AdtBatchConnection.ts:70`, cast `:93`) | It resolves with the envelope's raw part, which is never a `T`. | (a) Drop `<T, D>` to match `IAbapConnection.makeAdtRequest`: a caller naming `T` gets a compile error. (b) Keep it as an approved, named exception. |
+| C2 | `AdtClientsWS.request<TPayload, TResponse = unknown>` (`AdtClientsWS.ts:94`, cast `:126`; exported via `index.ws.ts:7`) | The payload comes from the socket, and nothing checks it is a `TResponse`. | (a) Answer `unknown`. (b) Take a reader `(payload: unknown) => TResponse` through an overload: `request(…)` answers `unknown`, and `request(…, { read })` answers `TResponse`. Callers that name `TResponse` migrate. (c) An approved exception. |
+| C3 | The verdict `E` on the library-answered paths of D3 (`adtResponse.ts:516–522`, `systemInfo.ts:194`, `structuredExchange.ts:197`, `chain.ts:183, 191`, legacy refusals) | The returned error is the library's, and `analyse` never produced it. | (a) interfaces-adt types the generic answer `IAdtResponse<T, E \| IAdtError>`: a consumer narrows the error. (b) The library calls `analyse(verdict, undefined)` on these paths too. `analyse` then runs where it does not today, and when it clears the verdict the library still needs an `E` it does not have, so (b) also needs a contract change such as a required `shape(error: IAdtError): E`. (c) An approved exception. |
+| C4 | abapGit `link` and `checkExternalRepo`, old and new form (`AdtAbapGitClient.ts:256–310, 400–430`, casts `:285, 295, 302 (×2), 409, 424, 427 (×2)`) | Only the overloads tie the args shape to `options.credentials`. The implementation sees two independent unions. | (a) A type predicate over the options and args (only if C6 allows predicates). (b) Remove the old form, `@deprecated` since 46.2.0: old-form callers break. (c) Give the new form its own member name. (d) An approved exception. |
+| C5 | `absentOnLegacy<T>` (`absentOnLegacy.ts:51–78`) | It builds a `T` from a record of refusing functions, and no record type is a class instance type. | (a) One refusing subclass per type that `extends` the modern handler and overrides every member. The object then differs: `instanceof` the modern class becomes true, members sit on a prototype rather than the object, and construction needs the connection. A test must prove no member is left un-overridden, since one left over would send a request. (b) An approved exception. |
+| C6 | Explicit type predicates (17, section 2 P) | A predicate is an unchecked assertion, like a cast. | (a) Predicates count as casts and are refused, except in boundary readers over values from outside. (b) Predicates stay allowed, which makes C4(a) available. |
 
-## 5. The guard test
+Until the owner decides, these sites stay as they are, and the plan does not start on them.
 
-The checker is one plain module at the repository root, `tools/sourceRules.js` (CommonJS, no
-dependency beyond the repository's own `typescript`). Each package's unit suite runs it in
-`src/__tests__/unit/sourceRules.test.ts`, on that package's `tsconfig.json`. The test passes
-when the checker reports `[]`, and on failure it lists every finding as `file:line rule`.
-The checker runs no regex over source. It reads the AST and asks the type checker:
+## 6. The guard test
 
-- **`cast`**: an `AsExpression` whose type node is not the type reference `const`; a
-  `TypeAssertionExpression`; a `satisfies` is allowed.
-- **`any`**: an `AnyKeyword` anywhere in a type position.
-- **`any-flow`**: an expression the checker types `any` is refused, unless it is the
-  initializer of a declaration annotated `unknown`, or an argument to a parameter typed
-  `unknown`.
-- **`hand-narrowed`**: a parameter declared `unknown`, of a function that is not exported,
-  is refused when it has at least one call site and every call site passes an argument whose
-  type is neither `unknown` nor `any`. An exported function with no call inside the package
-  is part of the public surface and is left alone. This is the rule that finds the U sites.
-- **`regex`**: a `RegularExpressionLiteral`; any reference to the identifier `RegExp`
-  (called, constructed, aliased or read); and a call to `match`, `matchAll` or `search`
-  on a receiver the checker types `string`, because each of these turns a string argument
-  into a regex.
+`tools/sourceRules.js` (CommonJS, using only the repository's own `typescript`) implements
+section 1 and exports `findForbidden(tsconfigPath)`. Its result is
+`{ file, line, column, rule, kind }[]`. The same module prints the inventory
+(`node tools/sourceRules.js --inventory`), so the two cannot drift. Each package's unit suite
+runs it in `src/__tests__/unit/sourceRules.test.ts` on that package's `tsconfig.json`. The
+test asserts the result is `[]` and, on failure, lists every finding. The module runs no
+regex over source.
 
-There is no exception list. A finding is fixed in the code.
+**Its own tests** feed in-memory programs, one or more per rule. Each forbidden form must
+yield exactly its rule, and each allowed form nothing:
 
-**Proving it load-bearing.** The checker's own tests feed it in-memory sources: one per rule
-and per form (an `as`, a `<T>` assertion, `as const` allowed, an `any` annotation, a
-`JSON.parse` result bound to a typed variable, a `JSON.parse` result bound to `unknown`
-allowed, a hand-narrowed parameter, a regex literal, `new RegExp`, `RegExp` aliased,
-`'x'.match('y')`). Each forbidden form must yield exactly its rule and each allowed form
-nothing. Then the plan breaks each rule in real `src` once, watches the suite go red, and
-reverts. The existing `noRegexInDocumentPatches.test.ts` stays as it is: the new guard covers
-it, and tests are out of scope unless touched for another reason.
+- **C**: `x as T` and `<T>x` are refused. These are allowed: `as const`, an import alias,
+  an export alias, `satisfies`, and two casts on one line counted as two.
+- **Y**:
+  - Refused: an `any` annotation; a `JSON.parse` result read as `.x`, returned, passed to a
+    typed parameter, or assigned to a typed variable.
+  - Allowed: a `JSON.parse` result bound to `unknown`, or passed to an `unknown` parameter.
+- **N**:
+  - Refused: a typed value passed to an `unknown` parameter that is narrowed; the same with
+    one typed and one `unknown` caller; an exported function narrowing a parameter one of
+    whose internal callers is typed; a local `const v: unknown = typed` that is then
+    narrowed.
+  - Allowed: a catch variable narrowed; a `.data` of `IAdtWireResponse` narrowed; a typed
+    value passed to a boundary reader.
+- **R**:
+  - Refused: a literal; `new RegExp`, `RegExp(…)` and an alias `const R = RegExp`; a
+    `RegExp` value received from a dependency's declaration and used; `s.match('x')`,
+    `s.matchAll('x')` and `s.search('x')`, also on a literal or a union receiver;
+    `s['match']`; `const m = s.match`; `Symbol.replace`.
+  - Allowed: `s.replace('a', 'b')`, `s.replaceAll('-', '')` and `s.split(',')`.
+- **P**: each predicate is counted, and refused or not as C6 decides.
 
-## 6. Proving behaviour unchanged, per site
+**Proving it load-bearing**: the plan breaks each rule once in real `src`, watches the
+suite go red, and reverts. There is no exception list. The boundary-reader list (section 1)
+is part of the rule. The existing `noRegexInDocumentPatches.test.ts` stays.
 
-- **Type-only removals** (K1, K2 under D1, K4 and the K7 casts under D3, K6, and every
-  cast that is only deleted):
-  TypeScript erases them, so each package's emitted `dist/**/*.js` is compared before and
-  after. Every file must be byte-identical except the files whose runtime code a K3, K5, A, R
-  or K8 change touched, or a D3 restructuring (the WebSocket reader, `absentOnLegacy`, the
-  abapGit split) touched. The plan lists those files, and each one gets the proof below.
-- **K5 and A** (readers over thrown values and parsed documents): the existing unit tests,
-  plus a table test per reader over the recorded answers. Every `refusal-*` recording in
-  `packages/adt-clients/corpus/adt/answers/` feeds the exception readers (`adtErrors.ts`,
-  `analyse.ts`, `read.ts`). Each reading is deep-equal to the one taken from the code
-  before the change.
-- **K3** (traces): the trace readers' results over every recording that holds
-  `abaptraces` (6 files in the corpus) and the strategies' feed fixtures
-  (`packages/adt-strategies/src/__tests__/fixtures/feeds/`) are deep-equal to the results
-  before the change. Under D2, one more test per required field shows the reading throws
-  when that field is absent.
-- **R** (each regex site): the replaced function is tested against an oracle. The oracle is
-  the old regex implementation, copied into the test, where regexes are allowed. The two are
-  compared on SAP's recorded inputs and on edge cases: empty, absent, upper/lower case, CRLF
-  and LF, a boundary-like line inside a body, a uri with `?`. These are the recorded inputs:
-  - **run ids and `aunit:run` uris**: `unittest-run-passing` and
-    `refusal-unittest-run-failing` (`corpus/adt/answers/`), where the bodies and the
-    `location` headers are SAP's;
-  - **activation run ids**: the `activation-*` recordings that carry a `/activation/runs/`
-    location (5 files);
-  - **`T100KEY-V` and longtext links**: the refusal recordings that carry them (15 and 20
-    files);
-  - **discovery hrefs**: `corpus/adt/discovery/`, one document per release;
-  - **trace ids and times**: the `abaptraces` recordings above;
-  - **the cloud host test**: a configuration value, not an answer, so the edge cases only.
+## 7. Proving equivalence, per site
 
-  Where the oracle and the new code differ on a recorded input, the plan stops and reports
-  it. Nothing is changed to match.
-- **The recordings this task added.** These are read-only, on the shared class
-  `ZAC_SHR_RUN01` and the shared domain `ZAC_SHR_GA_DOM`, on premise (`s4-2025`) and on
-  ABAP Cloud (`abap-cloud`). They are in `packages/adt-clients/corpus/adt/answers/`, one
-  `.json` per step beside its body:
-  - `batch-get-parts-<release>--01-batch`: a `$batch` envelope of two GET parts (the
-    class's and the domain's metadata), answered `202` with its multipart body
-    (`.body.txt`, byte for byte). These are the inputs of `batch/wire.ts`.
-  - `where-used-scope-class-<release>--01-usagereferences-scope`: the where-used scope of
-    the class. It is the input of `whereUsed.ts`'s `modifyWhereUsedScope` and of the
-    `usageScopeResult` rewrap.
-  - `atc-worklist-class-<release>--01-customizing`, `--02-worklist-create`, `--03-run`
-    and `--04-worklist`: the ATC customizing, the worklist id, a waiting run and the
-    worklist. These are the inputs of `atc.ts`'s customizing, waiting-run and worklist
-    readers.
+- **Type-only changes** (K1, K2's deletions under D1, the N/K6 parameter types, the K7
+  `AdtService` change, the D3 overloads, and Y bindings that add no runtime code): each
+  package's emitted `dist/**/*.js` is compared before and after, and must be byte-identical
+  outside the files the plan lists as runtime changes.
+- **Runtime changes**, each with its own test:
+  - **R scanners**: a differential test against an oracle, which is the old regex
+    implementation copied into the test, where regexes are allowed. The test runs on three
+    input sets:
+    - SAP's recorded inputs (below);
+    - hand-written edge cases: empty, absent, case variants, CRLF and LF, a boundary-like
+      line in a body, `?` in a uri, and the greedy and backtracking cases named in 3.7;
+    - every string up to a bounded length over a small alphabet built from each pattern's
+      significant characters (for example `< > " / = : a u r i n T 6 0 1 - \r \n` and a
+      space), plus random strings from it under a fixed seed.
 
-  Every field was scrubbed before commit:
-  - credentials and the session headers are redacted;
-  - the host is replaced by `sap.example.com` and the user by `SAPUSER01`;
-  - the system id is replaced by `SYS` and the client by `000`;
-  - IP addresses become `0.0.0.0` and e-mail addresses `user@example.com`;
-  - every 32-hex id is replaced by a numbered id of the same shape, consistently across a
-    case's files, so a multipart boundary still matches its body.
-- **D1 and D3 type changes**: test-only `*.typecheck.ts` files use `@ts-expect-error` to
-  show the new compile errors. One shows that an identity without its name is refused, and
-  one shows that a generic call without `analyse` is refused. The emitted JavaScript
-  comparison above covers both changes, since neither emits code.
-- **D2**: one test per required trace field. The reading throws, naming the field, when
-  that field is removed from a recorded feed.
-- **Live**: the changed readers' members run once against on premise and ABAP Cloud
-  through the existing integration suites. A patch runs live only the changed files' suites.
+    Any difference fails the test.
+  - **K5 readers**: a table test per reader. The inputs are each recorded `refusal-*`
+    answer, an `Error` with `response` set, an object whose `response` is inherited, a
+    getter-defined `response`, a primitive and `null`. Each site's result equals the result
+    taken from the code before the change, which proves each site kept its access policy.
+  - **D1 conversions**: each internal function that now takes `string | undefined` is
+    called with `undefined` and with a value, and the request it builds (URL, params, body)
+    equals the old code's.
+  - **The enhancement lock datum**: `unlockAll()` on an abandoned enhancement lock sends the
+    same unlock request as before. The other trackers still release as before.
+  - **`callTimeout`**: through the Proxy, `makeAdtRequest` carries the deadline; other
+    methods are bound to the target; non-function members, a method that is not part of
+    `IAbapConnection` and an absent member are read as before.
+  - **`ProfilerDomain`**: each view reaches its endpoint with its options, and an unknown
+    view from JavaScript throws the same error.
+  - **K8**: the thrown error is `instanceof Error`, has an own enumerable `code` equal to
+    `ADT_SESSION_ERROR.NOT_CONNECTED` and the same `message`, and has no other own
+    enumerable property.
+  - **D2**: one test per required trace field. When that field is removed from a recorded
+    feed, the reading throws and names it. The recorded feeds read as before.
+  - **Section 5 changes**, once decided, each get their own test. For C2(b): settlement on
+    answer, on close and on timeout; a reader that throws rejects that request only. For
+    C5(a): each legacy absent handler answers the refusal, sends no request (a recording
+    connection sees none), and overrides every member of the modern prototype chain.
+- **Type checks**: test-only `*.typecheck.ts` files use `@ts-expect-error`. They live under
+  `src/__tests__/` of adt-clients, where `tsconfig.test.json` (`src/**/*`, and adt-strategies'
+  `src`) includes them, and of adt-clients-legacy (its own `tsconfig.test.json`). Both run in
+  `test:check`, which the root `npm run check` runs. They show, per capability family:
+  - **compile errors**: an omitted name; an omitted `source` on `update`, `updateMetadata`
+    and the local includes' `validate` and `check`; an omitted `lockHandle`; a generic call
+    without `analyse`;
+  - **compiles**: a generic call with `analyse`; a default call with no `E`;
+  - **unchanged signatures**: every other exported signature. An `.d.ts` snapshot of each
+    package's public surface is compared before and after, and the only differences allowed
+    are the ones D1–D3 and any approved section 5 change name.
+- **Recorded inputs**:
+  - **run ids**: `unittest-run-passing`, `refusal-unittest-run-failing` and the
+    `activation-*` runs;
+  - **refusals**: the refusal recordings with `T100KEY-V` and longtext links;
+  - **discovery**: `corpus/adt/discovery/`;
+  - **traces**: the trace recordings and the strategies' feed fixtures;
+  - **new in this task**: the recordings below.
+  - **The recordings this task added.** These are read-only, on the shared class
+    `ZAC_SHR_RUN01` and the shared domain `ZAC_SHR_GA_DOM`, on premise (`s4-2025`) and on
+    ABAP Cloud (`abap-cloud`). They are in `packages/adt-clients/corpus/adt/answers/`, one
+    `.json` per step beside its body:
+    - `batch-get-parts-<release>--01-batch`: a `$batch` envelope of two GET parts (the
+      class's and the domain's metadata), answered `202` with its multipart body
+      (`.body.txt`, byte for byte). These are the inputs of `batch/wire.ts`.
+    - `where-used-scope-class-<release>--01-usagereferences-scope`: the where-used scope of
+      the class. It is the input of `whereUsed.ts`'s `modifyWhereUsedScope` and of the
+      `usageScopeResult` rewrap.
+    - `atc-worklist-class-<release>--01-customizing`, `--02-worklist-create`, `--03-run`
+      and `--04-worklist`: the ATC customizing, the worklist id, a waiting run and the
+      worklist. These are the inputs of `atc.ts`'s customizing, waiting-run and worklist
+      readers.
 
-## 7. Release order
+    Every field was scrubbed before commit:
+    - credentials and the session headers are redacted;
+    - the host is replaced by `sap.example.com` and the user by `SAPUSER01`;
+    - the system id is replaced by `SYS` and the client by `000`;
+    - IP addresses become `0.0.0.0` and e-mail addresses `user@example.com`;
+    - every 32-hex id is replaced by a numbered id of the same shape, consistently across a
+      case's files, so a multipart boundary still matches its body.
+  The existing corpus was also checked. `read-where-used-list-structure--01-informationsystem-usagereferences.body.xml:20`
+  carries an unscrubbed `responsible`. It is the owner of `ZLOCAL`, the package the ABAP
+  Cloud trial creates itself: `_SAPSUPPORT`, an SAP-defined support identity, not a
+  person's account (inference from where it appears; no person uses it). It is kept as it
+  is.
+- **Live**: the changed members run once on premise and on ABAP Cloud through the
+  existing integration suites.
 
-0. **`@mcp-abap-adt/interfaces-adt`**: its own PR in its own repository (D1), released in its
-   own versioning and published first.
-1. **`@mcp-abap-adt/adt-strategies`**: a patch (0.28.x). Its interfaces-adt range is raised
-   to the published version. adt-clients depends on it as `^0.28.2` and adt-clients-legacy
-   as `^0.28.0`. A 0.29.0 would fall outside both ranges and would in effect be a major, so
-   it stays a patch.
-2. **`@mcp-abap-adt/adt-clients`**: a minor (47.x), because D1 and D3 change what a caller
-   can compile. Its interfaces-adt range is raised to the published version, and its
-   strategies range to the published patch.
-3. **`@mcp-abap-adt/adt-clients-legacy`**: a patch (0.11.x). Under a 0.x caret range a
-   0.12.0 would in effect be a major. Its adt-clients range is raised to the published 47.x
-   minor, and its interfaces-adt range to the published version.
+## 8. Release order and documentation
 
-Before each tag, every dependency range resolves on the registry, and the lockfile holds no
-`"link": true` for interfaces-adt. The repository's own workspace siblings may stay linked
-during development. After each publish, a clean install from the registry, outside the
-repository, proves the package installs. Each package's `CHANGELOG.md`, README and docs
-state the consumer impact of D1, D2 and D3 in the release that ships it. The release gate
-is the root `npm run check`.
+**Order.** interfaces-adt goes first, in its own repository and its own PR, released in its
+own versioning and published. Then adt-strategies, adt-clients and adt-clients-legacy follow,
+in `publishOrder`, each one after the one before it is published. Each raises its
+`@mcp-abap-adt/interfaces-adt` range to the published version, resolved from the npm
+registry. No `file:`, `link:` or workspace link to interfaces-adt is used. After each
+install, the lockfile is checked: interfaces-adt must resolve from the registry and must not
+be `"link": true`. The version bump of each package is put to the owner separately.
 
-## 8. Not in this spec
+Before each tag:
 
-- Test code, tooling outside production `src`, and comments, as the goal states.
+- every range resolves on the registry;
+- the only `"link": true` entries are the repository's own workspace siblings;
+- after publishing, a clean install from the registry, outside the repository, proves the
+  package installs.
+
+The release gate is the root `npm run check`.
+
+**Documentation**, in the release that ships the change, per package:
+
+- **`CHANGELOG.md`**: D1–D3, and any section 5 change approved.
+- **A migration note** (`docs/usage/MIGRATION-<version>.md`, linked from the README's
+  migration list) saying what a consumer on the old contract must do. That means: give the
+  name, the `source` or the `lockHandle` where now required; pass `analyse` wherever `E` is
+  named; and expect a trace reading to throw on a feed lacking a required field. It also
+  covers any approved section 5 change.
+- **Usage examples**: every README and `docs/usage/` example that calls a member whose
+  signature changes is updated and compiled. The examples directory is in
+  `tsconfig.test.json`'s `include`.
+- **Affected guides**: the README sections on identities, `analyse` and error typing, and
+  batches (C1), WebSocket (C2) and legacy handlers (C5) if those are approved. Also
+  `docs/usage/ANSWER_SHAPES.md` and `ERRATA.md` where a reading's behaviour changed (D2),
+  and the legacy package's README and `docs/LEGACY.md` for its handlers.
+
+## 9. Not in this spec
+
+- Test code, and tooling other than the guard, as the goal states. Comments are not code.
 - The plan's step order, and how the 703 overload pairs are written.
 - The exact parameter shape of the interfaces-adt change, which its own PR settles.
