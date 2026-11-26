@@ -79,7 +79,9 @@ caller's to compose. Nothing else changes for consumers.
     do for each of these changes, the C7 recipe included.
 - **Behaviour is proved unchanged, in the way the change allows.**
   - A **type-only** change (a cast deleted, an annotation, an overload) leaves the emitted
-    JavaScript byte-identical, and the build output before and after shows it.
+    JavaScript the same: identical once parsed and printed without redundant parentheses
+    (a deleted cast leaves its own), a new module of types only counting as no
+    difference. The build output before and after shows it.
   - A **runtime** change (a regex replaced by string code, a reader replacing a cast)
     behaves the same as the code it replaces on every input that code accepted. Unit tests
     show this against the old code as an oracle, on SAP's recorded answers wherever the

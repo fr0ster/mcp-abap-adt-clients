@@ -56,10 +56,14 @@ call sites:
   - a parameter of a boundary reader (below).
 - A value whose static type is not `unknown` or `any` and that reaches an `unknown` binding
   is a **widening**. The checker follows these flows: argument to parameter, initializer,
-  assignment, return, and property of an object literal.
+  assignment, return, and property of an object literal. The owner decided how a value's
+  type is judged: by its binding's declared type, or by its initializer's type when the
+  binding has no annotation, and not by the type control flow narrowed it to. An `unknown`
+  checked with `typeof` and handed on is still the value from outside it was.
 - **N counts** a narrowing construct (`typeof`, `instanceof`, `in`, `Array.isArray`,
-  equality with a literal, a call to a reader of a boundary module) applied to a binding
-  reached by a widening. That covers mixed callers, exported functions and locally widened
+  equality with a literal) applied to a binding reached by a widening. Handing a binding
+  to a boundary reader is not narrowing (the owner's decision): a reader that takes
+  `unknown` and passes it straight to `field()` delegates, and narrows nothing by hand. That covers mixed callers, exported functions and locally widened
   bindings alike. A binding reached only from outside is not counted.
 - **Boundary readers** are the modules whose job is to read values from outside:
   `adt-strategies/src/parsed.ts` and the property readers of section 3.5. Their own
@@ -589,7 +593,7 @@ The remaining 29 casts are covered under "What D1 does not require" below, so
 
 - the inventory counts all 237 casts;
 - the type-only remediation covers 208 of them (144 + 52 + 12), whose deletion leaves the
-  emitted JavaScript byte-identical.
+  emitted JavaScript identical (section 7, type-only changes).
 
 The other 29 are runtime conversions with oracle tests.
 
@@ -926,8 +930,12 @@ is part of the rule. The existing `noRegexInDocumentPatches.test.ts` stays.
 
 - **Type-only changes** (K1, K2's deletions under D1, the N/K6 parameter types, the K7
   `AdtService` change, the D3 overloads, and Y bindings that add no runtime code): each
-  package's emitted `dist/**/*.js` is compared before and after, and must be byte-identical
-  outside the files the plan lists as runtime changes.
+  package's emitted `dist/**/*.js` before and after is compared by
+  `tools/compare-emit.js`. Each file is parsed and printed without its redundant
+  parentheses, because deleting `(x as T)` leaves `(x)` in TypeScript's output and the
+  parentheses change no evaluation. A new module that holds only types, and so emits only
+  the module marker, is no difference. Everything else must be identical, outside the
+  files the plan lists as runtime changes.
 - **Two kinds of runtime test**, kept apart:
   - **Equivalence tests** prove unchanged behaviour. They are green against the old code
     and stay green after the change. These cover the R scanners, the K5 readers, the Y

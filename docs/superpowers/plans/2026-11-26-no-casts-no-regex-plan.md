@@ -27,7 +27,9 @@ It holds no code. Each implementing step works test first.
   run locally before pushing.
 - **Proof by kind** (spec section 7):
   - A **type-only** change: each package's `dist/**/*.js` is snapshotted before and must be
-    byte-identical after.
+    byte-identical after. In this plan "byte-identical" means what the owner decided and
+    `tools/compare-emit.js` checks: identical once parsed and printed without redundant
+    parentheses, with a new module of types only counting as no difference.
   - A **runtime change meant to behave the same**: an equivalence test (an oracle or a
     differential test) comes first and is green against the old code. Then the code changes,
     and the same test stays green.
