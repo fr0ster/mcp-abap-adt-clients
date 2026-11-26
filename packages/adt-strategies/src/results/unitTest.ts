@@ -1,7 +1,7 @@
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { AdtHeaderMap, AdtHeaderValue } from '../headers';
-import { runIdAfter } from '../scan';
+import { aunitRunUri, quotedUri, runIdAfter } from '../scan';
 
 /** A header's value, whether the transport gave a string or a list of them. */
 function headerText(value: AdtHeaderValue): string {
@@ -38,9 +38,7 @@ export const unitTestRunId: IResultStrategy<string> = (
 
   const data = answer.data;
   if (typeof data === 'string') {
-    const uri =
-      /<aunit:run[^>]*uri="([^"]+)"/.exec(data)?.[1] ??
-      /uri="([^"]+)"/.exec(data)?.[1];
+    const uri = aunitRunUri(data) ?? quotedUri(data);
     const inBody = runIdAfter(uri ?? '', '/runs/');
     if (inBody !== undefined) return inBody;
   }

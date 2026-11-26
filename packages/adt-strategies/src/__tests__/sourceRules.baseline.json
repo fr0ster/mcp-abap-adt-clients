@@ -1,12 +1,5 @@
 [
   {
-    "file": "packages/adt-strategies/src/refusals/analyse.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/<aunit:run[^>]*uri=\"[^\"]*\\/runs\\/[^/\"]+/",
-    "count": 1
-  },
-  {
     "file": "packages/adt-strategies/src/refusals/read.ts",
     "rule": "predicate",
     "kind": "is",
@@ -95,20 +88,6 @@
     "rule": "predicate",
     "kind": "is",
     "text": "item is ParsedElement",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/unitTest.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/<aunit:run[^>]*uri=\"([^\"]+)\"/",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-strategies/src/results/unitTest.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/uri=\"([^\"]+)\"/",
     "count": 1
   }
 ]

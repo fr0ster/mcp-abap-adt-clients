@@ -6,7 +6,7 @@ import {
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { type AdtHeaderMap, firstOf } from '../headers';
 import { field } from '../parsed';
-import { runIdAfter } from '../scan';
+import { aunitRunUriHasRunId, runIdAfter } from '../scan';
 import {
   type AdtActivationFacts,
   type AdtActivationRefusal,
@@ -454,7 +454,7 @@ export const analyseUnitTestStart: IAnalyse<IAdtMessageFailure> = (
       (v) => typeof v === 'string' && runIdAfter(v, '/runs/') !== undefined,
     );
   const body = typeof answer?.data === 'string' ? answer.data : '';
-  const inBody = /<aunit:run[^>]*uri="[^"]*\/runs\/[^/"]+/.test(body);
+  const inBody = aunitRunUriHasRunId(body);
   if (header || inBody) return ADT_NO_FAILURE;
   const message = 'Failed to start unit test run: run ID not returned';
   return {

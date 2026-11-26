@@ -30,3 +30,83 @@ export function runIdAfter(text: string, prefix: string): string | undefined {
   }
   return undefined;
 }
+
+const AUNIT_RUN = '<aunit:run';
+const URI_OPEN = 'uri="';
+
+/** The value of a `uri="…"` at `at`: non-empty, up to its closing `"`. */
+function quotedValueAt(text: string, at: number): string | undefined {
+  const from = at + URI_OPEN.length;
+  const close = text.indexOf('"', from);
+  return close > from ? text.slice(from, close) : undefined;
+}
+
+/**
+ * Each `uri="` inside one `<aunit:run` before its first `>`, the last first —
+ * the order the greedy `[^>]*` of `<aunit:run[^>]*uri="` tries them in.
+ */
+function* runUrisFromLast(text: string, run: number): Generator<number> {
+  const start = run + AUNIT_RUN.length;
+  const gt = text.indexOf('>', start);
+  const limit = gt === -1 ? text.length : gt;
+  let at = limit > start ? text.lastIndexOf(URI_OPEN, limit - 1) : -1;
+  while (at >= start) {
+    yield at;
+    at = text.lastIndexOf(URI_OPEN, at - 1);
+  }
+}
+
+/** Each `<aunit:run`, left to right. */
+function* aunitRuns(text: string): Generator<number> {
+  let at = text.indexOf(AUNIT_RUN);
+  while (at !== -1) {
+    yield at;
+    at = text.indexOf(AUNIT_RUN, at + 1);
+  }
+}
+
+/**
+ * `/<aunit:run[^>]*uri="([^"]+)"/`: the uri of the first `<aunit:run` that
+ * has one, taking the last `uri="` before the element's first `>` that a
+ * non-empty value and `"` follow — the value may cross a `>`, as `[^"]` does.
+ */
+export function aunitRunUri(text: string): string | undefined {
+  for (const run of aunitRuns(text))
+    for (const at of runUrisFromLast(text, run)) {
+      const value = quotedValueAt(text, at);
+      if (value !== undefined) return value;
+    }
+  return undefined;
+}
+
+/** `/uri="([^"]+)"/`: the first `uri="` that a non-empty value and `"` follow. */
+export function quotedUri(text: string): string | undefined {
+  let at = text.indexOf(URI_OPEN);
+  while (at !== -1) {
+    const value = quotedValueAt(text, at);
+    if (value !== undefined) return value;
+    at = text.indexOf(URI_OPEN, at + 1);
+  }
+  return undefined;
+}
+
+/**
+ * `/<aunit:run[^>]*uri="[^"]*\/runs\/[^/"]+/.test`: some `uri="` of some
+ * `<aunit:run` whose value, up to its first `"` or the end, holds `/runs/`
+ * and then a character that is neither `/` nor `"`.
+ */
+export function aunitRunUriHasRunId(text: string): boolean {
+  for (const run of aunitRuns(text))
+    for (const at of runUrisFromLast(text, run)) {
+      const from = at + URI_OPEN.length;
+      const close = text.indexOf('"', from);
+      const end = close === -1 ? text.length : close;
+      let runs = text.indexOf('/runs/', from);
+      while (runs !== -1 && runs < end) {
+        const after = runs + '/runs/'.length;
+        if (after < end && text.charAt(after) !== '/') return true;
+        runs = text.indexOf('/runs/', runs + 1);
+      }
+    }
+  return false;
+}
