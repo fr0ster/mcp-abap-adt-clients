@@ -28,8 +28,12 @@ It holds no code. Each implementing step works test first.
 - **Proof by kind** (spec section 7):
   - A **type-only** change: each package's `dist/**/*.js` is snapshotted before and must be
     byte-identical after.
-  - A **runtime** change: the oracle or differential test comes first and is green against
-    the old code. Then the code changes, and the same test stays green.
+  - A **runtime change meant to behave the same**: an equivalence test (an oracle or a
+    differential test) comes first and is green against the old code. Then the code changes,
+    and the same test stays green.
+  - A **decided change** (D2, C1–C5): an intended-change test comes first and **fails
+    against the old code**. The failure is watched, and the test passes after the change.
+    Its equivalence counterpart, if it has one, stays green throughout.
   - Each step below says which kind it is.
 - **Load-bearing.** Each rule a test protects is broken once on purpose, the test is
   watched go red, and the change is reverted. One conjunct is broken at a time.
@@ -51,7 +55,8 @@ It holds no code. Each implementing step works test first.
 | | adt-strategies | adt-clients | adt-clients-legacy |
 |---|---:|---:|---:|
 | K1 | 11 | 36 | 2 |
-| K2 (D1) | 0 | 217 | 20 |
+| K2 (D1), inventory | 0 | 217 | 20 |
+| K2 type-only (name, source, lock handle) / runtime conversions | 0 | 188 / 29 | 20 / 0 |
 | K3 (D2) | 28 | 0 | 0 |
 | K4 | 0 | 11 (verdict 8, C1, C2, slot lookup) | 30 (verdict 29, C5) |
 | K5 | 13 | 29 | 0 |
@@ -84,7 +89,9 @@ finds joins its package's stage (step 12).
    member calls:
    - in adt-clients: the no-answer fallback after `analyse` (`adtResponse.ts:502–522`,
      `systemInfo.ts:185–194`, `structuredExchange.ts:189–197`) and chain steps;
-   - in adt-clients-legacy: every refusal and every override that answers one;
+   - in adt-clients-legacy: every refusal and every override that answers one, including
+     every operation of the 20 types `AdtClientLegacy` answers as absent
+     (`AdtClientLegacy.ts:588–1009`, spec section 5, C5);
    - any interface member that either package implements in such a way.
 
    Attach the list to the PR, and give those members' generic overloads
@@ -118,10 +125,13 @@ finds joins its package's stage (step 12).
     The differences, the N rule's full list included, are reported to the owner.
 11. **A baseline that refuses any new finding.** Each package gets
     `src/__tests__/unit/sourceRules.test.ts`. It compares the package's findings with a
-    committed baseline of the current findings, each keyed by file, rule, kind and the
-    node's text, not by line. A finding not in the baseline fails the test, so a new
-    violation cannot hide behind a removed one. A baseline entry that no longer matches also
-    fails the test, so the baseline shrinks with each fix. At the end of each package's stage
+    committed baseline. The guard's result carries `text`, the node's source text with
+    whitespace collapsed (spec section 6), and the baseline is a **multiset** keyed by
+    `{ file, rule, kind, text }`, with a count per key and no line numbers.
+    - A key whose findings exceed its count fails the test, so a new violation cannot hide
+      behind a removed one, and two identical casts on one line count twice.
+    - A key with fewer findings than its count also fails the test, so the baseline shrinks
+      with each fix. At the end of each package's stage
     the baseline is empty and is deleted, and the test asserts `[]`.
 12. **Assign every newly found site.** Each site step 10 found beyond spec section 2 is
     added to this plan, in its package's stage, as its own step. Each such step names its
@@ -152,9 +162,13 @@ finds joins its package's stage (step 12).
     constructed holders, against the old code. Then the `Node` and `Record` casts in
     `analyse.ts`, `atc.ts`, `traces.ts` and `parseSearchConfigurations.ts` become
     `parsed.ts` reads, and `analyse.ts:100, 102` uses `propertyOf`.
-19. **D2, the trace readers, runtime.** First one test per required field over the recorded
-    feeds: the feed reads as before, and the reading throws naming the field when that field
-    is removed. Then the 28 casts become throwing readers.
+19. **D2, the trace readers.**
+    - The **equivalence** test comes first: the recorded feeds read exactly as before. It is
+      green against the old code.
+    - The **intended-change** test, one per required field, comes next: with that field
+      removed, the reading throws naming it. It fails against the old code, which returns
+      `undefined`, and the failure is watched.
+    - Then the 28 casts become throwing readers, and both tests pass.
 20. **R scanners, runtime, one commit per pattern family.** For each, the differential test
     comes first: oracle, recorded inputs, edge cases, and the bounded exhaustive plus seeded
     random alphabet. Then the scanner. The families are:
@@ -166,17 +180,20 @@ finds joins its package's stage (step 12).
     - trace id, sub-millisecond and leap second.
 21. **P.** The guard checks the eight predicates' provenance. Any that fails is replaced as
     spec section 2, P describes, after a test of its callers' results.
-22. **Public surface.** Compare the `.d.ts` with step 14's snapshot. The only difference
-    allowed is the interfaces-adt types it re-exports, and any other is a defect, fixed
-    before going on.
+22. **Public surface, first check.** Compare the `.d.ts` with step 14's snapshot. No
+    difference is allowed yet, since nothing public changed and interfaces-adt is still the
+    old one.
 23. **Make the guard strict.** The baseline is empty, and the test asserts `[]`. Break each
     rule once in `src` and revert.
 24. **Docs.** These go in:
     - `CHANGELOG.md`: D2, and the interfaces-adt range raised in step 40;
-    - `ERRATA.md` and `ANSWER_SHAPES.md`, where a trace reading's behaviour changed;
-    - the README's trace readings section, and a migration note for D2 linked from the
-      README;
-    - every README and usage example that reads traces, checked and still compiling.
+    - the published `ERRATA.md`, with the D2 entry;
+    - the README: its trace readings section, its `analyse` section, and a "Migrating to
+      <version>" section. That section is the migration note, because the package publishes
+      only `dist`, `README.md`, `LICENSE`, `COPYING` and `ERRATA.md` (`package.json`
+      `files`), so a note in a `docs/` directory would not reach its consumers;
+    - every guide in spec section 8 that names a trace reading, and every example that reads
+      traces, checked and still compiling.
 
     The version is a breaking 0.x release, as the goal states.
 25. **Stage review.** Push, check CI, then run the external review.
@@ -200,16 +217,22 @@ upgrade.
     declares the old overloads, so removing them now would not compile.
 29. **AbapGit slot lookup, type-only.** The results map is typed per slot. `dist` is
     byte-identical.
-30. **C1.** First a test that a batch member gets its part. Then remove `<T, D>` from
-    `AdtBatchConnection.makeAdtRequest`, and add a type check that the generic call is
-    refused.
-31. **C2.** Write these first:
-    - the settlement tests, for answer, close and timeout, each with and without a reader;
-    - a reader that throws rejects only its own request;
-    - the next request on the same id still settles;
-    - type checks that the reader's return type is the answer's type, that a call without a
-      reader answers `unknown`, and that the old caller-chosen `TResponse` without a reader
-      is refused.
+30. **C1.**
+    - The **equivalence** test comes first: a batch member gets its part.
+    - The **intended-change** type check comes next: a generic call
+      `makeAdtRequest<X>(…)` is refused. It fails against the old code, and the failure is
+      watched.
+    - Then remove `<T, D>`.
+31. **C2.**
+    - The **equivalence** tests come first and are green against the old code: settlement
+      on answer, on close and on timeout without a reader, and the next request on the same
+      id.
+    - The **intended-change** tests come next, and each fails against the old code:
+      - settlement with a reader;
+      - a reader that throws rejects only its own request;
+      - type checks that the reader's return type is the answer's type, that a call without
+        a reader answers `unknown`, and that the old caller-chosen `TResponse` without a
+        reader is refused.
 
     Then add the two `request` overloads with the reader.
 32. **K5 readers, runtime.** First the table tests (spec section 7: recorded refusals, an
@@ -235,7 +258,7 @@ upgrade.
       gets one abandoned lock, `unlockAll()` runs, and the release request is compared.
 
     Then add the per-lock datum to `createLockTracker` and remove `lockedTypes`.
-37. **D1, the 29 fields it does not require, runtime.** For each internal function, a test
+37. **D1, the 29 fields it does not require, an equivalence change.** For each internal function, a test
     against the old code comes first: called with `undefined` and with a value, it builds
     the same request. Then the parameter takes the contract's type, and the implicit
     conversions are written out.
@@ -268,8 +291,8 @@ upgrade.
 41. **D1, the members' parameters.** The 455 `Partial<I…Config>` parameters in 54 files take
     the interface's identity type or the required options type. They go one handler family
     per commit, and the legacy overrides of that family follow in the same commit if the
-    compiler demands it. Then the family's K2 casts are deleted (217 in clients), and `dist`
-    is byte-identical. Each family gets type checks: omitting the name, a required `source`
+    compiler demands it. Then the family's type-only K2 casts are deleted: 188 in clients.
+    The other 29 were converted in step 37. `dist` is byte-identical. Each family gets type checks: omitting the name, a required `source`
     or a required `lockHandle` is refused, and the full call compiles.
 42. **D3 overloads, one commit per handler family.** The 598 clients signatures get the
     interfaces' two overloads, and `dist` is byte-identical. Each family gets type checks:
@@ -282,14 +305,17 @@ upgrade.
     - type checks for each such path;
     - a spy showing that `analyse` is called exactly as before: once, with the verdict and
       `undefined`, on the no-answer path, before the library's fallback.
-44. **Public surface.** Compare the `.d.ts` with step 26's snapshot. The only differences
+44. **Public surface.** Compare strategies' `.d.ts` with step 14's snapshot again, now after
+    its interfaces-adt upgrade in step 40. The only differences allowed are the
+    interfaces-adt types it uses or re-exports. Then compare clients' `.d.ts` with step 26's
+    snapshot. The only differences
     allowed are those D1–D3 and C1–C4 name, and any other is a defect, fixed before going
     on.
 45. **Make the guard strict.** The baseline is empty, and the test asserts `[]`. Break each
     rule once in `src` and revert.
 46. **Live run.** Tell the owner the stage is ready for its live run, and wait for the go.
     Then run the changed members' integration suites on premise and on ABAP Cloud.
-47. **Docs.** These go in:
+47. **Docs.** Every guide spec section 8 lists for adt-clients. These go in:
     - `CHANGELOG.md`;
     - `docs/usage/MIGRATION-<major>.md`, covering D1–D3 and C1–C4 and linked from the
       README's migration list;
@@ -318,14 +344,25 @@ it, and this stage finishes the rest.
 53. **C3 for the legacy refusals.** The refusal is typed `E | IAdtError`, with no cast. Tests:
     the refusal is answered, no request is sent (a recording connection sees none), and
     `analyse` is never called (a spy sees no call, as today).
-54. **C5.** These tests come first:
-    - each absent handler answers the refusal;
-    - it sends no request;
-    - it overrides every member of the modern prototype chain.
+54. **C5, all 20 absent types** (spec section 5, C5: `AdtClientLegacy.ts:588–1009`).
+    - The **equivalence** tests come first and are green against the old code: each
+      operation answers the same refusal (origin, code and message), no request is sent
+      (a recording connection sees none), and construction sends none.
+    - The **intended-change** tests come next, and each fails against the old code: the
+      handler is an instance of the modern class and of its `*AbsentLegacy` class, and every
+      public or protected member of the modern class, read from its TypeScript declarations,
+      is overridden on the subclass.
+    - Migrate the test helpers that recognise an absent handler as a plain object to the
+      subclass form, with the same strictness: `legacyRegistrations.ts:284–305`
+      (`isAbsentOnLegacy`) and `legacyMemberInventory.test.ts:293–305`.
+    - Then add the 20 `*AbsentLegacy` subclasses. Each overrides the public and protected
+      members with the refusal. Private helpers cannot be overridden (TS2415), and they stay
+      unreachable because every operation that calls them is overridden. Switch the factory
+      to construct the subclasses, and remove `absentOnLegacy`, which also removes its Y
+      site.
 
-    Then add the eight `*AbsentLegacy` subclasses, switch the factory to construct them, and
-    remove `absentOnLegacy` (which also removes its Y site). The legacy rules' existing tests
-    (`legacyClassesOnlyOverride`, `legacyStaysInLegacyClasses`) stay green.
+    The legacy rules' existing tests (`legacyClassesOnlyOverride`,
+    `legacyStaysInLegacyClasses`) stay green.
 55. **Ranges.** adt-clients is taken through the workspace at its new major, and the
     interfaces-adt range was already raised in step 40. Check the lockfile.
 56. **Public surface.** Compare the `.d.ts` with step 26's legacy snapshot. The only
@@ -334,7 +371,8 @@ it, and this stage finishes the rest.
 58. **Live run on the legacy system.** Wait for the go, then run the legacy package's live
     cycles for the changed handlers, as `docs/LIVE_TESTING.md` describes.
 59. **Docs.** These go in:
-    - the legacy README and `docs/LEGACY.md`;
+    - the legacy README (its migration section), `docs/LEGACY.md` and
+      `docs/LIVE_TESTING.md`, which describe the absent handlers;
     - `CHANGELOG.md`;
     - a migration note covering D1 and D3 on the legacy classes, C3 (a legacy refusal under
       a generic call is typed `E | IAdtError`) and C5 (absent handlers are subclasses);
@@ -343,13 +381,23 @@ it, and this stage finishes the rest.
 
 ## Stage 6: release
 
-61. **Full gate.** Run the root `npm run check`, and the full integration suites on premise
+61. **Sibling versions and ranges, in one commit.** Set the three new versions and, together
+    with them, every range between the siblings:
+    - adt-clients' `dependencies` on adt-strategies (`^0.28.2` today);
+    - adt-clients-legacy's `devDependencies` on adt-strategies (`^0.28.0`) and on
+      adt-clients (`^47.0.0`);
+    - adt-clients-legacy's `peerDependencies` on adt-clients (`^46.1.0 || ^47.0.0`).
+
+    Each points at the new breaking version, and npm regenerates the lockfile in the same
+    commit. A breaking bump without its ranges would leave a sibling pointing across it, so
+    no partial version change is committed.
+62. **Full gate.** Run the root `npm run check`, and the full integration suites on premise
     and on ABAP Cloud with the owner's go. Every failure is fixed before tagging.
-62. **Working documents go.** Delete the goal, spec and plan in the last commit before the
+63. **Working documents go.** Delete the goal, spec and plan in the last commit before the
     merge. Move what they still owe into the PR description: mcp-abap-adt adopting the new
     majors, and anything the interfaces-adt PR left for later.
-63. **Merge** after the external review approves and CI is green.
-64. **Tag all three at the merge commit.** Tag
+64. **Merge** after the external review approves and CI is green.
+65. **Tag all three at the merge commit.** Tag
     `adt-strategies-v<version>`, `adt-clients-v<version>` and
     `adt-clients-legacy-v<version>` on the main checkout at the merge. This is what
     `tools/publish-changed.js` requires: its guard checks a tag at HEAD for every pending
@@ -357,13 +405,13 @@ it, and this stage finishes the rest.
     - every third-party and interfaces-adt range resolves on the registry;
     - each workspace-sibling range names the version this release publishes;
     - the only `"link": true` entries are workspace siblings.
-65. **One publish run.** **The owner runs** `npm run release:publish`. It runs
+66. **One publish run.** **The owner runs** `npm run release:publish`. It runs
     `npm run check` once, publishes the pending packages in `publishOrder` (strategies,
     clients, legacy), and verifies at the end that each version is served. A version not yet
     served is reported by name (exit 2), and re-running publishes only what is missing.
-66. **Clean install.** Install each of the three from the registry into an empty directory
+67. **Clean install.** Install each of the three from the registry into an empty directory
     outside the repository, to prove it installs.
-67. **Hand-over.** Report the published versions and the migration notes for mcp-abap-adt,
+68. **Hand-over.** Report the published versions and the migration notes for mcp-abap-adt,
     which takes the new majors in its own work.
 
 ## Decisions this plan rests on
