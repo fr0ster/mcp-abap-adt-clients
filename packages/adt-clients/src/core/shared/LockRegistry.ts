@@ -120,10 +120,14 @@ export class LockRegistry {
  * Per-handler view over a {@link LockRegistry}: records/removes locks under a
  * stable, type-prefixed key. A no-op when no registry is present, so handlers
  * work unchanged whether or not a registry was injected.
+ *
+ * `D` is what a release needs beyond the name and the handle, carried with
+ * the lock (the enhancement's type); `void` — nothing to pass — for every
+ * other handler.
  */
-export interface LockTracker {
-  /** Record a held lock for `objectName`. */
-  track(objectName: string, lockHandle: string): void;
+export interface LockTracker<D = void> {
+  /** Record a held lock for `objectName`, with the release's datum. */
+  track(objectName: string, lockHandle: string, datum: D): void;
   /** Drop the lock for `objectName` after a clean unlock. */
   untrack(objectName: string): void;
 }
@@ -134,19 +138,26 @@ export interface LockTracker {
  * @param registry   Session registry to record into (undefined → no-op tracker).
  * @param objectType Stable type prefix for the key (e.g. `Domain`).
  * @param unlock     Raw release of a held lock, invoked by `unlockAll()` for
- *                   abandoned locks. MUST NOT toggle the session type —
- *                   `unlockAll()` manages the session for the whole batch.
+ *                   abandoned locks, with the datum the lock was tracked with.
+ *                   MUST NOT toggle the session type — `unlockAll()` manages
+ *                   the session for the whole batch.
  */
-export function createLockTracker(
+export function createLockTracker<D = void>(
   registry: LockRegistry | undefined,
   objectType: string,
-  unlock: (objectName: string, lockHandle: string) => Promise<unknown>,
-): LockTracker {
+  unlock: (
+    objectName: string,
+    lockHandle: string,
+    datum: D,
+  ) => Promise<unknown>,
+): LockTracker<D> {
   const keyOf = (objectName: string): string =>
     `${objectType}/${objectName.toUpperCase()}`;
   return {
-    track(objectName, lockHandle) {
-      registry?.track(keyOf(objectName), () => unlock(objectName, lockHandle));
+    track(objectName, lockHandle, datum) {
+      registry?.track(keyOf(objectName), () =>
+        unlock(objectName, lockHandle, datum),
+      );
     },
     untrack(objectName) {
       registry?.untrack(keyOf(objectName));

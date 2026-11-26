@@ -497,13 +497,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/core/enhancement/AdtEnhancement.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "this.lockedTypes.get(name) as EnhancementType",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/core/enhancement/versions.ts",
     "rule": "cast",
     "kind": "asserts-present",

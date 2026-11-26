@@ -130,9 +130,8 @@ export class AdtEnhancement<
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
-  private readonly lockTracker: LockTracker;
+  private readonly lockTracker: LockTracker<EnhancementType>;
   /** The enhancement type each held lock was taken with. */
-  private readonly lockedTypes = new Map<string, EnhancementType>();
   public readonly objectType: string = 'Enhancement';
 
   protected readonly results: ResultStrategiesOf<T>;
@@ -149,16 +148,12 @@ export class AdtEnhancement<
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
-    this.lockTracker = createLockTracker(
+    this.lockTracker = createLockTracker<EnhancementType>(
       lockRegistry,
       this.objectType,
-      (name, lockHandle) =>
-        unlockEnhancement(
-          this.connection,
-          this.lockedTypes.get(name) as EnhancementType,
-          name,
-          lockHandle,
-        ),
+      // The type the lock was taken with, carried with the lock.
+      (name, lockHandle, enhancementType) =>
+        unlockEnhancement(this.connection, enhancementType, name, lockHandle),
     );
   }
 
@@ -550,8 +545,11 @@ export class AdtEnhancement<
       options?.analyse,
     );
     if (answer.ok && answer.getResult().value) {
-      this.lockedTypes.set(name, this.enhancementType(config));
-      this.lockTracker.track(name, answer.getResult().value);
+      this.lockTracker.track(
+        name,
+        answer.getResult().value,
+        this.enhancementType(config),
+      );
     }
     return answer;
   }
