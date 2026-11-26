@@ -5,13 +5,12 @@ things:
 
 - every site that breaks the goal's two rules;
 - what replaces each group of sites;
-- the owner's decisions D1–D3;
-- the consumer changes that are still for the owner to decide (section 5);
+- the owner's decisions D1–D3 and C1–C6;
 - the guard test;
 - how equivalence is proved, and the release order.
 
-A replacement keeps behaviour and API exactly. Where it cannot, the spec says so and lists
-it in section 5. It does not decide those cases itself.
+A replacement keeps behaviour and API exactly, except for D1–D3 and C1–C5, which are the
+owner's decisions. There is no exception list.
 
 ## 1. The forbidden forms: one definition
 
@@ -86,10 +85,18 @@ call sites:
 `replace`, `replaceAll` and `split` called with a string count only when an argument is
 typed `RegExp`, which the second form above already catches.
 
-**P — explicit type predicate.** A user-defined `x is T` or `asserts x is T` is an assertion
-the compiler does not check, just as a cast is not checked. The owner's rule names `as`
-casts. Whether predicates also count is put to the owner (section 5, C6). Until then they
-are listed here and counted, but not refused.
+**P — explicit type predicate (C6).** A user-defined `x is T` or `asserts x is T` is an
+assertion the compiler does not check. It is allowed only in a reader of data from outside
+the type system, and anywhere else it counts as a cast. A predicate is in such a reader when
+two things hold:
+
+- its function sits in a boundary module, or in a reader of SAP answers (adt-strategies'
+  `results/` and `refusals/`, and adt-clients' readers of answers, parsed XML or JSON, and
+  files);
+- the narrowed parameter is from outside under N's provenance rule.
+
+The list of reader modules is fixed in `tools/sourceRules.js`, next to the boundary
+readers.
 
 Not counted: comments (JSDoc examples), and inferred predicates (TypeScript 5.5 and later),
 which the compiler proves.
@@ -355,6 +362,18 @@ lists them, and each one gets the K6/N treatment.
   `core/transport/AdtRequest.ts:93`, `endpoints/codes.ts:121`,
   `utils/criticalSection.ts:35`, and three predicates over `unknown`.
 
+Under C6, the six adt-clients predicates over typed parameters count as casts and are
+replaced:
+
+- **`AdtClient.ts:225`, `criticalSection.ts:35`** (connection capabilities): `in` and
+  `typeof … === 'function'` narrowing, which the compiler checks.
+- **`codeSets.ts:93, 98`, `endpoints/codes.ts:121`** (a string to a code union): a typed
+  lookup (`ReadonlyMap<string, Code>`) whose `get` answers `Code | undefined`.
+- **`AdtRequest.ts:93`**: narrowing on the union's own discriminant.
+
+The eleven predicates that remain sit in readers of SAP answers. The plan checks each
+narrowed value's provenance with the rule, and any that fails is replaced in the same way.
+
 ## 3. Replacements
 
 ### 3.1 K1
@@ -364,7 +383,7 @@ wider type: an annotation, not a cast. This change is type-only.
 
 ### 3.2 K2, K3, K4
 
-These follow D1, D2 and D3 (section 4) and the open cases of section 5.
+These follow D1, D2 and D3 (section 4) and C1–C5 (section 5).
 
 ### 3.3 K6 and N
 
@@ -387,10 +406,10 @@ goes. JavaScript callers that pass an unknown view keep today's error:
 
 - **`AdtService.ts:932, 939`**: the K1 widenings at `:481` and `:915` go, so `serviceType`
   keeps its `'odatav2' | 'odatav4'` type and no cast is left. This change is type-only.
-- **`AdtAbapGitClient.ts:285, 409`**: see section 5, C4. No typed correlation of args and
-  options exists without a predicate or an API change. Measured: a rest-tuple
-  implementation does not narrow on `options.credentials`, because `credentials` is not a
-  literal discriminant.
+- **`AdtAbapGitClient.ts:285, 409`**: C4 removes the old form, so `link` and
+  `checkExternalRepo` take only the new args and options. No union is left, so no cast is
+  left. With it go the casts at `:292, 295, 302 (×2), 416, 424, 427 (×2)` and
+  `DeprecatedOptions`.
 - **`AdtClient.ts:320`** (K8): `Object.assign(new Error(…), { code })`, whose type is the
   intersection. The thrown object stays an `Error` with an own enumerable `code`, as the
   cast-then-assign produced. Section 7 shows its shape.
@@ -632,29 +651,50 @@ These paths do that even when `analyse` is given:
 - The legacy refusals (`refusalLegacy.ts:6`): by design, no request is sent and `analyse`
   is not called.
 
-None of them can be typed `E` without either calling `analyse` where it is not called
-today, or changing what the generic answer's type says. That is C3 in section 5. Every
-other generic path, where the returned error is `analyse`'s own, is typed by the overload
-and needs no cast.
+These paths are typed by C3. Every other generic path, where the returned error is
+`analyse`'s own, is typed by the overload and needs no cast. The four other generic
+stand-ins and the abapGit args are C1, C2, C4 and C5.
 
-The four other generic stand-ins and the abapGit args go the way D3 goes, with no exception
-list. Each one's typed form is a consumer change, so they are C1, C2, C4 and C5 in section 5.
+## 5. Consumer changes C1–C6, as decided
 
-## 5. Consumer changes for the owner to decide
+- **C1: `AdtBatchConnection.makeAdtRequest`** (`AdtBatchConnection.ts:70`, cast `:93`).
+  `<T, D>` is removed. The signature is the contract's,
+  `makeAdtRequest(options: IAbapRequestOptions): Promise<IAdtWireResponse>`, and the queued
+  promise resolves with the part as it is, with no cast. A caller that named `T` drops it
+  and reads `data` as `unknown`, as it does from any connection.
+- **C2: `AdtClientsWS.request`** (`AdtClientsWS.ts:94`, cast `:126`). Two overloads replace
+  the caller-chosen `TResponse`:
+  - `request(…)` answers `unknown`;
+  - `request(…, { read })` answers `TResponse`, where `read: (payload: unknown) =>
+    TResponse` runs on the payload before the promise settles.
 
-Each of these is a change the goal does not yet name. The spec lists the options and does
-not choose.
-
-| # | Site | Why there is no exact typed form | Options |
-|---|---|---|---|
-| C1 | `AdtBatchConnection.makeAdtRequest<T = unknown, D = unknown>` (`AdtBatchConnection.ts:70`, cast `:93`) | It resolves with the envelope's raw part, which is never a `T`. | (a) Drop `<T, D>` to match `IAbapConnection.makeAdtRequest`: a caller naming `T` gets a compile error. (b) Keep it as an approved, named exception. |
-| C2 | `AdtClientsWS.request<TPayload, TResponse = unknown>` (`AdtClientsWS.ts:94`, cast `:126`; exported via `index.ws.ts:7`) | The payload comes from the socket, and nothing checks it is a `TResponse`. | (a) Answer `unknown`. (b) Take a reader `(payload: unknown) => TResponse` through an overload: `request(…)` answers `unknown`, and `request(…, { read })` answers `TResponse`. Callers that name `TResponse` migrate. (c) An approved exception. |
-| C3 | The verdict `E` on the library-answered paths of D3 (`adtResponse.ts:516–522`, `systemInfo.ts:194`, `structuredExchange.ts:197`, `chain.ts:183, 191`, legacy refusals) | The returned error is the library's, and `analyse` never produced it. | (a) interfaces-adt types the generic answer `IAdtResponse<T, E \| IAdtError>`: a consumer narrows the error. (b) The library calls `analyse(verdict, undefined)` on these paths too. `analyse` then runs where it does not today, and when it clears the verdict the library still needs an `E` it does not have, so (b) also needs a contract change such as a required `shape(error: IAdtError): E`. (c) An approved exception. |
-| C4 | abapGit `link` and `checkExternalRepo`, old and new form (`AdtAbapGitClient.ts:256–310, 400–430`, casts `:285, 295, 302 (×2), 409, 424, 427 (×2)`) | Only the overloads tie the args shape to `options.credentials`. The implementation sees two independent unions. | (a) A type predicate over the options and args (only if C6 allows predicates). (b) Remove the old form, `@deprecated` since 46.2.0: old-form callers break. (c) Give the new form its own member name. (d) An approved exception. |
-| C5 | `absentOnLegacy<T>` (`absentOnLegacy.ts:51–78`) | It builds a `T` from a record of refusing functions, and no record type is a class instance type. | (a) One refusing subclass per type that `extends` the modern handler and overrides every member. The object then differs: `instanceof` the modern class becomes true, members sit on a prototype rather than the object, and construction needs the connection. A test must prove no member is left un-overridden, since one left over would send a request. (b) An approved exception. |
-| C6 | Explicit type predicates (17, section 2 P) | A predicate is an unchecked assertion, like a cast. | (a) Predicates count as casts and are refused, except in boundary readers over values from outside. (b) Predicates stay allowed, which makes C4(a) available. |
-
-Until the owner decides, these sites stay as they are, and the plan does not start on them.
+  A reader that throws rejects that request alone, with the reader's error, and the pending
+  entry is removed exactly as on any other settlement. `TPayload` stays: it types what the
+  caller sends, which the caller owns.
+- **C3: `E | IAdtError` on the library's own paths.** In interfaces-adt, the generic
+  overload of every member whose implementation can answer the library's own error with
+  `analyse` given answers `IAdtResponse<T, E | IAdtError>`. Those paths are the no-answer
+  verdict (`answering`, `answeringExchange`, `systemInfo`, the abapGit facts exchange,
+  which gives `E | IAbapGitStructuredError`), a chain whose step answered without a
+  strategy, and the legacy refusals. `analyse` is not called on these paths, as today. The
+  helpers return that union with no cast. The members on paths that only ever return
+  `analyse`'s error keep `IAdtResponse<T, E>`. The interfaces-adt PR settles which members
+  are which, from the helper each member calls.
+- **C4: the old abapGit form is removed.** Removed: the `@deprecated` overloads of `link` and
+  `checkExternalRepo` (args with `remoteUser` and `remotePassword`, `DeprecatedOptions`), the
+  old-form request builders they alone reach (`linkRepo` and the old external-repo check),
+  and their result slots, together with interfaces-adt's declarations of them where it
+  carries them. The new form is unchanged.
+- **C5: refusing subclasses** (`absentOnLegacy.ts`). Each type that `AdtClientLegacy`
+  answers as absent (`:588–737`: domain, data element, structure, table, table settings,
+  text elements, table type, access control) gets a `*AbsentLegacy` class.
+  - The class `extends` the modern handler and overrides every member of the modern
+    prototype chain with the same refusal `absentOnLegacy` built.
+  - The factory constructs it with the connection and options the factory already holds.
+  - `absentOnLegacy` and its record-plus-cast go.
+  - A test walks the modern prototype chain and proves every member is overridden, so none
+    can send a request.
+- **C6: type predicates.** See section 1, P, and the replacements listed under section 2, P.
 
 ## 6. The guard test
 
@@ -731,10 +771,19 @@ is part of the rule. The existing `noRegexInDocumentPatches.test.ts` stays.
     enumerable property.
   - **D2**: one test per required trace field. When that field is removed from a recorded
     feed, the reading throws and names it. The recorded feeds read as before.
-  - **Section 5 changes**, once decided, each get their own test. For C2(b): settlement on
-    answer, on close and on timeout; a reader that throws rejects that request only. For
-    C5(a): each legacy absent handler answers the refusal, sends no request (a recording
+  - **C1**: a batch member still gets its part's answer, and a type check shows the generic
+    form is refused.
+  - **C2**: settlement on answer, on close and on timeout, with and without a reader. A
+    reader that throws rejects that request only, and the next request on the same id
+    settles normally.
+  - **C3**: type checks that the no-answer path, a chain step and a legacy refusal are typed
+    `E | IAdtError`, and that `analyse` is not called there (a spy sees no call).
+  - **C4**: type checks that the old-form calls are refused. The new form's existing tests
+    stay green.
+  - **C5**: each legacy absent handler answers the refusal, sends no request (a recording
     connection sees none), and overrides every member of the modern prototype chain.
+  - **C6**: each replaced predicate's callers get the same narrowing results on the same
+    inputs.
 - **Type checks**: test-only `*.typecheck.ts` files use `@ts-expect-error`. They live under
   `src/__tests__/` of adt-clients, where `tsconfig.test.json` (`src/**/*`, and adt-strategies'
   `src`) includes them, and of adt-clients-legacy (its own `tsconfig.test.json`). Both run in
@@ -745,7 +794,7 @@ is part of the rule. The existing `noRegexInDocumentPatches.test.ts` stays.
   - **compiles**: a generic call with `analyse`; a default call with no `E`;
   - **unchanged signatures**: every other exported signature. An `.d.ts` snapshot of each
     package's public surface is compared before and after, and the only differences allowed
-    are the ones D1–D3 and any approved section 5 change name.
+    are the ones D1–D3 and C1–C5 name.
 - **Recorded inputs**:
   - **run ids**: `unittest-run-passing`, `refusal-unittest-run-failing` and the
     `activation-*` runs;
@@ -791,7 +840,15 @@ in `publishOrder`, each one after the one before it is published. Each raises it
 `@mcp-abap-adt/interfaces-adt` range to the published version, resolved from the npm
 registry. No `file:`, `link:` or workspace link to interfaces-adt is used. After each
 install, the lockfile is checked: interfaces-adt must resolve from the registry and must not
-be `"link": true`. The version bump of each package is put to the owner separately.
+be `"link": true`.
+
+**Versions:**
+
+- **adt-clients** and **adt-clients-legacy**: breaking releases (majors).
+- **adt-strategies**: a breaking 0.x release. D2 changes its public trace readings, and its
+  interfaces-adt range crosses that package's breaking release.
+- **interfaces-adt**: its own versioning.
+- **mcp-abap-adt**: takes the new majors deliberately, outside this task.
 
 Before each tag:
 
@@ -804,17 +861,20 @@ The release gate is the root `npm run check`.
 
 **Documentation**, in the release that ships the change, per package:
 
-- **`CHANGELOG.md`**: D1–D3, and any section 5 change approved.
+- **`CHANGELOG.md`**: D1–D3 and C1–C6.
 - **A migration note** (`docs/usage/MIGRATION-<version>.md`, linked from the README's
   migration list) saying what a consumer on the old contract must do. That means: give the
   name, the `source` or the `lockHandle` where now required; pass `analyse` wherever `E` is
   named; and expect a trace reading to throw on a feed lacking a required field. It also
-  covers any approved section 5 change.
+  covers C1–C5: drop `<T>` on the batch connection; pass a reader to `AdtClientsWS.request`
+  for a typed answer; narrow `E | IAdtError` where a member now answers it; move from the
+  old abapGit form to the new one; and stop relying on an absent legacy handler not being
+  an instance of its modern class.
 - **Usage examples**: every README and `docs/usage/` example that calls a member whose
   signature changes is updated and compiled. The examples directory is in
   `tsconfig.test.json`'s `include`.
-- **Affected guides**: the README sections on identities, `analyse` and error typing, and
-  batches (C1), WebSocket (C2) and legacy handlers (C5) if those are approved. Also
+- **Affected guides**: the README sections on identities, `analyse` and error typing,
+  batches (C1), WebSocket (C2), abapGit (C4) and legacy handlers (C5). Also
   `docs/usage/ANSWER_SHAPES.md` and `ERRATA.md` where a reading's behaviour changed (D2),
   and the legacy package's README and `docs/LEGACY.md` for its handlers.
 
