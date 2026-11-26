@@ -3,9 +3,8 @@
 The goal is `docs/superpowers/2026-11-26-no-casts-no-regex-goal.md`. This spec lists every
 site that breaks the goal's two rules. It says what replaces each group of sites, how the
 guard test finds the forbidden forms, how unchanged behaviour is proved, and the release
-order. Some sites cannot meet the goal's rules and its unchanged-API invariant together.
-Those sites are put to the owner as decisions (section 4). The spec does not pick an option
-for them.
+order. Section 4 records the owner's decisions on the sites where a contract had to be
+made true.
 
 ## 1. How the inventory was taken
 
@@ -298,8 +297,8 @@ A.
 
 ### K2, K3, K4
 
-Each of these groups needs an owner's decision (section 4). The replacement depends on the
-option chosen.
+These follow the decisions in section 4: D1 for K2, D2 for K3, and D3 for K4 and the abapGit
+K7 casts.
 
 ### K5 — a typed reader, and the runtime check it carries
 
@@ -336,8 +335,7 @@ so the switch narrows them with no cast.
   `IAbapGitLinkNewArgs` (and the two external-repo shapes) differ only in
   `remoteUser?: string` versus `remoteUser?: never`. Nothing in the args lets the compiler
   narrow the union. Only the overloads tie a shape to `options.credentials`, and the
-  implementation signature cannot see that link. Like the verdict `E`, this site cannot drop
-  its cast without a signature change, so it is part of D3.
+  implementation signature cannot see that link. It is resolved under D3.
 - **`AdtService` service type**: the value is read from `params.serviceType`, which is
   already `'odatav2' | 'odatav4'` (see the K1 entries at `AdtService.ts:481, 915`). Without
   the earlier widening to `string`, no cast is left.
@@ -414,82 +412,97 @@ adt-clients gets its own.
   `baseUrl.toLowerCase().includes('.hana.ondemand.com')`. This is the same test as the
   unanchored, case-insensitive regex.
 
-## 4. Decisions for the owner
+## 4. Decisions
 
-These groups cannot meet the goal's rules and its "every public API and every answer stays
-the same" invariant together. Each decision lists its options. The plan is written after the
-owner chooses.
+### D1 — K2: the identity requires the name (237 casts)
 
-### D1 — K2: a caller's optional field asserted present (237 casts)
+The contract is made true in `@mcp-abap-adt/interfaces-adt`, in a PR of its own in that
+repository:
 
-interfaces-adt types the identity as `Partial`, so the compiler cannot prove the name is
-present. Every option changes something.
+- **The object's own name becomes required.** `AdtObjectIdentity` takes the config's name
+  key as well as its parent keys. The name and the parents are required, and every other
+  field stays optional. Each capability interface (`IAdtReadable`, `IAdtUpdatable`,
+  `IAdtLockable`, `IAdtEnhancementHost` and the rest) names the key it requires. The
+  interfaces-adt PR settles the exact parameter shape.
+- **The source and the lock handle become required where a member needs them.** Today
+  `IAdtOperationOptions` declares both as optional for every member. A member that sends a
+  source or a lock handle, such as an update, an upload or an unlock, takes an options type
+  that requires them. Every other member keeps the optional form.
+- **The union-typed options** (`enhancementType`, `implementationType`, `bindingVariant`,
+  the feature toggle's source) become required on the capabilities that send them.
+- **The two `Partial` configs cast to full ones** (`AdtFeatureToggle.ts:283`,
+  `AdtFunctionInclude.ts:314`) take the full config type where their member sends every
+  field.
+- **`AdtEnhancement.ts:158`** (`Map.get` cast to `EnhancementType`) reads the lock-time type
+  from the map and checks it. If no type was recorded, the member's own identity supplies
+  it, and that identity now requires it.
 
-- **(a) Refuse before any request.** A member whose identity lacks its name answers a
-  library refusal (`origin: 'refusal'`, fixed words naming the field) and sends nothing.
-  - What changes: the answer, and only for an input that today sends a request to `…/undefined`
-    or throws inside the exchange.
-  - What stays: the public types.
-  - Note: the package's comment on `AdtDdicTableType.create` calls the empty-package check
-    "the one guard this package keeps". This option adds such a guard to every member that
-    needs a name.
-- **(b) Require the field in the type.** interfaces-adt changes `AdtObjectIdentity` to
-  require the object's own name. That is a contract change in another repository, which is
-  outside the goal.
-- **(c) Pass the field on as `string | undefined`** down to the URL builders, which turn an
-  absent name into today's `undefined` text. This keeps the answer byte for byte, but it
-  types an absent name as a valid request. It is listed for completeness, not recommended.
+In adt-clients and adt-clients-legacy, each K2 cast is then deleted, because the field's type
+is already `string`. The emitted JavaScript of those sites does not change.
 
-### D2 — K3: an SAP answer's field asserted present (28 casts)
+**Consumer impact.** A caller that omits the name, or a source or lock handle a member needs,
+now gets a compile error. Before, the request went to a URL holding `undefined`. A
+JavaScript caller that omits the name sends the same request as before.
 
-The trace readers return `ITraceEntry` and view rows whose fields are typed as required.
-Today an absent field is `undefined` behind a type that says `string`.
+**Order.** interfaces-adt is released first, in its own versioning. adt-strategies,
+adt-clients and adt-clients-legacy then raise their `@mcp-abap-adt/interfaces-adt` range to
+that published version, which resolves from the npm registry. No `file:`, `link:` or
+workspace link to interfaces-adt is used at any point, and after the install the lockfile is
+checked: interfaces-adt must resolve from the registry and must not be `"link": true`.
+Nothing in this repository builds against an unpublished interfaces-adt.
 
-- **(a) The reading throws when a required field is absent**, as the table-settings readers
-  already do ("ts:… is missing"). What a reading's throw becomes is unchanged. The answer
-  changes only for a feed that lacks a field. The recorded feeds carry every field (the
-  reader's comment records sixty entries read in full).
-- **(b) Make the fields optional in the result types.** This is a type change of
-  adt-strategies' public results. It is a major release for a 0.x package under a caret
-  range, and the goal forbids that.
+### D2 — K3: a reading throws on a missing required field (28 casts)
 
-### D3 — K4 and the abapGit K7 casts: the verdict `E` without `analyse` (37 casts), the other generic stand-ins (4) and the abapGit args (2)
+The trace readers in `results/traces.ts` read each field the result type requires with a
+reader that throws when the field is absent, naming it (`trc:… is missing`). This is the form
+the table-settings readers use (`results/tableSettings.ts`, `text` and `attribute`). What a
+reading's throw becomes in `answering` is unchanged.
 
-**The verdict `E`.** interfaces-adt already declares two overloads for each member: a
-generic one that requires `analyse: IAnalyse<E>`, and a plain one returning `IAdtError`. The
-classes implement both with one signature, `<E = IAdtError>(…, options?: …<E>)`, so a caller
-can name `E` and pass no `analyse`. That single signature is the lie the cast hides.
+- Optional result fields keep their `?? undefined` reads, with no cast.
+- Numbers (`numberOf`, `attrNum`) and the boolean (`booleanOf`) throw when absent or
+  unreadable. They return their number or boolean typed, with no cast.
 
-- **(a) The classes declare the interfaces' two overloads**, and the shared helpers
-  (`answering`, `answeringExchange`, `systemInfo`, `chain`, the legacy refusals) get the same
-  pair.
-  - The implementations then return `IAdtResponse<T, IAdtError>`, with no cast.
-  - The emitted JavaScript does not change. Through the interfaces, nothing changes for a
-    caller.
-  - What changes: the classes' declaration files. A caller that names `E` on a class and
-    passes no `analyse` gets a compile error where it used to get a lie.
-  - Size: 703 signatures of the form `<E extends IAdtError = IAdtError>` in 86 files,
-    the members and the helpers, gain an overload pair.
-- **(b) Keep the casts as a named, guarded exception list.** The owner alone grants an
-  exception.
+The answer changes only for a feed that lacks a required field. Every recorded feed carries
+all of them (section 6).
 
-**The other four.**
+### D3 — K4 and the abapGit K7 casts: the declared overloads (43 casts)
 
-- `AdtBatchConnection.makeAdtRequest<T, D>`: the class's signature takes the contract's
-  non-generic one.
-- `AdtClientsWS.request<TPayload, TResponse>`: the payload is `unknown` from the socket,
-  so either the request takes a reader `(payload: unknown) => TResponse`, or `TResponse`
-  goes.
-- `AdtAbapGitClient`'s slot lookup: the results become a typed per-slot map.
-- `absentOnLegacy<T>`: each legacy factory builds its refusing handler as a class that
-  `extends` the modern one and overrides each member, the legacy package's own rule.
+**The verdict `E` (37 casts).** Every member implementation of the form
+`<E extends IAdtError = IAdtError>(…, options?: …<E>)` declares the two overloads its
+interface declares:
 
-Each of the first two changes a public signature, as option (a) does. The last two are
-internal.
+- a generic one whose options require `analyse: IAnalyse<E>`;
+- a plain one returning `IAdtResponse<T>`.
 
-**The abapGit args (K7).** Either (a) the new form's members move to a separate
-implementation that only the new-form overload reaches, which changes the class's
-declaration in the same way as the verdict `E`, or (b) they join the exception list.
+The implementation signature returns `IAdtResponse<T, IAdtError>`. That covers 703
+signatures in 86 files, plus the shared helpers: `answering`, `answeringExchange`,
+`answeringActivation`, `systemInfo`'s answer, `chain`, the abapGit facts exchange, and the
+legacy refusals (`legacyRefusal`, `refusalLegacy.ts`, `AdtPackageLegacy`,
+`AdtRequestLegacy`, the legacy runners). Each helper takes the same pair. With `analyse`
+given, its `E` comes from `analyse`. Without it, the helper returns the library's
+`IAdtError`. No cast is left. The emitted JavaScript does not change, because overloads are
+erased. A caller that names `E` and passes no `analyse` gets a compile error.
+
+**The other generic stand-ins (4 casts) go the same way.** There is no exception list:
+
+- **`AdtBatchConnection.makeAdtRequest`** declares the contract's non-generic signature,
+  `(options) => Promise<IAdtWireResponse>`. The `<T, D>` parameters go.
+- **`AdtClientsWS.request`**: the `TResponse` that only the caller claimed goes. The caller
+  passes a reader `(payload: unknown) => TResponse`, and the default reading is the payload
+  as `unknown`. The reader sits on the same overload pair: `request(…)` answers `unknown`,
+  and `request(…, { read })` answers `TResponse`.
+- **`AdtAbapGitClient`'s slot lookup**: the results become a map typed per slot
+  (`{ [K in AbapGitFactsSlot]?: IAbapGitFactsResultStrategy<FactsValue<T, K>, Facts<K>> }`),
+  so the lookup is typed by its key.
+- **`absentOnLegacy<T>`**: each legacy factory builds its refusing handler as a class that
+  `extends` the modern handler and overrides every member with the refusal. This is the
+  legacy package's own rule. The record-plus-cast goes.
+
+**The abapGit args (2 casts).** The new form (`IAbapGitLinkNewArgs`,
+`IAbapGitExternalRepoArgs`) and the old form (`IAbapGitLinkArgs`,
+`IAbapGitExternalRepoCredentials`) reach separate private implementations. Each public
+overload calls its own implementation directly, so the implementation signature is no
+longer a union of the two.
 
 ## 5. The guard test
 
@@ -514,9 +527,7 @@ The checker runs no regex over source. It reads the AST and asks the type checke
   on a receiver the checker types `string`, because each of these turns a string argument
   into a regex.
 
-An exception list does not exist unless the owner grants one under D3(b). If it does, it is
-a JSON file of `{ file, line-independent site, rule, reason }`, and the test refuses any
-entry that no longer matches a finding.
+There is no exception list. A finding is fixed in the code.
 
 **Proving it load-bearing.** The checker's own tests feed it in-memory sources: one per rule
 and per form (an `as`, a `<T>` assertion, `as const` allowed, an `any` annotation, a
@@ -529,10 +540,12 @@ it, and tests are out of scope unless touched for another reason.
 
 ## 6. Proving behaviour unchanged, per site
 
-- **Type-only removals** (K1, K4 under D3(a), K6, K7 and every cast that is only deleted):
+- **Type-only removals** (K1, K2 under D1, K4 and the K7 casts under D3, K6, and every
+  cast that is only deleted):
   TypeScript erases them, so each package's emitted `dist/**/*.js` is compared before and
-  after. Every file must be byte-identical except the files whose runtime code a K2, K3, K5,
-  A, R or K8 change touched. The plan lists those files, and each one gets the proof below.
+  after. Every file must be byte-identical except the files whose runtime code a K3, K5, A, R
+  or K8 change touched, or a D3 restructuring (the WebSocket reader, `absentOnLegacy`, the
+  abapGit split) touched. The plan lists those files, and each one gets the proof below.
 - **K5 and A** (readers over thrown values and parsed documents): the existing unit tests,
   plus a table test per reader over the recorded answers. Every `refusal-*` recording in
   `packages/adt-clients/corpus/adt/answers/` feeds the exception readers (`adtErrors.ts`,
@@ -541,7 +554,7 @@ it, and tests are out of scope unless touched for another reason.
 - **K3** (traces): the trace readers' results over every recording that holds
   `abaptraces` (6 files in the corpus) and the strategies' feed fixtures
   (`packages/adt-strategies/src/__tests__/fixtures/feeds/`) are deep-equal to the results
-  before the change. Under D2(a), one more test per required field shows the reading throws
+  before the change. Under D2, one more test per required field shows the reading throws
   when that field is absent.
 - **R** (each regex site): the replaced function is tested against an oracle. The oracle is
   the old regex implementation, copied into the test, where regexes are allowed. The two are
@@ -560,39 +573,61 @@ it, and tests are out of scope unless touched for another reason.
 
   Where the oracle and the new code differ on a recorded input, the plan stops and reports
   it. Nothing is changed to match.
-- **No recording yet.** Three regex sites read SAP answers that the corpus does not hold:
-  the multipart `$batch` answer (`batch/wire.ts`), the where-used scope answer
-  (`whereUsed.ts`'s `usageScopeResult`), and the ATC worklist and customizing documents read
-  by `atc.ts`. Before those sites change, the plan captures each answer with
-  `corpus:capture` on premise and on ABAP Cloud. That is a live run, and it waits for the
-  owner's go. Hand-written fixtures stand in only if the owner says so.
-- **D1 and D3 public changes**: a unit test per member family shows the chosen behaviour.
-  For D1(a), the refusal is answered and no request is sent. For D3(a), a `*.typecheck.ts`
-  file proves that the generic overload requires `analyse`, using `@ts-expect-error` in a
-  test-only file.
+- **The recordings this task added.** These are read-only, on the shared class
+  `ZAC_SHR_RUN01` and the shared domain `ZAC_SHR_GA_DOM`, on premise (`s4-2025`) and on
+  ABAP Cloud (`abap-cloud`). They are in `packages/adt-clients/corpus/adt/answers/`, one
+  `.json` per step beside its body:
+  - `batch-get-parts-<release>--01-batch`: a `$batch` envelope of two GET parts (the
+    class's and the domain's metadata), answered `202` with its multipart body
+    (`.body.txt`, byte for byte). These are the inputs of `batch/wire.ts`.
+  - `where-used-scope-class-<release>--01-usagereferences-scope`: the where-used scope of
+    the class. It is the input of `whereUsed.ts`'s `modifyWhereUsedScope` and of the
+    `usageScopeResult` rewrap.
+  - `atc-worklist-class-<release>--01-customizing`, `--02-worklist-create`, `--03-run`
+    and `--04-worklist`: the ATC customizing, the worklist id, a waiting run and the
+    worklist. These are the inputs of `atc.ts`'s customizing, waiting-run and worklist
+    readers.
+
+  Every field was scrubbed before commit:
+  - credentials and the session headers are redacted;
+  - the host is replaced by `sap.example.com` and the user by `SAPUSER01`;
+  - the system id is replaced by `SYS` and the client by `000`;
+  - IP addresses become `0.0.0.0` and e-mail addresses `user@example.com`;
+  - every 32-hex id is replaced by a numbered id of the same shape, consistently across a
+    case's files, so a multipart boundary still matches its body.
+- **D1 and D3 type changes**: test-only `*.typecheck.ts` files use `@ts-expect-error` to
+  show the new compile errors. One shows that an identity without its name is refused, and
+  one shows that a generic call without `analyse` is refused. The emitted JavaScript
+  comparison above covers both changes, since neither emits code.
+- **D2**: one test per required trace field. The reading throws, naming the field, when
+  that field is removed from a recorded feed.
 - **Live**: the changed readers' members run once against on premise and ABAP Cloud
   through the existing integration suites. A patch runs live only the changed files' suites.
 
 ## 7. Release order
 
-This is the repository's `publishOrder`. Each package goes out only after the one before it
-is published:
+0. **`@mcp-abap-adt/interfaces-adt`**: its own PR in its own repository (D1), released in its
+   own versioning and published first.
+1. **`@mcp-abap-adt/adt-strategies`**: a patch (0.28.x). Its interfaces-adt range is raised
+   to the published version. adt-clients depends on it as `^0.28.2` and adt-clients-legacy
+   as `^0.28.0`. A 0.29.0 would fall outside both ranges and would in effect be a major, so
+   it stays a patch.
+2. **`@mcp-abap-adt/adt-clients`**: a minor (47.x), because D1 and D3 change what a caller
+   can compile. Its interfaces-adt range is raised to the published version, and its
+   strategies range to the published patch.
+3. **`@mcp-abap-adt/adt-clients-legacy`**: a patch (0.11.x). Under a 0.x caret range a
+   0.12.0 would in effect be a major. Its adt-clients range is raised to the published 47.x
+   minor, and its interfaces-adt range to the published version.
 
-1. **`@mcp-abap-adt/adt-strategies`**: a patch (0.28.x). adt-clients depends on it as
-   `^0.28.2` and adt-clients-legacy as `^0.28.0`, so a 0.29.0 would fall outside both ranges
-   and would be a major in effect. A patch keeps them.
-2. **`@mcp-abap-adt/adt-clients`**: a patch (47.0.x). It is a minor if D1(a) or D3(a) is
-   chosen, since both change what a caller can observe or compile. Its strategies range is
-   raised to the published patch, so consumers get the fixed readers.
-3. **`@mcp-abap-adt/adt-clients-legacy`**: a patch (0.11.x). It depends on adt-clients
-   `^47.0.0`, which any 47.x satisfies. Its adt-clients range is raised to the published
-   version when the legacy code relies on a D3(a) overload.
-
-Each package's `CHANGELOG.md`, and its README and docs where a D1 or D3 change is visible,
-are updated in the release that ships the change. The release gate is the root
-`npm run check`.
+Before each tag, every dependency range resolves on the registry, and the lockfile holds no
+`"link": true` for interfaces-adt. The repository's own workspace siblings may stay linked
+during development. After each publish, a clean install from the registry, outside the
+repository, proves the package installs. Each package's `CHANGELOG.md`, README and docs
+state the consumer impact of D1, D2 and D3 in the release that ships it. The release gate
+is the root `npm run check`.
 
 ## 8. Not in this spec
 
 - Test code, tooling outside production `src`, and comments, as the goal states.
-- The plan's step order, and how the 703 overload pairs are written, if D3(a) is chosen.
+- The plan's step order, and how the 703 overload pairs are written.
+- The exact parameter shape of the interfaces-adt change, which its own PR settles.
