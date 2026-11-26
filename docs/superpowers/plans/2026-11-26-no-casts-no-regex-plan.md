@@ -354,7 +354,10 @@ it, and this stage finishes the rest.
       is overridden on the subclass.
     - Migrate the test helpers that recognise an absent handler as a plain object to the
       subclass form, with the same strictness: `legacyRegistrations.ts:284–305`
-      (`isAbsentOnLegacy`) and `legacyMemberInventory.test.ts:293–305`.
+      (`isAbsentOnLegacy`), `legacyMemberInventory.test.ts:293–305`, and
+      `legacyIntegrationHeadersOf.test.ts:202`, which excludes absent handlers by
+      `Object.getPrototypeOf(handler) === Object.prototype`. That test also gets an
+      intended-change case showing the subclass form is still excluded.
     - Then add the 20 `*AbsentLegacy` subclasses. Each overrides the public and protected
       members with the refusal. Private helpers cannot be overridden (TS2415), and they stay
       unreachable because every operation that calls them is overridden. Switch the factory
@@ -363,7 +366,8 @@ it, and this stage finishes the rest.
 
     The legacy rules' existing tests (`legacyClassesOnlyOverride`,
     `legacyStaysInLegacyClasses`) stay green.
-55. **Ranges.** adt-clients is taken through the workspace at its new major, and the
+55. **Ranges stay as they are.** adt-clients stays at its current workspace version, and so
+    do every sibling range. Only step 61's single commit moves the versions and ranges. The
     interfaces-adt range was already raised in step 40. Check the lockfile.
 56. **Public surface.** Compare the `.d.ts` with step 26's legacy snapshot. The only
     differences allowed are those of D1, D3, C3 and C5.
