@@ -26,7 +26,7 @@ import {
   sessionLostOf,
   succeeded,
 } from './adtResponse';
-import { propertyOf } from './ownValue';
+import { isElement, propertyOf } from './ownValue';
 
 /**
  * Whether a failure says the endpoint is not there — the one failure
@@ -58,15 +58,14 @@ function objectOf(data: unknown): Record<string, unknown> | undefined {
   let value = data;
   if (typeof value === 'string') {
     try {
-      value = JSON.parse(value);
+      const parsed: unknown = JSON.parse(value);
+      value = parsed;
     } catch {
       return undefined;
     }
   }
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    return undefined;
-  }
-  return value as Record<string, unknown>;
+  if (!isElement(value) || Array.isArray(value)) return undefined;
+  return value;
 }
 
 function recordOf(

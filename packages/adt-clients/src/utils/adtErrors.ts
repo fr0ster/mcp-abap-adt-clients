@@ -23,6 +23,7 @@
 
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
+import { field } from './ownValue';
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -134,8 +135,7 @@ const text = (value: unknown): string | undefined => {
     return value;
   }
   if (value && typeof value === 'object') {
-    const record = value as Record<string, unknown>;
-    const inner = record['#text'];
+    const inner = field(value, '#text');
     if (typeof inner === 'string') {
       return inner;
     }
@@ -145,7 +145,7 @@ const text = (value: unknown): string | undefined => {
 
 const attribute = (value: unknown, name: string): string | undefined => {
   if (value && typeof value === 'object') {
-    const found = (value as Record<string, unknown>)[name];
+    const found = field(value, name);
     if (typeof found === 'string') {
       return found;
     }
@@ -171,17 +171,15 @@ export function sapErrorIn(
   let adtType: string | undefined;
   let namespace: string | undefined;
   try {
-    const parsed = parser.parse(xmlData) as Record<string, unknown>;
-    const exception = parsed['exc:exception'] as
-      | Record<string, unknown>
-      | undefined;
+    const parsed: unknown = parser.parse(xmlData);
+    const exception = field(parsed, 'exc:exception');
     if (exception) {
       message =
-        text(exception.localizedMessage) ??
-        text(exception.message) ??
-        text(exception['exc:message']);
-      adtType = attribute(exception.type, 'id');
-      namespace = attribute(exception.namespace, 'id');
+        text(field(exception, 'localizedMessage')) ??
+        text(field(exception, 'message')) ??
+        text(field(exception, 'exc:message'));
+      adtType = attribute(field(exception, 'type'), 'id');
+      namespace = attribute(field(exception, 'namespace'), 'id');
     }
   } catch {
     // The document announced itself as an exception and then would not parse.

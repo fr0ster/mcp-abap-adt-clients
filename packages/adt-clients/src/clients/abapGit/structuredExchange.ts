@@ -68,7 +68,9 @@ function ownData(holder: unknown, key: string): unknown {
   if (holder === null || typeof holder !== 'object') return undefined;
   try {
     const descriptor = Object.getOwnPropertyDescriptor(holder, key);
-    return descriptor && 'value' in descriptor ? descriptor.value : undefined;
+    if (descriptor === undefined || !('value' in descriptor)) return undefined;
+    const value: unknown = descriptor.value;
+    return value;
   } catch {
     return undefined;
   }

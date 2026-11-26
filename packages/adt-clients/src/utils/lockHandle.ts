@@ -2,6 +2,7 @@ import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 import { headerValueToString } from './internalUtils';
+import { at } from './ownValue';
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -33,8 +34,8 @@ export const lockHandleOf: IResultStrategy<string> = (
   if (fromHeader) return fromHeader;
   if (typeof answer.data !== 'string' || answer.data.trim() === '') return '';
   try {
-    const handle = parser.parse(answer.data)?.['asx:abap']?.['asx:values']?.DATA
-      ?.LOCK_HANDLE;
+    const parsed: unknown = parser.parse(answer.data);
+    const handle = at(parsed, 'asx:abap', 'asx:values', 'DATA', 'LOCK_HANDLE');
     return typeof handle === 'string' ? handle : '';
   } catch {
     return '';

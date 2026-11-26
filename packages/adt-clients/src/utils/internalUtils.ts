@@ -58,7 +58,8 @@ export function headerValueToString(
     if (value.length === 0) {
       return undefined;
     }
-    return String(value[0]);
+    const first: unknown = value[0];
+    return String(first);
   }
   if (typeof value === 'object') {
     return undefined;

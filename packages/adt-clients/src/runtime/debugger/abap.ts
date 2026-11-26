@@ -42,6 +42,7 @@ import type {
 import { XMLParser } from 'fast-xml-parser';
 import { buildBatchPayload, createBatchBoundary } from '../../batch/wire';
 import { DEBUGGER } from '../../endpoints/objects';
+import { asString, at, field } from '../../utils/ownValue';
 import { requestHeaders } from '../../utils/requestHeaders';
 import { escapeXmlAttr, escapeXmlText } from '../../utils/xml';
 
@@ -405,14 +406,25 @@ export function readListenerConflict(
   }
   let entries: unknown;
   try {
-    entries = conflictParser.parse(response.data)?.exception?.properties?.entry;
+    const parsed: unknown = conflictParser.parse(response.data);
+    entries = at(parsed, 'exception', 'properties', 'entry');
   } catch {
     return undefined;
   }
-  const list = (
-    Array.isArray(entries) ? entries : entries ? [entries] : []
-  ) as Array<{ key?: string; '#text'?: string }>;
-  const value = (key: string) => list.find((e) => e.key === key)?.['#text'];
+  const list: readonly unknown[] = Array.isArray(entries)
+    ? entries
+    : entries
+      ? [entries]
+      : [];
+  // The parser keeps tag values as text (`parseTagValue: false`), so an
+  // entry's `#text` is a string or absent.
+  const value = (key: string) =>
+    asString(
+      field(
+        list.find((e) => field(e, 'key') === key),
+        '#text',
+      ),
+    );
   const conflictText = value('conflictText');
   if (!conflictText) return undefined;
   const ideUser = value('ideUser');

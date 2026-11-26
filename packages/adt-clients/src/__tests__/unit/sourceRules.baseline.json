@@ -71,13 +71,6 @@
   },
   {
     "file": "packages/adt-clients/src/clients/abapGit/structuredExchange.ts",
-    "rule": "any",
-    "kind": "flow",
-    "text": "descriptor.value",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/clients/abapGit/structuredExchange.ts",
     "rule": "cast",
     "kind": "re-types",
     "text": "verdict as E",
@@ -1246,53 +1239,11 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/runtime/debugger/abap.ts",
-    "rule": "any",
-    "kind": "flow",
-    "text": "conflictParser.parse(response.data)?.exception?.properties?.entry",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/runtime/debugger/abap.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "( Array.isArray(entries) ? entries : entries ? [entries] : [] ) as Array<{ key?: string; '#text'?: string }>",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/utils/activationUtils.ts",
     "rule": "predicate",
     "kind": "is",
     "text": "value is Record<string, unknown>",
     "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/utils/adtErrors.ts",
-    "rule": "any",
-    "kind": "flow",
-    "text": "parser.parse(xmlData)",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/utils/adtErrors.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "parsed['exc:exception'] as | Record<string, unknown> | undefined",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/utils/adtErrors.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "parser.parse(xmlData) as Record<string, unknown>",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/utils/adtErrors.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "value as Record<string, unknown>",
-    "count": 2
   },
   {
     "file": "packages/adt-clients/src/utils/adtResponse.ts",
@@ -1337,27 +1288,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/utils/callTimeout.ts",
-    "rule": "any",
-    "kind": "flow",
-    "text": "Reflect.get(target, property, receiver)",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/utils/callTimeout.ts",
-    "rule": "any",
-    "kind": "flow",
-    "text": "value.bind(target)",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/utils/callTimeout.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "value as IAbapConnection['makeAdtRequest']",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/utils/criticalSection.ts",
     "rule": "predicate",
     "kind": "is",
@@ -1372,31 +1302,10 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/utils/internalUtils.ts",
-    "rule": "any",
-    "kind": "flow",
-    "text": "value[0]",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/utils/lockHandle.ts",
-    "rule": "any",
-    "kind": "flow",
-    "text": "parser.parse(answer.data)?.['asx:abap']?.['asx:values']?.DATA ?.LOCK_HANDLE",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/utils/requestTrace.ts",
     "rule": "cast",
     "kind": "asserts-present",
     "text": "answer?.request as IAdtRequestTrace | undefined",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/utils/systemInfo.ts",
-    "rule": "any",
-    "kind": "flow",
-    "text": "JSON.parse(value)",
     "count": 1
   },
   {
@@ -1411,13 +1320,6 @@
     "rule": "cast",
     "kind": "asserts-present",
     "text": "error as { response?: IAdtWireResponse }",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/utils/systemInfo.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "value as Record<string, unknown>",
     "count": 1
   },
   {

@@ -40,3 +40,26 @@ export function asNumber(value: unknown): number | undefined {
 export function asString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
+
+/** An element of a parsed document: an object (an array included). */
+export type ParsedElement = Record<string, unknown>;
+
+/** Whether a parsed value is an element (an object, an array included). */
+export function isElement(value: unknown): value is ParsedElement {
+  return typeof value === 'object' && value !== null;
+}
+
+/**
+ * A field of a parsed element — what `parsed?.[key]` reads on a parser's
+ * plain object — or `undefined` when the value is no element.
+ */
+export function field(node: unknown, key: string): unknown {
+  return isElement(node) ? node[key] : undefined;
+}
+
+/** A field several levels down: `at(root, 'a', 'b')` is `root?.a?.b`. */
+export function at(node: unknown, ...keys: string[]): unknown {
+  let value = node;
+  for (const key of keys) value = field(value, key);
+  return value;
+}
