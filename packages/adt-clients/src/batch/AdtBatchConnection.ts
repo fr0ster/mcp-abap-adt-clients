@@ -64,9 +64,7 @@ export class AdtBatchConnection implements IAbapConnection {
   getSessionType(): Session {
     return this.session;
   }
-  makeAdtRequest<T = unknown, D = unknown>(
-    request: IAbapRequestOptions,
-  ): Promise<IAdtWireResponse<T, D>> {
+  makeAdtRequest(request: IAbapRequestOptions): Promise<IAdtWireResponse> {
     // A request that must not be logged or resent cannot be a part: the
     // envelope is logged and sent as a whole, at another time. Refused with
     // a synchronous throw, before anything is queued — not as a rejected
@@ -94,7 +92,7 @@ export class AdtBatchConnection implements IAbapConnection {
         resolve,
         reject,
       });
-    }) as Promise<IAdtWireResponse<T, D>>;
+    });
   }
   private envelopeKey(
     part: Pending,

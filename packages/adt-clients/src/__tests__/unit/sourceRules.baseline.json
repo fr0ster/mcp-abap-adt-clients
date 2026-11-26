@@ -3,13 +3,6 @@
     "file": "packages/adt-clients/src/batch/AdtBatchConnection.ts",
     "rule": "cast",
     "kind": "re-types",
-    "text": "new Promise<IAdtWireResponse>((resolve, reject) => { this.queue.push({ request: { ...request, headers }, stateful, resolve, reject, }); }) as Promise<IAdtWireResponse<T, D>>",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/batch/AdtBatchConnection.ts",
-    "rule": "cast",
-    "kind": "re-types",
     "text": "part.request.params as Record<string, string> | undefined",
     "count": 1
   },
