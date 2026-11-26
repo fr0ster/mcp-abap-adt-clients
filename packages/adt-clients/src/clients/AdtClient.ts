@@ -317,12 +317,13 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     if (!answersIsConnected(connection)) return;
 
     if (!connection.isConnected()) {
-      const error = new Error(
-        'AdtClient: the connection is not connected. Call connect() on it before ' +
-          'requesting a handler — this library does not connect on your behalf.',
-      ) as Error & { code: string };
-      error.code = ADT_SESSION_ERROR.NOT_CONNECTED;
-      throw error;
+      throw Object.assign(
+        new Error(
+          'AdtClient: the connection is not connected. Call connect() on it before ' +
+            'requesting a handler — this library does not connect on your behalf.',
+        ),
+        { code: ADT_SESSION_ERROR.NOT_CONNECTED },
+      );
     }
   }
 

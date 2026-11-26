@@ -155,13 +155,6 @@
   },
   {
     "file": "packages/adt-clients/src/clients/AdtClient.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "new Error( 'AdtClient: the connection is not connected. Call connect() on it before ' + 'requesting a handler — this library does not connect on your behalf.', ) as Error & { code: string }",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/clients/AdtClient.ts",
     "rule": "predicate",
     "kind": "is",
     "text": "connection is IAbapConnection & Pick<ISessionLifecycleAware, 'isConnected'>",
