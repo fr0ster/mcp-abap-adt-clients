@@ -10,7 +10,15 @@ answers, parsed XML or JSON, files — is checked at run time, by typed code. Te
 read with plain linear string code, a scanner, or the platform's or the XML parser, never a
 regular expression: over SAP's input a regex costs more than it solves, in correctness and in
 the review it needs. A guard test keeps both rules true from then on, so code that breaks
-them cannot be merged again. Consumers see no change.
+them cannot be merged again.
+
+Where a cast hid a contract that promised less than the code needs, the contract is made
+true instead. In `@mcp-abap-adt/interfaces-adt`, `AdtObjectIdentity` requires the object's
+own name, and also the source and the lock handle where a member needs them. The classes
+declare the two overloads their interfaces declare, so a caller who names the error type
+`E` also passes `analyse`. A reading of SAP's answer that lacks a field its result type
+requires throws, as the table-settings readings already do. Nothing else changes for
+consumers.
 
 ## Invariants
 
@@ -24,18 +32,30 @@ them cannot be merged again. Consumers see no change.
 - **A guard test holds both rules.** It runs in every package's unit suite, fails on any
   cast, `any`, hand-narrowed contract value or regular expression in production `src`, and
   is shown to be load-bearing: reintroducing each forbidden form turns it red.
-- **Every public API and every answer stays the same.** Exports, signatures, types, the
-  requests sent and the results, errors and refusals returned are unchanged; the work is
-  internal, and a consumer on the current versions needs to change nothing.
+- **Every public API and every answer stays the same, except where a contract is made
+  true.** Exports, the requests sent, and the results, errors and refusals returned stay as
+  they are. The consumer sees three changes:
+  - A caller that omits an object's name, or a source or lock handle a member needs, now
+    gets a compile error.
+  - A caller that names `E` on a class member without passing `analyse` now gets a compile
+    error.
+  - A reading of an SAP answer that lacks a field its result type requires now throws.
+    Before, it returned `undefined` under a type that said otherwise.
+
+  The emitted JavaScript of every other site stays the same.
 - **Behaviour is proved unchanged.** Each replaced site keeps its behaviour on the inputs it
   handled before, shown by unit tests; where the replacement reads SAP's input, that input is
   what the test feeds it.
-- **Patch or minor releases.** The affected packages ship as patch or minor versions, in
-  the repository's publish order; no major.
+- **interfaces-adt first, from the registry.** The interfaces-adt change is its own PR in
+  its own repository, released in its own versioning and published first. The packages
+  here then depend on that published version from the npm registry only, never through a
+  local link.
+- **Patch or minor releases here.** adt-strategies, adt-clients and adt-clients-legacy ship
+  as patch or minor versions, in the repository's publish order, with no major.
 
 ## Out of scope
 
 - Test code, unless a test file is touched for another reason.
 - Tooling and scripts outside the packages' production `src`.
 - Any change of behaviour, API or answer, and any new feature.
-- Other repositories, and a backport to an earlier major.
+- Other repositories than interfaces-adt, and a backport to an earlier major.
