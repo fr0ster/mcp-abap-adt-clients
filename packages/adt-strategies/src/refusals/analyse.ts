@@ -5,7 +5,7 @@ import {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { type AdtHeaderMap, firstOf } from '../headers';
-import { field } from '../parsed';
+import { field, propertyOf } from '../parsed';
 import { aunitRunUriHasRunId, runIdAfter } from '../scan';
 import {
   type AdtActivationFacts,
@@ -102,8 +102,8 @@ function requestOf(
 ): { method?: string; url?: string } | undefined {
   // Both are `unknown` in the contract: whatever the transport put there.
   for (const source of [answer?.request, answer?.config]) {
-    const sourceMethod = field(source, 'method');
-    const sourceUrl = field(source, 'url');
+    const sourceMethod = propertyOf(source, 'method');
+    const sourceUrl = propertyOf(source, 'url');
     const method = typeof sourceMethod === 'string' ? sourceMethod : undefined;
     const url = typeof sourceUrl === 'string' ? sourceUrl : undefined;
     if (method || url) return { method, url };
