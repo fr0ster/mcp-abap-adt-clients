@@ -91,7 +91,7 @@ describe('AdtClientsWS', () => {
     const transport = new MockWebSocketTransport();
     const client = new AdtClientsWS(transport);
 
-    const pending = client.request<{ x: number }, { ok: boolean }>(
+    const pending = client.request<{ x: number }>(
       'debugger.listen',
       { x: 1 },
       { correlationId: 'req-1' },
@@ -146,7 +146,7 @@ describe('AdtClientsWS', () => {
 
       let settled = false;
       const pending = client
-        .request<undefined, { ok: boolean }>('debugger.getStack', undefined, {
+        .request<undefined>('debugger.getStack', undefined, {
           correlationId: 'req-slow',
         })
         .finally(() => {
@@ -306,7 +306,7 @@ describe('AdtClientsWS', () => {
 
       let bSettled = false;
       const b = client
-        .request<undefined, { ok: boolean }>('b', undefined, {
+        .request<undefined>('b', undefined, {
           correlationId: 'req-reuse',
         })
         .finally(() => {
@@ -503,5 +503,87 @@ describe('AdtClientsWS', () => {
     await transport.emitMessage(eventMessage);
 
     expect(handler).toHaveBeenCalledWith(eventMessage);
+  });
+});
+
+/**
+ * C2 of #304: an answer is typed by the reader the caller passes, not by a
+ * type the caller names. The reader runs on the payload before the promise
+ * settles; a reader that throws rejects its own request alone.
+ */
+describe('AdtClientsWS request with a reader', () => {
+  it('settles with what the reader made of the payload', async () => {
+    const transport = new MockWebSocketTransport();
+    const client = new AdtClientsWS(transport);
+    const read = jest.fn((payload: unknown) =>
+      typeof payload === 'object' && payload !== null && 'ok' in payload
+        ? payload.ok === true
+        : false,
+    );
+    const pending = client.request(
+      'debugger.listen',
+      { x: 1 },
+      { correlationId: 'r-1', read },
+    );
+    await transport.emitMessage({
+      kind: 'response',
+      correlationId: 'r-1',
+      payload: { ok: true },
+    });
+    await expect(pending).resolves.toBe(true);
+    expect(read).toHaveBeenCalledWith({ ok: true });
+  });
+
+  it('a reader that throws rejects only its own request, and frees its id', async () => {
+    const transport = new MockWebSocketTransport();
+    const client = new AdtClientsWS(transport);
+    const failure = new Error('not a listener answer');
+    const failing = client.request('op', undefined, {
+      correlationId: 'r-1',
+      read: () => {
+        throw failure;
+      },
+    });
+    const other = client.request('op', undefined, { correlationId: 'r-2' });
+    const rejected = expect(failing).rejects.toBe(failure);
+    await transport.emitMessage({
+      kind: 'response',
+      correlationId: 'r-1',
+      payload: 1,
+    });
+    await rejected;
+    await transport.emitMessage({
+      kind: 'response',
+      correlationId: 'r-2',
+      payload: 2,
+    });
+    await expect(other).resolves.toBe(2);
+    // The failed request's entry is gone, as on any other settlement: its
+    // id is accepted again.
+    const again = client.request('op', undefined, { correlationId: 'r-1' });
+    await transport.emitMessage({
+      kind: 'response',
+      correlationId: 'r-1',
+      payload: 3,
+    });
+    await expect(again).resolves.toBe(3);
+  });
+
+  it('does not run the reader on an error envelope', async () => {
+    const transport = new MockWebSocketTransport();
+    const client = new AdtClientsWS(transport);
+    const read = jest.fn(() => 'read');
+    const pending = client.request('op', undefined, {
+      correlationId: 'r-1',
+      read,
+    });
+    const rejected = expect(pending).rejects.toThrow('request failed');
+    await transport.emitMessage({
+      kind: 'error',
+      correlationId: 'r-1',
+      payload: 'no',
+    });
+    await rejected;
+    expect(read).not.toHaveBeenCalled();
   });
 });
