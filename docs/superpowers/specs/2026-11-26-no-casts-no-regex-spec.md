@@ -580,7 +580,13 @@ become required, and only on the capabilities named:
    (`functionGroup/update.ts:37`, which then follows from the member's option): 12 casts.
 
 The remaining 29 casts are covered under "What D1 does not require" below, so
-144 + 52 + 12 + 29 = 237.
+144 + 52 + 12 + 29 = 237. Two counts must not be confused:
+
+- the inventory counts all 237 casts;
+- the type-only remediation covers 208 of them (144 + 52 + 12), whose deletion leaves the
+  emitted JavaScript byte-identical.
+
+The other 29 are runtime conversions with oracle tests.
 
 **The members' own parameters.** The members of adt-clients and adt-clients-legacy still
 declare their configs as `Partial<I…Config>`: 455 parameter sites in 54 files in
@@ -701,22 +707,58 @@ stand-ins and the abapGit args are C1, C2, C4 and C5.
   old-form request builders they alone reach (`linkRepo` and the old external-repo check),
   and their result slots, together with interfaces-adt's declarations of them where it
   carries them. The new form is unchanged.
-- **C5: refusing subclasses** (`absentOnLegacy.ts`). Each type that `AdtClientLegacy`
-  answers as absent (`:588–737`: domain, data element, structure, table, table settings,
-  text elements, table type, access control) gets a `*AbsentLegacy` class.
-  - The class `extends` the modern handler and overrides every member of the modern
-    prototype chain with the same refusal `absentOnLegacy` built.
-  - The factory constructs it with the connection and options the factory already holds.
-  - `absentOnLegacy` and its record-plus-cast go.
-  - A test walks the modern prototype chain and proves every member is overridden, so none
-    can send a request.
+- **C5: refusing subclasses** (`absentOnLegacy.ts`). `AdtClientLegacy` answers **20** types
+  as absent, through 20 `absentOnLegacy` calls at `AdtClientLegacy.ts:588–1009`:
+  `AdtAccessControl`, `AdtAppendStructure`, `AdtAuthorizationField`,
+  `AdtBehaviorDefinition`, `AdtBehaviorImplementation`, `AdtDataElement`,
+  `AdtDdicTableType`, `AdtDomain`, `AdtEnhancement`, `AdtFeatureToggle`,
+  `AdtMetadataExtension`, `AdtScalarFunction`, `AdtScalarFunctionImplementation`,
+  `AdtServiceBinding`, `AdtServiceDefinition`, `AdtStructure`, `AdtTable`,
+  `AdtTableSettings`, `AdtTextElements` and `AdtTransformation`. Each gets a
+  `*AbsentLegacy` class.
+
+  **What is overridden.** Today `membersOf` (`absentOnLegacy.ts:22–35`) walks the prototype
+  chain at run time. It refuses every function there, the TypeScript-private helpers
+  included (`AdtDomain.ts:111` `private name`, `AdtTable.ts:131` `private name`). A subclass
+  cannot declare a member under the name of a base class's private member (TS2415), so the
+  subclass overrides only the **public and protected** members, which are the class's
+  operations. The private helpers stay the modern ones.
+
+  The refusal still holds, for two reasons:
+
+  - Every overridden operation answers the refusal without calling anything. The private
+    helpers are reached only from the operations, so none of them runs. This was read for
+    `AdtDomain.ts` (11 `this.name(…)` calls, none in the constructor) and `AdtTable.ts` (13).
+    For all 20 classes it is inference until the test below runs.
+  - A test enumerates the modern prototype chain, splits it into public or protected
+    members and private ones by the TypeScript declarations (the compiler API over the
+    modern class), and proves two things. Every public or protected member is overridden.
+    Calling each one on the subclass, with a recording connection, answers the refusal and
+    sends no request.
+
+  **What a caller sees differently** (part of C5):
+
+  - `instanceof` the modern class is true;
+  - the operations sit on the subclass's prototype, not on the object;
+  - the private helpers are reachable from JavaScript as the modern ones.
+
+  The factory constructs each subclass with the connection and options it already holds.
+  The modern constructor sends no request, and the test shows it. `absentOnLegacy` and its
+  record-plus-cast go.
+
+  **The C3 inventory** includes all 20 types' operations, typed `E | IAdtError`, since each
+  answers the library's refusal under a generic call.
 - **C6: type predicates.** See section 1, P, and the replacements listed under section 2, P.
 
 ## 6. The guard test
 
 `tools/sourceRules.js` (CommonJS, using only the repository's own `typescript`) implements
 section 1 and exports `findForbidden(tsconfigPath)`. Its result is
-`{ file, line, column, rule, kind }[]`. The same module prints the inventory
+`{ file, line, column, rule, kind, text }[]`, where `text` is the node's source text with
+whitespace runs collapsed. The baseline keys on `{ file, rule, kind, text }`, which a line
+move does not change. It compares findings as a **multiset**: two identical casts in one
+file are two entries. A finding beyond the baseline's count of its key fails the test, and
+so does a baseline entry with fewer findings than its count. The same module prints the inventory
 (`node tools/sourceRules.js --inventory`), so the two cannot drift. Each package's unit suite
 runs it in `src/__tests__/unit/sourceRules.test.ts` on that package's `tsconfig.json`. The
 test asserts the result is `[]` and, on failure, lists every finding. The module runs no
@@ -756,7 +798,18 @@ is part of the rule. The existing `noRegexInDocumentPatches.test.ts` stays.
   `AdtService` change, the D3 overloads, and Y bindings that add no runtime code): each
   package's emitted `dist/**/*.js` is compared before and after, and must be byte-identical
   outside the files the plan lists as runtime changes.
-- **Runtime changes**, each with its own test:
+- **Two kinds of runtime test**, kept apart:
+  - **Equivalence tests** prove unchanged behaviour. They are green against the old code
+    and stay green after the change. These cover the R scanners, the K5 readers, the Y
+    sites, the D1 conversions, the lock datum, `callTimeout`, `ProfilerDomain`, K8 and C6.
+  - **Intended-change tests** prove a decided change. Each one is written to **fail against
+    the old code**, the failure is watched, and it then passes after the change. These
+    cover D2 (a reading throws on a missing field), C1 and C4 (the type checks refusing the
+    old forms), C2 (the reader decides the answer type, and a readerless call answers
+    `unknown`), C3 (the `E | IAdtError` type checks) and C5 (an absent handler is an
+    instance of its modern class, and every public or protected member is overridden).
+
+  Per site:
   - **R scanners**: a differential test against an oracle, which is the old regex
     implementation copied into the test, where regexes are allowed. The test runs on three
     input sets:
@@ -798,8 +851,19 @@ is part of the rule. The existing `noRegexInDocumentPatches.test.ts` stays.
     legacy refusal.
   - **C4**: type checks that the old-form calls are refused. The new form's existing tests
     stay green.
-  - **C5**: each legacy absent handler answers the refusal, sends no request (a recording
-    connection sees none), and overrides every member of the modern prototype chain.
+  - **C5**: for each of the 20 types, these are intended-change tests:
+    - the absent handler is an instance of the modern class and of its `*AbsentLegacy`
+      class;
+    - every public or protected member is overridden.
+
+    These are equivalence tests:
+    - each operation answers the same refusal as before (origin, code and message) and
+      sends no request;
+    - construction sends none.
+
+    The legacy test helpers that recognise an absent handler as a plain object move to the
+    subclass form, with the same strictness: `legacyRegistrations.ts:284–305`
+    (`isAbsentOnLegacy`) and `legacyMemberInventory.test.ts:293–305`.
   - **C6**: each replaced predicate's callers get the same narrowing results on the same
     inputs.
 - **Type checks**: test-only `*.typecheck.ts` files use `@ts-expect-error`. They live under
@@ -878,6 +942,18 @@ be `"link": true`.
 - **interfaces-adt**: its own versioning.
 - **mcp-abap-adt**: takes the new majors deliberately, outside this task.
 
+**Sibling versions and ranges move in one commit.** One commit sets the three new versions
+and every range between the siblings:
+
+- adt-clients' `dependencies` on adt-strategies (`^0.28.2` today);
+- adt-clients-legacy's `devDependencies` on adt-strategies (`^0.28.0`) and on adt-clients
+  (`^47.0.0`);
+- adt-clients-legacy's `peerDependencies` on adt-clients (`^46.1.0 || ^47.0.0`).
+
+Each becomes the new breaking version, so every range stays satisfiable by what this
+release publishes, and none points across it. The lockfile is regenerated by npm in the
+same commit.
+
 Before tagging:
 
 - every third-party and interfaces-adt range resolves on the registry, and each
@@ -900,13 +976,39 @@ The release gate is the root `npm run check`.
   for a typed answer; narrow `E | IAdtError` where a member now answers it; move from the
   old abapGit form to the new one; and stop relying on an absent legacy handler not being
   an instance of its modern class.
+- **Where each package's note ships.**
+  - adt-clients: `docs/usage/MIGRATION-<major>.md`.
+  - adt-clients-legacy: a migration section in its README, and `docs/LEGACY.md`.
+  - adt-strategies publishes only `dist`, `README.md`, `LICENSE`, `COPYING` and `ERRATA.md`
+    (`package.json` `files`), so a note in a `docs/` directory would not reach its
+    consumers. Its migration note is therefore a "Migrating to <version>" section of its
+    `README.md`, and its D2 entry goes into the `ERRATA.md` it publishes.
 - **Usage examples**: every README and `docs/usage/` example that calls a member whose
   signature changes is updated and compiled. The examples directory is in
   `tsconfig.test.json`'s `include`.
-- **Affected guides**: the README sections on identities, `analyse` and error typing,
-  batches (C1), WebSocket (C2), abapGit (C4) and legacy handlers (C5). Also
-  `docs/usage/ANSWER_SHAPES.md` and `ERRATA.md` where a reading's behaviour changed (D2),
-  and the legacy package's README and `docs/LEGACY.md` for its handlers.
+- **Affected guides**: every document that mentions a changed API is reviewed, as a search
+  finds them at this branch's base:
+  - **batches (C1)**: adt-clients `README.md`, `docs/usage/BATCH.md` and
+    `docs/usage/CLIENT_API_REFERENCE.md`, and adt-clients-legacy `docs/LEGACY.md`;
+  - **WebSocket (C2)**: adt-clients `README.md`, `docs/usage/CLIENT_API_REFERENCE.md`,
+    `docs/usage/ADT_OBJECT_ENTITIES.md` and `docs/architecture/ARCHITECTURE.md`, and
+    adt-clients-legacy `docs/LEGACY.md`;
+  - **abapGit (C4)**: adt-clients `README.md` and `docs/usage/CLIENT_API_REFERENCE.md`;
+  - **`analyse` and the error type (D3, C3)**: adt-clients `README.md`, `docs/README.md`,
+    `docs/usage/` (`OBJECT_LIFECYCLE.md`, `STATEFUL_SESSION_GUIDE.md`,
+    `CLIENT_API_REFERENCE.md`, `ERRATA.md`, `BATCH.md`, `CHECK_LOCAL_TEST_CLASS.md`,
+    `ANSWER_SHAPES.md`) and `docs/architecture/` (`ARCHITECTURE.md`, `DECISIONS.md`); the
+    adt-strategies `README.md`; and adt-clients-legacy `docs/LEGACY.md`;
+  - **trace readings (D2)**: adt-clients `README.md`, `docs/README.md`,
+    `docs/usage/CLIENT_API_REFERENCE.md`, `docs/usage/ADT_OBJECT_ENTITIES.md`,
+    `docs/architecture/ARCHITECTURE.md` and `docs/architecture/discovery.md`; and the
+    adt-strategies `README.md` and `ERRATA.md`;
+  - **absent legacy handlers (C5)**: adt-clients-legacy `README.md`, `docs/LEGACY.md` and
+    `docs/LIVE_TESTING.md`;
+  - **identities (D1)**: every guide whose examples pass a config, all checked by
+    compiling the examples.
+
+  Earlier `MIGRATION-*.md` notes are history and stay as they are.
 
 ## 9. Not in this spec
 
