@@ -1,0 +1,31 @@
+{
+  "case": "atc-worklist-class-s4-2025",
+  "step": 4,
+  "stepTag": "worklist",
+  "capturedAt": "2026-11-26T07:02:47.355Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/atc/worklists/00000000000000000000000000000001?includeExemptedFindings=false",
+    "params": null,
+    "headers": {
+      "Accept": "application/atc.worklist.v1+xml, application/vnd.sap.atc.worklist.v1+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point."
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/atc.worklist.v1+xml; charset=utf-8",
+      "content-length": "1244",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "[REDACTED]",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=422650",
+      "sap-server": "true",
+      "sap-perf-fesrec": "426287.000000"
+    },
+    "bodyFile": "atc-worklist-class-s4-2025--04-worklist.body.xml"
+  }
+}

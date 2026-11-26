@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<atcworklist:worklistRun xmlns:atcworklist="http://www.sap.com/adt/atc/worklist">
+  <atcworklist:worklistId>00000000000000000000000000000001</atcworklist:worklistId>
+  <atcworklist:worklistTimestamp>2026-11-26T07:03:22Z</atcworklist:worklistTimestamp>
+  <atcworklist:infos>
+    <atcinfo:info xmlns:atcinfo="http://www.sap.com/adt/atc/info">
+      <atcinfo:type>FINDING_STATS</atcinfo:type>
+      <atcinfo:description>0,0,2</atcinfo:description>
+    </atcinfo:info>
+  </atcworklist:infos>
+</atcworklist:worklistRun>

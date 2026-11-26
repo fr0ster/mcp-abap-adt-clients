@@ -1,0 +1,33 @@
+{
+  "case": "batch-get-parts-abap-cloud",
+  "step": 1,
+  "stepTag": "batch",
+  "capturedAt": "2026-11-26T07:02:01.931Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/communication/batch",
+    "params": null,
+    "headers": {
+      "Content-Type": "multipart/mixed; boundary=batch_4a521dec-dd05-48ae-92f6-ccaa9ae6bf54",
+      "Accept": "multipart/mixed"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": "--batch_4a521dec-dd05-48ae-92f6-ccaa9ae6bf54\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nGET /sap/bc/adt/oo/classes/zac_shr_run01 HTTP/1.1\r\nAccept: application/vnd.sap.adt.oo.classes.v4+xml, application/vnd.sap.adt.oo.classes.v3+xml, application/vnd.sap.adt.oo.classes.v2+xml, application/vnd.sap.adt.oo.classes.v1+xml\r\n\r\n\r\n--batch_4a521dec-dd05-48ae-92f6-ccaa9ae6bf54\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nGET /sap/bc/adt/ddic/domains/zac_shr_ga_dom HTTP/1.1\r\nAccept: application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml\r\n\r\n\r\n\r\n--batch_4a521dec-dd05-48ae-92f6-ccaa9ae6bf54--\r\n"
+  },
+  "response": {
+    "status": 202,
+    "statusText": "Accepted",
+    "headers": {
+      "content-type": "multipart/mixed; boundary=batch_BA79DFC2C0271FD1BAACE8DD6142E56E; charset=utf-8",
+      "content-length": "1824",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "[REDACTED]",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=1132080",
+      "sap-server": "true",
+      "sap-perf-fesrec": "1138658.000000"
+    },
+    "bodyFile": "batch-get-parts-abap-cloud--01-batch.body.txt"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "case": "where-used-scope-class-s4-2025",
+  "step": 1,
+  "stepTag": "usagereferences-scope",
+  "capturedAt": "2026-11-26T07:01:38.371Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/repository/informationsystem/usageReferences/scope?uri=%2Fsap%2Fbc%2Fadt%2Foo%2Fclasses%2Fzac_shr_run01",
+    "params": null,
+    "headers": {
+      "Accept": "application/vnd.sap.adt.repository.usagereferences.scope.response.v1+xml",
+      "Content-Type": "application/vnd.sap.adt.repository.usagereferences.scope.request.v1+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><usagereferences:usageScopeRequest xmlns:usagereferences=\"http://www.sap.com/adt/ris/usageReferences\"><usagereferences:affectedObjects/></usagereferences:usageScopeRequest>"
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.repository.usagereferences.scope.response.v1+xml; charset=utf-8",
+      "content-length": "685",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "[REDACTED]",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=24713",
+      "sap-server": "true",
+      "sap-perf-fesrec": "29287.000000"
+    },
+    "bodyFile": "where-used-scope-class-s4-2025--01-usagereferences-scope.body.xml"
+  }
+}
