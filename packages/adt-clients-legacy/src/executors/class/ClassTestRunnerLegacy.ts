@@ -28,6 +28,7 @@ import type {
   IAdtResponse,
   IAnalyse,
   IClassUnitTestRunOptions,
+  IUnitTestResultOptions,
 } from '@mcp-abap-adt/interfaces-adt';
 import { noResultToFetch, noRunToPoll } from '../abapUnitRunLegacy';
 
@@ -74,15 +75,43 @@ export class ClassTestRunnerLegacy<
    * Refused without a request: a legacy system finishes a run before it
    * answers and exposes no run to poll. `run`'s own answer is the result.
    */
+  override getStatus<E extends IAdtError>(
+    this: this & AdtPerformedBy<'class', 'unitTestStatus'>,
+    runId: string,
+    withLongPolling: boolean | undefined,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['status'], E | IAdtError>>;
+  override getStatus(
+    this: this & AdtPerformedBy<'class', 'unitTestStatus'>,
+    runId: string,
+    withLongPolling?: boolean | undefined,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['status'], IAdtError>>;
   override async getStatus<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'class', 'unitTestStatus'>,
+    _runId: string,
+    _withLongPolling?: boolean | undefined,
+    _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['status'], E | IAdtError>> {
     return noRunToPoll<T['status']>();
   }
 
   /** Refused for the same reason: `run`'s answer is the result document. */
+  override getResult<E extends IAdtError>(
+    this: this & AdtPerformedBy<'class', 'unitTestResult'>,
+    runId: string,
+    options: IUnitTestResultOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['result'], E | IAdtError>>;
+  override getResult(
+    this: this & AdtPerformedBy<'class', 'unitTestResult'>,
+    runId: string,
+    options?: IUnitTestResultOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['result'], IAdtError>>;
   override async getResult<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'class', 'unitTestResult'>,
+    _runId: string,
+    _options?: IUnitTestResultOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['result'], E | IAdtError>> {
     return noResultToFetch<T['result']>();
   }

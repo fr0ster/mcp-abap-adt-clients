@@ -39,13 +39,17 @@ import {
 } from '@mcp-abap-adt/adt-clients';
 import type {
   AdtObjectIdentity,
+  AdtRequiredUpdateOptions,
   AdtTaskType,
   IAbapObjectEntry,
   IAdtAnalyseOptions,
+  IAdtCreateOptions,
   IAdtError,
   IAdtHeaders,
+  IAdtLockFreeWrite,
   IAdtOperationOptions,
   IAdtResponse,
+  IAdtUpdateOptions,
   IAnalyse,
   ITransportConfig,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -74,8 +78,22 @@ export class AdtRequestLegacy<
    * Refused: the legacy CTS endpoint rejects every POST payload with "user
    * action is not supported" — no useraction value is accepted.
    */
+  override create<E extends IAdtError>(
+    this: this & AdtPerformedBy<'request', 'create'>,
+    config: Omit<ITransportConfig, 'source'> & { source?: never },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>>;
+  override create(
+    this: this & AdtPerformedBy<'request', 'create'>,
+    config: Omit<ITransportConfig, 'source'> & { source?: never },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['created'], IAdtError>>;
   override async create<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'create'>,
+    _config: Omit<ITransportConfig, 'source'> & { source?: never },
+    _options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<T['created'], E | IAdtError>> {
     return failed<T['created']>(
       unsupported(
@@ -168,8 +186,26 @@ export class AdtRequestLegacy<
   }
 
   /** Refused: the legacy endpoint's update shape has never been captured. */
+  override updateMetadata<E extends IAdtError>(
+    this: this & AdtPerformedBy<'request', 'updateMetadata'>,
+    config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockFreeWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>>;
+  override updateMetadata(
+    this: this & AdtPerformedBy<'request', 'updateMetadata'>,
+    config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockFreeWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], IAdtError>>;
   override async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'updateMetadata'>,
+    _config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
+    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockFreeWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
     return failed<T['metadataUpdated']>(
       unsupported(
@@ -180,8 +216,22 @@ export class AdtRequestLegacy<
   }
 
   /** Refused: the legacy endpoint's delete shape has never been captured. */
+  override delete<E extends IAdtError>(
+    this: this & AdtPerformedBy<'request', 'delete'>,
+    config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deleted'], E | IAdtError>>;
+  override delete(
+    this: this & AdtPerformedBy<'request', 'delete'>,
+    config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deleted'], IAdtError>>;
   override async delete<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'delete'>,
+    _config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deleted'], E | IAdtError>> {
     return failed<T['deleted']>(
       unsupported(

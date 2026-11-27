@@ -20,13 +20,18 @@ import {
 } from '@mcp-abap-adt/adt-clients';
 import type {
   AdtObjectIdentity,
+  AdtRequiredUpdateOptions,
   IAdtAnalyseOptions,
+  IAdtCreateOptions,
   IAdtError,
   IAdtHeaders,
+  IAdtLockedWrite,
   IAdtOperationOptions,
   IAdtResponse,
+  IAdtUpdateOptions,
   IAnalyse,
   IPackageConfig,
+  IReadOptions,
 } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import {
@@ -57,33 +62,88 @@ const UNSUPPORTED: IAdtError = {
 export class AdtPackageLegacy<
   T extends PackageValues = ResultValuesOf<typeof packageDocuments>,
 > extends AdtPackage<T> {
-  override async create<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<T['created'], E | IAdtError>
-  > {
+  override create<E extends IAdtError>(
+    config: Omit<IPackageConfig, 'source'> & { source?: never },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>>;
+  override create(
+    config: Omit<IPackageConfig, 'source'> & { source?: never },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['created'], IAdtError>>;
+  override async create<E extends IAdtError = IAdtError>(
+    _config: Omit<IPackageConfig, 'source'> & { source?: never },
+    _options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>> {
     return failed<T['created']>(UNSUPPORTED);
   }
 
-  override async readMetadata<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<T['metadata'], E | IAdtError>
-  > {
+  override readMetadata<E extends IAdtError>(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>>;
+  override readMetadata(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['metadata'], IAdtError>>;
+  override async readMetadata<E extends IAdtError = IAdtError>(
+    _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    _options?: IReadOptions & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>> {
     return failed<T['metadata']>(UNSUPPORTED);
   }
 
-  override async validate<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<T['validation'], E | IAdtError>
-  > {
+  override validate<E extends IAdtError>(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>>;
+  override validate(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['validation'], IAdtError>>;
+  override async validate<E extends IAdtError = IAdtError>(
+    _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    _options?: IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>> {
     return failed<T['validation']>(UNSUPPORTED);
   }
 
-  override async updateMetadata<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<T['metadataUpdated'], E | IAdtError>
-  > {
+  override updateMetadata<E extends IAdtError>(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>>;
+  override updateMetadata(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], IAdtError>>;
+  override async updateMetadata<E extends IAdtError = IAdtError>(
+    _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
     return failed<T['metadataUpdated']>(UNSUPPORTED);
   }
 
-  override async delete<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<T['deletion'], E | IAdtError>
-  > {
+  override delete<E extends IAdtError>(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>>;
+  override delete(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletion'], IAdtError>>;
+  override async delete<E extends IAdtError = IAdtError>(
+    _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
     return failed<T['deletion']>(UNSUPPORTED);
   }
 
