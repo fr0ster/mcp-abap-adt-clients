@@ -65,7 +65,7 @@ Measured on 7.40 SP04 through the library over `legacy-http`:
 new AdtClientLegacy(connection)          // the consumer declares the system; RFC
   ├── Served types: *Legacy handlers (direct DELETE under the caller's lock, caller's headers)
   ├── Members 7.40 does not serve, or does not advertise and nobody measured: a refusal, no request
-  ├── Types 7.40 lacks: the getter does not compile (ADT_TYPES_BASIS_740 has no such API); called anyway, absentOnLegacy — every member answers a refusal, no request
+  ├── Types 7.40 lacks: the getter does not compile (ADT_TYPES_BASIS_740 has no such API); called anyway, a *AbsentLegacy subclass of the modern handler — every public operation answers a refusal, no request
   └── Content types: AdtContentTypesBase (versionless headers)
 
 new AdtExecutorLegacy(connection)
@@ -212,9 +212,9 @@ await client.getFunctionInclude().create(config, {
 });
 ```
 
-### Types 7.40 does not serve, or does not advertise: `absentOnLegacy`
+### Types 7.40 does not serve, or does not advertise: the `*AbsentLegacy` handlers
 
-`ADT_TYPES_BASIS_740` has no such API, so since 0.2.0 the getter does not compile on `AdtClientLegacy`. Called from outside the type system, it still hands out a handler, and every member of that handler answers the refusal without a request.
+`ADT_TYPES_BASIS_740` has no such API, so since 0.2.0 the getter does not compile on `AdtClientLegacy`. Called from outside the type system, it still hands out a handler, and every public operation of that handler answers the refusal without a request. Since 0.12.0 (C5 of #304) the handler is a subclass of the modern one (`clients/absentHandlers.ts`: `AdtDomainAbsentLegacy` extends `AdtDomain`, and so on), constructed with the options the modern factory gives; it overrides every public operation, and keeps the modern private helpers, which only those operations reach. Before, `absentOnLegacy` built a plain object of refusing functions.
 
 | Object Type | Getter | Endpoint | Evidence (RFC) |
 |-------------|--------|----------|------------------|

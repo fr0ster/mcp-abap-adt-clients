@@ -4,6 +4,36 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [0.12.0] - 2026-11-27
+
+Released with `@mcp-abap-adt/adt-clients` 48.0.0 (fr0ster/mcp-abap-adt-clients#304),
+on `@mcp-abap-adt/interfaces-adt` `^33.0.0`. This package's `src` holds no
+cast, `any`, hand-narrowed value, regular expression or type predicate: the
+source-rules guard asserts none. The migration note is the README's
+"Migrating to 0.12.0".
+
+### Changed (breaking)
+
+- **D1**: every override takes the modern identity types; a write requires
+  its `lockHandle`, and its `source` where it sends one.
+- **D3**: every override is the overload pair (generic with `analyse`
+  required, then plain); the 20 refusing overrides of `AdtPackageLegacy`,
+  `AdtRequestLegacy` and the test runners declare the base's parameters
+  (unused).
+- **C3**: a legacy refusal is the library's `IAdtError`, typed
+  `E | IAdtError` under a generic call, with no cast: no request, and
+  `analyse` is never called.
+- **C5**: the 20 absent types' handlers are `*AbsentLegacy` subclasses of the
+  modern handlers (`clients/absentHandlers.ts`) instead of plain objects
+  `absentOnLegacy` built: `instanceof` the modern class is true; the
+  refusals' words are unchanged.
+- A message class message is the four members of adt-clients 48.
+
+### Changed
+
+- The upcasts are deleted (K1); the parented reads (`readObjectSource`,
+  `readObjectMetadata`) declare the overload pair.
+
 ## [0.11.2] - 2026-11-22
 
 Released with `@mcp-abap-adt/adt-clients` 47.0.0, on
