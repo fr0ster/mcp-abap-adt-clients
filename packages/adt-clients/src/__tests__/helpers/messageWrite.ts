@@ -44,11 +44,12 @@ export async function writeMessage(
   });
   if (!messageLock.ok && messageLock.getError().response?.status !== 403)
     return messageLock;
-  // Every lock taken is given up on every way out, in the old chain's order:
-  // the class first, then the message; an unlock that failed is tried once
-  // more on the way out, as the chain's scope ends did.
-  let messageHeld = true;
-  try {
+  // The locks held, newest last; each is given up on every way out, the
+  // class first, then the message, as the old chain's scope ends did.
+  const held: (() => Promise<unknown>)[] = [
+    () => message.unlockMessages(address, { analyse: analyseException }),
+  ];
+  const window = async () => {
     let classLock = await message.lockClassForMessage(address, {
       analyse: analyseException,
     });
@@ -56,66 +57,73 @@ export async function writeMessage(
       classLock = await messageClass.lock(klass, { analyse: analyseException });
     if (!classLock.ok) return classLock;
     const classLockHandle = classLock.getResult().value;
-    let classHeld = true;
+    held.push(() =>
+      messageClass.unlock(klass, classLockHandle, {
+        analyse: analyseException,
+      }),
+    );
+    const classDocument = String(read.getResult().value);
+    const messageLockHandle = messageLock.ok
+      ? messageLock.getResult().value
+      : classLockHandle;
+    const written = config.removeMessage
+      ? await message.update(
+          {
+            ...address,
+            transportRequest: config.transportRequest,
+            removeMessage: true,
+          },
+          {
+            headers: options.headers,
+            classDocument,
+            classLockHandle,
+            messageLockHandle,
+            analyse: analyseException,
+          },
+        )
+      : await message.update(
+          {
+            ...address,
+            msgtext: config.msgtext ?? '',
+            transportRequest: config.transportRequest,
+          },
+          {
+            headers: options.headers,
+            classDocument,
+            classLockHandle,
+            messageLockHandle,
+            analyse: analyseException,
+          },
+        );
+    if (!written.ok) return written;
+    const classUnlocked = await messageClass.unlock(klass, classLockHandle, {
+      analyse: analyseException,
+    });
+    if (!classUnlocked.ok) return classUnlocked; // given up again below
+    held.pop();
+    const messageUnlocked = await message.unlockMessages(address, {
+      analyse: analyseException,
+    });
+    if (!messageUnlocked.ok) return messageUnlocked; // given up again below
+    held.pop();
+    return written;
+  };
+  const outcome = await window().then(
+    (answer) => ({ answer }),
+    (error: unknown) => ({ error }),
+  );
+  // Every lock still held is given up, newest first, whatever an earlier one
+  // threw; the first error thrown — the window's, else a cleanup's — is the
+  // one that leaves, as in the old chain.
+  let thrown = 'error' in outcome ? outcome : undefined;
+  for (const release of held.reverse()) {
     try {
-      const under = {
-        headers: options.headers,
-        classDocument: String(read.getResult().value),
-        classLockHandle,
-        messageLockHandle: messageLock.ok
-          ? messageLock.getResult().value
-          : classLockHandle,
-        analyse: analyseException,
-      };
-      const written = config.removeMessage
-        ? await message.update(
-            {
-              ...address,
-              transportRequest: config.transportRequest,
-              removeMessage: true,
-            },
-            {
-              headers: under.headers,
-              classDocument: under.classDocument,
-              classLockHandle: under.classLockHandle,
-              messageLockHandle: under.messageLockHandle,
-              analyse: analyseException,
-            },
-          )
-        : await message.update(
-            {
-              ...address,
-              msgtext: config.msgtext ?? '',
-              transportRequest: config.transportRequest,
-            },
-            {
-              headers: under.headers,
-              classDocument: under.classDocument,
-              classLockHandle: under.classLockHandle,
-              messageLockHandle: under.messageLockHandle,
-              analyse: analyseException,
-            },
-          );
-      if (!written.ok) return written;
-      const classUnlocked = await messageClass.unlock(klass, classLockHandle, {
-        analyse: analyseException,
-      });
-      if (!classUnlocked.ok) return classUnlocked;
-      classHeld = false;
-      const messageUnlocked = await message.unlockMessages(address, {
-        analyse: analyseException,
-      });
-      if (!messageUnlocked.ok) return messageUnlocked;
-      messageHeld = false;
-      return written;
-    } finally {
-      if (classHeld)
-        await messageClass.unlock(klass, classLockHandle, {
-          analyse: analyseException,
-        });
+      await release();
+    } catch (error) {
+      thrown ??= { error };
     }
-  } finally {
-    if (messageHeld)
-      await message.unlockMessages(address, { analyse: analyseException });
   }
+  if (thrown) throw thrown.error;
+  if ('error' in outcome) throw outcome.error;
+  return outcome.answer;
 }

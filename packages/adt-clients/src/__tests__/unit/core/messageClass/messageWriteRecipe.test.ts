@@ -252,44 +252,70 @@ async function recipe(
   const messageLock = await message.lockMessage(address);
   if (!messageLock.ok && messageLock.getError().response?.status !== 403)
     return messageLock;
-  let messageHeld = true;
-  try {
+  // The locks held, newest last; each is given up on every way out, the
+  // class first, then the message, as the old chain's scope ends did.
+  const held: (() => Promise<unknown>)[] = [
+    () => message.unlockMessages(address),
+  ];
+  const window = async () => {
     let classLock = await message.lockClassForMessage(address);
     if (!classLock.ok && classLock.getError().response?.status === 403)
       classLock = await messageClass.lock(klass);
     if (!classLock.ok) return classLock;
     const classLockHandle = classLock.getResult().value;
-    let classHeld = true;
+    held.push(() => messageClass.unlock(klass, classLockHandle));
+    const classDocument = String(read.getResult().value);
+    const messageLockHandle = messageLock.ok
+      ? messageLock.getResult().value
+      : classLockHandle;
+    const written = removing
+      ? await message.update(
+          { ...address, removeMessage: true },
+          {
+            headers,
+            classDocument,
+            classLockHandle,
+            messageLockHandle,
+            analyse,
+          },
+        )
+      : await message.update(
+          { ...address, msgtext: config.msgtext ?? '' },
+          {
+            headers,
+            classDocument,
+            classLockHandle,
+            messageLockHandle,
+            analyse,
+          },
+        );
+    if (!written.ok) return written;
+    const classUnlocked = await messageClass.unlock(klass, classLockHandle);
+    if (!classUnlocked.ok) return classUnlocked; // given up again below
+    held.pop();
+    const messageUnlocked = await message.unlockMessages(address);
+    if (!messageUnlocked.ok) return messageUnlocked; // given up again below
+    held.pop();
+    return written;
+  };
+  const outcome = await window().then(
+    (answer) => ({ answer }),
+    (error: unknown) => ({ error }),
+  );
+  // Every lock still held is given up, newest first, whatever an earlier one
+  // threw; the first error thrown — the window's, else a cleanup's — is the
+  // one that leaves, as in the old chain.
+  let thrown = 'error' in outcome ? outcome : undefined;
+  for (const release of held.reverse()) {
     try {
-      const under = {
-        headers,
-        classDocument: String(read.getResult().value),
-        classLockHandle,
-        messageLockHandle: messageLock.ok
-          ? messageLock.getResult().value
-          : classLockHandle,
-        analyse,
-      };
-      const written = removing
-        ? await message.update({ ...address, removeMessage: true }, under)
-        : await message.update(
-            { ...address, msgtext: config.msgtext ?? '' },
-            under,
-          );
-      if (!written.ok) return written;
-      const classUnlocked = await messageClass.unlock(klass, classLockHandle);
-      if (!classUnlocked.ok) return classUnlocked;
-      classHeld = false;
-      const messageUnlocked = await message.unlockMessages(address);
-      if (!messageUnlocked.ok) return messageUnlocked;
-      messageHeld = false;
-      return written;
-    } finally {
-      if (classHeld) await messageClass.unlock(klass, classLockHandle);
+      await release();
+    } catch (error) {
+      thrown ??= { error };
     }
-  } finally {
-    if (messageHeld) await message.unlockMessages(address);
   }
+  if (thrown) throw thrown.error;
+  if ('error' in outcome) throw outcome.error;
+  return outcome.answer;
 }
 
 const OLD_CHAIN: Record<
@@ -443,5 +469,109 @@ describe('the recipe answers as the old chain did, a fault at a time', () => {
     expect(sent).toEqual(old?.sent);
     expect(calls).toBe(old?.analyseCalls);
     expect(outcome).toEqual(name in INTENDED ? INTENDED[name] : old?.outcome);
+  });
+});
+
+/**
+ * Two faults: one in the lock window and one in a cleanup after it. The old
+ * chain kept the first error and still ran every cleanup: a credential
+ * refusal thrown in the window wins over one thrown by a cleanup, and a
+ * cleanup's refusal is thrown only when the window answered (68deaf9a,
+ * `__fixtures__/oldMessageChainTwoFaults.json`). Each error is its own
+ * object, compared by identity.
+ */
+const OLD_TWO_FAULTS: Record<
+  string,
+  { sent: string[]; outcome: unknown; analyseCalls: number }
+> = JSON.parse(
+  readFileSync(
+    join(__dirname, '__fixtures__/oldMessageChainTwoFaults.json'),
+    'utf8',
+  ),
+);
+
+describe('the recipe keeps the first error and runs every cleanup', () => {
+  it.each(Object.keys(OLD_TWO_FAULTS))('%s', async (name) => {
+    const [first, second] = name.split(' + ');
+    const [s1, k1] = (first ?? '').split(' ');
+    const [s2, k2] = (second ?? '').split(' ');
+    const sent: string[] = [];
+    const errors = new Map<unknown, string>();
+    const seen = new Map<string, number>();
+    const fault = (tag: string, kind: string | undefined) => {
+      if (kind !== 'credential')
+        return {
+          response: { status: 500, statusText: 'E', headers: {}, data: tag },
+          message: tag,
+        };
+      const refusal = new AuthRefusedError(
+        {} as never,
+        'request',
+        new Error(tag),
+      );
+      errors.set(refusal, tag);
+      return refusal;
+    };
+    const ok = (data: string) => ({
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      data,
+    });
+    const connection: IAbapConnection = {
+      getBaseUrl: async () => '',
+      getSessionId: () => 'S',
+      connect: async () => undefined,
+      setSessionType: () => {},
+      makeAdtRequest: async (request: IAbapRequestOptions) => {
+        const step = stepOf(request.method, String(request.url));
+        sent.push(step);
+        const count = (seen.get(step) ?? 0) + 1;
+        seen.set(step, count);
+        if (step === s1 && count === 1)
+          return Promise.reject(fault(`${step}#1`, k1));
+        if (step === s2) return Promise.reject(fault(`${step}#2`, k2));
+        if (step === 'lockMessage') return ok(LOCKED('MH'));
+        if (step === 'lockClassForMessage') return ok(LOCKED('CH'));
+        if (step === 'read') return ok(CLASS_DOCUMENT);
+        return ok('');
+      },
+    };
+    let calls = 0;
+    const MINE: IAdtError = { origin: 'refusal', message: 'mine' };
+    const analyse: IAnalyse<IAdtError> = (verdict) => {
+      calls += 1;
+      return verdict === ADT_NO_FAILURE ? ADT_NO_FAILURE : MINE;
+    };
+    const message = new AdtMessageClassMessage(connection, {
+      results: { ...messageDocuments, written: () => 'W', deleted: () => 'D' },
+    });
+    const messageClass = new AdtMessageClass(connection, {
+      results: messageClassDocuments,
+    });
+    let outcome: unknown;
+    try {
+      const answer = await recipe(
+        messageClass,
+        message,
+        { className: 'ZMC', msgno: '001', msgtext: 'x' },
+        false,
+        analyse,
+      );
+      outcome = answer.ok
+        ? { ok: true, value: answer.getResult().value }
+        : {
+            ok: false,
+            mine: answer.getError() === MINE,
+            origin: answer.getError().origin,
+            message: answer.getError().message,
+          };
+    } catch (error) {
+      outcome = { threw: errors.get(error) ?? String(error) };
+    }
+    const old = OLD_TWO_FAULTS[name];
+    expect(sent).toEqual(old?.sent);
+    expect(calls).toBe(old?.analyseCalls);
+    expect(outcome).toEqual(old?.outcome);
   });
 });

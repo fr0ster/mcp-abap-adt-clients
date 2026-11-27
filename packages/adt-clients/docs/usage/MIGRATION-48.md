@@ -127,47 +127,56 @@ if (!read.ok) return read;
 const messageLock = await message.lockMessage(address);
 // 403: the message cannot be locked on its own; the class's handle stands in.
 if (!messageLock.ok && messageLock.getError().response?.status !== 403) return messageLock;
-// Every lock taken is given up on every way out — an answer that failed, a
-// credential refusal thrown — the class first, then the message.
-let messageHeld = true;
-try {
+// The locks held, newest last: each is given up on every way out — an answer
+// that failed, a credential refusal thrown — the class first, then the message.
+const held: (() => Promise<unknown>)[] = [() => message.unlockMessages(address)];
+const window = async () => {
   let classLock = await message.lockClassForMessage(address);
   // 403: the class lock for one message is refused; the plain class lock instead.
   if (!classLock.ok && classLock.getError().response?.status === 403)
     classLock = await messageClass.lock({ name: 'ZMC' });
   if (!classLock.ok) return classLock;
   const classLockHandle = classLock.getResult().value;
-  let classHeld = true;
+  held.push(() => messageClass.unlock({ name: 'ZMC' }, classLockHandle));
+  const written = await message.update(
+    { ...address, msgtext: 'Text', transportRequest },
+    {
+      headers,
+      classDocument: String(read.getResult().value),
+      classLockHandle,
+      messageLockHandle: messageLock.ok ? messageLock.getResult().value : classLockHandle,
+      analyse, // the PUT is the one answer the old chain judged
+    },
+  );
+  if (!written.ok) return written;
+  const classUnlocked = await messageClass.unlock({ name: 'ZMC' }, classLockHandle);
+  if (!classUnlocked.ok) return classUnlocked; // given up again below
+  held.pop();
+  const messageUnlocked = await message.unlockMessages(address);
+  if (!messageUnlocked.ok) return messageUnlocked; // given up again below
+  held.pop();
+  return written;
+};
+const outcome = await window().then((answer) => ({ answer }), (error: unknown) => ({ error }));
+// Every lock still held is given up, newest first, whatever an earlier one
+// threw; the first error thrown — the window's, else a cleanup's — leaves.
+let thrown = 'error' in outcome ? outcome : undefined;
+for (const release of held.reverse()) {
   try {
-    const written = await message.update(
-      { ...address, msgtext: 'Text', transportRequest },
-      {
-        headers,
-        classDocument: String(read.getResult().value),
-        classLockHandle,
-        messageLockHandle: messageLock.ok ? messageLock.getResult().value : classLockHandle,
-        analyse, // the PUT is the one answer the old chain judged
-      },
-    );
-    if (!written.ok) return written;
-    const classUnlocked = await messageClass.unlock({ name: 'ZMC' }, classLockHandle);
-    if (!classUnlocked.ok) return classUnlocked; // tried once more below
-    classHeld = false;
-    const messageUnlocked = await message.unlockMessages(address);
-    if (!messageUnlocked.ok) return messageUnlocked; // tried once more below
-    messageHeld = false;
-    return written;
-  } finally {
-    if (classHeld) await messageClass.unlock({ name: 'ZMC' }, classLockHandle);
+    await release();
+  } catch (error) {
+    thrown ??= { error };
   }
-} finally {
-  if (messageHeld) await message.unlockMessages(address);
 }
+if (thrown) throw thrown.error;
+if ('error' in outcome) throw outcome.error;
+return outcome.answer;
 ```
 
 This sends the requests the old chain sent, in its order, the 403 fallbacks
-and the cleanup on every way out included, answers what it answered, and calls
-`analyse` as often (the unit oracle compares the two, a fault at a time). A
+and the cleanup on every way out included, keeps the first error thrown while
+still giving up every lock, answers what it answered, and calls `analyse` as
+often (the unit oracle compares the two, a fault at a time). A
 removal is the same with `{ ...address, removeMessage: true }`.
 
 Two answers differ on purpose:
