@@ -243,3 +243,171 @@ export function lines(text: string): string[] {
     i < pieces.length - 1 && piece.endsWith('\r') ? piece.slice(0, -1) : piece,
   );
 }
+
+/** Whether `c` is a word character, `\w`. */
+function isWord(c: string): boolean {
+  return (
+    c.length === 1 &&
+    ((c >= 'a' && c <= 'z') ||
+      (c >= 'A' && c <= 'Z') ||
+      (c >= '0' && c <= '9') ||
+      c === '_')
+  );
+}
+
+function isLetter(c: string): boolean {
+  return c.length === 1 && ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'));
+}
+
+/** `\b` between `at - 1` and `at`. */
+function wordBoundary(text: string, at: number): boolean {
+  return isWord(text.charAt(at - 1)) !== isWord(text.charAt(at));
+}
+
+/**
+ * `<` + letter + `[\w-]*` + `suffix` at `at` (the run greedy; giving it back
+ * leaves a word character or `-` where `suffix` begins): the end of `suffix`.
+ */
+function prefixedNameAt(
+  text: string,
+  at: number,
+  open: string,
+  suffix: string,
+): { prefixEnd: number; end: number } | undefined {
+  if (!text.startsWith(open, at)) return undefined;
+  let p = at + open.length;
+  if (!isLetter(text.charAt(p))) return undefined;
+  p++;
+  while (isWord(text.charAt(p)) || text.charAt(p) === '-') p++;
+  if (!text.startsWith(suffix, p)) return undefined;
+  return { prefixEnd: p, end: p + suffix.length };
+}
+
+/**
+ * Every `/<[A-Za-z][\w-]*:type\b[^>]*?\/>/g` tag, left to right without
+ * overlap: a prefixed `type` tag name, a word boundary, then the nearest `/>`
+ * with no `>` before it.
+ */
+export function typeTags(text: string): { index: number; end: number }[] {
+  const tags: { index: number; end: number }[] = [];
+  let at = 0;
+  while (at < text.length) {
+    const name = prefixedNameAt(text, at, '<', ':type');
+    let end: number | undefined;
+    if (name && wordBoundary(text, name.end)) {
+      for (let i = name.end; i < text.length; i++) {
+        if (text.startsWith('/>', i)) {
+          end = i + 2;
+          break;
+        }
+        if (text.charAt(i) === '>') break;
+      }
+    }
+    if (end === undefined) at++;
+    else {
+      tags.push({ index: at, end });
+      at = end;
+    }
+  }
+  return tags;
+}
+
+/** Each tag of `text` replaced by what `replace` makes of it, as `String.replace` with `/g`. */
+export function replaceTypeTags(
+  text: string,
+  replace: (tag: string) => string,
+): string {
+  let out = '';
+  let from = 0;
+  for (const { index, end } of typeTags(text)) {
+    out += text.slice(from, index) + replace(text.slice(index, end));
+    from = end;
+  }
+  return out + text.slice(from);
+}
+
+/** `/\bname="([^"]*)"/`: the value of the first `name="…"` after a word boundary. */
+export function nameAttribute(tag: string): string | undefined {
+  for (
+    let at = tag.indexOf('name="');
+    at !== -1;
+    at = tag.indexOf('name="', at + 1)
+  ) {
+    if (!wordBoundary(tag, at)) continue;
+    const close = tag.indexOf('"', at + 'name="'.length);
+    if (close !== -1) return tag.slice(at + 'name="'.length, close);
+  }
+  return undefined;
+}
+
+/** `/\bisSelected="(?:true|false)"/`: where the first one stands, and its length. */
+export function isSelectedAttribute(
+  tag: string,
+): { index: number; length: number } | undefined {
+  const marker = 'isSelected="';
+  for (
+    let at = tag.indexOf(marker);
+    at !== -1;
+    at = tag.indexOf(marker, at + 1)
+  ) {
+    if (!wordBoundary(tag, at)) continue;
+    const from = at + marker.length;
+    for (const value of ['true"', 'false"'])
+      if (tag.startsWith(value, from))
+        return { index: at, length: marker.length + value.length };
+  }
+  return undefined;
+}
+
+/** `/<([A-Za-z][\w-]*:type)\b/`: where the first prefixed `type` name ends. */
+export function typeTagNameEnd(
+  tag: string,
+): { index: number; end: number } | undefined {
+  for (let at = tag.indexOf('<'); at !== -1; at = tag.indexOf('<', at + 1)) {
+    const name = prefixedNameAt(tag, at, '<', ':type');
+    if (name && wordBoundary(tag, name.end))
+      return { index: at, end: name.end };
+  }
+  return undefined;
+}
+
+/** `text.replace(/<\?xml[^>]*\?>/, '')`: the first XML declaration removed. */
+export function withoutXmlDeclaration(text: string): string {
+  for (
+    let at = text.indexOf('<?xml');
+    at !== -1;
+    at = text.indexOf('<?xml', at + 1)
+  ) {
+    const gt = text.indexOf('>', at + '<?xml'.length);
+    if (gt === -1) return text;
+    // The character before that `>` (never one of `<?xml` itself, whose
+    // last is `l`) must be the `?` of `?>`.
+    if (text.charAt(gt - 1) === '?')
+      return text.slice(0, at) + text.slice(gt + 1);
+  }
+  return text;
+}
+
+/**
+ * `text.replace(/<([A-Za-z][\w-]*):usageScopeResult\b([^>]*)>/, '<$1:scope$2>')`,
+ * then `.replace(/<\/([A-Za-z][\w-]*):usageScopeResult>/, '</$1:scope>')`:
+ * the first scope result, open and close, renamed to `scope`.
+ */
+export function scopeResultAsScope(text: string): string {
+  let out = text;
+  for (let at = out.indexOf('<'); at !== -1; at = out.indexOf('<', at + 1)) {
+    const name = prefixedNameAt(out, at, '<', ':usageScopeResult');
+    if (!name || !wordBoundary(out, name.end)) continue;
+    const gt = out.indexOf('>', name.end);
+    if (gt === -1) continue;
+    out = `${out.slice(0, at)}${out.slice(at, name.prefixEnd)}:scope${out.slice(name.end, gt)}>${out.slice(gt + 1)}`;
+    break;
+  }
+  for (let at = out.indexOf('</'); at !== -1; at = out.indexOf('</', at + 1)) {
+    const name = prefixedNameAt(out, at, '</', ':usageScopeResult>');
+    if (!name) continue;
+    out = `${out.slice(0, at)}${out.slice(at, name.prefixEnd)}:scope>${out.slice(name.end)}`;
+    break;
+  }
+  return out;
+}

@@ -14,6 +14,14 @@ import type { AdtAddressableCode } from '../../endpoints/codes';
 import { TEXT_ELEMENTS } from '../../endpoints/objects';
 import { buildObjectUri } from '../../utils/activationUtils';
 import { requestHeaders } from '../../utils/requestHeaders';
+import {
+  isSelectedAttribute,
+  nameAttribute,
+  replaceTypeTags,
+  scopeResultAsScope,
+  typeTagNameEnd,
+  withoutXmlDeclaration,
+} from '../../utils/scan';
 import type { AdtCodes } from './codeSets';
 
 /**
@@ -61,11 +69,8 @@ export function modifyWhereUsedScope(
   // <ns:payload> blob or attribute ordering — SAP emits attributes as
   // `isDefault isSelected name`, so logic must read `name` wherever it appears,
   // not assume it precedes isSelected.
-  const typeTagRegex = /<[A-Za-z][\w-]*:type\b[^>]*?\/>/g;
-
-  return scopeXml.replace(typeTagRegex, (tag) => {
-    const nameMatch = tag.match(/\bname="([^"]*)"/);
-    const name = nameMatch ? nameMatch[1] : '';
+  return replaceTypeTags(scopeXml, (tag) => {
+    const name = nameAttribute(tag) ?? '';
 
     let selected: boolean | undefined;
     if (options.enableAll) {
@@ -89,16 +94,13 @@ export function modifyWhereUsedScope(
  */
 function setIsSelected(typeTag: string, selected: boolean): string {
   const value = selected ? 'true' : 'false';
-  if (/\bisSelected="(?:true|false)"/.test(typeTag)) {
-    return typeTag.replace(
-      /\bisSelected="(?:true|false)"/,
-      `isSelected="${value}"`,
-    );
+  const present = isSelectedAttribute(typeTag);
+  if (present) {
+    return `${typeTag.slice(0, present.index)}isSelected="${value}"${typeTag.slice(present.index + present.length)}`;
   }
-  return typeTag.replace(
-    /<([A-Za-z][\w-]*:type)\b/,
-    `<$1 isSelected="${value}"`,
-  );
+  const name = typeTagNameEnd(typeTag);
+  if (!name) return typeTag;
+  return `${typeTag.slice(0, name.end)} isSelected="${value}"${typeTag.slice(name.end)}`;
 }
 
 /**
@@ -254,10 +256,7 @@ export async function getWhereUsed(
   // open tag's attributes ($2, i.e. the xmlns declaration) on <scope> so the
   // re-wrapped element stays namespace-bound regardless of which prefix SAP used.
   const scopeContent = params.scopeXml
-    ? params.scopeXml
-        .replace(/<\?xml[^>]*\?>/, '')
-        .replace(/<([A-Za-z][\w-]*):usageScopeResult\b([^>]*)>/, '<$1:scope$2>')
-        .replace(/<\/([A-Za-z][\w-]*):usageScopeResult>/, '</$1:scope>')
+    ? scopeResultAsScope(withoutXmlDeclaration(params.scopeXml))
     : '';
 
   const searchRequestBody = `<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageReferenceRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:affectedObjects/>${scopeContent}</usagereferences:usageReferenceRequest>`;

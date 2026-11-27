@@ -903,62 +903,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/core/shared/whereUsed.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/\\bisSelected=\"(?:true|false)\"/",
-    "count": 2
-  },
-  {
-    "file": "packages/adt-clients/src/core/shared/whereUsed.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/\\bname=\"([^\"]*)\"/",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/shared/whereUsed.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/<([A-Za-z][\\w-]*:type)\\b/",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/shared/whereUsed.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/<([A-Za-z][\\w-]*):usageScopeResult\\b([^>]*)>/",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/shared/whereUsed.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/<[A-Za-z][\\w-]*:type\\b[^>]*?\\/>/g",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/shared/whereUsed.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/<\\?xml[^>]*\\?>/",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/shared/whereUsed.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/<\\/([A-Za-z][\\w-]*):usageScopeResult>/",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/shared/whereUsed.ts",
-    "rule": "regex",
-    "kind": "String.match",
-    "text": "tag.match",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/core/structure/AdtStructure.ts",
     "rule": "cast",
     "kind": "asserts-present",
