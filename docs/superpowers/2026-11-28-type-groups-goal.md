@@ -101,7 +101,7 @@ header; that is not verified.
   1. A live measurement on that release settles the operation, by what the refusal is about:
      - **Served:** the operation's own handler answers — success, or a refusal of this object or
        these arguments (a taken or too long name, `400 InvalidTypeGroupName`; an unknown object,
-       `404` on the read; a lock held elsewhere). It is in the row: such a refusal is the call's
+       `404` on the read; a lock held elsewhere, unmeasured for type groups). It is in the row: such a refusal is the call's
        answer, not the operation's absence.
      - **Not offered:** the system has no handler for the request — the resource framework's
        `404 "No suitable resource found"` or `405 ExceptionMethodNotSupported` (measured on the
