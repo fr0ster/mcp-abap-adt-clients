@@ -1,9 +1,0 @@
-[
-  {
-    "file": "packages/adt-clients/src/core/enhancement/AdtEnhancement.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "config.enhancementType as EnhancementType",
-    "count": 1
-  }
-]

@@ -407,6 +407,17 @@ upgrade.
     on.
 45. **Make the guard strict.** The baseline is empty, and the test asserts `[]`. Break each
     rule once in `src` and revert.
+    - The owner's decision: the enhancement's `readMetadata` requires
+      `enhancementType` (a type check failing first), and its cast, the last entry,
+      goes.
+45a. **interfaces-adt 33.0.0** (the owner's decision), in its own PR in
+     `mcp-abap-adt-interfaces`, linked to #304 and #333: the 13 fields and
+     `enhancementType` on `readMetadata` required in its configs, each with a type
+     check failing against 32 and its mutation; the `IAdtObject` `t100` example, and
+     every other example, narrows `E | IAdtError` before reading a strategy's field;
+     its CHANGELOG, README and migration note. Merged and tagged by the coordinator,
+     published by the owner. Then one commit here raises all three packages to
+     `^33.0.0` from the registry, and the lockfile is checked for links.
 46. **Live run.** Tell the owner the stage is ready for its live run, and wait for the go.
     Then run the changed members' integration suites on premise and on ABAP Cloud.
 47. **Docs.** Every guide spec section 8 lists for adt-clients. These go in:

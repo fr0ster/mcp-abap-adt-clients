@@ -92,4 +92,11 @@ export async function requiredOnCreate(): Promise<void> {
   await client
     .getEnhancement()
     .create({ ...enho, enhancementType: 'enhoxhh' }, options);
+
+  // The read names its type too: its Accept is the type's (owner, #304).
+  // @ts-expect-error -- the enhancement type is read by the request
+  await client.getEnhancement().readMetadata({ enhancementName: 'ZE' });
+  await client
+    .getEnhancement()
+    .readMetadata({ enhancementName: 'ZE', enhancementType: 'enhoxhh' });
 }

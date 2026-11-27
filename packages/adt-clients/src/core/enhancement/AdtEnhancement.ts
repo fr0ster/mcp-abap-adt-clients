@@ -362,15 +362,24 @@ export class AdtEnhancement<
 
   /** Read the object's metadata document. */
   readMetadata<E extends IAdtError>(
-    config: AdtObjectIdentity<IEnhancementConfig, 'enhancementName'>,
+    config: AdtObjectIdentity<
+      IEnhancementConfig,
+      'enhancementName' | 'enhancementType'
+    >,
     options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
   ): Promise<IAdtResponse<T['metadata'], E | IAdtError>>;
   readMetadata(
-    config: AdtObjectIdentity<IEnhancementConfig, 'enhancementName'>,
+    config: AdtObjectIdentity<
+      IEnhancementConfig,
+      'enhancementName' | 'enhancementType'
+    >,
     options?: IReadOptions & IAdtOperationOptions<IAdtError>,
   ): Promise<IAdtResponse<T['metadata'], IAdtError>>;
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: AdtObjectIdentity<IEnhancementConfig, 'enhancementName'>,
+    config: AdtObjectIdentity<
+      IEnhancementConfig,
+      'enhancementName' | 'enhancementType'
+    >,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['metadata'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
@@ -382,9 +391,8 @@ export class AdtEnhancement<
       () =>
         getEnhancementMetadata(
           connection,
-          // Kept for the owner (#304): an absent type sends `Accept: undefined`,
-          // which the request type cannot hold without this assertion.
-          config.enhancementType as EnhancementType,
+          // Required (the owner, #304): the type names the Accept.
+          config.enhancementType,
           name,
           options,
           this.logger,

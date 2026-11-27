@@ -722,6 +722,17 @@ above did not settle.
   runtime `TypeError`, each pinned by a type check that fails first, and named in the
   migration note. They are required in adt-clients' own member parameters; a type of
   interfaces-adt is not changed without the owner's decision (another release).
+- **The enhancement's `readMetadata` requires `enhancementType`** (the owner's
+  decision): the type names the read's `Accept`, so an absent one would send
+  `Accept: undefined`. It is required like the 13 fields above, with a type check
+  that fails first, and the last cast of adt-clients goes: its baseline is empty.
+- **interfaces-adt 33.0.0, inside this task** (the owner's decision): the 13 fields
+  and `enhancementType` on `readMetadata` become required in interfaces-adt's own
+  config types too, each pinned by a type check that fails against 32, and the
+  `IAdtObject` example that reads `answer.getError().t100` narrows `E | IAdtError`
+  first. It goes in its own PR in that repository, linked to #304 and #333. Once it
+  is published, one commit raises all three packages to `^33.0.0` from the registry,
+  as step 40 did for 32.
 - **K5, a rejection with `null` or `undefined`**: the six catch blocks rethrow it as
   it came instead of the `TypeError` of their own. Accepted, and named in the
   migration note.
