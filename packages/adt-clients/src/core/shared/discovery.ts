@@ -21,7 +21,7 @@ export async function getDiscovery(
   connection: IAbapConnection,
   params: IGetDiscoveryParams = {},
 ): Promise<IAdtWireResponse> {
-  const requestId = params.requestId ?? randomUUID().replace(/-/g, '');
+  const requestId = params.requestId ?? randomUUID().replaceAll('-', '');
   const timeout = params.timeout ?? 0;
 
   return connection.makeAdtRequest({

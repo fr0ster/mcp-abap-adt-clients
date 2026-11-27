@@ -48,7 +48,7 @@ export function batchQuery(params: unknown): URLSearchParams {
 }
 
 export const createBatchBoundary = (): string => `batch_${randomUUID()}`;
-export const createRequestId = (): string => randomUUID().replace(/-/g, '');
+export const createRequestId = (): string => randomUUID().replaceAll('-', '');
 
 export function buildBatchPayload(
   requests: readonly string[],

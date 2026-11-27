@@ -14,13 +14,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/batch/wire.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/-/g",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/clients/abapGit/structuredExchange.ts",
     "rule": "cast",
     "kind": "re-types",
@@ -886,13 +879,6 @@
     "rule": "predicate",
     "kind": "is",
     "text": "code is AdtSourceReadCode",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/shared/discovery.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/-/g",
     "count": 1
   },
   {
