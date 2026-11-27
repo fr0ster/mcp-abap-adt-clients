@@ -682,6 +682,37 @@ These paths are typed by C3. Every other generic path, where the returned error 
 `analyse`'s own, is typed by the overload and needs no cast. The four other generic
 stand-ins and the abapGit args are C1, C2, C4 and C5.
 
+### D4 — the owner's decisions during the adt-clients stage
+
+These are the owner's decisions, taken when the stage met cases the sections
+above did not settle.
+
+- **The abapGit slot lookup** (`AdtAbapGitClient.ts:226, 231`): the constructor's
+  options type becomes `AdtHandlerOptions<AbapGitStrategiesOf<T> & FactsReaders<T>,
+  'logger'>`, so the compiler checks that each slot has a reader of the value it
+  answers. The lookup then indexes a map typed per slot, with no cast. The `.d.ts`
+  change is accepted, and it goes into the migration note.
+- **Values from outside the type system are shape-checked** where they fill a typed
+  field:
+  - from a thrown value, `message` is kept only when it is a string; `response` only
+    when it is an object whose `status` is an integer; `request` as only its string
+    `method` and `url`;
+  - a batch request's `params` is accepted when it is a string, a `URLSearchParams`,
+    or a plain object whose values are strings, numbers or booleans, and anything
+    else is refused with the library's own error.
+
+  These are intended changes for odd values. Each gets a test that fails against the
+  old code first, and each is named in the migration note.
+- **The absent-field failures of the 29 D1 does not require stay as they are** (step
+  37). The same inputs give the same results, the `TypeError`s included. Each site
+  keeps them in a form without a cast; a site for which none exists is reported to
+  the owner with its grounds, and nothing is invented.
+- **K5, a rejection with `null` or `undefined`**: the six catch blocks rethrow it as
+  it came instead of the `TypeError` of their own. Accepted, and named in the
+  migration note.
+- **The parsed readers are copied into adt-clients** (`utils/ownValue.ts`: `isElement`,
+  `field`, `at`), because adt-strategies' `parsed.ts` is not public. Accepted.
+
 ## 5. Consumer changes C1–C7, as decided
 
 - **C1: `AdtBatchConnection.makeAdtRequest`** (`AdtBatchConnection.ts:70`, cast `:93`).

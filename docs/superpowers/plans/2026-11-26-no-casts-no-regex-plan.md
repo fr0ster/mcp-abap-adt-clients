@@ -241,8 +241,10 @@ upgrade.
       `getErrorLog` and the failure case keep their request tests.
     - `unit/clients/abapGit/credentialWire.test.ts`: reads the new forms only
       (it asserts `remoteUser` is absent from their bodies); unchanged.
-29. **AbapGit slot lookup, type-only.** The results map is typed per slot. `dist` is
-    byte-identical.
+29. **AbapGit slot lookup** (the owner's decision, spec D4). The constructor's options
+    take `& FactsReaders<T>`, a map typed per slot, and the lookup indexes it with no
+    cast. The `.d.ts` change is accepted and goes into the migration note; the
+    emitted JavaScript is otherwise unchanged.
 30. **C1.**
     - The **equivalence** test comes first: a batch member gets its part.
     - The **intended-change** type check comes next: a generic call
@@ -261,7 +263,9 @@ upgrade.
         reader is refused.
 
     Then add the two `request` overloads with the reader.
-32. **K5 readers, runtime.** First the table tests (spec section 7: recorded refusals, an
+32. **K5 readers, runtime.** The owner's decisions (spec D4) add the shape checks of
+    thrown values and batch `params`, each an intended change with a test failing
+    first, and accept the rethrow of a `null` or `undefined` rejection. First the table tests (spec section 7: recorded refusals, an
     inherited `response`, a getter, primitives, `null`). Then add `propertyOf` and the
     `as…` readers beside `ownValue`, and change each site under its own policy, as the spec
     lists.
@@ -284,7 +288,9 @@ upgrade.
       gets one abandoned lock, `unlockAll()` runs, and the release request is compared.
 
     Then add the per-lock datum to `createLockTracker` and remove `lockedTypes`.
-37. **D1, the 29 fields it does not require, an equivalence change.** For each internal function, a test
+37. **D1, the 29 fields it does not require, an equivalence change.** The owner's
+    decision (spec D4): the absent-field failures stay, `TypeError`s included, in a
+    form without a cast; a site with no such form is reported, not invented. For each internal function, a test
     against the old code comes first: called with `undefined` and with a value, it builds
     the same request. Then the parameter takes the contract's type, and the implicit
     conversions are written out.
