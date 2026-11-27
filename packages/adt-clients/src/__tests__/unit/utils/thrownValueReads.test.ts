@@ -33,8 +33,6 @@ const { fetchDiscoveryEndpoints } =
   require('../../../utils/discoveryEndpoints') as typeof import('../../../utils/discoveryEndpoints');
 const { isModernAdtSystem } =
   require('../../../utils/systemInfo') as typeof import('../../../utils/systemInfo');
-const { lockClassForMessageOrPlain, lockMessageIfGranted } =
-  require('../../../core/messageClass/lock') as typeof import('../../../core/messageClass/lock');
 const { safeErrorMessage } =
   require('../../../utils/internalUtils') as typeof import('../../../utils/internalUtils');
 
@@ -199,11 +197,6 @@ const SITES: [string, (c: never, l: never, input: unknown) => unknown][] = [
   ],
   ['discovery endpoints', (c) => fetchDiscoveryEndpoints(c)],
   ['modern ADT system', (c) => isModernAdtSystem(c)],
-  [
-    'class lock for a message',
-    (c) => lockClassForMessageOrPlain(c, 'ZMC', '001'),
-  ],
-  ['message lock if granted', (c) => lockMessageIfGranted(c, 'ZMC', '001')],
   ['safe error message', (_c, _l, input) => safeErrorMessage(input)],
 ];
 

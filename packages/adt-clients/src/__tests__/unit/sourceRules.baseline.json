@@ -14,13 +14,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/core/messageClass/AdtMessageClassMessage.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "config.className as string",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/core/shared/chain.ts",
     "rule": "cast",
     "kind": "re-types",

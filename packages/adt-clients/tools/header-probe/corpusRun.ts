@@ -933,7 +933,7 @@ async function runClients(ctx: IContext): Promise<void> {
       const write = member.requests.some((request) => isWrite(request.method));
       const readable = typeof handlerOf(reference).readMetadata === 'function';
       const locks = member.requests.some(
-        (request) => request.action === 'LOCK',
+        (request) => request.action === 'LOCK' || request.action === 'LOCK_MSG',
       );
       const label = `${member.handler}.${member.member}`;
       const entry: IPlanned<ITarget> = {

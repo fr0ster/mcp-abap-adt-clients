@@ -920,20 +920,6 @@ export const KNOWN_PAIRS: readonly IKnownPair[] = [
   },
   {
     handler: 'getMessageClassMessage()',
-    member: 'create',
-    accept: 'application/vnd.sap.adt.mc.messageclass+xml',
-    contentType: 'application/vnd.sap.adt.mc.messageclass+xml; charset=utf-8',
-    from: 'completed',
-  },
-  {
-    handler: 'getMessageClassMessage()',
-    member: 'delete',
-    accept: 'application/vnd.sap.adt.mc.messageclass+xml',
-    contentType: 'application/vnd.sap.adt.mc.messageclass+xml; charset=utf-8',
-    from: 'completed',
-  },
-  {
-    handler: 'getMessageClassMessage()',
     member: 'update',
     accept: 'application/vnd.sap.adt.mc.messageclass+xml',
     contentType: 'application/vnd.sap.adt.mc.messageclass+xml; charset=utf-8',

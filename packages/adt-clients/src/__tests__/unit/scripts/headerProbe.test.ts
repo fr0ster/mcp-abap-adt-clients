@@ -573,18 +573,15 @@ describe('an interrupt', () => {
 });
 
 describe('prerequisites', () => {
-  it('creates the message whatever the filters, so a filtered update has one to work on', () => {
+  it('creates the class whatever the filters, so a filtered message update has one to work in', () => {
     const filters = { only: ['messageClass'], operation: 'update' };
     expect(plannedKinds(filters, 'messageClass', 'create')).toEqual(['known']);
-    expect(plannedKinds(filters, 'messageClassMessage', 'create')).toEqual([
-      'known',
-    ]);
+    // The message's one write upserts it (C7 of #304): no create to run first.
     expect(plannedKinds(filters, 'messageClassMessage', 'update')).toEqual([
       'known',
       'badAccept',
       'badContentType',
     ]);
-    expect(plannedKinds(filters, 'messageClassMessage', 'delete')).toEqual([]);
     expect(plannedKinds(filters, 'class', 'create')).toEqual([]);
   });
 

@@ -626,7 +626,12 @@ export async function recordMembers(): Promise<{
         entry.skipped = capture.failure
           ? `skipped: builds no request from the probe name alone: ${capture.failure}`
           : 'skipped: answers without a request on the probe name alone (it reads its input from a server answer it was not given)';
-      else if (entry.requests.some((request) => request.action === 'LOCK'))
+      else if (
+        entry.requests.some(
+          (request) =>
+            request.action === 'LOCK' || request.action === 'LOCK_MSG',
+        )
+      )
         entry.skipped = LOCK_SKIP;
       else if (
         entry.requests.some(

@@ -383,16 +383,16 @@ again and its existence and version are recorded.
 
 The probes of one step go to SAP in one batch envelope (`AdtBatchConnection`).
 Lock and unlock, and the steps that set up a dependency, run on their own; a
-row whose member is a chain (a message class message) is marked
-`sequential: <reason>`. 
+row whose call is a chain (a message class message's `update`, run through
+the caller's recipe in `messageRecipe.ts`) is marked `sequential: <reason>`. 
 
 Everything the probe may have created goes into a ledger before the create is
 sent; a `finally` deletes it all, on failure and on Ctrl-C too, reports each
 deletion, and lists loudly what could not be deleted. Ctrl-C sends nothing
 new: the member call in flight finishes first — whole, so a member whose call
-is a chain of requests (a message class message's create or update: read,
-locks, the write, unlocks) sends the rest of its chain and releases its own
-locks —, then the ledger is cleaned as it stands (a second Ctrl-C during the cleanup is ignored). A create runs whatever members are asked for, since every later step needs its
+is a chain of requests (a message class message's `update` through the
+recipe: read, locks, the write, unlocks) sends the rest of its chain and
+releases its own locks —, then the ledger is cleaned as it stands (a second Ctrl-C during the cleanup is ignored). A create runs whatever members are asked for, since every later step needs its
 object; it is reported only when asked for. Operations the cycle
 cannot run on its own (a debugger session, an abapGit repository, objects
 whose key the server assigns) are reported as `skipped: <reason>`.

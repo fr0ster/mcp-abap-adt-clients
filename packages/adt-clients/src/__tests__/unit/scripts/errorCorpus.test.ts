@@ -5146,7 +5146,7 @@ describe('the gate refuses what phase 2 may not send', () => {
     expect(written.error).toBeUndefined();
   });
 
-  it("an excluded read inside a member's own chain is not sent (the message class source)", async () => {
+  it("an excluded read inside a write's recipe is not sent (the message class source)", async () => {
     const members = new Map([
       [
         'getMessageClassMessage().read',
@@ -5160,9 +5160,7 @@ describe('the gate refuses what phase 2 may not send', () => {
         members,
         except: ['getMessageClassMessage().read'],
       }),
-      [
-        'getMessageClassMessage().create — POST /sap/bc/adt/messageclass/{name}',
-      ],
+      ['getMessageClassMessage().update — PUT /sap/bc/adt/messageclass/{name}'],
     );
     expect(sent(fake, 'GET', /\/sap\/bc\/adt\/messageclass\//)).toBe(false);
     expect(written.skipped?.join(' ')).toContain(

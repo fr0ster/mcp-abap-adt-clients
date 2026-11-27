@@ -88,75 +88,49 @@ function messageClassConnection(
   return { connection, calls };
 }
 
-describe('a message-class write (chain)', () => {
-  it('rejects with the same object when the PUT is refused, and still unlocks', async () => {
+describe('a message-class message member (C7 of #304: one request each)', () => {
+  const message = (connection: IAbapConnection) =>
+    new AdtMessageClassMessage(connection, {
+      logger: noopLogger,
+      results: messageDocuments,
+    });
+
+  it('the write rejects with the same object when the PUT is refused', async () => {
     const thrown = refused();
     const keys = ownKeys(thrown);
     const { connection, calls } = messageClassConnection(
       (o) => o.method === 'PUT',
       thrown,
     );
-
+    const m = message(connection);
     await expect(
-      new AdtMessageClassMessage(connection, {
-        logger: noopLogger,
-        results: messageDocuments,
-      }).update(
+      m.update(
+        { className: 'ZT', msgno: '001', msgtext: 'NEW' },
         {
-          className: 'ZT',
-          msgno: '001',
-          msgtext: 'NEW',
-        },
-        {
-          headers: headersOf(
-            new AdtMessageClassMessage(connection, {
-              logger: noopLogger,
-              results: messageDocuments,
-            }),
-            'update',
-          ),
+          headers: headersOf(m, 'update'),
+          classDocument: CLASS_XML,
+          classLockHandle: 'H',
+          messageLockHandle: 'H',
         },
       ),
     ).rejects.toBe(thrown);
-
-    expect(calls.some((c) => c.includes('_action=UNLOCK_ALL'))).toBe(true);
-    expect(
-      calls.some((c) => c.includes('_action=UNLOCK') && !c.includes('_ALL')),
-    ).toBe(true);
+    expect(calls).toHaveLength(1);
     expect(ownKeys(thrown)).toEqual(keys);
   });
 
-  it('rejects with the same object when the class lock is refused, and still releases the message lock', async () => {
+  it('the class-for-message lock rejects with the same object when it is refused', async () => {
     const thrown = refused();
     const { connection, calls } = messageClassConnection(
-      (o) => o.url.includes('_action=LOCK') && !o.url.includes('LOCK_MSG'),
+      (o) => o.url.includes('onSave=X'),
       thrown,
     );
-
     await expect(
-      new AdtMessageClassMessage(connection, {
-        logger: noopLogger,
-        results: messageDocuments,
-      }).update(
-        {
-          className: 'ZT',
-          msgno: '001',
-          msgtext: 'NEW',
-        },
-        {
-          headers: headersOf(
-            new AdtMessageClassMessage(connection, {
-              logger: noopLogger,
-              results: messageDocuments,
-            }),
-            'update',
-          ),
-        },
-      ),
+      message(connection).lockClassForMessage({
+        className: 'ZT',
+        msgno: '001',
+      }),
     ).rejects.toBe(thrown);
-
-    expect(calls.some((c) => c.includes('_action=UNLOCK_ALL'))).toBe(true);
-    expect(calls.some((c) => c.startsWith('PUT'))).toBe(false);
+    expect(calls).toHaveLength(1);
   });
 });
 

@@ -50,6 +50,7 @@ import {
   overTheLimit,
 } from '../../../helpers/descriptionLimit';
 import { judged } from '../../../helpers/judged';
+import { writeMessage } from '../../../helpers/messageWrite';
 import { presenceOf } from '../../../helpers/objectPresence';
 import { patchedDocument } from '../../../helpers/patchedDocument';
 import { readRootDescription } from '../../../helpers/rootDescription';
@@ -343,8 +344,12 @@ describe('MessageClass (using AdtClient)', () => {
           // One create, read as it answers: a refusal — "Resource MSAG ...
           // does not exist" included — fails the test; a retry that then
           // succeeded would not erase it.
+          // The caller's recipe (C7 of #304): read the class, lock the message
+          // and the class for it, write, unlock — one request per member.
           const createMessage = () =>
-            msgHandler.create(
+            writeMessage(
+              mcHandler,
+              msgHandler,
               {
                 className: msgClassName,
                 msgno: msgNo,
@@ -352,8 +357,7 @@ describe('MessageClass (using AdtClient)', () => {
                 transportRequest: config.transportRequest,
               },
               {
-                analyse: analyseException,
-                headers: integrationHeadersOf(msgHandler, 'create'),
+                headers: integrationHeadersOf(msgHandler, 'update'),
               },
             );
           expectResult(await createMessage(), `create message ${msgNo}`);
@@ -381,7 +385,9 @@ describe('MessageClass (using AdtClient)', () => {
           // ── Step 5: Update message ─────────────────────────────────────────
           logTestStep(`update message ${msgNo}`, testsLogger);
           const msgUpdateState = expectResult(
-            await msgHandler.update(
+            await writeMessage(
+              mcHandler,
+              msgHandler,
               {
                 className: msgClassName,
                 msgno: msgNo,
@@ -389,7 +395,6 @@ describe('MessageClass (using AdtClient)', () => {
                 transportRequest: config.transportRequest,
               },
               {
-                analyse: analyseException,
                 headers: integrationHeadersOf(msgHandler, 'update'),
               },
             ),
@@ -511,24 +516,20 @@ describe('MessageClass (using AdtClient)', () => {
 
           // ── Step 7: Remove the message ─────────────────────────────────────
           // A message is a row inside its class's document, so removing it is a
-          // write of that document — not a deletion, and the contract no longer
-          // calls it one. `AdtMessageClassMessage` keeps `delete()` as the name
-          // for writing the row away, and it is reached on the class rather than
-          // through the composition the factory declares.
+          // write of that document: the recipe's update with removeMessage.
           logTestStep(`remove message ${msgNo}`, testsLogger);
           const msgDeleteState = expectResult(
-            await (msgHandler as unknown as AdtMessageClassMessage).delete(
+            await writeMessage(
+              mcHandler,
+              msgHandler,
               {
                 className: msgClassName,
                 msgno: msgNo,
                 transportRequest: config.transportRequest,
+                removeMessage: true,
               },
               {
-                analyse: judged(analyseDeletion),
-                headers: integrationHeadersOf(
-                  msgHandler as unknown as AdtMessageClassMessage,
-                  'delete',
-                ),
+                headers: integrationHeadersOf(msgHandler, 'update'),
               },
             ),
             'msgDeleteState',

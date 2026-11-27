@@ -36,6 +36,7 @@ import {
   LOCK_SKIP,
   pairOf,
 } from './members';
+import { type IMessageHandlers, upsertMessage } from './messageRecipe';
 import {
   type IProbeClient,
   type ITemporaryContext,
@@ -879,23 +880,21 @@ async function prepare(
 ): Promise<void> {
   if (type === 'messageClass')
     await probe.direct1((client, analyse) =>
-      (
-        client.getMessageClassMessage() as unknown as {
-          create: (config: unknown, options: unknown) => Promise<unknown>;
-        }
-      ).create(
+      upsertMessage(
+        {
+          messageClass:
+            client.getMessageClass() as unknown as IMessageHandlers['messageClass'],
+          message:
+            client.getMessageClassMessage() as unknown as IMessageHandlers['message'],
+        },
         {
           className: name,
           msgno: '001',
           msgtext: 'Header probe 001',
-          ...(context.transportRequest
-            ? { transportRequest: context.transportRequest }
-            : {}),
+          transportRequest: context.transportRequest,
         },
-        {
-          headers: pairOf('getMessageClassMessage()', 'create'),
-          analyse,
-        },
+        pairOf('getMessageClassMessage()', 'update') as IAdtHeaders,
+        analyse,
       ),
     );
   if (type === 'class') {

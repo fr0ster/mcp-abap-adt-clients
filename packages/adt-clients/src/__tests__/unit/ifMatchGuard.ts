@@ -41,6 +41,8 @@ export interface UpdateRow {
   member: (typeof UPDATE_MEMBERS)[number];
   build: (connection: IAbapConnection) => unknown;
   config: Record<string, unknown>;
+  /** What the member takes beyond `source` and `lockHandle` ({@link HandlerEntry.updateOptions}). */
+  updateOptions?: Readonly<Record<string, unknown>>;
 }
 
 /** Whether `value` has a method `member`. */
@@ -61,7 +63,7 @@ export function updateRows(
   prefix = '',
 ): UpdateRow[] {
   const rows: UpdateRow[] = [];
-  for (const [name, entry] of Object.entries(HANDLERS)) {
+  for (const [name, entry] of Object.entries<HandlerEntry>(HANDLERS)) {
     const build = (connection: IAbapConnection) => handlerOf(connection, entry);
     const probe = build(recordingConnection().connection);
     for (const member of UPDATE_MEMBERS) {
@@ -71,6 +73,7 @@ export function updateRows(
         member,
         build,
         config: entry.config,
+        ...(entry.updateOptions ? { updateOptions: entry.updateOptions } : {}),
       });
     }
   }
@@ -111,6 +114,7 @@ async function callRow(
       headers: pair,
       source: String(row.config.source ?? '" guard'),
       lockHandle: 'GUARD-LOCK',
+      ...row.updateOptions,
       ...(ifMatch === undefined ? {} : { ifMatch }),
     });
   } catch {
