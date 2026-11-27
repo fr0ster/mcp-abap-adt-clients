@@ -28,101 +28,10 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients-legacy/src/core/class/AdtClassLegacy.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "config.className as string",
-    "count": 2
-  },
-  {
-    "file": "packages/adt-clients-legacy/src/core/class/AdtLocalDefinitionsLegacy.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "config.className as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients-legacy/src/core/class/AdtLocalMacrosLegacy.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "config.className as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients-legacy/src/core/class/AdtLocalTestClassLegacy.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "config.className as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients-legacy/src/core/class/AdtLocalTypesLegacy.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "config.className as string",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients-legacy/src/core/ddl/AdtDdlLegacy.ts",
     "rule": "cast",
     "kind": "re-types",
     "text": "{ origin: 'refusal', code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION, message: 'The CDS test-doubles check needs BASIS 7.50 or later; this system has no such endpoint.', } as E",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients-legacy/src/core/ddl/AdtDdlLegacy.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "config.ddlName as string",
-    "count": 3
-  },
-  {
-    "file": "packages/adt-clients-legacy/src/core/functionGroup/AdtFunctionGroupLegacy.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "config.functionGroupName as string",
-    "count": 3
-  },
-  {
-    "file": "packages/adt-clients-legacy/src/core/functionModule/AdtFunctionModuleLegacy.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "config.functionGroupName as string",
-    "count": 2
-  },
-  {
-    "file": "packages/adt-clients-legacy/src/core/functionModule/AdtFunctionModuleLegacy.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "config.functionModuleName as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients-legacy/src/core/functionModule/AdtFunctionModuleLegacy.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "module as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients-legacy/src/core/include/AdtIncludeLegacy.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "config.includeName as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients-legacy/src/core/interface/AdtInterfaceLegacy.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "config.interfaceName as string",
-    "count": 2
-  },
-  {
-    "file": "packages/adt-clients-legacy/src/core/messageClass/AdtMessageClassLegacy.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "config.name as string",
     "count": 1
   },
   {
@@ -131,13 +40,6 @@
     "kind": "re-types",
     "text": "UNSUPPORTED as E",
     "count": 5
-  },
-  {
-    "file": "packages/adt-clients-legacy/src/core/program/AdtProgramLegacy.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "config.programName as string",
-    "count": 2
   },
   {
     "file": "packages/adt-clients-legacy/src/core/shared/AdtUtilsLegacy.ts",

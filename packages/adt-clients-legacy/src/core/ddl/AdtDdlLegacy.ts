@@ -74,7 +74,7 @@ export class AdtDdlLegacy<
     config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
-    const name = config.ddlName as string;
+    const name = config.ddlName;
 
     const objectUrl = `${DDL_SOURCE.uri(name)}`;
     return answering(
@@ -194,7 +194,7 @@ export class AdtDdlLegacy<
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
     return noTransportResource<T['transport'], E>(
-      DDL_SOURCE.uri(config.ddlName as string),
+      DDL_SOURCE.uri(config.ddlName),
     );
   }
 
@@ -219,7 +219,7 @@ export class AdtDdlLegacy<
   ): Promise<IAdtResponse<T['versions'], E | IAdtError>> {
     return legacyMeasuredRefusal<T['versions'], E>(
       'getVersions',
-      `GET ${versionsUri(DDL_SOURCE.uri(config.ddlName as string))} answers 404.`,
+      `GET ${versionsUri(DDL_SOURCE.uri(config.ddlName))} answers 404.`,
     );
   }
 

@@ -66,7 +66,7 @@ export class AdtInterfaceLegacy<
     config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
-    const name = config.interfaceName as string;
+    const name = config.interfaceName;
 
     const objectUrl = `${INTERFACE.uri(name)}`;
     return answering(
@@ -162,7 +162,7 @@ export class AdtInterfaceLegacy<
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
     return noTransportResource<T['transport'], E>(
-      INTERFACE.uri(config.interfaceName as string),
+      INTERFACE.uri(config.interfaceName),
     );
   }
 }

@@ -68,7 +68,7 @@ export class AdtClassLegacy<
     config: AdtObjectIdentity<IClassConfig, 'className'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
-    const name = config.className as string;
+    const name = config.className;
 
     const objectUrl = `${CLASS.uri(name)}`;
     return answering(
@@ -163,8 +163,6 @@ export class AdtClassLegacy<
     config: AdtObjectIdentity<IClassConfig, 'className'>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
-    return noTransportResource<T['transport'], E>(
-      CLASS.uri(config.className as string),
-    );
+    return noTransportResource<T['transport'], E>(CLASS.uri(config.className));
   }
 }

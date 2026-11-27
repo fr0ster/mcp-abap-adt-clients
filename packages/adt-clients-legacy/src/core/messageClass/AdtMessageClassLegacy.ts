@@ -87,7 +87,7 @@ export class AdtMessageClassLegacy<
     config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
-    const objectUrl = MESSAGE_CLASS.uri(config.name as string);
+    const objectUrl = MESSAGE_CLASS.uri(config.name);
     return answering(
       () =>
         deleteObjectDirect(

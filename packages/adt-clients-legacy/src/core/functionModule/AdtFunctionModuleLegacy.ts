@@ -75,10 +75,10 @@ export class AdtFunctionModuleLegacy<
     >,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
-    const group = config.functionGroupName as string;
+    const group = config.functionGroupName;
     const module = config.functionModuleName;
 
-    const objectUrl = `${FUNCTION_MODULE.uri(group, module as string)}`;
+    const objectUrl = `${FUNCTION_MODULE.uri(group, module)}`;
     return answering(
       () =>
         deleteObjectDirect(
@@ -195,10 +195,7 @@ export class AdtFunctionModuleLegacy<
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
     return noTransportResource<T['transport'], E>(
-      FUNCTION_MODULE.uri(
-        config.functionGroupName as string,
-        config.functionModuleName as string,
-      ),
+      FUNCTION_MODULE.uri(config.functionGroupName, config.functionModuleName),
     );
   }
 }

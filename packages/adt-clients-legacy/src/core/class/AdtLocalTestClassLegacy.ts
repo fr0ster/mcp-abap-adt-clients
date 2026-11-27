@@ -50,8 +50,6 @@ export class AdtLocalTestClassLegacy<
     config: AdtObjectIdentity<IClassConfig, 'className'>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
-    return noTransportResource<T['transport'], E>(
-      CLASS.uri(config.className as string),
-    );
+    return noTransportResource<T['transport'], E>(CLASS.uri(config.className));
   }
 }

@@ -68,7 +68,7 @@ export class AdtFunctionGroupLegacy<
     config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
-    const name = config.functionGroupName as string;
+    const name = config.functionGroupName;
 
     const objectUrl = FUNCTION_GROUP.uri(name);
     return answering(
@@ -132,7 +132,7 @@ export class AdtFunctionGroupLegacy<
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
     return noTransportResource<T['transport'], E>(
-      FUNCTION_GROUP.uri(config.functionGroupName as string),
+      FUNCTION_GROUP.uri(config.functionGroupName),
     );
   }
 
@@ -163,7 +163,7 @@ export class AdtFunctionGroupLegacy<
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E | IAdtError>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
-    const name = config.functionGroupName as string;
+    const name = config.functionGroupName;
     const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
 <adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
   <adtcore:objectReference adtcore:uri="${FUNCTION_GROUP.uri(name)}" adtcore:name="${name}"/>

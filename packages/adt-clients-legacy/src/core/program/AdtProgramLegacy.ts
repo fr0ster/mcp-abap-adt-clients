@@ -66,7 +66,7 @@ export class AdtProgramLegacy<
     config: AdtObjectIdentity<IProgramConfig, 'programName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
-    const name = config.programName as string;
+    const name = config.programName;
 
     const objectUrl = `${PROGRAM.uri(name)}`;
     return answering(
@@ -162,7 +162,7 @@ export class AdtProgramLegacy<
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
     return noTransportResource<T['transport'], E>(
-      PROGRAM.uri(config.programName as string),
+      PROGRAM.uri(config.programName),
     );
   }
 }

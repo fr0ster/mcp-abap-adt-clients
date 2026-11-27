@@ -146,7 +146,7 @@ export class AdtIncludeLegacy<
     config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
-    const objectUrl = PROGRAM_INCLUDE.uri(config.includeName as string);
+    const objectUrl = PROGRAM_INCLUDE.uri(config.includeName);
     return answering(
       () =>
         deleteObjectDirect(
