@@ -24,6 +24,27 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [48.0.1] - 2026-11-27
+
+fr0ster/mcp-abap-adt#391: the library picks no bound of its own. A bound the
+caller gives goes out exactly as given, `0` included; without one the request
+carries none, and SAP's own bound applies. Measured on the BTP ABAP environment
+(2026-11-27).
+
+### Fixed
+
+- **`getSqlQuery` sends `row_number` as given, and no `rowNumber` without
+  one.** A missing or `0` bound was sent as 100. Without `rowNumber` SAP answers
+  100 records (selections of 163, 249, 1716 and 8466 measured); it refuses `0`,
+  a negative number and 2147483647 with `400`, and 2147483646 was the largest
+  it accepted.
+- **`search` sends `maxResults` as given, and none without one.** A missing or
+  `0` bound was sent as 100. Without `maxResults` the quick search answers 200
+  hits (of 8886 measured), and `maxResults=0` answers 200 too.
+- **`getAtc().startRun` sends no `maximumVerdicts` without one.** A missing cap
+  was sent as 100; SAP accepts a run payload without the attribute. A cap given
+  is still refused before the request when it is not a positive integer.
+
 ## [48.0.0] - 2026-11-27
 
 fr0ster/mcp-abap-adt-clients#304: this package's `src` holds no cast but
