@@ -324,7 +324,7 @@ Common behaviors in implementations:
 
 ## Type System and Exports
 
-**Types are defined once, in the contract packages** — `@mcp-abap-adt/interfaces-adt` `^12.0.0`, `@mcp-abap-adt/interfaces-adt-connection` `^1.0.0` and their siblings. As of 7.5.0 this package declares no type it shares with them, and since 22.0.0 it imports from each by name instead of through the facade, which is now deleted. Since 23.0.0 the connection names (`IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions`, `ITimeoutConfig`, the connection capability atoms, `ADT_SESSION_ERROR`) come from `-adt-connection`: `interfaces-adt` 11 no longer exports them. Each `src/core/<object>/types.ts` is a re-export surface:
+**Types are defined once, in the contract packages** — `@mcp-abap-adt/interfaces-adt` (`^33.0.0` today), `@mcp-abap-adt/interfaces-adt-connection` (`^5.3.0` today) and their siblings. As of 7.5.0 this package declares no type it shares with them, and since 22.0.0 it imports from each by name instead of through the facade, which is now deleted. Since 23.0.0 the connection names (`IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions`, `ITimeoutConfig`, the connection capability atoms, `ADT_SESSION_ERROR`) come from `-adt-connection`: `interfaces-adt` 11 no longer exports them. Each `src/core/<object>/types.ts` is a re-export surface:
 
 ```ts
 export type { IClassConfig, ICreateClassParams } from '@mcp-abap-adt/interfaces-adt';

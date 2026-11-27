@@ -12,11 +12,11 @@
  * interfaces-adt 30.2.0. HTTP operations are built by the functions in
  * ./abapGit/*; this class owns the options and enforces the public contract.
  *
- * **Two kinds of member.** The legacy ones (`link` and `checkExternalRepo`
- * without `credentials`, `pull`, `unlink`, `listRepos`, `getErrorLog`) keep
- * 46.1.0's requests, callbacks and answers. The new forms — the new members,
- * and `link` / `checkExternalRepo` given `credentials` (a credential, or `null`
- * for an anonymous call) — go through the facts exchange: SAP's answer is
+ * **Two kinds of member.** The legacy ones (`pull`, `unlink`, `listRepos`,
+ * `getErrorLog`) keep 46.1.0's requests, callbacks and answers. The new forms —
+ * the new members, and `link` / `checkExternalRepo`, which require
+ * `credentials` (a credential, or `null` for an anonymous call) since 48.0.0,
+ * when their legacy forms were removed — go through the facts exchange: SAP's answer is
  * reduced to the route's kept fields before anything sees it, and a failure is
  * an `IAbapGitStructuredError` of fixed words, a status and a T100 key.
  */

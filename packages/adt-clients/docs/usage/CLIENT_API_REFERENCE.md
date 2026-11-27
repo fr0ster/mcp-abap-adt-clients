@@ -604,12 +604,15 @@ const abapGit = AdtAbapGitClient.create(connection, {
 // `AdtAbapGitClient.create(connection)` answers the documents as they arrived.
 
 // Probe a remote repo before linking
+// (`credentials` is required since 48.0.0: a credential, or `null` for an
+// anonymous call; the answer is the facts, `{ status, facts }`.)
 const info = await abapGit.checkExternalRepo({
   url: 'https://github.com/SAP-samples/cloud-abap-rap.git',
-}, { headers });
+}, { headers, credentials: null });
 if (info.ok) {
-  console.log(info.getResult().value.accessMode);                    // 'PUBLIC' | 'PRIVATE' | ...
-  console.log(info.getResult().value.branches.map((b) => b.name));   // ['HEAD', 'refs/heads/main', ...]
+  const { facts } = info.getResult().value;
+  console.log(facts.accessMode);                    // 'PUBLIC' | 'PRIVATE' | ...
+  console.log(facts.branches.map((b) => b.name));   // ['HEAD', 'refs/heads/main', ...]
 }
 
 // Link a package to a remote repo
@@ -617,7 +620,7 @@ await abapGit.link({
   package: 'ZMY_PKG',
   url: 'https://github.com/SAP-samples/cloud-abap-rap.git',
   branchName: 'refs/heads/main',
-}, { headers });
+}, { headers, credentials: null });
 
 // Every member is addressed by what `listRepos` reported: the pull link, the
 // log link, the repository key. A member never looks them up for you.
@@ -689,7 +692,7 @@ if (repo.repositoryId) {
 
 #### abapGit new forms (46.2.0)
 
-The members above are the legacy forms: they keep 46.1.0's requests, callbacks and answers, and are deprecated. `pull` and `getErrorLog` send their link only when it is exactly the path a key would build (`/sap/bc/adt/abapgit/repos/{key}/pull`, `…/log/{id}`); anything else — an absolute URL, another host, a query, a fragment, an empty, `.` or `..` segment — is refused in fixed words with nothing sent.
+`pull`, `unlink`, `listRepos` and `getErrorLog` above are the legacy forms: they keep 46.1.0's requests, callbacks and answers, and are deprecated. `link` and `checkExternalRepo` have only their new forms since 48.0.0 (the calls above pass `credentials`); their legacy forms were removed — see [MIGRATION-48](MIGRATION-48.md#abapgit-the-old-form-is-gone-the-facts-readers-are-complete). `pull` and `getErrorLog` send their link only when it is exactly the path a key would build (`/sap/bc/adt/abapgit/repos/{key}/pull`, `…/log/{id}`); anything else — an absolute URL, another host, a query, a fragment, an empty, `.` or `..` segment — is refused in fixed words with nothing sent.
 
 The new forms are addressed by the repository's key, which `listRepos` / `listReposQuiet` report, and each builds its path from it, one encoded segment at a time (an empty, `.` or `..` key or segment is refused, nothing sent). No member takes a URL to send to.
 
@@ -712,11 +715,11 @@ The new forms are addressed by the repository's key, which `listRepos` / `listRe
 
 **What SAP does with them** — read from its handlers and measured on both systems — is in [ERRATA.md](ERRATA.md#abapgit-what-an-answer-says). Three things a caller meets first: before 46.2.0 a push with an attribute present and empty was refused (measured on premise: 400, T100 `00`/`001`; a selective pull falls under the same rule by its transformation, not measured); a cloud pull imports inactive, so activating is the caller's; and on the on-premise test system `checkRepo` cannot succeed — SAP's handler `ZCL_ABAPGIT_RES_REPO_CHECKS` does not compile (its syntax check: no value for the mandatory parameter `IV_SERVICE`, L53), every call ends in `SYNTAX_ERROR` and is answered `500` with no T100 key. The member returns that answer as it is: a failure with `facts.status` `500`.
 
-`link` and `checkExternalRepo` take `options.credentials`, required: a credential, or `null` for an anonymous call. Their legacy forms are gone since 48.0.0 (interfaces-adt 32): the legacy `checkExternalRepo` wrote `remoteUser` / `remotePassword`, which SAP does not read on R13, so a private repository was checked anonymously; the form left writes `user` / `password`.
+`link` and `checkExternalRepo` take `options.credentials`, required: a credential, or `null` for an anonymous call. Their legacy forms were removed in 48.0.0 (interfaces-adt 32; [MIGRATION-48](MIGRATION-48.md#abapgit-the-old-form-is-gone-the-facts-readers-are-complete)): the legacy `checkExternalRepo` wrote `remoteUser` / `remotePassword`, which SAP does not read on R13, so a private repository was checked anonymously; the form left writes `user` / `password`.
 
 **Facts, not documents.** Every new form goes through the facts exchange: SAP's answer is reduced by `abapGitFacts` (`@mcp-abap-adt/adt-strategies`) to the route's kept fields before the result strategy, the analyser or the client's logger sees it. A result slot is optional: left out, the member answers `IAbapGitFactsResponse<F>` (`{ status, facts }`); given, it is a facts reader `(answer: IAbapGitFactsResponse<F>) => T` — a wire reader (`IResultStrategy`) does not fit it. A failure is an `IAbapGitStructuredError`: `message` one of `ABAPGIT_ERROR_MESSAGES`, `facts` the status, `messageClass` / `messageNumber` (the T100 key) and R11's `gitHttpStatus`, `request` the method and the path without the query — no response, no SAP text, no thrown message. Strict by default: every non-2xx is the error; an analyser `(verdict, answer?)` may judge, and clears a failure only where there are facts to read. With no answer at all the message is `noResponse`, status `0`.
 
-**On the wire.** Each new form sends `timeout: 0`, `noLog`, `noResend` and `stateless` (interfaces-adt-connection 5.2.0, implemented by connection 25.1.0 and later): nothing of the request is logged by the connection, nothing is replayed (SAP may already have run a write), and the request goes stateless whatever the session mode, so no git credential stays in an ABAP session. The legacy forms and `unlink` send none of them. `getFile` also sends `rawText` (interfaces-adt-connection 5.3.0): its file is the exact text SAP sent only over a connection that honours it — `@mcp-abap-adt/connection` 25.2.0 or later; an older HTTP wire parses a JSON-looking file and strips a BOM. An `AdtBatchConnection` refuses any request carrying `noLog` or `noResend` with a synchronous throw ("this request cannot be recorded into a batch"), before anything is queued.
+**On the wire.** Each new form sends `timeout: 0`, `noLog`, `noResend` and `stateless` (interfaces-adt-connection 5.2.0, implemented by connection 25.1.0 and later): nothing of the request is logged by the connection, nothing is replayed (SAP may already have run a write), and the request goes stateless whatever the session mode, so no git credential stays in an ABAP session. The legacy forms (`pull`, `listRepos`, `getErrorLog`) and `unlink` send none of them. `getFile` also sends `rawText` (interfaces-adt-connection 5.3.0): its file is the exact text SAP sent only over a connection that honours it — `@mcp-abap-adt/connection` 25.2.0 or later; an older HTTP wire parses a JSON-looking file and strips a BOM. An `AdtBatchConnection` refuses any request carrying `noLog` or `noResend` with a synchronous throw ("this request cannot be recorded into a batch"), before anything is queued.
 
 ```typescript
 import { AdtAbapGitClient, abapGitDocuments } from '@mcp-abap-adt/adt-clients';

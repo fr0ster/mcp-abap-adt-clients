@@ -48,7 +48,7 @@ const program = client.getProgram();                          // the getters 7.4
   a 7.40 system is not a supported wire (no logon without a workaround, a write
   under a lock answers `423`, some reads disagree with RFC; the records are in
   LEGACY.md). The package does not detect the wire and has no branch for it.
-- The package depends on `@mcp-abap-adt/adt-clients` `^38.0.0`. It also exports
+- The package takes `@mcp-abap-adt/adt-clients` `^48.0.0` as a peer dependency (above). It also exports
   `AdtRequestLegacy`.
 - **Each getter answers a class** (since 0.2.0): its legacy class
   (`getProgram(): AdtProgramLegacy<…>`, `getInclude(): AdtIncludeLegacy<…>`, …)

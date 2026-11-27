@@ -270,7 +270,7 @@ npm install @mcp-abap-adt/adt-clients
 
 6. **AbapDebugger, AmdpDebugger, MemorySnapshots**
    - Standalone, from `@mcp-abap-adt/adt-clients/runtime` or the root: `AbapDebugger.create(connection, { logger?, onConflict? })` answers the shipped documents (`abapDebuggerDocuments`), `AbapDebugger.create(connection, { results, logger?, onConflict? })` the caller's; likewise `AmdpDebugger.create` and `MemorySnapshots.create` (`{ logger?, results? }`, since 38.0.0). `new AbapDebugger(connection, { results, logger?, onConflict? })` takes its results always
-   - One member per request, contracts `IAbapDebugger`, `IAmdpDebugger`, `IMemorySnapshots` from `@mcp-abap-adt/interfaces-adt` (contract 18 pairs with clients 32)
+   - One member per request, contracts `IAbapDebugger`, `IAmdpDebugger`, `IMemorySnapshots` from `@mcp-abap-adt/interfaces-adt` (since contract 18 and clients 32)
    - **The identity states its mode.** `{ debuggingMode: 'user', requestUser, terminalId, ideId }`, or `{ debuggingMode: 'terminal', terminalId, ideId }`; `attach` takes the identity, not the user. A terminal-mode listener catches a run that carries its ids: `run(target, { debuggee: { terminalId, ideId } })` sends them in `SAP-PASSPORT` (since 29.1.0)
    - **Breakpoints are replaced, not added to.** `setBreakpoints` and `syncBreakpoints` replace the identity's set, and `stopListener` deletes it: arm the whole set in one call
    - **Two sessions.** The ABAP listener holds one stateful connection; each debuggee caught is attached on a new one, routed to its application server. The AMDP debugger answers events on one session and takes commands on another
@@ -1942,7 +1942,7 @@ everything else is not.
 
 ### Single Definition Site: the contract packages
 
-Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^29.0.0`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^5.0.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the result-set contracts a factory accepts (`IClassResults`, …, since 38.0.0), the option and response types and the cross-cutting shared types all live there.
+Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^33.0.0`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^5.3.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the result-set contracts a factory accepts (`IClassResults`, …, since 38.0.0), the option and response types and the cross-cutting shared types all live there.
 
 **Import them from the package that owns them:**
 
@@ -2022,7 +2022,7 @@ contracts (`IAbapDebugger`, `IAmdpDebugger`, `IMemorySnapshots`, 13.1.0). This
 package no longer declares or exports any contract type — every contract name it uses is
 sourced from the contract packages.
 
-> **Version pairing.** `adt-clients` 32 pairs with `interfaces-adt` 18 and `interfaces-adt-connection` 3 (the enhancement subtype and host contracts), and `adt-strategies` 0.12.0 declares the same ranges. Because the types are sourced rather than copied, `@mcp-abap-adt/interfaces-adt` and `@mcp-abap-adt/interfaces-adt-connection` are hard peers of this package's public API. A major bump there implies a bump here; keep the two in step rather than letting a resolver pick a mismatched pair.
+> **Version pairing.** `adt-clients` 48 pairs with `interfaces-adt` `^33.0.0` and `interfaces-adt-connection` `^5.3.0`, and depends on `adt-strategies` `^0.29.0`, which declares the same `interfaces-adt` range (`^33.0.0`) and `interfaces-adt-connection` `^5.3.0`; its own tests run over `@mcp-abap-adt/connection` `^25.2.0` (a dev dependency: the consumer brings its connection). Because the types are sourced rather than copied, `@mcp-abap-adt/interfaces-adt` and `@mcp-abap-adt/interfaces-adt-connection` are hard peers of this package's public API. A major bump there implies a bump here; keep the two in step rather than letting a resolver pick a mismatched pair.
 
 ### Release variants and type codes
 
