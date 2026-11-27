@@ -89,6 +89,26 @@ export const SOURCE_READ = {
 /** A code `readObjectSource` reads. */
 export type AdtSourceReadCode = keyof typeof SOURCE_READ;
 
+/**
+ * The keys of a code set, each under its own text. `for … in` over a generic
+ * object types each key as `Extract<keyof C, string>`, so no code is retyped.
+ */
+function codeLookup<C extends object>(
+  codes: C,
+): ReadonlyMap<string, Extract<keyof C, string>> {
+  const lookup = new Map<string, Extract<keyof C, string>>();
+  for (const code in codes) lookup.set(code, code);
+  return lookup;
+}
+
+/** The codes `readObjectMetadata` reads, looked up by their text. */
+export const METADATA_READ_CODE: ReadonlyMap<string, AdtMetadataReadCode> =
+  codeLookup(METADATA_READ);
+
+/** The codes `readObjectSource` reads, looked up by their text. */
+export const SOURCE_READ_CODE: ReadonlyMap<string, AdtSourceReadCode> =
+  codeLookup(SOURCE_READ);
+
 /** Whether text from outside the types is a code `readObjectMetadata` reads. */
 export function isMetadataReadCode(code: string): boolean {
   return Object.hasOwn(METADATA_READ, code);

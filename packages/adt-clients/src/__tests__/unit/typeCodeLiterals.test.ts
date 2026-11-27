@@ -21,6 +21,10 @@ const ALLOWED: ReadonlyMap<string, string> = new Map([
     "The HTTP version of a batch part's request line (`HTTP/1.1`), not a type code.",
   ],
   [
+    'src/utils/scan.ts:HTTP/1',
+    "The HTTP version of a batch part's status line (`HTTP/1.1`), not a type code.",
+  ],
+  [
     'src/core/enhancement/create.ts:ENHS/XS',
     "The type of the enhancement spot as the BAdI implementation's create body references it (`enhcore:objectReference adtcore:type`): a type the systems list (`coverage.json`, unserved) that no API of the library serves, so no table holds it; it is the request body as sent, unchanged.",
   ],
