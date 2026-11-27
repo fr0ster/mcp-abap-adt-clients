@@ -26,7 +26,7 @@ import {
   sessionLostOf,
   succeeded,
 } from './adtResponse';
-import { isElement, propertyOf } from './ownValue';
+import { isElement, isWireResponse, propertyOf } from './ownValue';
 
 /**
  * Whether a failure says the endpoint is not there — the one failure
@@ -146,7 +146,8 @@ export async function getSystemInformation<E extends IAdtError = IAdtError>(
     lost = wire.sessionLost;
   } catch (error: unknown) {
     if (isUnansweredCredentialRefusal(error)) throw error;
-    wire = (error as { response?: IAdtWireResponse })?.response;
+    const thrown = propertyOf(error, 'response');
+    wire = isWireResponse(thrown) ? thrown : undefined;
     lost = sessionLostOf(error) ?? wire?.sessionLost;
     if (wire?.status !== 404) {
       const recognised = recogniseFailure(error);

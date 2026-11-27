@@ -49,7 +49,13 @@ import {
   RFC_RCS,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtSAPError } from './adtErrors';
-import { ownValue } from './ownValue';
+import {
+  asString,
+  isWireResponse,
+  ownValue,
+  propertyOf,
+  requestTraceOf,
+} from './ownValue';
 
 /**
  * An answer that succeeded, carrying the value a result strategy made.
@@ -126,10 +132,12 @@ function credentialRefusal(error: unknown): ICredentialRefusal | undefined {
   const cause = ownValue(error, 'cause');
   const response = ownValue(cause, 'response');
   if (ownValue(response, 'status') !== 401) return {};
+  // The status was read as 401, so the shape is a wire answer's.
+  if (!isWireResponse(response)) return {};
   return {
     answered: {
-      response: response as IAdtWireResponse,
-      request: ownValue(cause, 'request') as IWithResponse['request'],
+      response,
+      request: requestTraceOf(ownValue(cause, 'request')),
     },
   };
 }
@@ -314,7 +322,8 @@ export function recogniseFailure(error: unknown): IAdtError {
   if (answered) {
     return {
       origin: 'connection',
-      message: (error as IWithResponse).message ?? 'The credential was refused',
+      message:
+        asString(propertyOf(error, 'message')) ?? 'The credential was refused',
       response: answered.response,
       request: answered.request,
     };
@@ -322,7 +331,15 @@ export function recogniseFailure(error: unknown): IAdtError {
 
   // Everything else reached us from below the ADT conversation: a status the
   // transport refused, a socket that would not open, a session that is gone.
-  const carried = error as IWithResponse;
+  // Each field of the thrown value only with the shape its field has (the
+  // owner's decision D4 of #304).
+  const carriedMessage = asString(propertyOf(error, 'message'));
+  const carriedResponse = propertyOf(error, 'response');
+  const carried = {
+    message: carriedMessage,
+    response: isWireResponse(carriedResponse) ? carriedResponse : undefined,
+    request: requestTraceOf(propertyOf(error, 'request')),
+  };
   // The network code, by code alone, so a caller can say "no connection"
   // without reading the message. Absent unless it is a listed one.
   const connectionCause = connectionCauseOf(error);
@@ -485,7 +502,8 @@ export async function answeringExchange<T, E extends IAdtError = IAdtError>(
     // thrown as it came — the same object, before any strategy sees it.
     if (isUnansweredCredentialRefusal(error)) throw error;
     verdict = recogniseFailure(error);
-    wire = (error as IWithResponse)?.response;
+    const thrown = propertyOf(error, 'response');
+    wire = isWireResponse(thrown) ? thrown : undefined;
     lost = sessionLostOf(error) ?? wire?.sessionLost;
   }
 

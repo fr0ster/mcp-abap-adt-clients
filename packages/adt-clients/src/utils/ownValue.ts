@@ -1,3 +1,4 @@
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 /**
  * Reading values from outside the type system — what a connection threw, a
  * field a contract types `unknown` — under the two access policies the code
@@ -62,4 +63,29 @@ export function at(node: unknown, ...keys: string[]): unknown {
   let value = node;
   for (const key of keys) value = field(value, key);
   return value;
+}
+
+/**
+ * Whether a value from outside the type system has a wire answer's shape, as
+ * far as the library relies on it: an object whose `status` is an integer
+ * (the owner's decision D4 of #304). Read as a direct read reads it.
+ */
+export function isWireResponse(value: unknown): value is IAdtWireResponse {
+  return isElement(value) && Number.isInteger(propertyOf(value, 'status'));
+}
+
+/**
+ * Of a request carried by a value from outside the type system, its string
+ * `method` and `url` alone; `undefined` when it is no object.
+ */
+export function requestTraceOf(
+  value: unknown,
+): { method?: string; url?: string } | undefined {
+  if (!isElement(value) && typeof value !== 'function') return undefined;
+  const method = asString(propertyOf(value, 'method'));
+  const url = asString(propertyOf(value, 'url'));
+  return {
+    ...(method === undefined ? {} : { method }),
+    ...(url === undefined ? {} : { url }),
+  };
 }

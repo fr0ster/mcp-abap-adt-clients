@@ -4,6 +4,42 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 
+/** The words a batch request with params of another shape is refused in. */
+export const BATCH_REFUSES_PARAMS =
+  "a batch request's params must be a string, a URLSearchParams or a plain object of string, number or boolean values";
+
+/**
+ * A request's params as the query it adds, or `''` for none. Accepted, as the
+ * owner decided (D4 of #304): a string, a `URLSearchParams`, or a plain object
+ * (its prototype `Object.prototype` or `null`) whose values are strings,
+ * numbers or booleans; anything else throws `BATCH_REFUSES_PARAMS`. An
+ * accepted value gives the query `new URLSearchParams(params)` gave.
+ */
+export function batchQuery(params: unknown): URLSearchParams {
+  if (params === undefined || params === null || params === '')
+    return new URLSearchParams();
+  if (typeof params === 'string' || params instanceof URLSearchParams)
+    return new URLSearchParams(params);
+  if (typeof params === 'object') {
+    const prototype: object | null = Object.getPrototypeOf(params);
+    if (prototype === Object.prototype || prototype === null) {
+      const query = new URLSearchParams();
+      for (const [key, value] of Object.entries(params)) {
+        const entry: unknown = value;
+        if (
+          typeof entry !== 'string' &&
+          typeof entry !== 'number' &&
+          typeof entry !== 'boolean'
+        )
+          throw new Error(BATCH_REFUSES_PARAMS);
+        query.append(key, String(entry));
+      }
+      return query;
+    }
+  }
+  throw new Error(BATCH_REFUSES_PARAMS);
+}
+
 export const createBatchBoundary = (): string => `batch_${randomUUID()}`;
 export const createRequestId = (): string => randomUUID().replace(/-/g, '');
 
@@ -35,9 +71,7 @@ export function innerRequest(request: IAbapRequestOptions): string {
       if (key.toLowerCase() === 'content-length') delete headers[key];
     headers['Content-Length'] = String(Buffer.byteLength(body));
   }
-  const params = request.params
-    ? new URLSearchParams(request.params as Record<string, string>).toString()
-    : '';
+  const params = request.params ? batchQuery(request.params).toString() : '';
   const url =
     request.url +
     (params ? `${request.url.includes('?') ? '&' : '?'}${params}` : '');

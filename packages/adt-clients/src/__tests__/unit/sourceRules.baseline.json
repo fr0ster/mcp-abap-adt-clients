@@ -1,16 +1,16 @@
 [
   {
-    "file": "packages/adt-clients/src/batch/AdtBatchConnection.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "part.request.params as Record<string, string> | undefined",
+    "file": "packages/adt-clients/src/batch/wire.ts",
+    "rule": "any",
+    "kind": "flow",
+    "text": "Object.getPrototypeOf(params)",
     "count": 1
   },
   {
     "file": "packages/adt-clients/src/batch/wire.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "request.params as Record<string, string>",
+    "rule": "hand-narrowed",
+    "kind": "widened",
+    "text": "params: unknown",
     "count": 1
   },
   {
@@ -1248,27 +1248,6 @@
   {
     "file": "packages/adt-clients/src/utils/adtResponse.ts",
     "rule": "cast",
-    "kind": "asserts-present",
-    "text": "error as IWithResponse",
-    "count": 3
-  },
-  {
-    "file": "packages/adt-clients/src/utils/adtResponse.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "ownValue(cause, 'request') as IWithResponse['request']",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/utils/adtResponse.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "response as IAdtWireResponse",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/utils/adtResponse.ts",
-    "rule": "cast",
     "kind": "re-types",
     "text": "verdict as E",
     "count": 1
@@ -1295,24 +1274,10 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/utils/requestTrace.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "answer?.request as IAdtRequestTrace | undefined",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/utils/systemInfo.ts",
     "rule": "cast",
     "kind": "re-types",
     "text": "(verdict === ADT_NO_FAILURE ? { origin: 'connection', message: 'The request did not complete, and carried no answer', request, } : verdict) as E",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/utils/systemInfo.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "error as { response?: IAdtWireResponse }",
     "count": 1
   },
   {

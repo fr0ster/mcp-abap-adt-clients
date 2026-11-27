@@ -7,7 +7,12 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { BATCH } from '../endpoints/objects';
 import { isUnansweredCredentialRefusal, markOf } from '../utils/adtResponse';
 import { markEnvelopeFailure } from '../utils/requestTrace';
-import { buildBatchPayload, innerRequest, parseBatchResponse } from './wire';
+import {
+  batchQuery,
+  buildBatchPayload,
+  innerRequest,
+  parseBatchResponse,
+} from './wire';
 
 type Session = 'stateful' | 'stateless';
 
@@ -72,6 +77,9 @@ export class AdtBatchConnection implements IAbapConnection {
     // before it sees a rejection.
     if (request.noLog === true || request.noResend === true)
       throw new Error(BATCH_REFUSES_FLAGGED);
+    // Params of another shape are refused the same way, before anything is
+    // queued (the owner's decision D4 of #304).
+    batchQuery(request.params);
     if (this.settlementFailure)
       return Promise.reject(this.settlementFailure.error);
     const headers = { ...request.headers };
@@ -102,10 +110,7 @@ export class AdtBatchConnection implements IAbapConnection {
     const action =
       new URL(part.request.url, 'https://batch.invalid').searchParams.get(
         '_action',
-      ) ??
-      new URLSearchParams(
-        part.request.params as Record<string, string> | undefined,
-      ).get('_action');
+      ) ?? batchQuery(part.request.params).get('_action');
     if (action === 'LOCK') return 'lock';
     if (action === 'UNLOCK') return 'unlock';
     // Communication members currently use stateful mode only for LOCK/UNLOCK.
