@@ -26,6 +26,7 @@ import type {
   IAdtTransportAware,
   IAdtUpdateOptions,
   IAdtValidatable,
+  IAnalyse,
   IServiceBindingPublicationConfig,
   IServiceGroupParams,
   IServiceResults,
@@ -327,10 +328,18 @@ export class AdtServiceBinding<
    * the system's own catalogue, and posting a variant the system does not offer
    * produces a failure the caller cannot interpret.
    */
+  validate<E extends IAdtError>(
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>>;
+  validate(
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['validation'], IAdtError>>;
   async validate<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['validation'], E>> {
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -358,6 +367,34 @@ export class AdtServiceBinding<
    * order they choose. (Until 27.0.0 this comment described a chain that had
    * already gone, and a consumer built on that reading.)
    */
+  create<E extends IAdtError>(
+    config: Omit<IServiceBindingConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+      // Read by the request builder, so required (#304, D4).
+      description: string;
+      serviceName: string;
+      serviceDefinitionName: string;
+      serviceVersion: string;
+      bindingVariant: NonNullable<IServiceBindingConfig['bindingVariant']>;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>>;
+  create(
+    config: Omit<IServiceBindingConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+      // Read by the request builder, so required (#304, D4).
+      description: string;
+      serviceName: string;
+      serviceDefinitionName: string;
+      serviceVersion: string;
+      bindingVariant: NonNullable<IServiceBindingConfig['bindingVariant']>;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['created'], IAdtError>>;
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IServiceBindingConfig, 'source'> & {
       source?: never;
@@ -370,7 +407,7 @@ export class AdtServiceBinding<
       bindingVariant: NonNullable<IServiceBindingConfig['bindingVariant']>;
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<T['created'], E>> {
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // The type requires a package; this refuses an empty one, which the type
@@ -416,11 +453,23 @@ export class AdtServiceBinding<
   }
 
   /** Read the binding document. */
+  read<E extends IAdtError>(
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
+    version: AdtReadVersion | undefined,
+    options: ({ withLongPolling?: boolean } & IAdtOperationOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>>;
+  read(
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
+    version?: AdtReadVersion,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['source'], IAdtError>>;
   async read<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
     version?: AdtReadVersion,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['source'], E>> {
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -441,13 +490,27 @@ export class AdtServiceBinding<
    * The same resource `read` fetches — a binding has one document — declared
    * separately because the contract asks both of a readable.
    */
+  readMetadata<E extends IAdtError>(
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
+    options: ({
+      withLongPolling?: boolean;
+      version?: AdtReadVersion;
+    } & IAdtOperationOptions<E>) & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>>;
+  readMetadata(
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
+    options?: {
+      withLongPolling?: boolean;
+      version?: AdtReadVersion;
+    } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['metadata'], IAdtError>>;
   async readMetadata<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
     options?: {
       withLongPolling?: boolean;
       version?: AdtReadVersion;
     } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['metadata'], E>> {
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -481,6 +544,16 @@ export class AdtServiceBinding<
    * what the object holds, change what you mean to change, and pass the result:
    * anything left out is gone, because nothing is read here to keep it.
    */
+  update<E extends IAdtError>(
+    config: IServiceBindingPublicationConfig,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>>;
+  update(
+    config: IServiceBindingPublicationConfig,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['updated'], IAdtError>>;
   async update<E extends IAdtError = IAdtError>(
     // **Narrower than `IAdtUpdatable` gives every other type, on purpose.**
     // A binding's update is its publication, and two of its fields are not
@@ -491,7 +564,7 @@ export class AdtServiceBinding<
     // still satisfies `IAdtUpdatable`.
     config: IServiceBindingPublicationConfig,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['updated'], E>> {
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -567,10 +640,18 @@ export class AdtServiceBinding<
    * that locks and unlocks around its own operation decides that for everyone.
    * See `docs/usage/CLIENT_API_REFERENCE.md` for the shape a consumer writes.
    */
+  lock<E extends IAdtError>(
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  lock(
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   async lock<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
     const name = this.name(config);
     // Stateful for the LOCK request alone: on older BASIS a handle is only
     // issued inside a stateful request. The switch used to sit outside
@@ -597,11 +678,21 @@ export class AdtServiceBinding<
    * else — another session, another process, the same user — is answered
    * `403 ExceptionResourceNoAccess`.
    */
+  unlock<E extends IAdtError>(
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
+    lockHandle: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<void, E | IAdtError>>;
+  unlock(
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
+    lockHandle: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<void, IAdtError>>;
   async unlock<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<void, E>> {
+  ): Promise<IAdtResponse<void, E | IAdtError>> {
     const name = this.name(config);
     return answering(
       // The UNLOCK reaches the context the LOCK opened only if it is sent
@@ -639,13 +730,27 @@ export class AdtServiceBinding<
    * and pass the result: anything left out is gone, because nothing is read
    * here to keep it.
    */
+  updateMetadata<E extends IAdtError>(
+    this: this & AdtPerformedBy<'serviceBinding', 'updateMetadata'>,
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>>;
+  updateMetadata(
+    this: this & AdtPerformedBy<'serviceBinding', 'updateMetadata'>,
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], IAdtError>>;
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'serviceBinding', 'updateMetadata'>,
     config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
       IAdtLockedWrite &
       AdtRequiredUpdateOptions<'source'>,
-  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -673,10 +778,20 @@ export class AdtServiceBinding<
    * with `update({ desiredPublicationState: 'unpublished' })`, which is a call
    * the consumer makes and can see the answer to.
    */
+  checkDeletion<E extends IAdtError>(
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  checkDeletion(
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -689,10 +804,20 @@ export class AdtServiceBinding<
     );
   }
 
+  delete<E extends IAdtError>(
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>>;
+  delete(
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletion'], IAdtError>>;
   async delete<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletion'], E>> {
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -715,10 +840,20 @@ export class AdtServiceBinding<
    * Judged by the messages, never by the status: ADT answers 200 with a
    * `<msg type="E">` when it refuses.
    */
+  activate<E extends IAdtError>(
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>>;
+  activate(
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['activation'], IAdtError>>;
   async activate<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
-  ): Promise<IAdtResponse<T['activation'], E>> {
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -737,11 +872,23 @@ export class AdtServiceBinding<
   }
 
   /** Check the binding. */
+  check<E extends IAdtError>(
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>>;
+  check(
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['check'], IAdtError>>;
   async check<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['check'], E>> {
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -765,10 +912,20 @@ export class AdtServiceBinding<
    * A binding has no `objectstates` resource: what stands in for it is the CTS
    * transport check, sent with the name and, when given, the package.
    */
+  readTransport<E extends IAdtError>(
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
+    options: ({ withLongPolling?: boolean } & IAdtOperationOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>>;
+  readTransport(
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['transport'], IAdtError>>;
   async readTransport<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['transport'], E>> {
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -793,9 +950,15 @@ export class AdtServiceBinding<
   }
 
   /** The binding types this system offers. */
+  getServiceBindingTypes<E extends IAdtError>(
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['bindingTypes'], E | IAdtError>>;
+  getServiceBindingTypes(
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['bindingTypes'], IAdtError>>;
   async getServiceBindingTypes<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['bindingTypes'], E>> {
+  ): Promise<IAdtResponse<T['bindingTypes'], E | IAdtError>> {
     return answering(
       () => this.bindingTypesRequest(this.connection),
       this.results.bindingTypes,
@@ -1036,10 +1199,18 @@ export class AdtServiceBinding<
    * sends it — a system that only serves v1 answered 406 to the v2-only header
    * this used to send.
    */
+  getServiceGroup<E extends IAdtError>(
+    params: IServiceGroupParams,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['odata'], E | IAdtError>>;
+  getServiceGroup(
+    params: IServiceGroupParams,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['odata'], IAdtError>>;
   async getServiceGroup<E extends IAdtError = IAdtError>(
     params: IServiceGroupParams,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['odata'], E>> {
+  ): Promise<IAdtResponse<T['odata'], E | IAdtError>> {
     return answering(
       () => this.serviceGroupRequest(this.connection, params),
       this.results.odata,

@@ -125,7 +125,7 @@ type FactsAnswer<
   T,
   K extends AbapGitFactsSlot,
   E extends IAbapGitStructuredError,
-> = Promise<IAdtResponse<FactsValue<T, K>, E>>;
+> = Promise<IAdtResponse<FactsValue<T, K>, E | IAbapGitStructuredError>>;
 
 /**
  * One request per member, each read by the strategy the client was built
@@ -251,6 +251,18 @@ export class AdtAbapGitClient<
   }
 
   /** Link a package to a repository — the new form, answered by its facts. */
+  link<E extends IAbapGitStructuredError>(
+    args: IAbapGitLinkNewArgs,
+    options: IAbapGitHeaderOptions &
+      IAbapGitNewFormOptions<Facts<'linkedFacts'>, E> & {
+        analyse: IAbapGitFactsAnalyse<Facts<'linkedFacts'>, E>;
+      },
+  ): FactsAnswer<T, 'linkedFacts', E>;
+  link(
+    args: IAbapGitLinkNewArgs,
+    options: IAbapGitHeaderOptions &
+      IAbapGitNewFormOptions<Facts<'linkedFacts'>, IAbapGitStructuredError>,
+  ): FactsAnswer<T, 'linkedFacts', IAbapGitStructuredError>;
   link<E extends IAbapGitStructuredError = IAbapGitStructuredError>(
     args: IAbapGitLinkNewArgs,
     options: IAbapGitHeaderOptions &
@@ -275,10 +287,18 @@ export class AdtAbapGitClient<
    * @deprecated Since 46.2.0 — use the key-based `pullRepo`. The link is sent
    * only when it is exactly `/sap/bc/adt/abapgit/repos/{key}/pull`.
    */
+  pull<E extends IAdtError>(
+    args: IAbapGitPullArgs,
+    options: DeprecatedOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['pulled'], E | IAdtError>>;
+  pull(
+    args: IAbapGitPullArgs,
+    options: DeprecatedOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['pulled'], IAdtError>>;
   async pull<E extends IAdtError = IAdtError>(
     args: IAbapGitPullArgs,
     options: DeprecatedOptions<E>,
-  ): Promise<IAdtResponse<T['pulled'], E>> {
+  ): Promise<IAdtResponse<T['pulled'], E | IAdtError>> {
     this.logger?.debug?.(`AdtAbapGitClient.pull: package=${args.package}`);
     // Refused before anything is built: a link that is not the path a key
     // would build throws here, outside the exchange, with nothing sent.
@@ -291,14 +311,22 @@ export class AdtAbapGitClient<
   }
 
   /** Remove a repository link, by the key `listRepos` reported. */
+  unlink<E extends IAdtError>(
+    args: IAbapGitUnlinkArgs,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<void, E | IAdtError>>;
+  unlink(
+    args: IAbapGitUnlinkArgs,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<void, IAdtError>>;
   async unlink<E extends IAdtError = IAdtError>(
     args: IAbapGitUnlinkArgs,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<void, E>> {
+  ): Promise<IAdtResponse<void, E | IAdtError>> {
     this.logger?.debug?.(
       `AdtAbapGitClient.unlink: repositoryId=${args.repositoryId}`,
     );
-    return answering<void, E>(
+    return answering<void>(
       () => unlinkRepo(this.connection, args),
       this.results.unlinked,
       options?.analyse,
@@ -306,9 +334,15 @@ export class AdtAbapGitClient<
   }
 
   /** Every repository this system has linked. */
+  listRepos<E extends IAdtError>(
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['repos'], E | IAdtError>>;
+  listRepos(
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['repos'], IAdtError>>;
   async listRepos<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['repos'], E>> {
+  ): Promise<IAdtResponse<T['repos'], E | IAdtError>> {
     return answering(
       () => listRepos(this.connection),
       this.results.repos,
@@ -323,10 +357,18 @@ export class AdtAbapGitClient<
    * link is sent only when it is exactly
    * `/sap/bc/adt/abapgit/repos/{key}/log/{id}`.
    */
+  getErrorLog<E extends IAdtError>(
+    logLink: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['errorLog'], E | IAdtError>>;
+  getErrorLog(
+    logLink: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['errorLog'], IAdtError>>;
   async getErrorLog<E extends IAdtError = IAdtError>(
     logLink: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['errorLog'], E>> {
+  ): Promise<IAdtResponse<T['errorLog'], E | IAdtError>> {
     const url = logLinkPath(logLink);
     return answering(
       () => getErrorLog(this.connection, url),
@@ -336,6 +378,21 @@ export class AdtAbapGitClient<
   }
 
   /** What an external repository offers — the new form, answered by its facts. */
+  checkExternalRepo<E extends IAbapGitStructuredError>(
+    args: IAbapGitExternalRepoArgs,
+    options: IAbapGitHeaderOptions &
+      IAbapGitNewFormOptions<Facts<'externalRepoFacts'>, E> & {
+        analyse: IAbapGitFactsAnalyse<Facts<'externalRepoFacts'>, E>;
+      },
+  ): FactsAnswer<T, 'externalRepoFacts', E>;
+  checkExternalRepo(
+    args: IAbapGitExternalRepoArgs,
+    options: IAbapGitHeaderOptions &
+      IAbapGitNewFormOptions<
+        Facts<'externalRepoFacts'>,
+        IAbapGitStructuredError
+      >,
+  ): FactsAnswer<T, 'externalRepoFacts', IAbapGitStructuredError>;
   checkExternalRepo<
     E extends IAbapGitStructuredError = IAbapGitStructuredError,
   >(
@@ -360,6 +417,17 @@ export class AdtAbapGitClient<
    * The repository list, read without a credential and with nothing logged —
    * the pre-read a server makes before a key-addressed call.
    */
+  listReposQuiet<E extends IAbapGitStructuredError>(
+    options: IAbapGitQuietOptions<Facts<'reposFacts'>, E> & {
+      analyse: IAbapGitFactsAnalyse<Facts<'reposFacts'>, E>;
+    },
+  ): FactsAnswer<T, 'reposFacts', E>;
+  listReposQuiet(
+    options?: IAbapGitQuietOptions<
+      Facts<'reposFacts'>,
+      IAbapGitStructuredError
+    >,
+  ): FactsAnswer<T, 'reposFacts', IAbapGitStructuredError>;
   async listReposQuiet<
     E extends IAbapGitStructuredError = IAbapGitStructuredError,
   >(
@@ -377,6 +445,18 @@ export class AdtAbapGitClient<
    * Pull a repository, by its key. Onprem answers when the pull ran; cloud
    * answers `202` when the job was accepted — waiting is the caller's.
    */
+  pullRepo<E extends IAbapGitStructuredError>(
+    args: IAbapGitPullRepoArgs,
+    options: IAbapGitHeaderOptions &
+      IAbapGitFactsOptions<Facts<'repoPulled'>, E> & {
+        analyse: IAbapGitFactsAnalyse<Facts<'repoPulled'>, E>;
+      },
+  ): FactsAnswer<T, 'repoPulled', E>;
+  pullRepo(
+    args: IAbapGitPullRepoArgs,
+    options: IAbapGitHeaderOptions &
+      IAbapGitFactsOptions<Facts<'repoPulled'>, IAbapGitStructuredError>,
+  ): FactsAnswer<T, 'repoPulled', IAbapGitStructuredError>;
   async pullRepo<E extends IAbapGitStructuredError = IAbapGitStructuredError>(
     args: IAbapGitPullRepoArgs,
     options: IAbapGitHeaderOptions &
@@ -391,6 +471,21 @@ export class AdtAbapGitClient<
   }
 
   /** Pull a repository in the request (cloud, `…/pull/v2`): `202` when it ran. */
+  pullRepoInDialog<E extends IAbapGitStructuredError>(
+    args: IAbapGitPullRepoArgs,
+    options: IAbapGitHeaderOptions &
+      IAbapGitFactsOptions<Facts<'repoPulledInDialog'>, E> & {
+        analyse: IAbapGitFactsAnalyse<Facts<'repoPulledInDialog'>, E>;
+      },
+  ): FactsAnswer<T, 'repoPulledInDialog', E>;
+  pullRepoInDialog(
+    args: IAbapGitPullRepoArgs,
+    options: IAbapGitHeaderOptions &
+      IAbapGitFactsOptions<
+        Facts<'repoPulledInDialog'>,
+        IAbapGitStructuredError
+      >,
+  ): FactsAnswer<T, 'repoPulledInDialog', IAbapGitStructuredError>;
   async pullRepoInDialog<
     E extends IAbapGitStructuredError = IAbapGitStructuredError,
   >(
@@ -407,6 +502,19 @@ export class AdtAbapGitClient<
   }
 
   /** What a pull would overwrite (cloud). */
+  getModifiedObjects<E extends IAbapGitStructuredError>(
+    args: IAbapGitRepoKeyArgs,
+    options: IAbapGitFactsOptions<Facts<'modifiedObjects'>, E> & {
+      analyse: IAbapGitFactsAnalyse<Facts<'modifiedObjects'>, E>;
+    },
+  ): FactsAnswer<T, 'modifiedObjects', E>;
+  getModifiedObjects(
+    args: IAbapGitRepoKeyArgs,
+    options?: IAbapGitFactsOptions<
+      Facts<'modifiedObjects'>,
+      IAbapGitStructuredError
+    >,
+  ): FactsAnswer<T, 'modifiedObjects', IAbapGitStructuredError>;
   async getModifiedObjects<
     E extends IAbapGitStructuredError = IAbapGitStructuredError,
   >(
@@ -422,6 +530,16 @@ export class AdtAbapGitClient<
   }
 
   /** A repository's status (cloud): SAP answers a fixed text. */
+  getStatus<E extends IAbapGitStructuredError>(
+    args: IAbapGitRepoKeyArgs,
+    options: IAbapGitFactsOptions<Facts<'status'>, E> & {
+      analyse: IAbapGitFactsAnalyse<Facts<'status'>, E>;
+    },
+  ): FactsAnswer<T, 'status', E>;
+  getStatus(
+    args: IAbapGitRepoKeyArgs,
+    options?: IAbapGitFactsOptions<Facts<'status'>, IAbapGitStructuredError>,
+  ): FactsAnswer<T, 'status', IAbapGitStructuredError>;
   async getStatus<E extends IAbapGitStructuredError = IAbapGitStructuredError>(
     args: IAbapGitRepoKeyArgs,
     options?: IAbapGitFactsOptions<Facts<'status'>, E>,
@@ -435,6 +553,16 @@ export class AdtAbapGitClient<
   }
 
   /** A run's log, by the repository's key and the log's `appLogKey`. */
+  getRunLog<E extends IAbapGitStructuredError>(
+    args: IAbapGitRunLogArgs,
+    options: IAbapGitFactsOptions<Facts<'runLog'>, E> & {
+      analyse: IAbapGitFactsAnalyse<Facts<'runLog'>, E>;
+    },
+  ): FactsAnswer<T, 'runLog', E>;
+  getRunLog(
+    args: IAbapGitRunLogArgs,
+    options?: IAbapGitFactsOptions<Facts<'runLog'>, IAbapGitStructuredError>,
+  ): FactsAnswer<T, 'runLog', IAbapGitStructuredError>;
   async getRunLog<E extends IAbapGitStructuredError = IAbapGitStructuredError>(
     args: IAbapGitRunLogArgs,
     options?: IAbapGitFactsOptions<Facts<'runLog'>, E>,
@@ -448,6 +576,16 @@ export class AdtAbapGitClient<
   }
 
   /** A repository's unstaged, staged and ignored objects. */
+  getStaging<E extends IAbapGitStructuredError>(
+    args: IAbapGitRepoKeyArgs,
+    options: IAbapGitFactsOptions<Facts<'staging'>, E> & {
+      analyse: IAbapGitFactsAnalyse<Facts<'staging'>, E>;
+    },
+  ): FactsAnswer<T, 'staging', E>;
+  getStaging(
+    args: IAbapGitRepoKeyArgs,
+    options?: IAbapGitFactsOptions<Facts<'staging'>, IAbapGitStructuredError>,
+  ): FactsAnswer<T, 'staging', IAbapGitStructuredError>;
   async getStaging<E extends IAbapGitStructuredError = IAbapGitStructuredError>(
     args: IAbapGitRepoKeyArgs,
     options?: IAbapGitFactsOptions<Facts<'staging'>, E>,
@@ -464,6 +602,16 @@ export class AdtAbapGitClient<
    * Commit and push the staged objects. Onprem answers when it ran; cloud
    * answers `202` when the job was accepted.
    */
+  push<E extends IAbapGitStructuredError>(
+    args: IAbapGitPushArgs,
+    options: IAbapGitFactsOptions<Facts<'pushed'>, E> & {
+      analyse: IAbapGitFactsAnalyse<Facts<'pushed'>, E>;
+    },
+  ): FactsAnswer<T, 'pushed', E>;
+  push(
+    args: IAbapGitPushArgs,
+    options?: IAbapGitFactsOptions<Facts<'pushed'>, IAbapGitStructuredError>,
+  ): FactsAnswer<T, 'pushed', IAbapGitStructuredError>;
   async push<E extends IAbapGitStructuredError = IAbapGitStructuredError>(
     args: IAbapGitPushArgs,
     options?: IAbapGitFactsOptions<Facts<'pushed'>, E>,
@@ -477,6 +625,16 @@ export class AdtAbapGitClient<
   }
 
   /** Check a repository's connection to its remote. */
+  checkRepo<E extends IAbapGitStructuredError>(
+    args: IAbapGitRepoKeyArgs,
+    options: IAbapGitFactsOptions<Facts<'checked'>, E> & {
+      analyse: IAbapGitFactsAnalyse<Facts<'checked'>, E>;
+    },
+  ): FactsAnswer<T, 'checked', E>;
+  checkRepo(
+    args: IAbapGitRepoKeyArgs,
+    options?: IAbapGitFactsOptions<Facts<'checked'>, IAbapGitStructuredError>,
+  ): FactsAnswer<T, 'checked', IAbapGitStructuredError>;
   async checkRepo<E extends IAbapGitStructuredError = IAbapGitStructuredError>(
     args: IAbapGitRepoKeyArgs,
     options?: IAbapGitFactsOptions<Facts<'checked'>, E>,
@@ -490,6 +648,16 @@ export class AdtAbapGitClient<
   }
 
   /** One file of a repository, in the system's version or the remote's. */
+  getFile<E extends IAbapGitStructuredError>(
+    args: IAbapGitFileArgs,
+    options: IAbapGitFactsOptions<Facts<'file'>, E> & {
+      analyse: IAbapGitFactsAnalyse<Facts<'file'>, E>;
+    },
+  ): FactsAnswer<T, 'file', E>;
+  getFile(
+    args: IAbapGitFileArgs,
+    options?: IAbapGitFactsOptions<Facts<'file'>, IAbapGitStructuredError>,
+  ): FactsAnswer<T, 'file', IAbapGitStructuredError>;
   async getFile<E extends IAbapGitStructuredError = IAbapGitStructuredError>(
     args: IAbapGitFileArgs,
     options?: IAbapGitFactsOptions<Facts<'file'>, E>,
@@ -505,6 +673,18 @@ export class AdtAbapGitClient<
   }
 
   /** One remote branch, for the package it would be linked to (cloud). */
+  getBranchInfo<E extends IAbapGitStructuredError>(
+    args: IAbapGitBranchInfoArgs,
+    options: IAbapGitHeaderOptions &
+      IAbapGitFactsOptions<Facts<'branchInfo'>, E> & {
+        analyse: IAbapGitFactsAnalyse<Facts<'branchInfo'>, E>;
+      },
+  ): FactsAnswer<T, 'branchInfo', E>;
+  getBranchInfo(
+    args: IAbapGitBranchInfoArgs,
+    options: IAbapGitHeaderOptions &
+      IAbapGitFactsOptions<Facts<'branchInfo'>, IAbapGitStructuredError>,
+  ): FactsAnswer<T, 'branchInfo', IAbapGitStructuredError>;
   async getBranchInfo<
     E extends IAbapGitStructuredError = IAbapGitStructuredError,
   >(
@@ -521,6 +701,16 @@ export class AdtAbapGitClient<
   }
 
   /** Switch a repository's branch, or create it in the remote (onprem). */
+  switchBranch<E extends IAbapGitStructuredError>(
+    args: IAbapGitSwitchBranchArgs,
+    options: IAbapGitFactsOptions<Facts<'switched'>, E> & {
+      analyse: IAbapGitFactsAnalyse<Facts<'switched'>, E>;
+    },
+  ): FactsAnswer<T, 'switched', E>;
+  switchBranch(
+    args: IAbapGitSwitchBranchArgs,
+    options?: IAbapGitFactsOptions<Facts<'switched'>, IAbapGitStructuredError>,
+  ): FactsAnswer<T, 'switched', IAbapGitStructuredError>;
   async switchBranch<
     E extends IAbapGitStructuredError = IAbapGitStructuredError,
   >(

@@ -57,13 +57,13 @@ describe('the deprecated abapGit forms, as 46.1.0 sent and answered them', () =>
   it('refuses the old form of link and checkExternalRepo (C4 of #304)', () => {
     // Compiled, never called: each old-form call is refused by the types.
     const _refused = (connection: ScriptedConnection) => {
+      // @ts-expect-error -- remoteUser/remotePassword are the old form, gone
       void gitClient(connection).link(
-        // @ts-expect-error -- remoteUser/remotePassword are the old form, gone
         { package: 'ZPKG', url: 'u', remoteUser: 'u', remotePassword: 'p' },
         { headers: HEADERS },
       );
+      // @ts-expect-error -- remoteUser/remotePassword are the old form, gone
       void gitClient(connection).checkExternalRepo(
-        // @ts-expect-error -- remoteUser/remotePassword are the old form, gone
         { url: 'u', remoteUser: 'u', remotePassword: 'p' },
         { headers: HEADERS },
       );

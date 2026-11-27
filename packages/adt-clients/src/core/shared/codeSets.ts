@@ -274,3 +274,15 @@ export type ParentedArguments<C extends string, Rest extends unknown[]> = [
 ] extends [AdtParentedTypeCode]
   ? [functionGroup: string, ...Rest]
   : [functionGroup?: string, ...Rest];
+
+/**
+ * {@link ParentedArguments} where `Rest` is required — a generic overload's
+ * `options`, which names its `analyse` (D3 of #304): the parent's name is
+ * then given for every code, `undefined` for an unparented one.
+ */
+export type ParentedArgumentsBefore<
+  C extends string,
+  Rest extends unknown[],
+> = [C] extends [AdtParentedTypeCode]
+  ? [functionGroup: string, ...Rest]
+  : [functionGroup: string | undefined, ...Rest];

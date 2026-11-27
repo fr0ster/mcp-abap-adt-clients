@@ -156,6 +156,7 @@ export type {
   AdtWhereUsedCode,
   IAdtGroupReference,
   ParentedArguments,
+  ParentedArgumentsBefore,
 } from './core/shared/codeSets';
 export {
   AdtContentTypesBase,

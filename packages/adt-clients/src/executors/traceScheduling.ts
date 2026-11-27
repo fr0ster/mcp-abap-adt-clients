@@ -16,6 +16,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtResponse,
+  IAnalyse,
   IProfilerTraceParameters,
   IResultStrategy,
   ITraceScheduling,
@@ -87,9 +88,15 @@ export class TraceScheduling<
     this.results = options.results;
   }
 
+  listObjectTypes<E extends IAdtError>(
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['types'], E | IAdtError>>;
+  listObjectTypes(
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['types'], IAdtError>>;
   async listObjectTypes<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['types'], E>> {
+  ): Promise<IAdtResponse<T['types'], E | IAdtError>> {
     return answering(
       () => listObjectTypes(this.connection),
       this.results.types,
@@ -97,9 +104,15 @@ export class TraceScheduling<
     );
   }
 
+  listProcessTypes<E extends IAdtError>(
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['types'], E | IAdtError>>;
+  listProcessTypes(
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['types'], IAdtError>>;
   async listProcessTypes<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['types'], E>> {
+  ): Promise<IAdtResponse<T['types'], E | IAdtError>> {
     return answering(
       () => listProcessTypes(this.connection),
       this.results.types,
@@ -113,9 +126,15 @@ export class TraceScheduling<
    * An empty answer means nothing is scheduled — the runs that fulfil requests
    * consume them — not that the endpoint is dead.
    */
+  listRequests<E extends IAdtError>(
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['requests'], E | IAdtError>>;
+  listRequests(
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['requests'], IAdtError>>;
   async listRequests<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['requests'], E>> {
+  ): Promise<IAdtResponse<T['requests'], E | IAdtError>> {
     return answering(
       () => listTraceRequests(this.connection),
       this.results.requests,
@@ -123,10 +142,18 @@ export class TraceScheduling<
     );
   }
 
+  getRequestsByUri<E extends IAdtError>(
+    uri: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['requests'], E | IAdtError>>;
+  getRequestsByUri(
+    uri: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['requests'], IAdtError>>;
   async getRequestsByUri<E extends IAdtError = IAdtError>(
     uri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['requests'], E>> {
+  ): Promise<IAdtResponse<T['requests'], E | IAdtError>> {
     return answering(
       () => getTraceRequestsByUri(this.connection, uri),
       this.results.requests,
@@ -143,10 +170,18 @@ export class TraceScheduling<
    * from the resource — read it with `traceSchedulingProfilerId`, and judge a
    * missing one with `analyse`.
    */
+  scheduleTrace<E extends IAdtError>(
+    options: { headers: IAdtHeaders } & IProfilerTraceParameters &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['scheduled'], E | IAdtError>>;
+  scheduleTrace(
+    options: { headers: IAdtHeaders } & IProfilerTraceParameters &
+      IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['scheduled'], IAdtError>>;
   async scheduleTrace<E extends IAdtError = IAdtError>(
     options: { headers: IAdtHeaders } & IProfilerTraceParameters &
       IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['scheduled'], E>> {
+  ): Promise<IAdtResponse<T['scheduled'], E | IAdtError>> {
     return answering(
       () => createTraceParameters(this.connection, options.headers, options),
       this.results.scheduled,

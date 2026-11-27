@@ -44,6 +44,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtResponse,
+  IAnalyse,
   IClassUnitTestRunOptions,
   IUnitTestResultOptions,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -124,11 +125,22 @@ export class AbapUnitTestRunner<
    * @mcp-abap-adt/adt-strategies for `run` to be answered the id, and pass
    * `analyseUnitTestStart` to have an id-less answer read as a failure.
    */
+  run<E extends IAdtError>(
+    this: this & OnRunsEndpoint,
+    target: AbapUnitRunTarget,
+    options: IClassUnitTestRunOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>>;
+  run(
+    this: this & OnRunsEndpoint,
+    target: AbapUnitRunTarget,
+    options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['run'], IAdtError>>;
   async run<E extends IAdtError = IAdtError>(
     this: this & OnRunsEndpoint,
     target: AbapUnitRunTarget,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['run'], E>> {
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>> {
     return answering(
       () => startUnitTestRunByTarget(this.connection, target, options),
       this.results.run,
@@ -145,11 +157,21 @@ export class AbapUnitTestRunner<
    * `result`, the strategy `getResult` uses; `options.analyse` judges it.
    * `title` and `context` have no place in this format and are not sent.
    */
+  runSync<E extends IAdtError>(
+    uris: readonly [string, ...string[]],
+    options: { headers: IAdtHeaders } & IClassUnitTestRunOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['result'], E | IAdtError>>;
+  runSync(
+    uris: readonly [string, ...string[]],
+    options: { headers: IAdtHeaders } & IClassUnitTestRunOptions &
+      IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['result'], IAdtError>>;
   async runSync<E extends IAdtError = IAdtError>(
     uris: readonly [string, ...string[]],
     options: { headers: IAdtHeaders } & IClassUnitTestRunOptions &
       IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['result'], E>> {
+  ): Promise<IAdtResponse<T['result'], E | IAdtError>> {
     // `runOptions` is an object even when the caller gave only the headers,
     // so the `<options>` element is always sent.
     const { analyse, headers, ...runOptions } = options;
@@ -165,12 +187,24 @@ export class AbapUnitTestRunner<
    * Poll a run. Takes the run it is about: nothing here remembers the last one
    * started, because ADT does not either — any holder of the id may ask.
    */
+  getStatus<E extends IAdtError>(
+    this: this & OnRunsEndpoint,
+    runId: string,
+    withLongPolling: boolean | undefined | undefined,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['status'], E | IAdtError>>;
+  getStatus(
+    this: this & OnRunsEndpoint,
+    runId: string,
+    withLongPolling?: boolean | undefined,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['status'], IAdtError>>;
   async getStatus<E extends IAdtError = IAdtError>(
     this: this & OnRunsEndpoint,
     runId: string,
     withLongPolling: boolean | undefined = true,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['status'], E>> {
+  ): Promise<IAdtResponse<T['status'], E | IAdtError>> {
     return answering(
       () =>
         getUnitTestRunStatus(this.connection, runId, withLongPolling ?? true),
@@ -180,11 +214,22 @@ export class AbapUnitTestRunner<
   }
 
   /** The result document of a finished run. */
+  getResult<E extends IAdtError>(
+    this: this & OnRunsEndpoint,
+    runId: string,
+    options: IUnitTestResultOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['result'], E | IAdtError>>;
+  getResult(
+    this: this & OnRunsEndpoint,
+    runId: string,
+    options?: IUnitTestResultOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['result'], IAdtError>>;
   async getResult<E extends IAdtError = IAdtError>(
     this: this & OnRunsEndpoint,
     runId: string,
     options?: IUnitTestResultOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['result'], E>> {
+  ): Promise<IAdtResponse<T['result'], E | IAdtError>> {
     return answering(
       () => getUnitTestRunResult(this.connection, runId, options),
       this.results.result,

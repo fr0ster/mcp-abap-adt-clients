@@ -54,19 +54,5 @@
     "kind": "re-types",
     "text": "verdict as E",
     "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/utils/systemInfo.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "(verdict === ADT_NO_FAILURE ? { origin: 'connection', message: 'The request did not complete, and carried no answer', request, } : verdict) as E",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/utils/systemInfo.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "verdict as E",
-    "count": 1
   }
 ]

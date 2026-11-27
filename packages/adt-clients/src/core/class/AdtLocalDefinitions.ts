@@ -2,6 +2,7 @@ import type {
   AdtReadVersion,
   AdtRequiredUpdateOptions,
   IAdtLockedWrite,
+  IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
 /**
  * The definitions include of a class — where its local class and interface
@@ -95,10 +96,18 @@ export class AdtLocalDefinitions<
   }
 
   /** Syntax-check the source a caller is about to write. */
+  validate<E extends IAdtError>(
+    config: AdtObjectIdentity<ILocalDefinitionsConfig, 'className' | 'source'>,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>>;
+  validate(
+    config: AdtObjectIdentity<ILocalDefinitionsConfig, 'className' | 'source'>,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['validation'], IAdtError>>;
   async validate<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<ILocalDefinitionsConfig, 'className' | 'source'>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['validation'], E>> {
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -121,11 +130,21 @@ export class AdtLocalDefinitions<
   }
 
   /** Read the include's source. */
+  read<E extends IAdtError>(
+    config: AdtObjectIdentity<ILocalDefinitionsConfig, 'className'>,
+    version: AdtReadVersion | undefined,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>>;
+  read(
+    config: AdtObjectIdentity<ILocalDefinitionsConfig, 'className'>,
+    version?: AdtReadVersion,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['source'], IAdtError>>;
   async read<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<ILocalDefinitionsConfig, 'className'>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['source'], E>> {
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -165,11 +184,21 @@ export class AdtLocalDefinitions<
    * what the object holds, change what you mean to change, and pass the result:
    * anything left out is gone, because nothing is read here to keep it.
    */
+  update<E extends IAdtError>(
+    config: AdtObjectIdentity<ILocalDefinitionsConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>>;
+  update(
+    config: AdtObjectIdentity<ILocalDefinitionsConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite,
+  ): Promise<IAdtResponse<T['updated'], IAdtError>>;
   async update<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<ILocalDefinitionsConfig, 'className'>,
     // The source may come with the options or the config (see delete()).
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> & IAdtLockedWrite,
-  ): Promise<IAdtResponse<T['updated'], E>> {
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>> {
     // An empty string is source: writing it is how the include is emptied
     // (see delete()). Only its absence is an error.
     const source = options?.source ?? config.source ?? '';
@@ -184,7 +213,7 @@ export class AdtLocalDefinitions<
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
         ifMatch?: string | undefined;
       },
-  ): Promise<IAdtResponse<T['updated'], E>> {
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
@@ -209,10 +238,20 @@ export class AdtLocalDefinitions<
    * There is no DELETE for a class include: ADT removes local definitions source by writing
    * the include empty, so this answers what that write answered.
    */
+  delete<E extends IAdtError>(
+    config: AdtObjectIdentity<ILocalDefinitionsConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>>;
+  delete(
+    config: AdtObjectIdentity<ILocalDefinitionsConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['updated'], IAdtError>>;
   async delete<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<ILocalDefinitionsConfig, 'className'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['updated'], E>> {
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>> {
     // The include written empty, with whatever handle and source the options
     // carry, as before (the contract's delete names neither).
     return await this.#write(
@@ -224,11 +263,23 @@ export class AdtLocalDefinitions<
   }
 
   /** Syntax-check the include. */
+  check<E extends IAdtError>(
+    config: AdtObjectIdentity<ILocalDefinitionsConfig, 'className' | 'source'>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>>;
+  check(
+    config: AdtObjectIdentity<ILocalDefinitionsConfig, 'className' | 'source'>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['check'], IAdtError>>;
   async check<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<ILocalDefinitionsConfig, 'className' | 'source'>,
     status: string = 'inactive',
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['check'], E>> {
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -248,10 +299,18 @@ export class AdtLocalDefinitions<
   }
 
   /** Version history of this include. */
+  getVersions<E extends IAdtError>(
+    config: AdtObjectIdentity<ILocalDefinitionsConfig, 'className'>,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>>;
+  getVersions(
+    config: AdtObjectIdentity<ILocalDefinitionsConfig, 'className'>,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versions'], IAdtError>>;
   async getVersions<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<ILocalDefinitionsConfig, 'className'>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versions'], E>> {
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>> {
     return this.includeVersions(config.className, 'definitions', options);
   }
 }

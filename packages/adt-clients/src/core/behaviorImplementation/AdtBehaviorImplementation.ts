@@ -2,6 +2,7 @@ import type {
   AdtReadVersion,
   AdtRequiredUpdateOptions,
   IAdtLockedWrite,
+  IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
 /**
  * AdtBehaviorImplementation - CRUD for a behavior implementation class.
@@ -174,10 +175,18 @@ export class AdtBehaviorImplementation<
   }
 
   /** Validate the class name and its behavior definition before creating. */
+  validate<E extends IAdtError>(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>>;
+  validate(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['validation'], IAdtError>>;
   async validate<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['validation'], E>> {
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -204,13 +213,29 @@ export class AdtBehaviorImplementation<
    * plain and `update` writes both sources, because the include the clause
    * refers to does not exist until then.
    */
+  create<E extends IAdtError>(
+    config: Omit<IBehaviorImplementationConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>>;
+  create(
+    config: Omit<IBehaviorImplementationConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['created'], IAdtError>>;
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IBehaviorImplementationConfig, 'source'> & {
       source?: never;
       packageName: string;
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<T['created'], E>> {
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // The type requires a package; this refuses an empty one, which the type
@@ -248,11 +273,21 @@ export class AdtBehaviorImplementation<
   }
 
   /** Read the class's source. */
+  read<E extends IAdtError>(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    version: AdtReadVersion | undefined,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>>;
+  read(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    version?: AdtReadVersion,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['source'], IAdtError>>;
   async read<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['source'], E>> {
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -281,11 +316,21 @@ export class AdtBehaviorImplementation<
    * the version asked; answered through the result set's `source` slot, the
    * text as it came by default.
    */
+  readImplementations<E extends IAdtError>(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    version: AdtReadVersion | undefined,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>>;
+  readImplementations(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    version?: AdtReadVersion,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['source'], IAdtError>>;
   async readImplementations<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['source'], E>> {
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -306,10 +351,18 @@ export class AdtBehaviorImplementation<
   }
 
   /** Read the class's metadata document. */
+  readMetadata<E extends IAdtError>(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>>;
+  readMetadata(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['metadata'], IAdtError>>;
   async readMetadata<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['metadata'], E>> {
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -329,10 +382,20 @@ export class AdtBehaviorImplementation<
   }
 
   /** The transport request the class belongs to. */
+  readTransport<E extends IAdtError>(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    options: ({ withLongPolling?: boolean } & IAdtOperationOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>>;
+  readTransport(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['transport'], IAdtError>>;
   async readTransport<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['transport'], E>> {
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -368,12 +431,24 @@ export class AdtBehaviorImplementation<
    * what the object holds, change what you mean to change, and pass the result:
    * anything left out is gone, because nothing is read here to keep it.
    */
+  update<E extends IAdtError>(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>>;
+  update(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['updated'], IAdtError>>;
   async update<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
       IAdtLockedWrite &
       AdtRequiredUpdateOptions<'source'>,
-  ): Promise<IAdtResponse<T['updated'], E>> {
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -410,10 +485,20 @@ export class AdtBehaviorImplementation<
    * Delegated, like the delete: a behavior implementation *is* its class, and
    * the deletion service is asked about the class's URI.
    */
+  checkDeletion<E extends IAdtError>(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  checkDeletion(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
     return this.class.checkDeletion(
       {
         className: this.name(config),
@@ -423,10 +508,20 @@ export class AdtBehaviorImplementation<
     );
   }
 
+  delete<E extends IAdtError>(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>>;
+  delete(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletion'], IAdtError>>;
   async delete<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletion'], E>> {
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
     const name = this.name(config);
 
     this.logger?.info?.('Deleting behavior implementation class');
@@ -437,36 +532,76 @@ export class AdtBehaviorImplementation<
   }
 
   /** Activate the implementation class. */
+  activate<E extends IAdtError>(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>>;
+  activate(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['activation'], IAdtError>>;
   async activate<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
-  ): Promise<IAdtResponse<T['activation'], E>> {
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>> {
     return this.class.activate({ className: this.name(config) }, options);
   }
 
   /** Check the implementation class. */
+  check<E extends IAdtError>(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>>;
+  check(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['check'], IAdtError>>;
   async check<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['check'], E>> {
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>> {
     return this.class.check({ className: this.name(config) }, status, options);
   }
 
   /** Lock the class. A behavior implementation has no lock of its own. */
+  lock<E extends IAdtError>(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  lock(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   async lock<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
     return this.class.lock({ className: this.name(config) }, options);
   }
 
   /** Unlock the class. */
+  unlock<E extends IAdtError>(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    lockHandle: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<void, E | IAdtError>>;
+  unlock(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    lockHandle: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<void, IAdtError>>;
   async unlock<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<void, E>> {
+  ): Promise<IAdtResponse<void, E | IAdtError>> {
     return this.class.unlock(
       { className: this.name(config) },
       lockHandle,
@@ -475,10 +610,18 @@ export class AdtBehaviorImplementation<
   }
 
   /** Version history of the object's source. */
+  getVersions<E extends IAdtError>(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>>;
+  getVersions(
+    config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versions'], IAdtError>>;
   async getVersions<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versions'], E>> {
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>> {
     return answering(
       () => getBehaviorImplementationVersions(this.connection, config),
       this.results.versions,
@@ -487,10 +630,18 @@ export class AdtBehaviorImplementation<
   }
 
   /** Source of one version, by the `contentUri` its entry carried. */
+  getVersionSource<E extends IAdtError>(
+    contentUri: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versionSource'], E | IAdtError>>;
+  getVersionSource(
+    contentUri: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versionSource'], IAdtError>>;
   async getVersionSource<E extends IAdtError = IAdtError>(
     contentUri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versionSource'], E>> {
+  ): Promise<IAdtResponse<T['versionSource'], E | IAdtError>> {
     return answering(
       () => getBehaviorImplementationVersionSource(this.connection, contentUri),
       this.results.versionSource,

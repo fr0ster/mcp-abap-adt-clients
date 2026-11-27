@@ -26,6 +26,7 @@ import type {
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
+  IAnalyse,
   IClassUnitTestRunOptions,
 } from '@mcp-abap-adt/interfaces-adt';
 import { noResultToFetch, noRunToPoll } from '../abapUnitRunLegacy';
@@ -40,11 +41,22 @@ export class ClassTestRunnerLegacy<
    * the request `runSync` sends, with `<options>` — the caller's scope, risk
    * levels and durations — read by this runner's `run` strategy as it came.
    */
+  override run<E extends IAdtError>(
+    this: this & AdtPerformedBy<'class', 'unitTestRun'>,
+    target: IClassTestRunTarget,
+    options: IClassUnitTestRunOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>>;
+  override run(
+    this: this & AdtPerformedBy<'class', 'unitTestRun'>,
+    target: IClassTestRunTarget,
+    options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['run'], IAdtError>>;
   override async run<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'class', 'unitTestRun'>,
     target: IClassTestRunTarget,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['run'], E>> {
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>> {
     const { analyse, ...runOptions } = options ?? {};
     return answering(
       () =>

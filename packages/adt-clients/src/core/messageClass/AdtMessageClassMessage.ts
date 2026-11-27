@@ -9,6 +9,7 @@ import type {
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
+  IAnalyse,
   IMessageClassMessageRemoval,
   IMessageClassMessageResults,
   IMessageClassMessageUpdateOptions,
@@ -122,11 +123,23 @@ export class AdtMessageClassMessage<
    * {@link AdtObjectErrorCodes.OBJECT_NOT_FOUND}, so a consumer branches on the
    * code rather than on a message.
    */
+  read<E extends IAdtError>(
+    config: MessageAddress,
+    version: AdtReadVersion | undefined,
+    options: ({ withLongPolling?: boolean } & IAdtOperationOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['read'], E | IAdtError>>;
+  read(
+    config: MessageAddress,
+    version?: AdtReadVersion,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['read'], IAdtError>>;
   async read<E extends IAdtError = IAdtError>(
     config: MessageAddress,
     version?: AdtReadVersion,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['read'], E>> {
+  ): Promise<IAdtResponse<T['read'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -143,13 +156,27 @@ export class AdtMessageClassMessage<
   }
 
   /** The same class document `read` fetches. */
+  readMetadata<E extends IAdtError>(
+    config: MessageAddress,
+    options: ({
+      withLongPolling?: boolean;
+      version?: AdtReadVersion;
+    } & IAdtOperationOptions<E>) & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['read'], E | IAdtError>>;
+  readMetadata(
+    config: MessageAddress,
+    options?: {
+      withLongPolling?: boolean;
+      version?: AdtReadVersion;
+    } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['read'], IAdtError>>;
   async readMetadata<E extends IAdtError = IAdtError>(
     config: MessageAddress,
     options?: {
       withLongPolling?: boolean;
       version?: AdtReadVersion;
     } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['read'], E>> {
+  ): Promise<IAdtResponse<T['read'], E | IAdtError>> {
     return this.read(config, options?.version, options);
   }
 
@@ -160,10 +187,18 @@ export class AdtMessageClassMessage<
    * message's `mc:lockhandle`. A 403 is SAP's answer: it may be a system that
    * grants no message lock or another user's lock, which is not measured.
    */
+  lockMessage<E extends IAdtError>(
+    config: MessageAddress,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  lockMessage(
+    config: MessageAddress,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   async lockMessage<E extends IAdtError = IAdtError>(
     config: MessageAddress,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
     const { name, no } = this.names(config);
     return answering(
       () =>
@@ -180,10 +215,18 @@ export class AdtMessageClassMessage<
    * goes into the PUT's `lockHandle`. A 403 is SAP's answer; the class's plain
    * `lock` is what Eclipse takes then.
    */
+  lockClassForMessage<E extends IAdtError>(
+    config: MessageAddress,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  lockClassForMessage(
+    config: MessageAddress,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   async lockClassForMessage<E extends IAdtError = IAdtError>(
     config: MessageAddress,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
     const { name, no } = this.names(config);
     return answering(
       () =>
@@ -196,10 +239,18 @@ export class AdtMessageClassMessage<
   }
 
   /** `UNLOCK_ALL` on the message, on the stateful session. */
+  unlockMessages<E extends IAdtError>(
+    config: MessageAddress,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<void, E | IAdtError>>;
+  unlockMessages(
+    config: MessageAddress,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<void, IAdtError>>;
   async unlockMessages<E extends IAdtError = IAdtError>(
     config: MessageAddress,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<void, E>> {
+  ): Promise<IAdtResponse<void, E | IAdtError>> {
     const { name, no } = this.names(config);
     return answering(
       () =>
@@ -222,18 +273,26 @@ export class AdtMessageClassMessage<
    * **The whole content, every time.** Only the fields the caller names are
    * overridden in an existing message; the rest stays as the document has it.
    */
-  update<E extends IAdtError = IAdtError>(
+  update<E extends IAdtError>(
     config: IMessageClassMessageUpsert,
-    options: IMessageClassMessageUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['written'], E>>;
-  update<E extends IAdtError = IAdtError>(
+    options: IMessageClassMessageUpdateOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['written'], E | IAdtError>>;
+  update(
+    config: IMessageClassMessageUpsert,
+    options: IMessageClassMessageUpdateOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['written'], IAdtError>>;
+  update<E extends IAdtError>(
     config: IMessageClassMessageRemoval,
-    options: IMessageClassMessageUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['deleted'], E>>;
+    options: IMessageClassMessageUpdateOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['deleted'], E | IAdtError>>;
+  update(
+    config: IMessageClassMessageRemoval,
+    options: IMessageClassMessageUpdateOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deleted'], IAdtError>>;
   async update<E extends IAdtError = IAdtError>(
     config: IMessageClassMessageUpsert | IMessageClassMessageRemoval,
     options: IMessageClassMessageUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['written'] | T['deleted'], E>> {
+  ): Promise<IAdtResponse<T['written'] | T['deleted'], E | IAdtError>> {
     // The caller's deadline, if they set one, on the request.
     const connection = withCallTimeout(this.connection, options.timeout);
     const name = config.className;

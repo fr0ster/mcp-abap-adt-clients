@@ -32,6 +32,7 @@ import type {
   IAdtHeaders,
   IAdtOperationOptions,
   IAdtResponse,
+  IAnalyse,
   IFunctionGroupConfig,
 } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
@@ -53,10 +54,20 @@ export class AdtFunctionGroupLegacy<
    * A delete with `corrNr` in a transportable package was not measured.
    * `/sap/bc/adt/deletion/*` does not exist there.
    */
+  override delete<E extends IAdtError>(
+    config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>>;
+  override delete(
+    config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletion'], IAdtError>>;
   override async delete<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletion'], E>> {
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
     const name = config.functionGroupName as string;
 
     const objectUrl = FUNCTION_GROUP.uri(name);
@@ -79,11 +90,23 @@ export class AdtFunctionGroupLegacy<
    * `POST /sap/bc/adt/deletion/check` answers `404` (spec §5). `delete` with
    * the object's lock handle is the delete.
    */
+  override checkDeletion<E extends IAdtError>(
+    this: this & AdtPerformedBy<'functionGroup', 'deletionCheck'>,
+    _config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  override checkDeletion(
+    this: this & AdtPerformedBy<'functionGroup', 'deletionCheck'>,
+    _config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   override async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionGroup', 'deletionCheck'>,
     _config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
     return noDeletionCheck<T['deletionCheck'], E>();
   }
 
@@ -91,11 +114,23 @@ export class AdtFunctionGroupLegacy<
    * Refused without a request: measured on 7.40 SP04, `GET <object URI>/transport`
    * answers `404` for every type (record B4-cycles-20261026-2019).
    */
+  override readTransport<E extends IAdtError>(
+    this: this & AdtPerformedBy<'functionGroup', 'transport'>,
+    config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
+    _options: ({ withLongPolling?: boolean } & IAdtOperationOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>>;
+  override readTransport(
+    this: this & AdtPerformedBy<'functionGroup', 'transport'>,
+    config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
+    _options?: { withLongPolling?: boolean } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['transport'], IAdtError>>;
   override async readTransport<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionGroup', 'transport'>,
     config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['transport'], E>> {
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
     return noTransportResource<T['transport'], E>(
       FUNCTION_GROUP.uri(config.functionGroupName as string),
     );
@@ -113,10 +148,20 @@ export class AdtFunctionGroupLegacy<
    * activation helper: after a silent checklist alone, the inactive list is
    * read once and handed to `analyse`.
    */
+  override activate<E extends IAdtError>(
+    config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>>;
+  override activate(
+    config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['activation'], IAdtError>>;
   override async activate<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
-  ): Promise<IAdtResponse<T['activation'], E>> {
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     const name = config.functionGroupName as string;
     const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>

@@ -2,6 +2,7 @@ import type {
   AdtReadVersion,
   AdtRequiredUpdateOptions,
   IAdtLockedWrite,
+  IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
 import { withCallTimeout } from '../../utils/callTimeout';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
@@ -126,10 +127,18 @@ export class AdtClass<
   }
 
   /** Read the host's enhancement elements. */
+  readEnhancementElements<E extends IAdtError>(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['enhancementElements'], E | IAdtError>>;
+  readEnhancementElements(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['enhancementElements'], IAdtError>>;
   async readEnhancementElements<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IClassConfig, 'className'>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['enhancementElements'], E>> {
+  ): Promise<IAdtResponse<T['enhancementElements'], E | IAdtError>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
       () => getClassEnhancementElements(connection, config.className),
@@ -139,10 +148,18 @@ export class AdtClass<
   }
 
   /** Read the host's enhancement options. */
+  readEnhancementOptions<E extends IAdtError>(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['enhancementOptions'], E | IAdtError>>;
+  readEnhancementOptions(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['enhancementOptions'], IAdtError>>;
   async readEnhancementOptions<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IClassConfig, 'className'>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['enhancementOptions'], E>> {
+  ): Promise<IAdtResponse<T['enhancementOptions'], E | IAdtError>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
       () => getClassEnhancementOptions(connection, config.className),
@@ -154,10 +171,18 @@ export class AdtClass<
   /**
    * Validate class configuration before creation
    */
+  validate<E extends IAdtError>(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>>;
+  validate(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['validation'], IAdtError>>;
   async validate<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IClassConfig, 'className'>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['validation'], E>> {
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -181,6 +206,34 @@ export class AdtClass<
   /**
    * Create class with full operation chain
    */
+  create<E extends IAdtError>(
+    config: Omit<IClassConfig, 'source'> & {
+      source?: never;
+      /**
+       * Not taken: SAP ignores `class:abstract` on create (measured on
+       * premise — the class stayed not abstract). The source's `ABSTRACT`
+       * makes a class abstract, set afterwards.
+       */
+      abstract?: never;
+      packageName: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>>;
+  create(
+    config: Omit<IClassConfig, 'source'> & {
+      source?: never;
+      /**
+       * Not taken: SAP ignores `class:abstract` on create (measured on
+       * premise — the class stayed not abstract). The source's `ABSTRACT`
+       * makes a class abstract, set afterwards.
+       */
+      abstract?: never;
+      packageName: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['created'], IAdtError>>;
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IClassConfig, 'source'> & {
       source?: never;
@@ -193,7 +246,7 @@ export class AdtClass<
       packageName: string;
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<T['created'], E>> {
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // The type requires a package; this refuses an empty one, which the type
@@ -254,11 +307,21 @@ export class AdtClass<
   /**
    * Read class
    */
+  read<E extends IAdtError>(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    version: AdtReadVersion | undefined,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>>;
+  read(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    version?: AdtReadVersion,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['source'], IAdtError>>;
   async read<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IClassConfig, 'className'>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['source'], E>> {
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -284,12 +347,24 @@ export class AdtClass<
    * what the object holds, change what you mean to change, and pass the result:
    * anything left out is gone, because nothing is read here to keep it.
    */
+  update<E extends IAdtError>(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>>;
+  update(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['updated'], IAdtError>>;
   async update<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IClassConfig, 'className'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
       IAdtLockedWrite &
       AdtRequiredUpdateOptions<'source'>,
-  ): Promise<IAdtResponse<T['updated'], E>> {
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -335,13 +410,27 @@ export class AdtClass<
    * and pass the result: anything left out is gone, because nothing is read
    * here to keep it.
    */
+  updateMetadata<E extends IAdtError>(
+    this: this & AdtPerformedBy<'class', 'updateMetadata'>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>>;
+  updateMetadata(
+    this: this & AdtPerformedBy<'class', 'updateMetadata'>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], IAdtError>>;
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'class', 'updateMetadata'>,
     config: AdtObjectIdentity<IClassConfig, 'className'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
       IAdtLockedWrite &
       AdtRequiredUpdateOptions<'source'>,
-  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -364,11 +453,23 @@ export class AdtClass<
   /**
    * Ask whether the class can be deleted now.
    */
+  checkDeletion<E extends IAdtError>(
+    this: this & AdtPerformedBy<'class', 'deletionCheck'>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  checkDeletion(
+    this: this & AdtPerformedBy<'class', 'deletionCheck'>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'class', 'deletionCheck'>,
     config: AdtObjectIdentity<IClassConfig, 'className'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -386,10 +487,20 @@ export class AdtClass<
   /**
    * Delete class
    */
+  delete<E extends IAdtError>(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>>;
+  delete(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletion'], IAdtError>>;
   async delete<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IClassConfig, 'className'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletion'], E>> {
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -410,11 +521,23 @@ export class AdtClass<
   /**
    * Check class
    */
+  check<E extends IAdtError>(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>>;
+  check(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['check'], IAdtError>>;
   async check<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IClassConfig, 'className'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['check'], E>> {
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -445,13 +568,29 @@ export class AdtClass<
    * Activate test classes (local classes) — one activation POST, read by the
    * `activation` strategy. `preauditRequested` is sent as given; absent, `true`.
    */
+  activateTestClasses<E extends IAdtError>(
+    config: AdtObjectIdentity<IClassConfig, 'className'> & {
+      testClassName: string;
+    },
+    options: IAdtAnalyseOptions<E> &
+      Pick<IAdtActivationOptions<E>, 'preauditRequested'> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>>;
+  activateTestClasses(
+    config: AdtObjectIdentity<IClassConfig, 'className'> & {
+      testClassName: string;
+    },
+    options?: IAdtAnalyseOptions<IAdtError> &
+      Pick<IAdtActivationOptions<IAdtError>, 'preauditRequested'>,
+  ): Promise<IAdtResponse<T['activation'], IAdtError>>;
   async activateTestClasses<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IClassConfig, 'className'> & {
       testClassName: string;
     },
     options?: IAdtAnalyseOptions<E> &
       Pick<IAdtActivationOptions<E>, 'preauditRequested'>,
-  ): Promise<IAdtResponse<T['activation'], E>> {
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>> {
     return answeringActivation(
       this.connection,
       (sent) =>
@@ -467,10 +606,18 @@ export class AdtClass<
   }
 
   /** Version history of the class's `main` include. */
+  getVersions<E extends IAdtError>(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>>;
+  getVersions(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versions'], IAdtError>>;
   async getVersions<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IClassConfig, 'className'>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versions'], E>> {
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>> {
     return this.includeVersions(config.className, 'main', options);
   }
 }

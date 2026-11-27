@@ -26,6 +26,7 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IAdtUpdateOptions,
+  IAnalyse,
   IInterfaceConfig,
 } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
@@ -51,10 +52,20 @@ export class AdtInterfaceLegacy<
    * A delete with `corrNr` in a transportable package was not measured.
    * `/sap/bc/adt/deletion/*` does not exist there.
    */
+  override delete<E extends IAdtError>(
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>>;
+  override delete(
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletion'], IAdtError>>;
   override async delete<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletion'], E>> {
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
     const name = config.interfaceName as string;
 
     const objectUrl = `${INTERFACE.uri(name)}`;
@@ -77,11 +88,23 @@ export class AdtInterfaceLegacy<
    * `POST /sap/bc/adt/deletion/check` answers `404` (spec §5). `delete` with
    * the object's lock handle is the delete.
    */
+  override checkDeletion<E extends IAdtError>(
+    this: this & AdtPerformedBy<'interface', 'deletionCheck'>,
+    _config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  override checkDeletion(
+    this: this & AdtPerformedBy<'interface', 'deletionCheck'>,
+    _config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   override async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'interface', 'deletionCheck'>,
     _config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
     return noDeletionCheck<T['deletionCheck'], E>();
   }
 
@@ -90,13 +113,27 @@ export class AdtInterfaceLegacy<
    * `updateMetadata` for the interface, and no run there has sent the PUT of its
    * metadata document.
    */
+  override updateMetadata<E extends IAdtError>(
+    this: this & AdtPerformedBy<'interface', 'updateMetadata'>,
+    _config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>>;
+  override updateMetadata(
+    this: this & AdtPerformedBy<'interface', 'updateMetadata'>,
+    _config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], IAdtError>>;
   override async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'interface', 'updateMetadata'>,
     _config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
     _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
       IAdtLockedWrite &
       AdtRequiredUpdateOptions<'source'>,
-  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
     return legacyNotMeasuredRefusal<T['metadataUpdated'], E>(
       'updateMetadata',
       'PUT /sap/bc/adt/oo/interfaces/{name}',
@@ -107,11 +144,23 @@ export class AdtInterfaceLegacy<
    * Refused without a request: measured on 7.40 SP04, `GET <object URI>/transport`
    * answers `404` for every type (record B4-cycles-20261026-2019).
    */
+  override readTransport<E extends IAdtError>(
+    this: this & AdtPerformedBy<'interface', 'transport'>,
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    _options: ({ withLongPolling?: boolean } & IAdtOperationOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>>;
+  override readTransport(
+    this: this & AdtPerformedBy<'interface', 'transport'>,
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    _options?: { withLongPolling?: boolean } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['transport'], IAdtError>>;
   override async readTransport<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'interface', 'transport'>,
     config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['transport'], E>> {
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
     return noTransportResource<T['transport'], E>(
       INTERFACE.uri(config.interfaceName as string),
     );

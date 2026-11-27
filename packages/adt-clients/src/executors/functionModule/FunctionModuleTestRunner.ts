@@ -26,6 +26,7 @@ import type {
   IAdtError,
   IAdtResponse,
   IAdtRunnable,
+  IAnalyse,
   IClassUnitTestRunOptions,
   IFunctionModuleConfig,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -73,11 +74,22 @@ export class FunctionModuleTestRunner<
   }
 
   /** Run the test classes that exercise the module. One POST. */
+  run<E extends IAdtError>(
+    this: this & AdtPerformedBy<'functionModule', 'unitTestRun'>,
+    functionModuleName: string,
+    options: IClassUnitTestRunOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>>;
+  run(
+    this: this & AdtPerformedBy<'functionModule', 'unitTestRun'>,
+    functionModuleName: string,
+    options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['run'], IAdtError>>;
   async run<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionModule', 'unitTestRun'>,
     functionModuleName: string,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['run'], E>> {
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>> {
     return this.startByObject(functionModuleName, 'FUNC', options);
   }
 
@@ -110,11 +122,22 @@ export class FunctionModuleTestRunner<
    * `result` strategy; whether a failing test is a failure is
    * `options.analyse`'s.
    */
+  runSync<E extends IAdtError>(
+    this: this & AdtPerformedBy<'functionModule', 'unitTestRunSync'>,
+    target: IFunctionModuleTestRunSyncTarget,
+    options: IClassUnitTestRunOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['result'], E | IAdtError>>;
+  runSync(
+    this: this & AdtPerformedBy<'functionModule', 'unitTestRunSync'>,
+    target: IFunctionModuleTestRunSyncTarget,
+    options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['result'], IAdtError>>;
   async runSync<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionModule', 'unitTestRunSync'>,
     target: IFunctionModuleTestRunSyncTarget,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['result'], E>> {
+  ): Promise<IAdtResponse<T['result'], E | IAdtError>> {
     return this.startSync(
       [
         FUNCTION_MODULE.uri(

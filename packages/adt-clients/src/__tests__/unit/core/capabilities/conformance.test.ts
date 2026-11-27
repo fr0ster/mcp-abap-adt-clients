@@ -31,7 +31,13 @@ function recordingConnection() {
 
 const noopLogger = { info() {}, warn() {}, error() {}, debug() {} } as any;
 
-const cases = [
+/** The two members the cases call: one plain signature each, not a union of overload sets. */
+interface ILockPair {
+  lock(config: never): Promise<unknown>;
+  unlock(config: never, lockHandle: string): Promise<unknown>;
+}
+
+const cases: { name: string; make: (c: any) => ILockPair; cfg: never }[] = [
   {
     name: 'AdtClass',
     make: (c: any) =>

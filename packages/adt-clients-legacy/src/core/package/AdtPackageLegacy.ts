@@ -25,6 +25,7 @@ import type {
   IAdtHeaders,
   IAdtOperationOptions,
   IAdtResponse,
+  IAnalyse,
   IPackageConfig,
 } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
@@ -91,10 +92,20 @@ export class AdtPackageLegacy<
    * `POST /sap/bc/adt/deletion/check` answers `404` (spec §5) — and the
    * package `delete` refuses as well (§8).
    */
+  override checkDeletion<E extends IAdtError>(
+    _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  override checkDeletion(
+    _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   override async checkDeletion<E extends IAdtError = IAdtError>(
     _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
     return noDeletionCheckNorDelete<T['deletionCheck'], E>();
   }
 
@@ -103,36 +114,76 @@ export class AdtPackageLegacy<
    * (or name it, for the check run), the item resource 7.40 SP04 answered
    * `404` to. Refused without a request; not measured themselves (spec §8).
    */
+  override lock<E extends IAdtError>(
+    _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    _options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  override lock(
+    _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    _options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   override async lock<E extends IAdtError = IAdtError>(
     _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     _options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
     return legacyRefusal<string, E>('lock', ITEM_RESOURCE);
   }
 
+  override unlock<E extends IAdtError>(
+    _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    _lockHandle: string,
+    _options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<void, E | IAdtError>>;
+  override unlock(
+    _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    _lockHandle: string,
+    _options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<void, IAdtError>>;
   override async unlock<E extends IAdtError = IAdtError>(
     _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     _lockHandle: string,
     _options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<void, E>> {
+  ): Promise<IAdtResponse<void, E | IAdtError>> {
     return legacyRefusal<void, E>('unlock', ITEM_RESOURCE);
   }
 
+  override readTransport<E extends IAdtError>(
+    _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    _options: ({ withLongPolling?: boolean } & IAdtOperationOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>>;
+  override readTransport(
+    _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    _options?: { withLongPolling?: boolean } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['transport'], IAdtError>>;
   override async readTransport<E extends IAdtError = IAdtError>(
     _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['transport'], E>> {
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
     return legacyRefusal<T['transport'], E>(
       'readTransport',
       `${ITEM_RESOURCE}/transport`,
     );
   }
 
+  override check<E extends IAdtError>(
+    _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    _status: string | undefined,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>>;
+  override check(
+    _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    _status: string | undefined,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['check'], IAdtError>>;
   override async check<E extends IAdtError = IAdtError>(
     _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     _status: string | undefined,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['check'], E>> {
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>> {
     return legacyRefusal<T['check'], E>(
       'check',
       `${ITEM_RESOURCE} to check (the check run names it)`,

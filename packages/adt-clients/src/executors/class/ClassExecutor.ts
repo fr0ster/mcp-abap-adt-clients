@@ -5,6 +5,7 @@ import type {
   IAdtHeaders,
   IAdtResponse,
   IAdtRunnable,
+  IAnalyse,
   IClassExecuteOptions,
   IClassExecuteWithProfilerOptions,
   IClassExecutionTarget,
@@ -100,43 +101,88 @@ export class ClassExecutor<
   // is what fulfils a scheduled request; not on a base, because an ATC run
   // implements IAdtRunnable too and has no business with traces.
 
+  listObjectTypes<E extends IAdtError>(
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['types'], E | IAdtError>>;
+  listObjectTypes(
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['types'], IAdtError>>;
   listObjectTypes<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['types'], E>> {
+  ): Promise<IAdtResponse<T['types'], E | IAdtError>> {
     return this.scheduling.listObjectTypes(options);
   }
 
+  listProcessTypes<E extends IAdtError>(
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['types'], E | IAdtError>>;
+  listProcessTypes(
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['types'], IAdtError>>;
   listProcessTypes<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['types'], E>> {
+  ): Promise<IAdtResponse<T['types'], E | IAdtError>> {
     return this.scheduling.listProcessTypes(options);
   }
 
+  listRequests<E extends IAdtError>(
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['requests'], E | IAdtError>>;
+  listRequests(
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['requests'], IAdtError>>;
   listRequests<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['requests'], E>> {
+  ): Promise<IAdtResponse<T['requests'], E | IAdtError>> {
     return this.scheduling.listRequests(options);
   }
 
+  getRequestsByUri<E extends IAdtError>(
+    uri: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['requests'], E | IAdtError>>;
+  getRequestsByUri(
+    uri: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['requests'], IAdtError>>;
   getRequestsByUri<E extends IAdtError = IAdtError>(
     uri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['requests'], E>> {
+  ): Promise<IAdtResponse<T['requests'], E | IAdtError>> {
     return this.scheduling.getRequestsByUri(uri, options);
   }
 
+  scheduleTrace<E extends IAdtError>(
+    options: { headers: IAdtHeaders } & IProfilerTraceParameters &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['scheduled'], E | IAdtError>>;
+  scheduleTrace(
+    options: { headers: IAdtHeaders } & IProfilerTraceParameters &
+      IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['scheduled'], IAdtError>>;
   scheduleTrace<E extends IAdtError = IAdtError>(
     options: { headers: IAdtHeaders } & IProfilerTraceParameters &
       IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['scheduled'], E>> {
+  ): Promise<IAdtResponse<T['scheduled'], E | IAdtError>> {
     return this.scheduling.scheduleTrace(options);
   }
 
+  run<E extends IAdtError>(
+    this: this & AdtPerformedBy<'class', 'run'>,
+    target: IClassExecutionTarget,
+    options: IClassExecuteOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>>;
+  run(
+    this: this & AdtPerformedBy<'class', 'run'>,
+    target: IClassExecutionTarget,
+    options?: IClassExecuteOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['run'], IAdtError>>;
   async run<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'class', 'run'>,
     target: IClassExecutionTarget,
     options?: IClassExecuteOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['run'], E>> {
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>> {
     return answering(
       () =>
         runClass(
@@ -151,11 +197,22 @@ export class ClassExecutor<
     );
   }
 
+  runWithProfiler<E extends IAdtError>(
+    this: this & AdtPerformedBy<'class', 'profile'>,
+    target: IClassExecutionTarget,
+    options: IClassExecuteWithProfilerOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>>;
+  runWithProfiler(
+    this: this & AdtPerformedBy<'class', 'profile'>,
+    target: IClassExecutionTarget,
+    options: IClassExecuteWithProfilerOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['run'], IAdtError>>;
   async runWithProfiler<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'class', 'profile'>,
     target: IClassExecutionTarget,
     options: IClassExecuteWithProfilerOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['run'], E>> {
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>> {
     const encodedProfilerId = encodeURIComponent(options.profilerId);
     return answering(
       () =>

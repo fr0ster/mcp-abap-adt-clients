@@ -27,6 +27,7 @@ import type {
   IAdtError,
   IAdtResponse,
   IAdtRunnable,
+  IAnalyse,
   IClassUnitTestRunOptions,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -64,11 +65,22 @@ export class ProgramTestRunner<
   }
 
   /** Run every test class of the report. One POST. */
+  run<E extends IAdtError>(
+    this: this & AdtPerformedBy<'program', 'unitTestRun'>,
+    programName: string,
+    options: IClassUnitTestRunOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>>;
+  run(
+    this: this & AdtPerformedBy<'program', 'unitTestRun'>,
+    programName: string,
+    options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['run'], IAdtError>>;
   async run<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'program', 'unitTestRun'>,
     programName: string,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['run'], E>> {
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>> {
     return this.startByObject(programName, 'PROG', options);
   }
 
@@ -91,11 +103,22 @@ export class ProgramTestRunner<
    * failure is `options.analyse`'s (`analyseUnitTest` from
    * @mcp-abap-adt/adt-strategies reads it so).
    */
+  runSync<E extends IAdtError>(
+    this: this & AdtPerformedBy<'program', 'unitTestRunSync'>,
+    programName: string,
+    options: IClassUnitTestRunOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['result'], E | IAdtError>>;
+  runSync(
+    this: this & AdtPerformedBy<'program', 'unitTestRunSync'>,
+    programName: string,
+    options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['result'], IAdtError>>;
   async runSync<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'program', 'unitTestRunSync'>,
     programName: string,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['result'], E>> {
+  ): Promise<IAdtResponse<T['result'], E | IAdtError>> {
     return this.startSync([PROGRAM.uri(programName)], options);
   }
 }

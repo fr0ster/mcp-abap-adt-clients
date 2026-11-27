@@ -2,6 +2,7 @@ import type {
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
+  IAnalyse,
   IDdicActivation,
   IGetActivationGraphOptions,
   IResultStrategy,
@@ -55,9 +56,16 @@ export class DdicActivation<
     this.results = options.results;
   }
 
+  getGraph<E extends IAdtError>(
+    options: IGetActivationGraphOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['graph'], E | IAdtError>>;
+  getGraph(
+    options?: IGetActivationGraphOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['graph'], IAdtError>>;
   async getGraph<E extends IAdtError = IAdtError>(
     options?: IGetActivationGraphOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['graph'], E>> {
+  ): Promise<IAdtResponse<T['graph'], E | IAdtError>> {
     return answering(
       () => getActivationGraph(this.connection, options),
       this.results.graph,

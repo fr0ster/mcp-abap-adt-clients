@@ -2,6 +2,7 @@ import type {
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
+  IAnalyse,
   IResultStrategy,
   IRuntimeDumpReadOptions,
   IRuntimeDumps,
@@ -63,9 +64,16 @@ export class RuntimeDumps<
     this.results = options.results;
   }
 
+  list<E extends IAdtError>(
+    options: IRuntimeDumpsListOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['list'], E | IAdtError>>;
+  list(
+    options?: IRuntimeDumpsListOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['list'], IAdtError>>;
   async list<E extends IAdtError = IAdtError>(
     options?: IRuntimeDumpsListOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['list'], E>> {
+  ): Promise<IAdtResponse<T['list'], E | IAdtError>> {
     return answering(
       () => listRuntimeDumps(this.connection, options ?? {}),
       this.results.list,
@@ -73,10 +81,20 @@ export class RuntimeDumps<
     );
   }
 
+  listByUser<E extends IAdtError>(
+    user: string | undefined,
+    options: Omit<IRuntimeDumpsListOptions, 'query'> &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['list'], E | IAdtError>>;
+  listByUser(
+    user?: string,
+    options?: Omit<IRuntimeDumpsListOptions, 'query'> &
+      IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['list'], IAdtError>>;
   async listByUser<E extends IAdtError = IAdtError>(
     user?: string,
     options?: Omit<IRuntimeDumpsListOptions, 'query'> & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['list'], E>> {
+  ): Promise<IAdtResponse<T['list'], E | IAdtError>> {
     return answering(
       () => listRuntimeDumpsByUser(this.connection, user, options),
       this.results.list,
@@ -84,10 +102,19 @@ export class RuntimeDumps<
     );
   }
 
+  getById<E extends IAdtError>(
+    dumpId: string,
+    options: IRuntimeDumpReadOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['dump'], E | IAdtError>>;
+  getById(
+    dumpId: string,
+    options?: IRuntimeDumpReadOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['dump'], IAdtError>>;
   async getById<E extends IAdtError = IAdtError>(
     dumpId: string,
     options?: IRuntimeDumpReadOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['dump'], E>> {
+  ): Promise<IAdtResponse<T['dump'], E | IAdtError>> {
     return answering(
       () => getRuntimeDumpById(this.connection, dumpId, options),
       this.results.dump,

@@ -36,7 +36,7 @@ export function runSyncLegacy<T, E extends IAdtError>(
   objectUris: string[],
   strategy: IResultStrategy<T>,
   options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-): Promise<IAdtResponse<T, E>> {
+): Promise<IAdtResponse<T, E | IAdtError>> {
   const { analyse, ...runOptions } = options ?? {};
   return answering(
     () => startUnitTestRunSync(connection, objectUris, runOptions),

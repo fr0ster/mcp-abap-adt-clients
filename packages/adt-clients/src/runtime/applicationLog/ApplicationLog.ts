@@ -2,6 +2,7 @@ import type {
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
+  IAnalyse,
   IApplicationLog,
   IGetApplicationLogObjectOptions,
   IGetApplicationLogSourceOptions,
@@ -64,10 +65,19 @@ export class ApplicationLog<
     this.results = options.results;
   }
 
+  getObject<E extends IAdtError>(
+    objectName: string,
+    options: IGetApplicationLogObjectOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['object'], E | IAdtError>>;
+  getObject(
+    objectName: string,
+    options?: IGetApplicationLogObjectOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['object'], IAdtError>>;
   async getObject<E extends IAdtError = IAdtError>(
     objectName: string,
     options?: IGetApplicationLogObjectOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['object'], E>> {
+  ): Promise<IAdtResponse<T['object'], E | IAdtError>> {
     return answering(
       () => getApplicationLogObject(this.connection, objectName, options),
       this.results.object,
@@ -75,10 +85,19 @@ export class ApplicationLog<
     );
   }
 
+  getSource<E extends IAdtError>(
+    objectName: string,
+    options: IGetApplicationLogSourceOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>>;
+  getSource(
+    objectName: string,
+    options?: IGetApplicationLogSourceOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['source'], IAdtError>>;
   async getSource<E extends IAdtError = IAdtError>(
     objectName: string,
     options?: IGetApplicationLogSourceOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['source'], E>> {
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>> {
     return answering(
       () => getApplicationLogSource(this.connection, objectName, options),
       this.results.source,
@@ -86,10 +105,18 @@ export class ApplicationLog<
     );
   }
 
+  validateName<E extends IAdtError>(
+    objectName: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>>;
+  validateName(
+    objectName: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['validation'], IAdtError>>;
   async validateName<E extends IAdtError = IAdtError>(
     objectName: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['validation'], E>> {
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>> {
     return answering(
       () => validateApplicationLogName(this.connection, objectName),
       this.results.validation,

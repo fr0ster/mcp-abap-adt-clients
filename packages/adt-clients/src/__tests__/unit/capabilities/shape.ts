@@ -215,12 +215,23 @@ export type Offenders = {
 // `read` (the parent class's document; a message has no resource of its own).
 // The deleted composition left the atom out, so the type hid it. The class's
 // members are not changed by #216, so the disagreement is recorded here.
+//
+// The four after it since D3 of #304, when every member became an overload
+// pair: against the `any` configs of this check, the pair of a member with a
+// contract of its own also satisfies the general atom's pair. Their own
+// contracts are `IAdtTextElementsReadable` / `IAdtTextElementsUpdatable`,
+// `IAdtTableSettingsUpdatable` and `IAdtMessageClassMessageUpdatable`, each
+// checked by its handler's own tests.
 export type KnownDisagreements =
   | 'include.enhancementHost — offered but not claimed'
   | 'class.includeEnhancementHost — offered but not claimed'
   | 'program.includeEnhancementHost — offered but not claimed'
   | 'functionGroup.includeEnhancementHost — offered but not claimed'
-  | 'messageClassMessage.metadataReadable — offered but not claimed';
+  | 'messageClassMessage.metadataReadable — offered but not claimed'
+  | 'textElements.readable — offered but not claimed'
+  | 'textElements.updatable — offered but not claimed'
+  | 'tableSettings.metadataUpdatable — offered but not claimed'
+  | 'messageClassMessage.updatable — offered but not claimed';
 
 /**
  * The assertion.

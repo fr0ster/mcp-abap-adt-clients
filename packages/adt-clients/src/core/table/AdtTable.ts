@@ -36,6 +36,7 @@ import type {
   IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
+  IAnalyse,
   ITableResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -146,10 +147,18 @@ export class AdtTable<
   }
 
   /** Validate the name before creating the object. */
+  validate<E extends IAdtError>(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>>;
+  validate(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['validation'], IAdtError>>;
   async validate<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<ITableConfig, 'tableName'>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['validation'], E>> {
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -163,13 +172,29 @@ export class AdtTable<
   }
 
   /** Create the object. */
+  create<E extends IAdtError>(
+    config: Omit<ITableConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>>;
+  create(
+    config: Omit<ITableConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['created'], IAdtError>>;
   async create<E extends IAdtError = IAdtError>(
     config: Omit<ITableConfig, 'source'> & {
       source?: never;
       packageName: string;
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<T['created'], E>> {
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // The type requires a package; this refuses an empty one, which the type
@@ -211,11 +236,21 @@ export class AdtTable<
   }
 
   /** Read the object. */
+  read<E extends IAdtError>(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    version: AdtReadVersion | undefined,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>>;
+  read(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    version?: AdtReadVersion,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['source'], IAdtError>>;
   async read<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<ITableConfig, 'tableName'>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['source'], E>> {
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -232,10 +267,18 @@ export class AdtTable<
   }
 
   /** Read the object's metadata document. */
+  readMetadata<E extends IAdtError>(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>>;
+  readMetadata(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['metadata'], IAdtError>>;
   async readMetadata<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<ITableConfig, 'tableName'>,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['metadata'], E>> {
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -249,10 +292,20 @@ export class AdtTable<
   }
 
   /** The transport request the object belongs to. */
+  readTransport<E extends IAdtError>(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    options: ({ withLongPolling?: boolean } & IAdtOperationOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>>;
+  readTransport(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['transport'], IAdtError>>;
   async readTransport<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<ITableConfig, 'tableName'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['transport'], E>> {
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -283,12 +336,24 @@ export class AdtTable<
    * what the object holds, change what you mean to change, and pass the result:
    * anything left out is gone, because nothing is read here to keep it.
    */
+  update<E extends IAdtError>(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>>;
+  update(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['updated'], IAdtError>>;
   async update<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<ITableConfig, 'tableName'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
       IAdtLockedWrite &
       AdtRequiredUpdateOptions<'source'>,
-  ): Promise<IAdtResponse<T['updated'], E>> {
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -325,13 +390,27 @@ export class AdtTable<
    * and pass the result: anything left out is gone, because nothing is read
    * here to keep it.
    */
+  updateMetadata<E extends IAdtError>(
+    this: this & AdtPerformedBy<'table', 'updateMetadata'>,
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>>;
+  updateMetadata(
+    this: this & AdtPerformedBy<'table', 'updateMetadata'>,
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], IAdtError>>;
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'table', 'updateMetadata'>,
     config: AdtObjectIdentity<ITableConfig, 'tableName'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
       IAdtLockedWrite &
       AdtRequiredUpdateOptions<'source'>,
-  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -358,10 +437,20 @@ export class AdtTable<
    * it: a consumer that wants the check runs this first and decides what a
    * refusal means.
    */
+  checkDeletion<E extends IAdtError>(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  checkDeletion(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   async checkDeletion<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<ITableConfig, 'tableName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -386,10 +475,20 @@ export class AdtTable<
    * shipped reading of that answer; a caller who wants another passes their own
    * `analyse`.
    */
+  delete<E extends IAdtError>(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>>;
+  delete(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletion'], IAdtError>>;
   async delete<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<ITableConfig, 'tableName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletion'], E>> {
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -406,10 +505,20 @@ export class AdtTable<
   }
 
   /** Activate the object. Needs no stateful session. */
+  activate<E extends IAdtError>(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>>;
+  activate(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['activation'], IAdtError>>;
   async activate<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<ITableConfig, 'tableName'>,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
-  ): Promise<IAdtResponse<T['activation'], E>> {
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -430,11 +539,23 @@ export class AdtTable<
   }
 
   /** Check the object. */
+  check<E extends IAdtError>(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>>;
+  check(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['check'], IAdtError>>;
   async check<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<ITableConfig, 'tableName'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['check'], E>> {
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -464,10 +585,18 @@ export class AdtTable<
    * carrying no handle reads as `''`; whether that is a refusal is the
    * caller's `analyse` to say.
    */
+  lock<E extends IAdtError>(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  lock(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   async lock<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<ITableConfig, 'tableName'>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
     const name = this.name(config);
     const answer = await answering(
       () =>
@@ -484,11 +613,21 @@ export class AdtTable<
   }
 
   /** Unlock the object. */
+  unlock<E extends IAdtError>(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    lockHandle: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<void, E | IAdtError>>;
+  unlock(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    lockHandle: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<void, IAdtError>>;
   async unlock<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<ITableConfig, 'tableName'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<void, E>> {
+  ): Promise<IAdtResponse<void, E | IAdtError>> {
     const name = this.name(config);
     return answering(
       async () => {
@@ -506,10 +645,18 @@ export class AdtTable<
   }
 
   /** Version history of the object's source. */
+  getVersions<E extends IAdtError>(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>>;
+  getVersions(
+    config: AdtObjectIdentity<ITableConfig, 'tableName'>,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versions'], IAdtError>>;
   async getVersions<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<ITableConfig, 'tableName'>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versions'], E>> {
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>> {
     return answering(
       () => getTableVersions(this.connection, config),
       this.results.versions,
@@ -518,10 +665,18 @@ export class AdtTable<
   }
 
   /** Source of one version, by the `contentUri` its entry carried. */
+  getVersionSource<E extends IAdtError>(
+    contentUri: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versionSource'], E | IAdtError>>;
+  getVersionSource(
+    contentUri: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versionSource'], IAdtError>>;
   async getVersionSource<E extends IAdtError = IAdtError>(
     contentUri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versionSource'], E>> {
+  ): Promise<IAdtResponse<T['versionSource'], E | IAdtError>> {
     return answering(
       () => getTableVersionSource(this.connection, contentUri),
       this.results.versionSource,

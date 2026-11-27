@@ -70,6 +70,7 @@ import {
   type IAdtTableSettingsPatchOptions,
   type IAdtTableSettingsUpdatable,
   type IAdtTableSettingsUpdateOptions,
+  type IAnalyse,
   type ITableSettingsChangesOf,
   type ITableSettingsResults,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -214,10 +215,18 @@ export class AdtTableSettings<
   }
 
   /** Read the settings document (v2). */
+  readMetadata<E extends IAdtError>(
+    config: Partial<ITableSettingsConfig>,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>>;
+  readMetadata(
+    config: Partial<ITableSettingsConfig>,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['metadata'], IAdtError>>;
   async readMetadata<E extends IAdtError = IAdtError>(
     config: Partial<ITableSettingsConfig>,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['metadata'], E>> {
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
     const name = this.name(config);
@@ -242,10 +251,22 @@ export class AdtTableSettings<
    * (`ITableSettingsUpdateConfig<V>`); at run time this checks only the
    * empty lock handle, and the document carries any boolean it is given.
    */
+  updateMetadata<E extends IAdtError>(
+    config: ITableSettingsUpdateConfig<SettingsVariant<V>>,
+    options: { headers: IAdtHeaders } & IAdtTableSettingsUpdateOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>>;
+  updateMetadata(
+    config: ITableSettingsUpdateConfig<SettingsVariant<V>>,
+    options: {
+      headers: IAdtHeaders;
+    } & IAdtTableSettingsUpdateOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], IAdtError>>;
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: ITableSettingsUpdateConfig<SettingsVariant<V>>,
     options: { headers: IAdtHeaders } & IAdtTableSettingsUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
     // **The one guard here, before any request.** The type requires a lock
     // handle; this refuses an empty one, which the type cannot rule out and
     // which the query would drop: the PUT would go out with no `lockHandle`.
@@ -300,12 +321,24 @@ export class AdtTableSettings<
    * library retries nothing; the connection may
    * refresh its CSRF token and resend.
    */
+  patchMetadata<E extends IAdtError>(
+    config: TableSettingsPatchConfig<V>,
+    options: {
+      headers: IAdtTableSettingsPatchHeaders;
+    } & IAdtTableSettingsPatchOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>>;
+  patchMetadata(
+    config: TableSettingsPatchConfig<V>,
+    options: {
+      headers: IAdtTableSettingsPatchHeaders;
+    } & IAdtTableSettingsPatchOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], IAdtError>>;
   async patchMetadata<E extends IAdtError = IAdtError>(
     config: TableSettingsPatchConfig<V>,
     options: {
       headers: IAdtTableSettingsPatchHeaders;
     } & IAdtTableSettingsPatchOptions<E>,
-  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
     if (options.lockHandle === '') {
       throw new Error(
         'lockHandle is required for a settings patch: an empty one would send the PUT without a lock',
@@ -398,10 +431,18 @@ export class AdtTableSettings<
    * 2xx status is tracked whatever `analyse` rules, so `unlockAll()` can
    * release it.
    */
+  lock<E extends IAdtError>(
+    config: Partial<ITableSettingsConfig>,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  lock(
+    config: Partial<ITableSettingsConfig>,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   async lock<E extends IAdtError = IAdtError>(
     config: Partial<ITableSettingsConfig>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
     const name = this.name(config);
     return answeringExchange(
       async () => {
@@ -440,11 +481,21 @@ export class AdtTableSettings<
    * whatever a caller's `analyse` makes of the answer: a failed one stays
    * tracked, so `unlockAll()` can try again.
    */
+  unlock<E extends IAdtError>(
+    config: Partial<ITableSettingsConfig>,
+    lockHandle: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<void, E | IAdtError>>;
+  unlock(
+    config: Partial<ITableSettingsConfig>,
+    lockHandle: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<void, IAdtError>>;
   async unlock<E extends IAdtError = IAdtError>(
     config: Partial<ITableSettingsConfig>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<void, E>> {
+  ): Promise<IAdtResponse<void, E | IAdtError>> {
     const name = this.name(config);
     // UNLOCK must run stateful (the context cookie goes with stateful
     // requests only); stateless after.

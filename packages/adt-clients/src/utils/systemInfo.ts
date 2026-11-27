@@ -8,6 +8,7 @@ import type {
   IAdtContentTypes,
   IAdtError,
   IAdtResponse,
+  IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -116,13 +117,31 @@ const isSuccessStatus = (status: number) => status >= 200 && status <= 299;
  * A credential refusal SAP was never asked about is thrown as it came, as by
  * every member.
  */
+export function getSystemInformation<E extends IAdtError>(
+  connection: IAbapConnection,
+  options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+): Promise<
+  IAdtResponse<
+    { present: true; info: SystemInformationRecord } | { present: false },
+    E | IAdtError
+  >
+>;
+export function getSystemInformation(
+  connection: IAbapConnection,
+  options?: IAdtAnalyseOptions<IAdtError>,
+): Promise<
+  IAdtResponse<
+    { present: true; info: SystemInformationRecord } | { present: false },
+    IAdtError
+  >
+>;
 export async function getSystemInformation<E extends IAdtError = IAdtError>(
   connection: IAbapConnection,
   options?: IAdtAnalyseOptions<E>,
 ): Promise<
   IAdtResponse<
     { present: true; info: SystemInformationRecord } | { present: false },
-    E
+    E | IAdtError
   >
 > {
   const request = { method: 'GET', url: SYSTEM_INFORMATION_URL };
@@ -180,25 +199,25 @@ export async function getSystemInformation<E extends IAdtError = IAdtError>(
     }
   }
 
-  // `E` is given a value only by `analyse`; without one the verdict is the
-  // library's own `IAdtError`, which is `E`'s default — as in `answering`.
+  // The failure is `analyse`'s own `E`, or the library's `IAdtError` where it
+  // falls back to its own verdict — as in `answering` (C3 of #304).
   const analyse = options?.analyse;
   if (analyse) {
     const overruled = analyse(verdict, wire);
     if (overruled !== ADT_NO_FAILURE) return failed(overruled);
   } else if (verdict !== ADT_NO_FAILURE) {
-    return failed(verdict as E);
+    return failed(verdict);
   }
 
   if (!wire) {
     return failed(
-      (verdict === ADT_NO_FAILURE
+      verdict === ADT_NO_FAILURE
         ? {
             origin: 'connection',
             message: 'The request did not complete, and carried no answer',
             request,
           }
-        : verdict) as E,
+        : verdict,
     );
   }
   if (!isSuccessStatus(wire.status)) return succeeded({ present: false }, lost);

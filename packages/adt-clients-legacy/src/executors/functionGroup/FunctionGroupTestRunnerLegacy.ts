@@ -20,6 +20,7 @@ import type {
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
+  IAnalyse,
   IClassUnitTestRunOptions,
 } from '@mcp-abap-adt/interfaces-adt';
 import {
@@ -34,11 +35,22 @@ export class FunctionGroupTestRunnerLegacy<
   >,
 > extends FunctionGroupTestRunner<T, 'basis740'> {
   /** Run every test class of the group: the `runSync` request, read by `run`. */
+  override run<E extends IAdtError>(
+    this: this & AdtPerformedBy<'functionGroup', 'unitTestRun'>,
+    functionGroupName: string,
+    options: IClassUnitTestRunOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>>;
+  override run(
+    this: this & AdtPerformedBy<'functionGroup', 'unitTestRun'>,
+    functionGroupName: string,
+    options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['run'], IAdtError>>;
   override async run<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionGroup', 'unitTestRun'>,
     functionGroupName: string,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['run'], E>> {
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>> {
     return runSyncLegacy(
       this.connection,
       [FUNCTION_GROUP.uri(functionGroupName)],

@@ -56,6 +56,7 @@ import {
   type IAdtTextElementsReadOptions,
   type IAdtTextElementsUpdatable,
   type IAdtTextElementsUpdateOptions,
+  type IAnalyse,
   type ITextElementsResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -151,11 +152,21 @@ export class AdtTextElements<
   }
 
   /** Read one part: its text, as the result set reads it. */
+  read<E extends IAdtError>(
+    config: ITextElementsPartConfig,
+    version: TextElementsReadVersion | undefined,
+    options: IAdtTextElementsReadOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>>;
+  read(
+    config: ITextElementsPartConfig,
+    version?: TextElementsReadVersion,
+    options?: IAdtTextElementsReadOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['source'], IAdtError>>;
   async read<E extends IAdtError = IAdtError>(
     config: ITextElementsPartConfig,
     version?: TextElementsReadVersion,
     options?: IAdtTextElementsReadOptions<E>,
-  ): Promise<IAdtResponse<T['source'], E>> {
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
       () =>
@@ -178,10 +189,22 @@ export class AdtTextElements<
    * **The whole content, every time.** This is a replace, never a merge: SAP
    * deletes every entry the list leaves out; read, change, write back.
    */
+  update<E extends IAdtError>(
+    config: ITextElementsUpdateConfig,
+    options: { headers: IAdtHeaders } & IAdtTextElementsUpdateOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>>;
+  update(
+    config: ITextElementsUpdateConfig,
+    options: {
+      headers: IAdtHeaders;
+    } & IAdtTextElementsUpdateOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['updated'], IAdtError>>;
   async update<E extends IAdtError = IAdtError>(
     config: ITextElementsUpdateConfig,
     options: { headers: IAdtHeaders } & IAdtTextElementsUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['updated'], E>> {
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>> {
     // The type requires a lock handle; an empty one would drop out of the
     // query and send the PUT with no lock at all.
     if (options.lockHandle === '') {
@@ -211,10 +234,18 @@ export class AdtTextElements<
    * runs: a handle SAP answered with a 2xx status is tracked whatever a
    * caller rules, so `unlockAll()` can release it.
    */
+  lock<E extends IAdtError>(
+    config: TextElementsObject,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  lock(
+    config: TextElementsObject,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   async lock<E extends IAdtError = IAdtError>(
     config: TextElementsObject,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
     const { objectKind, objectName } = config;
     return answeringExchange(
       async () => {
@@ -248,11 +279,21 @@ export class AdtTextElements<
    * Unlock the object's text elements. The lock leaves the registry only when
    * the UNLOCK succeeded on the wire (a 2xx status), whatever `analyse` rules.
    */
+  unlock<E extends IAdtError>(
+    config: TextElementsObject,
+    lockHandle: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<void, E | IAdtError>>;
+  unlock(
+    config: TextElementsObject,
+    lockHandle: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<void, IAdtError>>;
   async unlock<E extends IAdtError = IAdtError>(
     config: TextElementsObject,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<void, E>> {
+  ): Promise<IAdtResponse<void, E | IAdtError>> {
     const { objectKind, objectName } = config;
     return answering(
       async () => {

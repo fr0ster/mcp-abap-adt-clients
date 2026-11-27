@@ -44,6 +44,7 @@ import type {
   IAdtTransportObjectActions,
   IAdtTransportSortAndCompress,
   IAdtUpdateOptions,
+  IAnalyse,
   ITransportResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -191,11 +192,23 @@ export class AdtRequest<
    * There is no release member: releasing a request stays a person's
    * decision, made in the organizer.
    */
+  create<E extends IAdtError>(
+    this: this & AdtPerformedBy<'request', 'create'>,
+    config: Omit<ITransportConfig, 'source'> & { source?: never },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>>;
+  create(
+    this: this & AdtPerformedBy<'request', 'create'>,
+    config: Omit<ITransportConfig, 'source'> & { source?: never },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['created'], IAdtError>>;
   async create<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'create'>,
     config: Omit<ITransportConfig, 'source'> & { source?: never },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<T['created'], E>> {
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -225,10 +238,20 @@ export class AdtRequest<
    * this.readMetadata(...)`; one endpoint behind two members, admitted in the
    * code.
    */
+  readMetadata<E extends IAdtError>(
+    config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
+    options: ({ withLongPolling?: boolean } & IAdtOperationOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>>;
+  readMetadata(
+    config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['metadata'], IAdtError>>;
   async readMetadata<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['metadata'], E>> {
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -267,9 +290,16 @@ export class AdtRequest<
    * Wider than the contract's `IListTransportsOptions`, which names the saved
    * search alone: a caller typed by the contract keeps that form.
    */
+  list<E extends IAdtError>(
+    options: ListTransportsParams &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['list'], E | IAdtError>>;
+  list(
+    options: ListTransportsParams & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['list'], IAdtError>>;
   async list<E extends IAdtError = IAdtError>(
     options: ListTransportsParams & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['list'], E>> {
+  ): Promise<IAdtResponse<T['list'], E | IAdtError>> {
     this.logger?.info?.('Listing transport requests', {
       configUri: options.configUri,
       user: options.user,
@@ -290,10 +320,18 @@ export class AdtRequest<
    * read by the strategy this implementation was built with and judged by the
    * caller's `analyse`.
    */
+  searchConfigurations<E extends IAdtError>(
+    this: this & AdtPerformedBy<'request', 'searchConfigurations'>,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['searchConfigurations'], E | IAdtError>>;
+  searchConfigurations(
+    this: this & AdtPerformedBy<'request', 'searchConfigurations'>,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['searchConfigurations'], IAdtError>>;
   async searchConfigurations<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'searchConfigurations'>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['searchConfigurations'], E>> {
+  ): Promise<IAdtResponse<T['searchConfigurations'], E | IAdtError>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     return answering(
@@ -318,6 +356,20 @@ export class AdtRequest<
    * what the object holds, change what you mean to change, and pass the result:
    * anything left out is gone, because nothing is read here to keep it.
    */
+  updateMetadata<E extends IAdtError>(
+    this: this & AdtPerformedBy<'request', 'updateMetadata'>,
+    config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockFreeWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>>;
+  updateMetadata(
+    this: this & AdtPerformedBy<'request', 'updateMetadata'>,
+    config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockFreeWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], IAdtError>>;
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'updateMetadata'>,
     config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
@@ -325,7 +377,7 @@ export class AdtRequest<
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
       IAdtLockFreeWrite &
       AdtRequiredUpdateOptions<'source'>,
-  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -371,11 +423,23 @@ export class AdtRequest<
    * One request, like every other member; it is simply not the same one the
    * other twenty-nine types use.
    */
+  checkDeletion<E extends IAdtError>(
+    this: this & AdtPerformedBy<'request', 'deletionCheck'>,
+    config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  checkDeletion(
+    this: this & AdtPerformedBy<'request', 'deletionCheck'>,
+    config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'deletionCheck'>,
     config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -388,11 +452,23 @@ export class AdtRequest<
     );
   }
 
+  delete<E extends IAdtError>(
+    this: this & AdtPerformedBy<'request', 'delete'>,
+    config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deleted'], E | IAdtError>>;
+  delete(
+    this: this & AdtPerformedBy<'request', 'delete'>,
+    config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deleted'], IAdtError>>;
   async delete<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'delete'>,
     config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deleted'], E>> {
+  ): Promise<IAdtResponse<T['deleted'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -442,12 +518,26 @@ export class AdtRequest<
    * `200` is not evidence: {@link readActionLog}, or a re-read of the task, is
    * what confirms the removal happened.
    */
+  removeObject<E extends IAdtError>(
+    this: this & AdtPerformedBy<'request', 'removeObject'>,
+    transportNumber: string,
+    object: IAbapObjectEntry & { position: string },
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['removedObject'], E | IAdtError>>;
+  removeObject(
+    this: this & AdtPerformedBy<'request', 'removeObject'>,
+    transportNumber: string,
+    object: IAbapObjectEntry & { position: string },
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['removedObject'], IAdtError>>;
   async removeObject<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'removeObject'>,
     transportNumber: string,
     object: IAbapObjectEntry & { position: string },
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['removedObject'], E>> {
+  ): Promise<IAdtResponse<T['removedObject'], E | IAdtError>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     this.logger?.info?.(
@@ -478,11 +568,21 @@ export class AdtRequest<
    * The answer says nothing about the list, so {@link readObjects} is what
    * shows each entry once again.
    */
+  sortAndCompress<E extends IAdtError>(
+    this: this & AdtPerformedBy<'request', 'sortAndCompress'>,
+    taskNumber: string,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['sortedAndCompressed'], E | IAdtError>>;
+  sortAndCompress(
+    this: this & AdtPerformedBy<'request', 'sortAndCompress'>,
+    taskNumber: string,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['sortedAndCompressed'], IAdtError>>;
   async sortAndCompress<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'sortAndCompress'>,
     taskNumber: string,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['sortedAndCompressed'], E>> {
+  ): Promise<IAdtResponse<T['sortedAndCompressed'], E | IAdtError>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     this.logger?.info?.(`Sorting and compressing task ${taskNumber}`);
@@ -512,13 +612,29 @@ export class AdtRequest<
    * - both requests must have the same target — otherwise *"Object can only
    *   be moved to a request with the same target"*.
    */
+  moveObjects<E extends IAdtError>(
+    this: this & AdtPerformedBy<'request', 'moveObjects'>,
+    sourceTask: string,
+    targetNumber: string,
+    objects: readonly (IAbapObjectEntry & { position: string })[],
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['movedObjects'], E | IAdtError>>;
+  moveObjects(
+    this: this & AdtPerformedBy<'request', 'moveObjects'>,
+    sourceTask: string,
+    targetNumber: string,
+    objects: readonly (IAbapObjectEntry & { position: string })[],
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['movedObjects'], IAdtError>>;
   async moveObjects<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'moveObjects'>,
     sourceTask: string,
     targetNumber: string,
     objects: readonly (IAbapObjectEntry & { position: string })[],
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['movedObjects'], E>> {
+  ): Promise<IAdtResponse<T['movedObjects'], E | IAdtError>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     this.logger?.info?.(
@@ -560,12 +676,26 @@ export class AdtRequest<
    * transport layer**: *"Only edit objects from package … in local
    * requests"*. Such objects belong in a local request.
    */
+  addObject<E extends IAdtError>(
+    this: this & AdtPerformedBy<'request', 'addObject'>,
+    transportNumber: string,
+    object: IAbapObjectEntry,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['addedObject'], E | IAdtError>>;
+  addObject(
+    this: this & AdtPerformedBy<'request', 'addObject'>,
+    transportNumber: string,
+    object: IAbapObjectEntry,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['addedObject'], IAdtError>>;
   async addObject<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'addObject'>,
     transportNumber: string,
     object: IAbapObjectEntry,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['addedObject'], E>> {
+  ): Promise<IAdtResponse<T['addedObject'], E | IAdtError>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     this.logger?.info?.(
@@ -601,13 +731,27 @@ export class AdtRequest<
    * cost a second request. It is sent in upper case, as SAP user names are; a
    * lower case name is refused with the same message.
    */
+  createTask<E extends IAdtError>(
+    this: this & AdtPerformedBy<'request', 'createTask'>,
+    transportNumber: string,
+    options: { headers: IAdtHeaders } & {
+      targetUser: string;
+    } & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['createdTask'], E | IAdtError>>;
+  createTask(
+    this: this & AdtPerformedBy<'request', 'createTask'>,
+    transportNumber: string,
+    options: { headers: IAdtHeaders } & {
+      targetUser: string;
+    } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['createdTask'], IAdtError>>;
   async createTask<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'createTask'>,
     transportNumber: string,
     options: { headers: IAdtHeaders } & {
       targetUser: string;
     } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['createdTask'], E>> {
+  ): Promise<IAdtResponse<T['createdTask'], E | IAdtError>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     this.logger?.info?.(
@@ -635,11 +779,21 @@ export class AdtRequest<
    * {@link removeObject} landed, since that action's own answer merely repeats
    * what it was asked.
    */
+  readActionLog<E extends IAdtError>(
+    this: this & AdtPerformedBy<'request', 'readActionLog'>,
+    transportNumber: string,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['actionLog'], E | IAdtError>>;
+  readActionLog(
+    this: this & AdtPerformedBy<'request', 'readActionLog'>,
+    transportNumber: string,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['actionLog'], IAdtError>>;
   async readActionLog<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'readActionLog'>,
     transportNumber: string,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['actionLog'], E>> {
+  ): Promise<IAdtResponse<T['actionLog'], E | IAdtError>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     this.logger?.info?.(
@@ -699,12 +853,26 @@ export class AdtRequest<
    * As with every user action here, `ok` means the document was understood.
    * Read the request back to see the type.
    */
+  changeTaskType<E extends IAdtError>(
+    this: this & AdtPerformedBy<'request', 'changeTaskType'>,
+    taskNumber: string,
+    type: AdtTaskType,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['taskTypeChanged'], E | IAdtError>>;
+  changeTaskType(
+    this: this & AdtPerformedBy<'request', 'changeTaskType'>,
+    taskNumber: string,
+    type: AdtTaskType,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['taskTypeChanged'], IAdtError>>;
   async changeTaskType<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'changeTaskType'>,
     taskNumber: string,
     type: AdtTaskType,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['taskTypeChanged'], E>> {
+  ): Promise<IAdtResponse<T['taskTypeChanged'], E | IAdtError>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     this.logger?.info?.(`Changing the type of task ${taskNumber} to`, type);
@@ -753,11 +921,21 @@ export class AdtRequest<
    *   await request.removeObject(task, { ...entry, position: entry.position });
    * ```
    */
+  readObjects<E extends IAdtError>(
+    this: this & AdtPerformedBy<'request', 'readObjects'>,
+    transportNumber: string,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['objects'], E | IAdtError>>;
+  readObjects(
+    this: this & AdtPerformedBy<'request', 'readObjects'>,
+    transportNumber: string,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['objects'], IAdtError>>;
   async readObjects<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'readObjects'>,
     transportNumber: string,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['objects'], E>> {
+  ): Promise<IAdtResponse<T['objects'], E | IAdtError>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     this.logger?.info?.(

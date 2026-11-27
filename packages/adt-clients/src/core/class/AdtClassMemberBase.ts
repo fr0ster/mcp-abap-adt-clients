@@ -24,6 +24,7 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   IAdtSystemContext,
+  IAnalyse,
   IClassResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -126,10 +127,18 @@ export abstract class AdtClassMemberBase<
    * `/oo/classes/{name}`, never the include, and the PUT that writes the
    * include carries the class's handle.
    */
+  lock<E extends IAdtError>(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  lock(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   async lock<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IClassConfig, 'className'>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
     const name = config.className;
     // One LOCK, its handle read by `lockHandleOf`. A 200 carrying no handle
     // reads as `''`; whether that is a refusal is the caller's `analyse` to say.
@@ -153,11 +162,21 @@ export abstract class AdtClassMemberBase<
    *
    * Until 23.0.0 this built an empty answer of its own and dropped SAP's.
    */
+  unlock<E extends IAdtError>(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    lockHandle: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<void, E | IAdtError>>;
+  unlock(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    lockHandle: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<void, IAdtError>>;
   async unlock<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IClassConfig, 'className'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<void, E>> {
+  ): Promise<IAdtResponse<void, E | IAdtError>> {
     const name = config.className;
     return answering(
       async () => {
@@ -181,10 +200,20 @@ export abstract class AdtClassMemberBase<
    * An include has no activation of its own — activating the class publishes
    * whatever its includes now contain.
    */
+  activate<E extends IAdtError>(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>>;
+  activate(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['activation'], IAdtError>>;
   async activate<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IClassConfig, 'className'>,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
-  ): Promise<IAdtResponse<T['activation'], E>> {
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -212,10 +241,18 @@ export abstract class AdtClassMemberBase<
    * responsible are the class's. This reads the class, and says so rather than
    * implying the include carries any of it.
    */
+  readMetadata<E extends IAdtError>(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>>;
+  readMetadata(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['metadata'], IAdtError>>;
   async readMetadata<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IClassConfig, 'className'>,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['metadata'], E>> {
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -240,11 +277,23 @@ export abstract class AdtClassMemberBase<
    * An include is never in a transport of its own — it travels inside its
    * class, so this reads the class's.
    */
+  readTransport<E extends IAdtError>(
+    this: this & AdtPerformedBy<A, 'transport'>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options: ({ withLongPolling?: boolean } & IAdtOperationOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>>;
+  readTransport(
+    this: this & AdtPerformedBy<A, 'transport'>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['transport'], IAdtError>>;
   async readTransport<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<A, 'transport'>,
     config: AdtObjectIdentity<IClassConfig, 'className'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['transport'], E>> {
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -256,10 +305,18 @@ export abstract class AdtClassMemberBase<
   }
 
   /** Source of one version, by the `contentUri` its entry carried. */
+  getVersionSource<E extends IAdtError>(
+    contentUri: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versionSource'], E | IAdtError>>;
+  getVersionSource(
+    contentUri: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versionSource'], IAdtError>>;
   async getVersionSource<E extends IAdtError = IAdtError>(
     contentUri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versionSource'], E>> {
+  ): Promise<IAdtResponse<T['versionSource'], E | IAdtError>> {
     return answering(
       () => getClassVersionSource(this.connection, contentUri),
       this.results.versionSource,
@@ -271,11 +328,21 @@ export abstract class AdtClassMemberBase<
    * Version history of one include, or of `main` for the class itself — the
    * Atom feed read by the `versions` strategy.
    */
+  protected includeVersions<E extends IAdtError>(
+    className: string,
+    includeType: ClassIncludeType,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>>;
+  protected includeVersions(
+    className: string,
+    includeType: ClassIncludeType,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versions'], IAdtError>>;
   protected includeVersions<E extends IAdtError = IAdtError>(
     className: string,
     includeType: ClassIncludeType,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versions'], E>> {
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>> {
     return answering(
       () => getClassIncludeVersions(this.connection, className, includeType),
       this.results.versions,
@@ -284,8 +351,12 @@ export abstract class AdtClassMemberBase<
   }
 
   /** Version history of whatever the concrete implementation's subject is. */
-  abstract getVersions<E extends IAdtError = IAdtError>(
+  abstract getVersions<E extends IAdtError>(
     config: AdtObjectIdentity<IClassConfig, 'className'>,
-    options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versions'], E>>;
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>>;
+  abstract getVersions(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versions'], IAdtError>>;
 }

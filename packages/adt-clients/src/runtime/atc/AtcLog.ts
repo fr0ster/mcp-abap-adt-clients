@@ -2,6 +2,7 @@ import type {
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
+  IAnalyse,
   IAtcLog,
   IGetCheckFailureLogsOptions,
   IResultStrategy,
@@ -55,9 +56,16 @@ export class AtcLog<
     this.results = options.results;
   }
 
+  getCheckFailureLogs<E extends IAdtError>(
+    options: IGetCheckFailureLogsOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['checkFailures'], E | IAdtError>>;
+  getCheckFailureLogs(
+    options?: IGetCheckFailureLogsOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['checkFailures'], IAdtError>>;
   async getCheckFailureLogs<E extends IAdtError = IAdtError>(
     options?: IGetCheckFailureLogsOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['checkFailures'], E>> {
+  ): Promise<IAdtResponse<T['checkFailures'], E | IAdtError>> {
     return answering(
       () => getCheckFailureLogs(this.connection, options),
       this.results.checkFailures,
@@ -65,10 +73,18 @@ export class AtcLog<
     );
   }
 
+  getExecutionLog<E extends IAdtError>(
+    executionId: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['executionLog'], E | IAdtError>>;
+  getExecutionLog(
+    executionId: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['executionLog'], IAdtError>>;
   async getExecutionLog<E extends IAdtError = IAdtError>(
     executionId: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['executionLog'], E>> {
+  ): Promise<IAdtResponse<T['executionLog'], E | IAdtError>> {
     return answering(
       () => getExecutionLog(this.connection, executionId),
       this.results.executionLog,
