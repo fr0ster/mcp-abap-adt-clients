@@ -98,9 +98,17 @@ header; that is not verified.
   rule. The rule itself (a stateless UNLOCK releases nothing) is measured on other types, not on
   type groups.
 - **Availability is decided per operation and per release, in this order:**
-  1. A live measurement on that release settles the operation. Served means it is in the row.
-     Refused for a reason other than the user's authorization means it is out. An authorization
-     refusal decides nothing.
+  1. A live measurement on that release settles the operation, by what the refusal is about:
+     - **Served:** the operation's own handler answers — success, or a refusal of this object or
+       these arguments (a taken or too long name, `400 InvalidTypeGroupName`; an unknown object,
+       `404` on the read; a lock held elsewhere). It is in the row: such a refusal is the call's
+       answer, not the operation's absence.
+     - **Not offered:** the system has no handler for the request — the resource framework's
+       `404 "No suitable resource found"` or `405 ExceptionMethodNotSupported` (measured on the
+       object structure and on a GET of validation). It is out of the row.
+     - **Decides nothing:** an authorization refusal (the user's authorization), and any answer
+       not clearly one of the two above. The operation then stays unmeasured, and the next steps
+       apply.
   2. Unmeasured, the release's discovery decides: a listed collection with its media types.
   3. Where discovery does not describe the operation, the typestructure capabilities decide.
   4. Every operation the cloud row lists is measured on the trial before the release. One that
@@ -117,8 +125,14 @@ header; that is not verified.
   is.**
   - On premise the suite runs the whole cycle: validate, create, lock, write, unlock, activate,
     versions, lock, delete, unlock.
-  - On ABAP Cloud it runs the operations the cloud row lists. Without create, the suite has no
-    type group of its own and runs only the reads, against an SAP type group.
+  - On ABAP Cloud it runs every operation the cloud row lists, each in a case of its own, so one
+    that cannot run is never skipped because another is missing:
+    - validation always runs on its own, with names of its own, since it needs no object;
+    - the reads (metadata, source, versions) run against an SAP type group;
+    - lock, write, unlock, activate and delete run on a type group of the test's own when create
+      is served. Any of them listed without create gets a case on an object the system lets the
+      test user change, named in the test config; if none exists, the operation stays out of the
+      cloud row (step 4 above).
   - Each suite is enabled by what its system serves, not by a flag of convenience.
 - **Additive only.** No existing member, type, default or answer changes: a minor release of
   adt-clients, and of interfaces-adt for the table rows.
