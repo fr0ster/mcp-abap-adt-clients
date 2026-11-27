@@ -223,6 +223,23 @@ function findForbidden(
     ts.isFunctionExpression(node) ||
     ts.isArrowFunction(node) ||
     ts.isMethodDeclaration(node);
+  // A function answers `unknown` when its declared or inferred answer is.
+  const answersUnknown = (node) => {
+    if (node.type) return isUnknownAnnotation(node.type);
+    const signature = checker.getSignatureFromDeclaration(node);
+    return Boolean(
+      signature && isUnknownType(checker.getReturnTypeOfSignature(signature)),
+    );
+  };
+  // The member an access names: `a.b`, or `a['b']` with a literal key.
+  const memberName = (expr) =>
+    ts.isPropertyAccessExpression(expr)
+      ? expr.name
+      : ts.isElementAccessExpression(expr) &&
+          (ts.isStringLiteral(expr.argumentExpression) ||
+            ts.isNumericLiteral(expr.argumentExpression))
+        ? expr.argumentExpression
+        : undefined;
   for (const sf of files) {
     const boundary = inList(sf.fileName, boundaryModules);
     const collect = (node) => {
@@ -243,7 +260,7 @@ function findForbidden(
         unknownBindings.set(node, { sf, widened: false });
       } else if (
         isFunctionLike(node) &&
-        isUnknownAnnotation(node.type) &&
+        answersUnknown(node) &&
         // A boundary reader's answer is from outside by definition.
         !boundary
       ) {
@@ -257,8 +274,9 @@ function findForbidden(
   const widenedValue = (value) => {
     const expr = unparen(value);
     if (!expr) return false;
-    if (ts.isIdentifier(expr) || ts.isPropertyAccessExpression(expr)) {
-      const d = declarationOf(ts.isIdentifier(expr) ? expr : expr.name);
+    const named = ts.isIdentifier(expr) ? expr : memberName(expr);
+    if (named) {
+      const d = declarationOf(named);
       return Boolean(d && unknownBindings.get(d)?.widened);
     }
     if (ts.isCallExpression(expr)) {
@@ -287,8 +305,8 @@ function findForbidden(
       ) {
         const left = unparen(node.left);
         if (ts.isIdentifier(left)) edge(declarationOf(left), node.right);
-        if (ts.isPropertyAccessExpression(left))
-          edge(declarationOf(left.name), node.right);
+        const member = memberName(left);
+        if (member) edge(declarationOf(member), node.right);
       }
       if (
         (ts.isCallExpression(node) || ts.isNewExpression(node)) &&
@@ -320,7 +338,17 @@ function findForbidden(
               )
             )
               continue;
-            const name = property.name.getText(sf);
+            const key = property.name;
+            // A written key: an identifier, a quoted or a numeric name.
+            if (
+              !(
+                ts.isIdentifier(key) ||
+                ts.isStringLiteral(key) ||
+                ts.isNumericLiteral(key)
+              )
+            )
+              continue;
+            const name = key.text;
             const target = checker.getPropertyOfType(
               contextual,
               name,
@@ -371,7 +399,10 @@ function findForbidden(
     if (!expr) return undefined;
     let d;
     if (ts.isIdentifier(expr)) d = declarationOf(expr);
-    else if (ts.isPropertyAccessExpression(expr)) d = declarationOf(expr.name);
+    else {
+      const named = memberName(expr);
+      if (named) d = declarationOf(named);
+    }
     const entry = d && unknownBindings.get(d);
     // A function's answer is not a binding a narrowing reads.
     return entry?.widened && !isFunctionLike(d) ? d : undefined;

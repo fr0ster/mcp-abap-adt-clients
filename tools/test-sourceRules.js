@@ -372,6 +372,30 @@ const cases = [
     [],
   ],
   [
+    'N: a typed value returned through an inferred unknown answer',
+    {
+      'a.ts':
+        "function f(v: unknown) { return v; }\nconst u = f('a');\nexport const x = typeof u === 'string';",
+    },
+    ['hand-narrowed/widened'],
+  ],
+  [
+    'N: a property declared unknown, narrowed through a computed access',
+    {
+      'a.ts':
+        "interface IHolder { v: unknown }\nconst h: IHolder = { v: 1 };\nexport const x = typeof h['v'] === 'number';",
+    },
+    ['hand-narrowed/widened'],
+  ],
+  [
+    'N: a property declared unknown, widened through a quoted name',
+    {
+      'a.ts':
+        "interface IHolder { v: unknown }\nconst h: IHolder = { 'v': 1 };\nexport const x = typeof h.v === 'number';",
+    },
+    ['hand-narrowed/widened'],
+  ],
+  [
     'Y: an identifier typed any, used',
     { 'a.ts': 'declare const a: any;\nexport const x: string = a;' },
     ['any/keyword', 'any/flow'],
