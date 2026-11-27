@@ -92,6 +92,11 @@ is the reason for the major. On `@mcp-abap-adt/interfaces-adt` ^33.0.0 and
   requires a create's fields in its configs too): a full config literal of
   those seven types gives the fields, and a partial of one no longer takes an
   explicit `undefined` for them (`exactOptionalPropertyTypes`).
+- **A message removal is read by the `deleted` strategy** (the old `delete`
+  read it with `written` and cast it); a batch part's `params: null` is
+  refused (`undefined`, omitted, still adds no query); the message's
+  `lockMessage`, `lockClassForMessage` and `unlockMessages` take
+  `options.timeout` and send it, as the old chain did on every request.
 - **K5: a rejection with `null` or `undefined`** is rethrown as it came, not as
   a `TypeError` of the library's own.
 - **D2 (adt-strategies 0.29.0): a trace reading throws on a missing required

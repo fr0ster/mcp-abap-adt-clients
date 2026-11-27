@@ -2044,7 +2044,8 @@ await client.getMessageClass().create({
 }, { headers });
 
 // Add or change a message: the class document read, both locks taken, one PUT,
-// both released (the 403 fallbacks of MIGRATION-48.md left out here).
+// both released (the 403 fallbacks and the cleanup on every way out of
+// MIGRATION-48.md left out here).
 const message = client.getMessageClassMessage();
 const address = { className: 'ZMY_MSG', msgno: '001' };
 const read = await client.getMessageClass().readMetadata({ name: 'ZMY_MSG' }, { version: 'workingArea' });

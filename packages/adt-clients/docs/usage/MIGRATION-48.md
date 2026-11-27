@@ -127,30 +127,57 @@ if (!read.ok) return read;
 const messageLock = await message.lockMessage(address);
 // 403: the message cannot be locked on its own; the class's handle stands in.
 if (!messageLock.ok && messageLock.getError().response?.status !== 403) return messageLock;
-let classLock = await message.lockClassForMessage(address);
-// 403: the class lock for one message is refused; the plain class lock instead.
-if (!classLock.ok && classLock.getError().response?.status === 403)
-  classLock = await messageClass.lock({ name: 'ZMC' });
-if (!classLock.ok) {
-  await message.unlockMessages(address);
-  return classLock;
+// Every lock taken is given up on every way out — an answer that failed, a
+// credential refusal thrown — the class first, then the message.
+let messageHeld = true;
+try {
+  let classLock = await message.lockClassForMessage(address);
+  // 403: the class lock for one message is refused; the plain class lock instead.
+  if (!classLock.ok && classLock.getError().response?.status === 403)
+    classLock = await messageClass.lock({ name: 'ZMC' });
+  if (!classLock.ok) return classLock;
+  const classLockHandle = classLock.getResult().value;
+  let classHeld = true;
+  try {
+    const written = await message.update(
+      { ...address, msgtext: 'Text', transportRequest },
+      {
+        headers,
+        classDocument: String(read.getResult().value),
+        classLockHandle,
+        messageLockHandle: messageLock.ok ? messageLock.getResult().value : classLockHandle,
+        analyse, // the PUT is the one answer the old chain judged
+      },
+    );
+    if (!written.ok) return written;
+    const classUnlocked = await messageClass.unlock({ name: 'ZMC' }, classLockHandle);
+    if (!classUnlocked.ok) return classUnlocked; // tried once more below
+    classHeld = false;
+    const messageUnlocked = await message.unlockMessages(address);
+    if (!messageUnlocked.ok) return messageUnlocked; // tried once more below
+    messageHeld = false;
+    return written;
+  } finally {
+    if (classHeld) await messageClass.unlock({ name: 'ZMC' }, classLockHandle);
+  }
+} finally {
+  if (messageHeld) await message.unlockMessages(address);
 }
-const classLockHandle = classLock.getResult().value;
-const written = await message.update(
-  { ...address, msgtext: 'Text', transportRequest },
-  {
-    headers,
-    classDocument: String(read.getResult().value),
-    classLockHandle,
-    messageLockHandle: messageLock.ok ? messageLock.getResult().value : classLockHandle,
-  },
-);
-await messageClass.unlock({ name: 'ZMC' }, classLockHandle);
-await message.unlockMessages(address);
 ```
 
 This sends the requests the old chain sent, in its order, the 403 fallbacks
-included. A removal is the same with `{ ...address, removeMessage: true }`.
+and the cleanup on every way out included, answers what it answered, and calls
+`analyse` as often (the unit oracle compares the two, a fault at a time). A
+removal is the same with `{ ...address, removeMessage: true }`.
+
+Two answers differ on purpose:
+
+- **A removal is read by the `deleted` strategy.** The old `delete` read its
+  answer with `written` and cast it to the deleted type; a result set whose
+  `written` and `deleted` differ now gets `deleted`'s value.
+- **A class read SAP refused, or one with no answer, is an answer.** The old
+  chain's raw read threw it; `readMetadata` answers it, as every member does.
+  A credential refusal is still thrown.
 
 ## `analyse` and the error type
 
@@ -197,8 +224,9 @@ library's own.
 `AdtBatchConnection.makeAdtRequest` is the contract's
 `makeAdtRequest(options): Promise<IAdtWireResponse>`. Drop `<T, D>`, and read
 `data` as `unknown`, as from any connection. A part's `params` is a string, a
-`URLSearchParams` or a plain object of string, number or boolean values;
-anything else throws `BATCH_REFUSES_PARAMS` before anything is queued.
+`URLSearchParams` or a plain object of string, number or boolean values, or
+omitted (`undefined`); anything else — `null` included — throws
+`BATCH_REFUSES_PARAMS` before anything is queued.
 
 ## `AdtClientsWS.request` is typed by a reader
 

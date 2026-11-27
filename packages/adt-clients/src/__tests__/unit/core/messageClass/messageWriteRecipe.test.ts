@@ -6,6 +6,15 @@
  * chain before the split), and the caller's recipe below, the README's, sends
  * the same, the 403 fallbacks included.
  */
+
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { AuthRefusedError } from '@mcp-abap-adt/connection';
+import {
+  ADT_NO_FAILURE,
+  type IAdtError,
+  type IAnalyse,
+} from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAbapRequestOptions,
@@ -209,5 +218,230 @@ describe('the recipe gives up the locks it took on every way out', () => {
     const answer = await writeOn(connection, config, false);
     expect(answer.ok).toBe(false);
     expect(shape(sent)).toEqual(expected);
+  });
+});
+
+// ── #333 review: answers, strategies, errors, analyse and thrown values ────
+
+/**
+ * What the old chain did (`update` / `delete` before the split, run at
+ * 68deaf9a with distinct `written` / `deleted` strategies and an `analyse`
+ * spy), with one request faulted at a time: refused with SAP's answer,
+ * failed with no answer, or a credential refusal the provider raised. Each
+ * case's requests, outcome and `analyse` calls.
+ */
+
+/** The documented recipe (MIGRATION-48.md), `analyse` on the write alone, as the old chain judged only the PUT. */
+async function recipe(
+  messageClass: AdtMessageClass,
+  message: AdtMessageClassMessage<{
+    read: string;
+    written: string;
+    deleted: string;
+  }>,
+  config: { className: string; msgno: string; msgtext?: string },
+  removing: boolean,
+  analyse: IAnalyse<IAdtError>,
+) {
+  const klass = { name: config.className };
+  const address = { className: config.className, msgno: config.msgno };
+  const read = await messageClass.readMetadata(klass, {
+    version: 'workingArea',
+  });
+  if (!read.ok) return read;
+  const messageLock = await message.lockMessage(address);
+  if (!messageLock.ok && messageLock.getError().response?.status !== 403)
+    return messageLock;
+  let messageHeld = true;
+  try {
+    let classLock = await message.lockClassForMessage(address);
+    if (!classLock.ok && classLock.getError().response?.status === 403)
+      classLock = await messageClass.lock(klass);
+    if (!classLock.ok) return classLock;
+    const classLockHandle = classLock.getResult().value;
+    let classHeld = true;
+    try {
+      const under = {
+        headers,
+        classDocument: String(read.getResult().value),
+        classLockHandle,
+        messageLockHandle: messageLock.ok
+          ? messageLock.getResult().value
+          : classLockHandle,
+        analyse,
+      };
+      const written = removing
+        ? await message.update({ ...address, removeMessage: true }, under)
+        : await message.update(
+            { ...address, msgtext: config.msgtext ?? '' },
+            under,
+          );
+      if (!written.ok) return written;
+      const classUnlocked = await messageClass.unlock(klass, classLockHandle);
+      if (!classUnlocked.ok) return classUnlocked;
+      classHeld = false;
+      const messageUnlocked = await message.unlockMessages(address);
+      if (!messageUnlocked.ok) return messageUnlocked;
+      messageHeld = false;
+      return written;
+    } finally {
+      if (classHeld) await messageClass.unlock(klass, classLockHandle);
+    }
+  } finally {
+    if (messageHeld) await message.unlockMessages(address);
+  }
+}
+
+const OLD_CHAIN: Record<
+  string,
+  { sent: string[]; outcome: unknown; analyseCalls: number }
+> = JSON.parse(
+  readFileSync(join(__dirname, '__fixtures__/oldMessageChain.json'), 'utf8'),
+);
+
+const STEPS = [
+  'read',
+  'lockMessage',
+  'lockClassForMessage',
+  'put',
+  'unlockClass',
+  'unlockMessages',
+] as const;
+const KINDS = ['answered', 'unanswered', 'credential'] as const;
+
+function stepOf(method: string, url: string): string {
+  if (method === 'GET') return 'read';
+  if (method === 'PUT') return 'put';
+  if (url.includes('_action=LOCK_MSG')) return 'lockMessage';
+  if (url.includes('UNLOCK_ALL')) return 'unlockMessages';
+  if (url.includes('_action=UNLOCK')) return 'unlockClass';
+  if (url.includes('_action=LOCK')) return 'lockClassForMessage';
+  return 'other';
+}
+
+function faulted(fault: string | undefined, kind: string | undefined) {
+  const sent: string[] = [];
+  const connection: IAbapConnection = {
+    getBaseUrl: async () => '',
+    getSessionId: () => 'S',
+    connect: async () => undefined,
+    setSessionType: () => {},
+    makeAdtRequest: async (request: IAbapRequestOptions) => {
+      const step = stepOf(request.method, String(request.url));
+      sent.push(step);
+      if (step === fault) {
+        if (kind === 'answered')
+          return Promise.reject({
+            response: {
+              status: 500,
+              statusText: 'E',
+              headers: {},
+              data: 'refused',
+            },
+            message: 'refused',
+          });
+        if (kind === 'unanswered')
+          return Promise.reject(
+            Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' }),
+          );
+        return Promise.reject(
+          new AuthRefusedError(
+            {} as never,
+            'request',
+            new Error('the provider gave up'),
+          ),
+        );
+      }
+      const ok = (data: string) => ({
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        data,
+      });
+      if (step === 'lockMessage') return ok(LOCKED('MH'));
+      if (step === 'lockClassForMessage') return ok(LOCKED('CH'));
+      if (step === 'read') return ok(CLASS_DOCUMENT);
+      return ok('');
+    },
+  };
+  return { connection, sent };
+}
+
+/**
+ * Where the recipe answers differently from the old chain, on purpose:
+ * - a read SAP refused, or one with no answer, is an answer (every member
+ *   answers; the old chain's raw read threw it);
+ * - a removal is read by the `deleted` strategy (the old chain read it with
+ *   `written` and cast it to the deleted type).
+ */
+const INTENDED: Record<string, unknown> = {
+  'upsert read answered': { ok: false, mine: false, origin: 'connection' },
+  'upsert read unanswered': { ok: false, mine: false, origin: 'connection' },
+  'remove read answered': { ok: false, mine: false, origin: 'connection' },
+  'remove read unanswered': { ok: false, mine: false, origin: 'connection' },
+  'remove none': { ok: true, value: 'D' },
+};
+
+describe('the recipe answers as the old chain did, a fault at a time', () => {
+  const MINE: IAdtError = { origin: 'refusal', message: 'mine' };
+  const cases: [string, boolean, string | undefined, string | undefined][] = [];
+  for (const removing of [false, true])
+    for (const fault of [undefined, ...STEPS])
+      for (const kind of fault ? KINDS : [undefined])
+        cases.push([
+          `${removing ? 'remove' : 'upsert'} ${fault ?? 'none'} ${kind ?? ''}`.trim(),
+          removing,
+          fault,
+          kind,
+        ]);
+  it.each(cases)('%s', async (name, removing, fault, kind) => {
+    const { connection, sent } = faulted(fault, kind);
+    let calls = 0;
+    const analyse: IAnalyse<IAdtError> = (verdict) => {
+      calls += 1;
+      return verdict === ADT_NO_FAILURE ? ADT_NO_FAILURE : MINE;
+    };
+    const message = new AdtMessageClassMessage(connection, {
+      results: { ...messageDocuments, written: () => 'W', deleted: () => 'D' },
+    });
+    const messageClass = new AdtMessageClass(connection, {
+      results: messageClassDocuments,
+    });
+    const config = removing
+      ? { className: 'ZMC', msgno: '001' }
+      : { className: 'ZMC', msgno: '001', msgtext: 'changed' };
+    let outcome: unknown;
+    try {
+      const answer = await recipe(
+        messageClass,
+        message,
+        config,
+        removing,
+        analyse,
+      );
+      outcome = answer.ok
+        ? { ok: true, value: answer.getResult().value }
+        : {
+            ok: false,
+            mine: answer.getError() === MINE,
+            origin: answer.getError().origin,
+          };
+    } catch (error) {
+      outcome = {
+        threw:
+          error instanceof AuthRefusedError
+            ? 'AuthRefusedError'
+            : String(error),
+      };
+    }
+    const old = (
+      OLD_CHAIN as Record<
+        string,
+        { sent: string[]; outcome: unknown; analyseCalls: number }
+      >
+    )[name];
+    expect(sent).toEqual(old?.sent);
+    expect(calls).toBe(old?.analyseCalls);
+    expect(outcome).toEqual(name in INTENDED ? INTENDED[name] : old?.outcome);
   });
 });

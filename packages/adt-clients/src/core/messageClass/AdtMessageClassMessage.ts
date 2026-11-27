@@ -189,22 +189,22 @@ export class AdtMessageClassMessage<
    */
   lockMessage<E extends IAdtError>(
     config: MessageAddress,
-    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
   ): Promise<IAdtResponse<string, E | IAdtError>>;
   lockMessage(
     config: MessageAddress,
-    options?: IAdtAnalyseOptions<IAdtError>,
+    options?: IAdtOperationOptions<IAdtError>,
   ): Promise<IAdtResponse<string, IAdtError>>;
   async lockMessage<E extends IAdtError = IAdtError>(
     config: MessageAddress,
-    options?: IAdtAnalyseOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<string, E | IAdtError>> {
     const { name, no } = this.names(config);
+    // The caller's deadline, if they set one, on the request.
+    const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
       () =>
-        inStatefulSession(this.connection, () =>
-          lockMessage(this.connection, name, no),
-        ),
+        inStatefulSession(connection, () => lockMessage(connection, name, no)),
       lockHandleOf,
       options?.analyse,
     );
@@ -217,21 +217,23 @@ export class AdtMessageClassMessage<
    */
   lockClassForMessage<E extends IAdtError>(
     config: MessageAddress,
-    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
   ): Promise<IAdtResponse<string, E | IAdtError>>;
   lockClassForMessage(
     config: MessageAddress,
-    options?: IAdtAnalyseOptions<IAdtError>,
+    options?: IAdtOperationOptions<IAdtError>,
   ): Promise<IAdtResponse<string, IAdtError>>;
   async lockClassForMessage<E extends IAdtError = IAdtError>(
     config: MessageAddress,
-    options?: IAdtAnalyseOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<string, E | IAdtError>> {
     const { name, no } = this.names(config);
+    // The caller's deadline, if they set one, on the request.
+    const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
       () =>
-        inStatefulSession(this.connection, () =>
-          lockClassForMessage(this.connection, name, no),
+        inStatefulSession(connection, () =>
+          lockClassForMessage(connection, name, no),
         ),
       lockHandleOf,
       options?.analyse,
@@ -241,21 +243,23 @@ export class AdtMessageClassMessage<
   /** `UNLOCK_ALL` on the message, on the stateful session. */
   unlockMessages<E extends IAdtError>(
     config: MessageAddress,
-    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
   ): Promise<IAdtResponse<void, E | IAdtError>>;
   unlockMessages(
     config: MessageAddress,
-    options?: IAdtAnalyseOptions<IAdtError>,
+    options?: IAdtOperationOptions<IAdtError>,
   ): Promise<IAdtResponse<void, IAdtError>>;
   async unlockMessages<E extends IAdtError = IAdtError>(
     config: MessageAddress,
-    options?: IAdtAnalyseOptions<E>,
+    options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<void, E | IAdtError>> {
     const { name, no } = this.names(config);
+    // The caller's deadline, if they set one, on the request.
+    const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
       () =>
-        inStatefulSession(this.connection, () =>
-          unlockAllMessages(this.connection, name, no),
+        inStatefulSession(connection, () =>
+          unlockAllMessages(connection, name, no),
         ),
       nothing,
       options?.analyse,

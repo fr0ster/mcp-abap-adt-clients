@@ -198,3 +198,41 @@ describe('AdtMessageClassMessage', () => {
     expect(body).toContain('adtcore:description="New message desc"');
   });
 });
+
+describe('the lock members carry the caller deadline (#333 review)', () => {
+  const address = { className: 'ZT', msgno: '001' };
+  it.each(['lockMessage', 'lockClassForMessage', 'unlockMessages'] as const)(
+    '%s sends options.timeout on its request, and 0 (no deadline) without it',
+    async (member) => {
+      const timed = handler();
+      await timed.m[member](address, { timeout: 1234 });
+      expect(timed.calls.map((c) => c.timeout)).toEqual([1234]);
+      const untimed = handler();
+      await untimed.m[member](address);
+      expect(untimed.calls.map((c) => c.timeout)).toEqual([0]);
+    },
+  );
+});
+
+describe('a removal is read by the deleted strategy (#333 review)', () => {
+  it('answers deleted for a removal and written for an upsert', async () => {
+    // The old `delete` read the PUT with `written` and cast it to the deleted
+    // type (oldMessageChain.json, "remove none": "W"); the value is now
+    // `deleted`'s.
+    const { conn } = recorder();
+    const m = new AdtMessageClassMessage(conn, {
+      logger: noopLogger,
+      results: { ...messageDocuments, written: () => 'W', deleted: () => 'D' },
+    });
+    const removed = await m.update(
+      { className: 'ZT', msgno: '001', removeMessage: true },
+      under(m),
+    );
+    const written = await m.update(
+      { className: 'ZT', msgno: '001', msgtext: 'x' },
+      under(m),
+    );
+    expect(removed.ok && removed.getResult().value).toBe('D');
+    expect(written.ok && written.getResult().value).toBe('W');
+  });
+});
