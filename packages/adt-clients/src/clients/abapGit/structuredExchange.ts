@@ -133,6 +133,22 @@ function refusal(
  * `run` sends the request; `reduce` is the route's `abapGitFacts` reducer;
  * `read` the slot's facts reader; `analyse` the caller's judge of the facts.
  */
+export function answeringFactsExchange<T, F, E extends IAbapGitStructuredError>(
+  run: () => Promise<IAdtWireResponse>,
+  reduce: (wire: IAdtWireResponse) => IAbapGitFactsResponse<F>,
+  read: IAbapGitFactsResultStrategy<T, F>,
+  analyse: IAbapGitFactsAnalyse<F, E>,
+  request: IAbapGitSentRequest,
+  route: AbapGitFactsSlot,
+): Promise<IAdtResponse<T, E | IAbapGitStructuredError>>;
+export function answeringFactsExchange<T, F>(
+  run: () => Promise<IAdtWireResponse>,
+  reduce: (wire: IAdtWireResponse) => IAbapGitFactsResponse<F>,
+  read: IAbapGitFactsResultStrategy<T, F>,
+  analyse: IAbapGitFactsAnalyse<F> | undefined,
+  request: IAbapGitSentRequest,
+  route: AbapGitFactsSlot,
+): Promise<IAdtResponse<T, IAbapGitStructuredError>>;
 export async function answeringFactsExchange<
   T,
   F,
@@ -144,7 +160,7 @@ export async function answeringFactsExchange<
   analyse: IAbapGitFactsAnalyse<F, E> | undefined,
   request: IAbapGitSentRequest,
   route: AbapGitFactsSlot,
-): Promise<IAdtResponse<T, E>> {
+): Promise<IAdtResponse<T, E | IAbapGitStructuredError>> {
   let verdict: IAbapGitStructuredError | AdtNoFailure = ADT_NO_FAILURE;
   let answer: IAbapGitFactsResponse<F> | undefined;
   let lost: IAdtWireResponse['sessionLost'];
@@ -185,19 +201,30 @@ export async function answeringFactsExchange<
         : refusal(wire, request, route);
   }
 
-  // `E` gets a value only from `analyse`; without one the verdict is the
-  // library's own, which is what `E` defaults to. The compiler cannot see
-  // that from inside the body; a caller never sees the casts.
+  // The failure is `analyse`'s own `E`, or the library's where it falls back
+  // to its own verdict (C3 of #304): `E | IAbapGitStructuredError`.
   if (analyse) {
     const judged = analyse(verdict, answer);
-    if (judged !== ADT_NO_FAILURE) return failed<T, E>(judged);
+    if (judged !== ADT_NO_FAILURE)
+      return failed<T, E | IAbapGitStructuredError>(judged);
   } else if (verdict !== ADT_NO_FAILURE) {
-    return failed<T, E>(verdict as E);
+    return failed<T, E | IAbapGitStructuredError>(verdict);
   }
   if (answer === undefined) {
-    // Cleared, but there are no facts to read: the verdict stands.
-    return failed<T, E>(verdict as E);
+    // Cleared, but there are no facts to read: the verdict stands. With no
+    // facts the library always set one (a refusal, an unreadable answer, no
+    // response), so the `noResponse` fallback below is never reached; it is
+    // there so the type holds without a cast.
+    return failed<T, E | IAbapGitStructuredError>(
+      verdict === ADT_NO_FAILURE
+        ? structuredError(
+            ABAPGIT_ERROR_MESSAGES.noResponse,
+            { status: 0 },
+            request,
+          )
+        : verdict,
+    );
   }
   // Outside any catch: the reader is the caller's, and so is its exception.
-  return succeeded<T, E>(read(answer), lost);
+  return succeeded<T, E | IAbapGitStructuredError>(read(answer), lost);
 }

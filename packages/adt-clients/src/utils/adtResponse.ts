@@ -447,11 +447,21 @@ export const nothingIsARefusal: IAnalyse<IAdtError> = () => ADT_NO_FAILURE;
  * wrong system entirely. A document this library cannot read is its own failure
  * and surfaces as itself.
  */
+export function answering<T, E extends IAdtError>(
+  run: () => Promise<IAdtWireResponse>,
+  read: IResultStrategy<T>,
+  analyse: IAnalyse<E>,
+): Promise<IAdtResponse<T, E | IAdtError>>;
+export function answering<T>(
+  run: () => Promise<IAdtWireResponse>,
+  read: IResultStrategy<T>,
+  analyse?: IAnalyse,
+): Promise<IAdtResponse<T>>;
 export async function answering<T, E extends IAdtError = IAdtError>(
   run: () => Promise<IAdtWireResponse>,
   read: IResultStrategy<T>,
   analyse?: IAnalyse<E>,
-): Promise<IAdtResponse<T, E>> {
+): Promise<IAdtResponse<T, E | IAdtError>> {
   return answeringExchange(
     async () => ({ answer: await run() }),
     read,
@@ -482,11 +492,21 @@ export interface IAdtExchange {
  * and a failed read (`failure`) is the verdict it starts from. Every other
  * row of {@link answering}'s table holds as it is.
  */
+export function answeringExchange<T, E extends IAdtError>(
+  run: () => Promise<IAdtExchange>,
+  read: IResultStrategy<T>,
+  analyse: IAnalyse<E>,
+): Promise<IAdtResponse<T, E | IAdtError>>;
+export function answeringExchange<T>(
+  run: () => Promise<IAdtExchange>,
+  read: IResultStrategy<T>,
+  analyse?: IAnalyse,
+): Promise<IAdtResponse<T>>;
 export async function answeringExchange<T, E extends IAdtError = IAdtError>(
   run: () => Promise<IAdtExchange>,
   read: IResultStrategy<T>,
   analyse?: IAnalyse<E>,
-): Promise<IAdtResponse<T, E>> {
+): Promise<IAdtResponse<T, E | IAdtError>> {
   let wire: IAdtWireResponse | undefined;
   let verdict: IAdtError | AdtNoFailure = ADT_NO_FAILURE;
   let context: IAdtAnalyseContext | undefined;
@@ -519,11 +539,9 @@ export async function answeringExchange<T, E extends IAdtError = IAdtError>(
     lost = sessionLostOf(error) ?? wire?.sessionLost;
   }
 
-  // Two casts below, and one reason for both: `E` is only ever given a value by
-  // the `analyse` argument. Where the code falls back to the library's own
-  // verdict — no strategy was supplied, or nothing came back for one to read —
-  // `E` is its default `IAdtError`, which is what that verdict already is. The
-  // compiler cannot see that from inside the body; a caller never sees either.
+  // The failure is `analyse`'s own `E`, or the library's `IAdtError` where it
+  // falls back to its own verdict — no strategy was supplied, or nothing came
+  // back for one to read (C3 of #304): the answer is typed `E | IAdtError`.
   if (analyse) {
     // The facts only where a member read some: every other member calls
     // `analyse` with the two arguments it always had.
@@ -532,10 +550,10 @@ export async function answeringExchange<T, E extends IAdtError = IAdtError>(
         ? analyse(verdict, wire)
         : analyse(verdict, wire, context);
     if (overruled !== ADT_NO_FAILURE) {
-      return failed<T, E>(overruled);
+      return failed<T, E | IAdtError>(overruled);
     }
   } else if (verdict !== ADT_NO_FAILURE) {
-    return failed<T, E>(verdict as E);
+    return failed<T, E | IAdtError>(verdict);
   }
 
   if (!wire) {
@@ -543,18 +561,18 @@ export async function answeringExchange<T, E extends IAdtError = IAdtError>(
     // caller: a success built from no answer would be a lie the type cannot
     // catch, so the original verdict stands. A strategy that adds fields has
     // none to add about a request that never arrived.
-    return failed<T, E>(
-      (verdict === ADT_NO_FAILURE
+    return failed<T, E | IAdtError>(
+      verdict === ADT_NO_FAILURE
         ? {
             origin: 'connection',
             message: 'The request did not complete, and carried no answer',
           }
-        : verdict) as E,
+        : verdict,
     );
   }
 
   // Outside any catch, on purpose. The reading's own exception is the reading's.
-  return succeeded<T, E>(read(wire), lost);
+  return succeeded<T, E | IAdtError>(read(wire), lost);
 }
 
 /**

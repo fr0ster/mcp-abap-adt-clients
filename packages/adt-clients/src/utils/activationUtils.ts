@@ -242,12 +242,24 @@ async function activationExchange(
  * beside `answering` for the handler classes built on this package (the
  * legacy package's activation overrides); the read itself is not.
  */
+export function answeringActivation<T, E extends IAdtError>(
+  connection: IAbapConnection,
+  send: (connection: IAbapConnection) => Promise<IAdtWireResponse>,
+  read: IResultStrategy<T>,
+  analyse: IAnalyse<E>,
+): Promise<IAdtResponse<T, E | IAdtError>>;
+export function answeringActivation<T>(
+  connection: IAbapConnection,
+  send: (connection: IAbapConnection) => Promise<IAdtWireResponse>,
+  read: IResultStrategy<T>,
+  analyse?: IAnalyse,
+): Promise<IAdtResponse<T>>;
 export function answeringActivation<T, E extends IAdtError = IAdtError>(
   connection: IAbapConnection,
   send: (connection: IAbapConnection) => Promise<IAdtWireResponse>,
   read: IResultStrategy<T>,
   analyse?: IAnalyse<E>,
-): Promise<IAdtResponse<T, E>> {
+): Promise<IAdtResponse<T, E | IAdtError>> {
   return answeringExchange(
     () => activationExchange(connection, send),
     read,

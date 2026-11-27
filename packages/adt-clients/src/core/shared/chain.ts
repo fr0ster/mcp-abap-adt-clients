@@ -75,10 +75,10 @@ export interface IChainScope {
   onFailure(undo: () => Promise<void>): () => void;
 }
 
-export async function chain<T, E extends IAdtError = IAdtError>(
+export async function chain<T>(
   logger: ILogger | undefined,
   body: (scope: IChainScope) => Promise<T>,
-): Promise<IAdtResponse<T, E>> {
+): Promise<IAdtResponse<T>> {
   const undos: Array<() => Promise<void>> = [];
   const rollbacks: Array<() => Promise<void>> = [];
   const register = (
@@ -138,9 +138,9 @@ export async function chain<T, E extends IAdtError = IAdtError>(
   }
   await unwind(undos);
   if (cleanupRefusal) throw cleanupRefusal.error;
-  return succeeded<T, E>(value, lost);
+  return succeeded<T>(value, lost);
 
-  async function abandon(error: unknown): Promise<IAdtResponse<T, E>> {
+  async function abandon(error: unknown): Promise<IAdtResponse<T>> {
     // Cleanups first, rollbacks after — the order a single reverse-ordered list
     // already produced, since a rollback is registered before the lock it must
     // outlive. A delete issued while the chain still holds the object's lock is
@@ -163,10 +163,9 @@ export async function chain<T, E extends IAdtError = IAdtError>(
       throw error;
     }
 
-    // The same cast `answering` makes, for the same reason: a chain abandons
-    // with whatever failure its failing step answered, and a step that had no
-    // strategy answered the library's own `IAdtError` — which is what every `E`
-    // extends. Nothing a caller sees is cast.
+    // A chain abandons with whatever failure its failing step answered; a
+    // step takes no strategy (`IChainScope.step` awaits a plain answer), so
+    // that failure is the library's own `IAdtError`, and so is the chain's.
     const failure =
       error instanceof ChainAbandoned ? error.failure : recogniseFailure(error);
 
@@ -180,7 +179,7 @@ export async function chain<T, E extends IAdtError = IAdtError>(
       throw cleanupRefusal.error;
     }
 
-    if (unrolled.length === 0) return failed<T, E>(failure as E);
+    if (unrolled.length === 0) return failed<T>(failure);
 
     // **A rollback that failed has to reach the caller.** It used to end in a
     // `logger.warn` and nowhere else, so the answer carried the original
@@ -188,9 +187,9 @@ export async function chain<T, E extends IAdtError = IAdtError>(
     // left clean. It was not: what the rollback could not remove is still
     // there, holding its name. Said in the message rather than in a new field —
     // a failure type grows a field per special case, and this is one.
-    return failed<T, E>({
+    return failed<T>({
       ...failure,
       message: `${failure.message} — and the rollback did not complete, so something this call made may still exist: ${unrolled.join('; ')}`,
-    } as E);
+    });
   }
 }
