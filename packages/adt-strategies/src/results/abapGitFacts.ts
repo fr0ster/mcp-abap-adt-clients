@@ -7,7 +7,7 @@ import type {
   IAbapGitStagedObject,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
-import type { AdtHeaderMap } from '../headers';
+import type { AdtHeaderMap, AdtHeaderValue } from '../headers';
 import { at, field, listOf } from '../parsed';
 import {
   abapGitBranchInfo,
@@ -232,7 +232,7 @@ const R7_TEXT = 'DEMO STATUS';
  * The header as it arrived, whatever its letter case: `undefined` when absent;
  * a value that is not one string (an array) is present and returned as it is.
  */
-function headerOf(answer: IAdtWireResponse, name: string): unknown {
+function headerOf(answer: IAdtWireResponse, name: string): AdtHeaderValue {
   const headers: AdtHeaderMap = answer.headers ?? {};
   for (const [key, value] of Object.entries(headers))
     if (key.toLowerCase() === name) return value;
@@ -240,7 +240,7 @@ function headerOf(answer: IAdtWireResponse, name: string): unknown {
 }
 
 /** `text/plain` exactly, optionally followed by `;` parameters. */
-function isTextPlain(type: unknown): boolean {
+function isTextPlain(type: AdtHeaderValue): boolean {
   if (typeof type !== 'string') return false;
   const at = type.indexOf(';');
   const media = (at < 0 ? type : type.slice(0, at)).trim().toLowerCase();

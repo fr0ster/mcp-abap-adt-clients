@@ -57,11 +57,10 @@ const A = (o: unknown): Record<string, string> => {
 
 export function parseMessageClass(xml: string): IParsedMessageClass {
   const root: unknown = parser.parse(xml);
-  const mc =
-    field(root, 'mc:messageClass') ?? field(root, 'messageClass') ?? {};
+  // Absent, `undefined`: every reader below answers it as it answered `{}`.
+  const mc = field(root, 'mc:messageClass') ?? field(root, 'messageClass');
   const attrs = A(mc);
-  const pkgRef =
-    field(mc, 'adtcore:packageRef') ?? field(mc, 'packageRef') ?? {};
+  const pkgRef = field(mc, 'adtcore:packageRef') ?? field(mc, 'packageRef');
   const rawMsgs = field(mc, 'mc:messages') ?? field(mc, 'messages');
   const list: unknown[] = Array.isArray(rawMsgs)
     ? rawMsgs

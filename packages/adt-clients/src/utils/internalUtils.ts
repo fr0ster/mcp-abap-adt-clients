@@ -128,7 +128,8 @@ export function safeStringify(value: unknown, maxLength = 500): string {
 
   try {
     const seen = new WeakSet();
-    return JSON.stringify(value, (_key, val) => {
+    // The replacer's value is JSON's `any`, bound at once to `unknown`.
+    return JSON.stringify(value, (_key, val: unknown) => {
       if (typeof val === 'object' && val !== null) {
         if (seen.has(val)) return '[Circular]';
         seen.add(val);

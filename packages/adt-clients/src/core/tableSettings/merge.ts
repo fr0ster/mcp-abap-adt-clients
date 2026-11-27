@@ -32,7 +32,9 @@ export type SettingsMerge =
  * {} }` passes here, and the type (`ITableSettingsChangesOf`) refuses it.
  */
 export function namesASetting(changes: ITableSettingsChanges): boolean {
-  return Object.values(changes).some((value) => value !== undefined);
+  // `Object.values` of an interface answers `any[]`: each value is bound at
+  // once to `unknown`.
+  return Object.values(changes).some((value: unknown) => value !== undefined);
 }
 
 /** The read overlaid with the changes, or the refusal of a change SAP would drop. */

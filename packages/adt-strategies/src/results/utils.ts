@@ -26,7 +26,7 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
-import { type AdtHeaderMap, firstOf } from '../headers';
+import { type AdtHeaderMap, type AdtHeaderValue, firstOf } from '../headers';
 import { readInactiveListText } from '../inactiveList';
 import {
   at,
@@ -564,9 +564,22 @@ function headerText(value: unknown): string | undefined {
  * who kept the exchange and reads the id later.
  */
 export function extractRunId(location: unknown): string | null {
-  const text = headerText(location);
+  return runIdOfText(headerText(location));
+}
+
+/** The run id in a header's text, `null` without one. */
+function runIdOfText(text: string | undefined): string | null {
   if (!text) return null;
   return runIdAfter(text, '/activation/runs/') ?? null;
+}
+
+/** A typed header's text, as {@link headerText} reads one. */
+function typedHeaderText(value: AdtHeaderValue): string | undefined {
+  if (Array.isArray(value))
+    return value.length ? String(firstOf(value)) : undefined;
+  if (value === undefined || value === null || typeof value === 'object')
+    return undefined;
+  return String(value);
 }
 
 /**
@@ -584,7 +597,7 @@ export const utilActivationRunId: IResultStrategy<string> = (answer) => {
     headers.Location ??
     headers['content-location'] ??
     headers['Content-Location'];
-  return extractRunId(location) ?? '';
+  return runIdOfText(typedHeaderText(location)) ?? '';
 };
 
 // ---------------------------------------------------------------------------
