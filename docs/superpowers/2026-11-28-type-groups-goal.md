@@ -21,6 +21,29 @@ The work ships as a minor release of adt-clients, so that mcp-abap-adt can add i
 tools on top of it in 24.3.0. The server only calls these members; it builds no request and
 no document of its own.
 
+## Measured
+
+What the systems serve today, measured with read-only requests on S/4HANA 2025 (on premise) and
+ABAP Cloud (trial); the write cycle on premise is the measured table of the tracking issue.
+
+| Request | On premise | ABAP Cloud |
+|---|---|---|
+| Discovery: `/sap/bc/adt/ddic/typegroups` | listed, accepts v2 and v3 | listed, `app:accept` empty |
+| Discovery: `…/typegroups/validation` | listed | listed |
+| Typestructure `TYPE/DG` (corpus) | CREATE, INDEX_UPD; user may create; name ≤ 5 | CREATE, INDEX_UPD; no user authorization listed; name ≤ 5 |
+| `GET …/typegroups/{name}`, Accept v3 / v2 | 200 | 200 |
+| `GET …/typegroups/{name}`, no caller Accept | 200 (no Accept at all: 400) | 200 |
+| `GET …/{name}/source/main`, `text/plain` | 200 | 200 |
+| `GET …/{name}/source/main/versions` | 200 | 200 |
+| `GET …/{name}/objectstructure` | 404 | 404 |
+| `GET …/typegroups` (the collection) | 400, no type group name | 400, no type group name |
+| `GET …/typegroups/validation` | 405 | 405 |
+| quickSearch, `objectType=TYPE/DG` | found | found (SAP's type groups; none in the customer namespace) |
+
+Unverified on ABAP Cloud: validation, create, lock, source write, activation and delete. The
+empty `app:accept` says create is not offered there; typestructure lists CREATE. The trial
+check decides each.
+
 ## Holds throughout
 
 - **One endpoint, one member.** Each member sends exactly one request; nothing composes lock,
@@ -34,8 +57,10 @@ no document of its own.
   validity are SAP's to refuse (validation and create answer them). The table's
   `nameMaxLength` is data for the consumer, not a check in the member.
 - **Headers are the caller's, with the library's pair as the default.** The default for the
-  metadata read is a type group media type, because the system refuses that read without an
-  Accept; a caller's `options.headers` replaces it.
+  metadata read is a type group media type: a request carrying no Accept at all is refused on
+  premise (`400`, measured), and the connector's request without a caller Accept is answered
+  only because the connector supplies a header of its own. A caller's `options.headers`
+  replaces the default.
 - **The validation request is the one SAP takes.** Its `objtype` is the type group's code as
   SAP spells it; the codes other validations use are not reused for it.
 - **Addresses live in one place.** The type group's collection, validation and object
