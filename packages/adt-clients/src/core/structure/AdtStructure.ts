@@ -387,7 +387,7 @@ export class AdtStructure<
           options.ifMatch,
           {
             structureName: name,
-            ddlCode: source as string,
+            ddlCode: source,
             transportRequest: config.transportRequest,
           },
           options?.lockHandle,

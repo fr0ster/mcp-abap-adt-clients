@@ -370,7 +370,7 @@ export class AdtTable<
           options.ifMatch,
           {
             table_name: name,
-            ddl_code: source as string,
+            ddl_code: source,
             transport_request: config.transportRequest,
           },
           options?.lockHandle,

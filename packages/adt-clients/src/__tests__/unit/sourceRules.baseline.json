@@ -5,19 +5,5 @@
     "kind": "asserts-present",
     "text": "config.enhancementType as EnhancementType",
     "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/structure/AdtStructure.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "source as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/table/AdtTable.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "source as string",
-    "count": 1
   }
 ]
