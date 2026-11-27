@@ -1,4 +1,8 @@
-import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtReadVersion,
+  AdtRequiredUpdateOptions,
+  IAdtLockedWrite,
+} from '@mcp-abap-adt/interfaces-adt';
 /**
  * AdtBehaviorImplementation - CRUD for a behavior implementation class.
  *
@@ -104,7 +108,8 @@ export class AdtBehaviorImplementation<
     IAdtUpdatable<
       Partial<IBehaviorImplementationConfig>,
       T['updated'],
-      'className'
+      'className',
+      'source'
     >,
     IAdtDeletable<
       IBehaviorImplementationConfig,
@@ -365,7 +370,9 @@ export class AdtBehaviorImplementation<
    */
   async update<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -387,7 +394,7 @@ export class AdtBehaviorImplementation<
           options.headers,
           options.ifMatch,
           name,
-          source as string,
+          source,
           options?.lockHandle,
           config.transportRequest,
         ),

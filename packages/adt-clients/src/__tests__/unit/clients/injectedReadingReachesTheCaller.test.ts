@@ -104,13 +104,13 @@ describe('an injected reading reaches the caller as its own type', () => {
         featureToggleName: 'ZFT',
         source: { rollout: { defaultEnabledFor: 'none' } },
       } as never,
-      { headers: headersOf(toggle, 'update') },
+      { headers: headersOf(toggle, 'update'), lockHandle: 'H' },
     );
     const wroteDocument = await toggle.updateMetadata(
       {
         featureToggleName: 'ZFT',
       },
-      { headers: headersOf(toggle, 'updateMetadata') },
+      { headers: headersOf(toggle, 'updateMetadata'), lockHandle: 'H' },
     );
 
     if (!wroteSource.ok || !wroteDocument.ok)
@@ -131,7 +131,11 @@ describe('an injected reading reaches the caller as its own type', () => {
 
     const source = await include.update(
       { functionGroupName: 'ZFG', includeName: 'LZFGF01' },
-      { headers: headersOf(include, 'update'), source: '* code' },
+      {
+        headers: headersOf(include, 'update'),
+        lockHandle: 'H',
+        source: '* code',
+      },
     );
     const document = await include.updateMetadata(
       {
@@ -139,7 +143,7 @@ describe('an injected reading reaches the caller as its own type', () => {
         includeName: 'LZFGF01',
         description: 'x',
       },
-      { headers: headersOf(include, 'updateMetadata') },
+      { headers: headersOf(include, 'updateMetadata'), lockHandle: 'H' },
     );
 
     if (!source.ok || !document.ok) throw new Error('expected results');

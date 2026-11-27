@@ -263,7 +263,9 @@ interface HarnessWrites<TConfig> {
 
 interface IHarnessWriteOptions {
   headers: IAdtHeaders;
-  analyse: IAnalyse<IAdtMessageFailure>;
+  // Optional here so a member's own options (where it is optional) match;
+  // the harness always passes it.
+  analyse?: IAnalyse<IAdtMessageFailure>;
   lockHandle?: string;
   source?: string;
   timeout?: number;

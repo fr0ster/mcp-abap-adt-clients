@@ -7,6 +7,7 @@
 import type {
   AdtObjectIdentity,
   AdtReadVersion,
+  AdtRequiredUpdateOptions,
   AdtVariant,
   IAdtActivatable,
   IAdtActivationOptions,
@@ -18,6 +19,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
@@ -90,12 +92,14 @@ export class AdtScalarFunction<
     IAdtUpdatable<
       Partial<IScalarFunctionConfig>,
       T['updated'],
-      'scalarFunctionName'
+      'scalarFunctionName',
+      'source'
     >,
     IAdtMetadataUpdatable<
       Partial<IScalarFunctionConfig>,
       T['metadataUpdated'],
-      'scalarFunctionName'
+      'scalarFunctionName',
+      'source'
     >,
     IAdtDeletable<
       IScalarFunctionConfig,
@@ -311,7 +315,9 @@ export class AdtScalarFunction<
    */
   async update<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IScalarFunctionConfig, 'scalarFunctionName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -332,7 +338,7 @@ export class AdtScalarFunction<
           options.ifMatch,
           {
             scalar_function_name: name,
-            source_code: source as string,
+            source_code: source,
             transport_request: config.transportRequest,
           },
           options?.lockHandle,
@@ -355,7 +361,9 @@ export class AdtScalarFunction<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'scalarFunction', 'updateMetadata'>,
     config: AdtObjectIdentity<IScalarFunctionConfig, 'scalarFunctionName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -367,7 +375,7 @@ export class AdtScalarFunction<
           options.headers,
           options.ifMatch,
           SCALAR_FUNCTION.uri(this.name(config)),
-          options?.source as string,
+          options?.source,
           options?.lockHandle,
           config.transportRequest,
         ),

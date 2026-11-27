@@ -12,6 +12,7 @@
 import type {
   AdtObjectIdentity,
   AdtReadVersion,
+  AdtRequiredUpdateOptions,
   AdtVariant,
   IAdtActivatable,
   IAdtActivationOptions,
@@ -23,6 +24,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
@@ -79,11 +81,12 @@ export class AdtTable<
     IAdtCreatable<ITableConfig, T['created']>,
     IAdtReadable<ITableConfig, T['source'], 'tableName'>,
     IAdtMetadataReadable<ITableConfig, T['metadata'], 'tableName'>,
-    IAdtUpdatable<Partial<ITableConfig>, T['updated'], 'tableName'>,
+    IAdtUpdatable<Partial<ITableConfig>, T['updated'], 'tableName', 'source'>,
     IAdtMetadataUpdatable<
       Partial<ITableConfig>,
       T['metadataUpdated'],
-      'tableName'
+      'tableName',
+      'source'
     >,
     IAdtDeletable<ITableConfig, T['deletion'], 'tableName', T['deletionCheck']>,
     IAdtValidatable<ITableConfig, T['validation'], 'tableName'>,
@@ -282,13 +285,17 @@ export class AdtTable<
    */
   async update<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<ITableConfig, 'tableName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    const source = options?.source || config.source;
+    // The options' source, required (D1 of #304); an empty one still falls
+    // back to the config's, and is sent as it is when the config has none.
+    const source = options.source || (config.source ?? options.source);
 
     return answering(
       () =>
@@ -321,7 +328,9 @@ export class AdtTable<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'table', 'updateMetadata'>,
     config: AdtObjectIdentity<ITableConfig, 'tableName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -333,7 +342,7 @@ export class AdtTable<
           options.headers,
           options.ifMatch,
           TABLE.uri(this.name(config)),
-          options?.source as string,
+          options?.source,
           options?.lockHandle,
           config.transportRequest,
         ),

@@ -16,6 +16,7 @@
 
 import type {
   AdtObjectIdentity,
+  AdtRequiredUpdateOptions,
   IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtCreatable,
@@ -24,6 +25,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
@@ -72,7 +74,8 @@ export class AdtPackage<
     IAdtMetadataUpdatable<
       Partial<IPackageConfig>,
       T['metadataUpdated'],
-      'packageName'
+      'packageName',
+      'source'
     >,
     IAdtDeletable<
       IPackageConfig,
@@ -254,7 +257,9 @@ export class AdtPackage<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -291,8 +296,8 @@ export class AdtPackage<
           fields,
           // The document the caller built, from the options — see
           // `AdtDomain.updateMetadata`; the fields above describe a create.
-          options?.source as string,
-          options?.lockHandle as string,
+          options?.source,
+          options?.lockHandle,
         ),
       this.results.metadataUpdated,
       options?.analyse,

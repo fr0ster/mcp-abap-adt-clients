@@ -1,4 +1,8 @@
-import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtReadVersion,
+  AdtRequiredUpdateOptions,
+  IAdtLockedWrite,
+} from '@mcp-abap-adt/interfaces-adt';
 /**
  * AdtFunctionInclude - CRUD for `FUGR/I` function-group includes.
  *
@@ -102,7 +106,8 @@ export class AdtFunctionInclude<
     IAdtUpdatable<
       Partial<IFunctionIncludeConfig>,
       T['updated'],
-      'functionGroupName' | 'includeName'
+      'functionGroupName' | 'includeName',
+      'source'
     >,
     IAdtDeletable<
       IFunctionIncludeConfig,
@@ -357,7 +362,7 @@ export class AdtFunctionInclude<
       IFunctionIncludeConfig,
       'functionGroupName' | 'includeName'
     >,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> & IAdtLockedWrite,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -397,7 +402,9 @@ export class AdtFunctionInclude<
       IFunctionIncludeConfig,
       'functionGroupName' | 'includeName'
     >,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -418,7 +425,7 @@ export class AdtFunctionInclude<
           options.ifMatch,
           group,
           include,
-          source as string,
+          source,
           options?.lockHandle,
           config.transportRequest,
         ),

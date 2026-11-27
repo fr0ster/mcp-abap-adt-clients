@@ -1,4 +1,8 @@
-import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtReadVersion,
+  AdtRequiredUpdateOptions,
+  IAdtLockedWrite,
+} from '@mcp-abap-adt/interfaces-adt';
 /**
  * AdtFunctionGroup - CRUD for `FUGR/F` function groups.
  *
@@ -103,12 +107,14 @@ export class AdtFunctionGroup<
     IAdtUpdatable<
       Partial<IFunctionGroupConfig>,
       T['updated'],
-      'functionGroupName'
+      'functionGroupName',
+      'source'
     >,
     IAdtMetadataUpdatable<
       Partial<IFunctionGroupConfig>,
       T['metadataUpdated'],
-      'functionGroupName'
+      'functionGroupName',
+      'source'
     >,
     IAdtDeletable<
       IFunctionGroupConfig,
@@ -345,7 +351,9 @@ export class AdtFunctionGroup<
   async update<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionGroup', 'update'>,
     config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -357,8 +365,8 @@ export class AdtFunctionGroup<
           options.headers,
           options.ifMatch,
           config.functionGroupName,
-          options?.source as string,
-          options?.lockHandle as string,
+          options?.source,
+          options?.lockHandle,
           config.transportRequest,
         ),
       this.results.updated,
@@ -379,7 +387,9 @@ export class AdtFunctionGroup<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionGroup', 'updateMetadata'>,
     config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -394,7 +404,7 @@ export class AdtFunctionGroup<
           options.ifMatch,
           {
             function_group_name: name,
-            lock_handle: options?.lockHandle as string,
+            lock_handle: options?.lockHandle,
             transport_request: config.transportRequest,
           },
           // The document the caller built, from the options — see
@@ -403,7 +413,7 @@ export class AdtFunctionGroup<
           // The description used to be merged
           // into a document read here, inside a lock window opened here; both
           // the read and the window are theirs now.
-          options?.source as string,
+          options?.source,
         ),
       this.results.metadataUpdated,
       options?.analyse,

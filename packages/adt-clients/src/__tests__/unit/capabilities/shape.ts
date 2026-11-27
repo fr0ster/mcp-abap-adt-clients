@@ -30,6 +30,8 @@ import type {
   IAdtEnhancementHost,
   IAdtIncludeEnhancementHost,
   IAdtLockable,
+  IAdtLockFreeMetadataUpdatable,
+  IAdtLockFreeUpdatable,
   IAdtMainProgramsReadable,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
@@ -76,6 +78,21 @@ type Contract<H extends keyof typeof HANDLERS> = ReturnType<
  */
 type Offers<T, A> = T extends A ? true : false;
 
+/**
+ * Does `T` offer one form of a write atom? Since #304 a write names the
+ * options it requires (`source`) and whether it takes a lock (C7), so the
+ * atom has these forms; any one of them is the method offered.
+ */
+type OffersWrite<T, Forms> = true extends (
+  Forms extends unknown
+    ? T extends Forms
+      ? true
+      : false
+    : never
+)
+  ? true
+  : false;
+
 type OffersAtom<T, A extends string> = A extends 'enhancementHost'
   ? Offers<T, IAdtEnhancementHost<any, any, any, never>>
   : A extends 'includeEnhancementHost'
@@ -89,9 +106,21 @@ type OffersAtom<T, A extends string> = A extends 'enhancementHost'
           : A extends 'metadataReadable'
             ? Offers<T, IAdtMetadataReadable<any, any, never>>
             : A extends 'updatable'
-              ? Offers<T, IAdtUpdatable<any, any, never>>
+              ? OffersWrite<
+                  T,
+                  | IAdtUpdatable<any, any, never>
+                  | IAdtUpdatable<any, any, never, 'source'>
+                  | IAdtLockFreeUpdatable<any, any, never>
+                  | IAdtLockFreeUpdatable<any, any, never, 'source'>
+                >
               : A extends 'metadataUpdatable'
-                ? Offers<T, IAdtMetadataUpdatable<any, any, never>>
+                ? OffersWrite<
+                    T,
+                    | IAdtMetadataUpdatable<any, any, never>
+                    | IAdtMetadataUpdatable<any, any, never, 'source'>
+                    | IAdtLockFreeMetadataUpdatable<any, any, never>
+                    | IAdtLockFreeMetadataUpdatable<any, any, never, 'source'>
+                  >
                 : A extends 'deletable'
                   ? Offers<T, IAdtDeletable<any, any, never>>
                   : A extends 'validatable'

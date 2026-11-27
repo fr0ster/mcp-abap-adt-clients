@@ -7,6 +7,7 @@
 import type {
   AdtObjectIdentity,
   AdtReadVersion,
+  AdtRequiredUpdateOptions,
   AdtVariant,
   IAdtActivatable,
   IAdtActivationOptions,
@@ -18,6 +19,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
@@ -87,11 +89,17 @@ export class AdtBehaviorDefinition<
     IAdtCreatable<IBehaviorDefinitionConfig, T['created']>,
     IAdtReadable<IBehaviorDefinitionConfig, T['source'], 'name'>,
     IAdtMetadataReadable<IBehaviorDefinitionConfig, T['metadata'], 'name'>,
-    IAdtUpdatable<Partial<IBehaviorDefinitionConfig>, T['updated'], 'name'>,
+    IAdtUpdatable<
+      Partial<IBehaviorDefinitionConfig>,
+      T['updated'],
+      'name',
+      'source'
+    >,
     IAdtMetadataUpdatable<
       Partial<IBehaviorDefinitionConfig>,
       T['metadataUpdated'],
-      'name'
+      'name',
+      'source'
     >,
     IAdtDeletable<
       IBehaviorDefinitionConfig,
@@ -315,7 +323,9 @@ export class AdtBehaviorDefinition<
    */
   async update<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IBehaviorDefinitionConfig, 'name'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -332,7 +342,7 @@ export class AdtBehaviorDefinition<
       () =>
         updateBehaviorDefinition(connection, options.headers, options.ifMatch, {
           name,
-          sourceCode: source as string,
+          sourceCode: source,
           lockHandle: options?.lockHandle,
           transportRequest: config.transportRequest,
         }),
@@ -354,7 +364,9 @@ export class AdtBehaviorDefinition<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'behaviorDefinition', 'updateMetadata'>,
     config: AdtObjectIdentity<IBehaviorDefinitionConfig, 'name'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -366,7 +378,7 @@ export class AdtBehaviorDefinition<
           options.headers,
           options.ifMatch,
           BEHAVIOR_DEFINITION.uri(this.name(config)),
-          options?.source as string,
+          options?.source,
           options?.lockHandle,
           config.transportRequest,
         ),

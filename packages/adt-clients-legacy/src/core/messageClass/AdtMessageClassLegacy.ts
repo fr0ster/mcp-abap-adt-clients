@@ -24,8 +24,10 @@ import {
 } from '@mcp-abap-adt/adt-clients';
 import type {
   AdtObjectIdentity,
+  AdtRequiredUpdateOptions,
   IAdtError,
   IAdtHeaders,
+  IAdtLockedWrite,
   IAdtOperationOptions,
   IAdtResponse,
   IAdtUpdateOptions,
@@ -85,7 +87,9 @@ export class AdtMessageClassLegacy<
   override async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'messageClass', 'updateMetadata'>,
     _config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
-    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     return legacyMeasuredRefusal<T['metadataUpdated'], E>(
       'updateMetadata',

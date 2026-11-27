@@ -15,6 +15,7 @@
 import type {
   AdtObjectIdentity,
   AdtReadVersion,
+  AdtRequiredUpdateOptions,
   IAdtActivatable,
   IAdtActivationOptions,
   IAdtAnalyseOptions,
@@ -25,6 +26,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
@@ -100,7 +102,8 @@ export class AdtScalarFunctionImplementation<
     IAdtUpdatable<
       Partial<IScalarFunctionImplementationConfig>,
       T['updated'],
-      'implementationName'
+      'implementationName',
+      'source'
     >,
     IAdtDeletable<
       IScalarFunctionImplementationConfig,
@@ -354,7 +357,9 @@ export class AdtScalarFunctionImplementation<
       IScalarFunctionImplementationConfig,
       'implementationName'
     >,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -375,7 +380,7 @@ export class AdtScalarFunctionImplementation<
           options.ifMatch,
           {
             implementation_name: name,
-            source_code: source as string,
+            source_code: source,
             transport_request: config.transportRequest,
           },
           options?.lockHandle,
@@ -400,7 +405,9 @@ export class AdtScalarFunctionImplementation<
       IScalarFunctionImplementationConfig,
       'implementationName'
     >,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -416,7 +423,7 @@ export class AdtScalarFunctionImplementation<
           options.ifMatch,
           {
             implementation_name: name,
-            source_code: source as string,
+            source_code: source,
             transport_request: config.transportRequest,
           },
           options?.lockHandle,

@@ -19,6 +19,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
@@ -285,7 +286,7 @@ export class AdtFeatureToggle<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IFeatureToggleConfig, 'featureToggleName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> & IAdtLockedWrite,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -318,7 +319,7 @@ export class AdtFeatureToggle<
    */
   async update<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IFeatureToggleConfig, 'featureToggleName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> & IAdtLockedWrite,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);

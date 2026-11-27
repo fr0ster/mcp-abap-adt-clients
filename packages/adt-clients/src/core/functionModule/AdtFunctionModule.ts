@@ -1,4 +1,8 @@
-import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtReadVersion,
+  AdtRequiredUpdateOptions,
+  IAdtLockedWrite,
+} from '@mcp-abap-adt/interfaces-adt';
 /**
  * AdtFunctionModule - CRUD for `FUGR/FF` function modules.
  *
@@ -103,12 +107,14 @@ export class AdtFunctionModule<
     IAdtUpdatable<
       Partial<IFunctionModuleConfig>,
       T['updated'],
-      'functionGroupName' | 'functionModuleName'
+      'functionGroupName' | 'functionModuleName',
+      'source'
     >,
     IAdtMetadataUpdatable<
       Partial<IFunctionModuleConfig>,
       T['metadataUpdated'],
-      'functionGroupName' | 'functionModuleName'
+      'functionGroupName' | 'functionModuleName',
+      'source'
     >,
     IAdtDeletable<
       IFunctionModuleConfig,
@@ -364,7 +370,9 @@ export class AdtFunctionModule<
       IFunctionModuleConfig,
       'functionGroupName' | 'functionModuleName'
     >,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -382,8 +390,8 @@ export class AdtFunctionModule<
         update(connection, options.headers, options.ifMatch, {
           functionModuleName: module,
           functionGroupName: group,
-          sourceCode: source as string,
-          lockHandle: options?.lockHandle as string,
+          sourceCode: source,
+          lockHandle: options?.lockHandle,
           transportRequest: config.transportRequest,
         }),
       this.results.updated,
@@ -408,7 +416,9 @@ export class AdtFunctionModule<
       IFunctionModuleConfig,
       'functionGroupName' | 'functionModuleName'
     >,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -422,7 +432,7 @@ export class AdtFunctionModule<
           options.headers,
           options.ifMatch,
           FUNCTION_MODULE.uri(group, module),
-          options?.source as string,
+          options?.source,
           options?.lockHandle,
           config.transportRequest,
         ),

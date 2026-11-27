@@ -1,4 +1,8 @@
-import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtReadVersion,
+  AdtRequiredUpdateOptions,
+  IAdtLockedWrite,
+} from '@mcp-abap-adt/interfaces-adt';
 import { withCallTimeout } from '../../utils/callTimeout';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import {
@@ -86,11 +90,12 @@ export class AdtClass<
     IAdtCreatable<IClassConfig, T['created']>,
     IAdtReadable<IClassConfig, T['source'], 'className'>,
     IAdtMetadataReadable<IClassConfig, T['metadata'], 'className'>,
-    IAdtUpdatable<Partial<IClassConfig>, T['updated'], 'className'>,
+    IAdtUpdatable<Partial<IClassConfig>, T['updated'], 'className', 'source'>,
     IAdtMetadataUpdatable<
       Partial<IClassConfig>,
       T['metadataUpdated'],
-      'className'
+      'className',
+      'source'
     >,
     IAdtDeletable<IClassConfig, T['deletion'], 'className', T['deletionCheck']>,
     IAdtValidatable<IClassConfig, T['validation'], 'className'>,
@@ -279,7 +284,9 @@ export class AdtClass<
    */
   async update<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IClassConfig, 'className'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -308,7 +315,7 @@ export class AdtClass<
           options.headers,
           options.ifMatch,
           config.className,
-          source as string,
+          source,
           options?.lockHandle,
           config.transportRequest,
         ),
@@ -330,7 +337,9 @@ export class AdtClass<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'class', 'updateMetadata'>,
     config: AdtObjectIdentity<IClassConfig, 'className'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -342,7 +351,7 @@ export class AdtClass<
           options.headers,
           options.ifMatch,
           CLASS.uri(config.className),
-          options?.source as string,
+          options?.source,
           options?.lockHandle,
           config.transportRequest,
         ),

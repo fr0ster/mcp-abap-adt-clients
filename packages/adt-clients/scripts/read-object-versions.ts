@@ -417,6 +417,7 @@ async function run(): Promise<void> {
         { className: options.objectName, transportRequest },
         {
           headers: headersOf(client.getClass(), 'update'),
+          lockHandle: 'H',
           source: updatedSource,
         },
       );
@@ -478,6 +479,7 @@ async function run(): Promise<void> {
         { className: options.objectName, transportRequest },
         {
           headers: headersOf(client.getClass(), 'update'),
+          lockHandle: 'H',
           source: originalSource,
         },
       );

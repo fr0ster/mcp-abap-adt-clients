@@ -10,6 +10,7 @@
 import type {
   AdtObjectIdentity,
   AdtReadVersion,
+  AdtRequiredUpdateOptions,
   AdtVariant,
   IAdtActivatable,
   IAdtActivationOptions,
@@ -21,6 +22,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
@@ -81,11 +83,17 @@ export class AdtStructure<
     IAdtCreatable<IStructureConfig, T['created']>,
     IAdtReadable<IStructureConfig, T['source'], 'structureName'>,
     IAdtMetadataReadable<IStructureConfig, T['metadata'], 'structureName'>,
-    IAdtUpdatable<Partial<IStructureConfig>, T['updated'], 'structureName'>,
+    IAdtUpdatable<
+      Partial<IStructureConfig>,
+      T['updated'],
+      'structureName',
+      'source'
+    >,
     IAdtMetadataUpdatable<
       Partial<IStructureConfig>,
       T['metadataUpdated'],
-      'structureName'
+      'structureName',
+      'source'
     >,
     IAdtDeletable<
       IStructureConfig,
@@ -290,13 +298,17 @@ export class AdtStructure<
    */
   async update<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IStructureConfig, 'structureName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    const source = options?.source || config.source;
+    // The options' source, required (D1 of #304); an empty one still falls
+    // back to the config's, and is sent as it is when the config has none.
+    const source = options.source || (config.source ?? options.source);
 
     return answering(
       () =>
@@ -329,7 +341,9 @@ export class AdtStructure<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'structure', 'updateMetadata'>,
     config: AdtObjectIdentity<IStructureConfig, 'structureName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -341,7 +355,7 @@ export class AdtStructure<
           options.headers,
           options.ifMatch,
           STRUCTURE.uri(this.name(config)),
-          options?.source as string,
+          options?.source,
           options?.lockHandle,
           config.transportRequest,
         ),

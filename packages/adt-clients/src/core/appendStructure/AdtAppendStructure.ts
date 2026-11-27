@@ -10,6 +10,7 @@
 import type {
   AdtObjectIdentity,
   AdtReadVersion,
+  AdtRequiredUpdateOptions,
   IAdtActivatable,
   IAdtActivationOptions,
   IAdtAnalyseOptions,
@@ -20,6 +21,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
@@ -87,7 +89,8 @@ export class AdtAppendStructure<
     IAdtUpdatable<
       Partial<IAppendStructureConfig>,
       T['updated'],
-      'appendStructureName'
+      'appendStructureName',
+      'source'
     >,
     IAdtDeletable<
       IAppendStructureConfig,
@@ -316,7 +319,9 @@ export class AdtAppendStructure<
    */
   async update<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -337,10 +342,10 @@ export class AdtAppendStructure<
           options.ifMatch,
           {
             append_structure_name: name,
-            source_code: source as string,
+            source_code: source,
             transport_request: config.transportRequest,
           },
-          options?.lockHandle as string,
+          options?.lockHandle,
         ),
       this.results.updated,
       options?.analyse,

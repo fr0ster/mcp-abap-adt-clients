@@ -34,8 +34,8 @@ export async function updateFunctionGroup(
   params: IUpdateFunctionGroupParams,
   document: string,
 ): Promise<IAdtWireResponse> {
-  const lockHandle = params.lock_handle as string;
-  const url = `${FUNCTION_GROUP.uri(params.function_group_name)}${lockHandle ? `?lockHandle=${encodeURIComponent(lockHandle)}` : ''}${params.transport_request ? `${lockHandle ? '&' : '?'}corrNr=${params.transport_request}` : ''}`;
+  // The handle is required, and sent as given (C7 of #304).
+  const url = `${FUNCTION_GROUP.uri(params.function_group_name)}?lockHandle=${encodeURIComponent(params.lock_handle)}${params.transport_request ? `&corrNr=${params.transport_request}` : ''}`;
 
   return connection.makeAdtRequest({
     url,

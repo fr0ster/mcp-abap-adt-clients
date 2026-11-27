@@ -10,6 +10,7 @@
  */
 import type {
   AdtObjectIdentity,
+  AdtRequiredUpdateOptions,
   IAdtActivatable,
   IAdtActivationOptions,
   IAdtAnalyseOptions,
@@ -20,6 +21,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
@@ -70,7 +72,8 @@ export class AdtDataElement<
     IAdtMetadataUpdatable<
       Partial<IDataElementConfig>,
       T['metadataUpdated'],
-      'dataElementName'
+      'dataElementName',
+      'source'
     >,
     IAdtDeletable<
       IDataElementConfig,
@@ -243,7 +246,9 @@ export class AdtDataElement<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IDataElementConfig, 'dataElementName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -264,7 +269,7 @@ export class AdtDataElement<
           // `AdtDomain.updateMetadata` for why that is the only channel. The fields
           // beside it describe a create; on an update nothing merges them into
           // a body here.
-          options?.source as string,
+          options?.source,
           options?.lockHandle,
         ),
       this.results.metadataUpdated,

@@ -366,10 +366,14 @@ async function main(): Promise<void> {
     say('');
     say('── after the window ────────────────────────────────');
     const naked = await step('update (no handle)', () =>
-      session.cls.update(config, {
-        headers: headersOf(session.cls, 'update'),
-        source: sourceFor(className, 3),
-      }),
+      session.cls.update(
+        config,
+        // @ts-expect-error -- deliberately no handle: what the server answers is the probe
+        {
+          headers: headersOf(session.cls, 'update'),
+          source: sourceFor(className, 3),
+        },
+      ),
     );
     steps.push(naked.record);
     say(

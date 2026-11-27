@@ -9,6 +9,7 @@
  */
 import type {
   AdtObjectIdentity,
+  AdtRequiredUpdateOptions,
   IAdtActivatable,
   IAdtActivationOptions,
   IAdtAnalyseOptions,
@@ -19,6 +20,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
@@ -69,7 +71,8 @@ export class AdtDomain<
     IAdtMetadataUpdatable<
       Partial<IDomainConfig>,
       T['metadataUpdated'],
-      'domainName'
+      'domainName',
+      'source'
     >,
     IAdtDeletable<
       IDomainConfig,
@@ -239,7 +242,9 @@ export class AdtDomain<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IDomainConfig, 'domainName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -268,7 +273,7 @@ export class AdtDomain<
             domain_name: name,
             transport_request: config.transportRequest,
           },
-          options?.source as string,
+          options?.source,
           options?.lockHandle,
         ),
       this.results.metadataUpdated,

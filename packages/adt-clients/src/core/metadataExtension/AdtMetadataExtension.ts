@@ -7,6 +7,7 @@
 import type {
   AdtObjectIdentity,
   AdtReadVersion,
+  AdtRequiredUpdateOptions,
   AdtVariant,
   IAdtActivatable,
   IAdtActivationOptions,
@@ -18,6 +19,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
@@ -87,11 +89,17 @@ export class AdtMetadataExtension<
     IAdtCreatable<IMetadataExtensionConfig, T['created']>,
     IAdtReadable<IMetadataExtensionConfig, T['source'], 'name'>,
     IAdtMetadataReadable<IMetadataExtensionConfig, T['metadata'], 'name'>,
-    IAdtUpdatable<Partial<IMetadataExtensionConfig>, T['updated'], 'name'>,
+    IAdtUpdatable<
+      Partial<IMetadataExtensionConfig>,
+      T['updated'],
+      'name',
+      'source'
+    >,
     IAdtMetadataUpdatable<
       Partial<IMetadataExtensionConfig>,
       T['metadataUpdated'],
-      'name'
+      'name',
+      'source'
     >,
     IAdtDeletable<
       IMetadataExtensionConfig,
@@ -295,7 +303,9 @@ export class AdtMetadataExtension<
    */
   async update<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IMetadataExtensionConfig, 'name'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -315,7 +325,7 @@ export class AdtMetadataExtension<
           options.headers,
           options.ifMatch,
           name,
-          source as string,
+          source,
           options?.lockHandle,
           config.transportRequest,
         ),
@@ -338,7 +348,9 @@ export class AdtMetadataExtension<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'metadataExtension', 'updateMetadata'>,
     config: AdtObjectIdentity<IMetadataExtensionConfig, 'name'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -350,7 +362,7 @@ export class AdtMetadataExtension<
           options.headers,
           options.ifMatch,
           METADATA_EXTENSION.uri(this.name(config)),
-          options?.source as string,
+          options?.source,
           options?.lockHandle,
           config.transportRequest,
         ),

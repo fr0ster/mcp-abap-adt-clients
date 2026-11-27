@@ -7,6 +7,7 @@
 import type {
   AdtObjectIdentity,
   AdtReadVersion,
+  AdtRequiredUpdateOptions,
   AdtVariant,
   IAccessControlResults,
   IAdtActivatable,
@@ -19,6 +20,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
@@ -88,12 +90,14 @@ export class AdtAccessControl<
     IAdtUpdatable<
       Partial<IAccessControlConfig>,
       T['updated'],
-      'accessControlName'
+      'accessControlName',
+      'source'
     >,
     IAdtMetadataUpdatable<
       Partial<IAccessControlConfig>,
       T['metadataUpdated'],
-      'accessControlName'
+      'accessControlName',
+      'source'
     >,
     IAdtDeletable<
       IAccessControlConfig,
@@ -300,7 +304,9 @@ export class AdtAccessControl<
    */
   async update<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -321,7 +327,7 @@ export class AdtAccessControl<
           options.ifMatch,
           {
             access_control_name: name,
-            source_code: source as string,
+            source_code: source,
             transport_request: config.transportRequest,
           },
           options?.lockHandle,
@@ -344,7 +350,9 @@ export class AdtAccessControl<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'accessControl', 'updateMetadata'>,
     config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -356,7 +364,7 @@ export class AdtAccessControl<
           options.headers,
           options.ifMatch,
           ACCESS_CONTROL.uri(this.name(config)),
-          options?.source as string,
+          options?.source,
           options?.lockHandle,
           config.transportRequest,
         ),

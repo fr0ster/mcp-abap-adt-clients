@@ -7,6 +7,7 @@
 import type {
   AdtObjectIdentity,
   AdtReadVersion,
+  AdtRequiredUpdateOptions,
   AdtVariant,
   IAdtActivatable,
   IAdtActivationOptions,
@@ -18,6 +19,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
@@ -90,12 +92,14 @@ export class AdtTransformation<
     IAdtUpdatable<
       Partial<ITransformationConfig>,
       T['updated'],
-      'transformationName'
+      'transformationName',
+      'source'
     >,
     IAdtMetadataUpdatable<
       Partial<ITransformationConfig>,
       T['metadataUpdated'],
-      'transformationName'
+      'transformationName',
+      'source'
     >,
     IAdtDeletable<
       ITransformationConfig,
@@ -318,7 +322,9 @@ export class AdtTransformation<
    */
   async update<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<ITransformationConfig, 'transformationName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -339,7 +345,7 @@ export class AdtTransformation<
           options.ifMatch,
           {
             transformation_name: name,
-            source_code: source as string,
+            source_code: source,
             transport_request: config.transportRequest,
           },
           options?.lockHandle,
@@ -362,7 +368,9 @@ export class AdtTransformation<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'transformation', 'updateMetadata'>,
     config: AdtObjectIdentity<ITransformationConfig, 'transformationName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -374,7 +382,7 @@ export class AdtTransformation<
           options.headers,
           options.ifMatch,
           TRANSFORMATION.uri(this.name(config)),
-          options?.source as string,
+          options?.source,
           options?.lockHandle,
           config.transportRequest,
         ),

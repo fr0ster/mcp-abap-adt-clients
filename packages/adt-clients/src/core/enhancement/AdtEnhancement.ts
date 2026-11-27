@@ -12,6 +12,7 @@ import type {
   AdtObjectIdentity,
   AdtOperation,
   AdtReadVersion,
+  AdtRequiredUpdateOptions,
   AdtTypeCodeWith,
   AdtVariant,
   IAdtActivatable,
@@ -24,6 +25,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
@@ -116,9 +118,15 @@ export class AdtEnhancement<
     IAdtMetadataUpdatable<
       IEnhancementConfig,
       T['metadataUpdated'],
-      'enhancementName'
+      'enhancementName',
+      'source'
     >,
-    IAdtUpdatable<Partial<IEnhancementConfig>, T['updated'], 'enhancementName'>,
+    IAdtUpdatable<
+      Partial<IEnhancementConfig>,
+      T['updated'],
+      'enhancementName',
+      'source'
+    >,
     IAdtDeletable<
       IEnhancementConfig,
       T['deletion'],
@@ -347,7 +355,9 @@ export class AdtEnhancement<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IEnhancementConfig, 'enhancementName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
@@ -358,7 +368,7 @@ export class AdtEnhancement<
           options.ifMatch,
           this.enhancementType(config),
           this.name(config),
-          options?.source as string,
+          options?.source,
           options?.lockHandle,
           config.transportRequest,
         ),
@@ -407,7 +417,9 @@ export class AdtEnhancement<
     config: AdtObjectIdentity<IEnhancementConfig, 'enhancementName'> & {
       enhancementType: EnhancementTypeWith<V, 'update'>;
     },
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -429,7 +441,7 @@ export class AdtEnhancement<
           options.ifMatch,
           type,
           name,
-          source as string,
+          source,
           options?.lockHandle,
           config.transportRequest,
           this.logger,

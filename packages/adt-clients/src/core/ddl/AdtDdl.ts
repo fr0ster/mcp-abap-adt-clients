@@ -12,6 +12,7 @@
 import type {
   AdtObjectIdentity,
   AdtReadVersion,
+  AdtRequiredUpdateOptions,
   AdtVariant,
   IAdtActivatable,
   IAdtActivationOptions,
@@ -23,6 +24,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
@@ -81,8 +83,13 @@ export class AdtDdl<
     IAdtCreatable<IDdlConfig, T['created']>,
     IAdtReadable<IDdlConfig, T['source'], 'ddlName'>,
     IAdtMetadataReadable<IDdlConfig, T['metadata'], 'ddlName'>,
-    IAdtUpdatable<Partial<IDdlConfig>, T['updated'], 'ddlName'>,
-    IAdtMetadataUpdatable<Partial<IDdlConfig>, T['metadataUpdated'], 'ddlName'>,
+    IAdtUpdatable<Partial<IDdlConfig>, T['updated'], 'ddlName', 'source'>,
+    IAdtMetadataUpdatable<
+      Partial<IDdlConfig>,
+      T['metadataUpdated'],
+      'ddlName',
+      'source'
+    >,
     IAdtDeletable<IDdlConfig, T['deletion'], 'ddlName', T['deletionCheck']>,
     IAdtValidatable<IDdlConfig, T['validation'], 'ddlName'>,
     IAdtCheckable<IDdlConfig, T['check'], 'ddlName'>,
@@ -276,13 +283,17 @@ export class AdtDdl<
    */
   async update<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    const source = options?.source || config.source;
+    // The options' source, required (D1 of #304); an empty one still falls
+    // back to the config's, and is sent as it is when the config has none.
+    const source = options.source || (config.source ?? options.source);
 
     return answering(
       () =>
@@ -291,7 +302,7 @@ export class AdtDdl<
           options.headers,
           options.ifMatch,
           name,
-          source as string,
+          source,
           options?.lockHandle,
           config.transportRequest,
         ),
@@ -314,7 +325,9 @@ export class AdtDdl<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'ddl', 'updateMetadata'>,
     config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -326,7 +339,7 @@ export class AdtDdl<
           options.headers,
           options.ifMatch,
           DDL_SOURCE.uri(this.name(config)),
-          options?.source as string,
+          options?.source,
           options?.lockHandle,
           config.transportRequest,
         ),

@@ -7,6 +7,7 @@
 import type {
   AdtObjectIdentity,
   AdtReadVersion,
+  AdtRequiredUpdateOptions,
   AdtVariant,
   IAdtActivatable,
   IAdtActivationOptions,
@@ -18,6 +19,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
@@ -97,12 +99,14 @@ export class AdtServiceDefinition<
     IAdtUpdatable<
       Partial<IServiceDefinitionConfig>,
       T['updated'],
-      'serviceDefinitionName'
+      'serviceDefinitionName',
+      'source'
     >,
     IAdtMetadataUpdatable<
       Partial<IServiceDefinitionConfig>,
       T['metadataUpdated'],
-      'serviceDefinitionName'
+      'serviceDefinitionName',
+      'source'
     >,
     IAdtDeletable<
       IServiceDefinitionConfig,
@@ -333,7 +337,9 @@ export class AdtServiceDefinition<
       IServiceDefinitionConfig,
       'serviceDefinitionName'
     >,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -354,7 +360,7 @@ export class AdtServiceDefinition<
           options.ifMatch,
           {
             service_definition_name: name,
-            source_code: source as string,
+            source_code: source,
             transport_request: config.transportRequest,
           },
           options?.lockHandle,
@@ -380,7 +386,9 @@ export class AdtServiceDefinition<
       IServiceDefinitionConfig,
       'serviceDefinitionName'
     >,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -392,7 +400,7 @@ export class AdtServiceDefinition<
           options.headers,
           options.ifMatch,
           SERVICE_DEFINITION.uri(this.name(config)),
-          options?.source as string,
+          options?.source,
           options?.lockHandle,
           config.transportRequest,
         ),

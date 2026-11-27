@@ -12,6 +12,7 @@
 import type {
   AdtObjectIdentity,
   AdtReadVersion,
+  AdtRequiredUpdateOptions,
   AdtVariant,
   IAdtAnalyseOptions,
   IAdtCreatable,
@@ -20,6 +21,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
@@ -69,7 +71,8 @@ export class AdtMessageClass<
     IAdtMetadataUpdatable<
       Partial<IMessageClassConfig>,
       T['metadataUpdated'],
-      'name'
+      'name',
+      'source'
     >,
     IAdtDeletable<
       IMessageClassConfig,
@@ -242,7 +245,9 @@ export class AdtMessageClass<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'messageClass', 'updateMetadata'>,
     config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -256,7 +261,7 @@ export class AdtMessageClass<
           options.headers,
           options.ifMatch,
           name,
-          options?.source as string,
+          options?.source,
           options?.lockHandle,
           config.transportRequest,
         ),

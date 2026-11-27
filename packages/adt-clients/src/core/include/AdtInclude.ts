@@ -11,6 +11,7 @@
 import type {
   AdtObjectIdentity,
   AdtReadVersion,
+  AdtRequiredUpdateOptions,
   AdtVariant,
   IAdtActivatable,
   IAdtActivationOptions,
@@ -23,6 +24,7 @@ import type {
   IAdtHeaders,
   IAdtIncludeEnhancementHost,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMainProgramsReadable,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
@@ -92,11 +94,17 @@ export class AdtInclude<
     IAdtCreatable<IIncludeConfig, T['created']>,
     IAdtReadable<IIncludeConfig, T['source'], 'includeName'>,
     IAdtMetadataReadable<IIncludeConfig, T['metadata'], 'includeName'>,
-    IAdtUpdatable<Partial<IIncludeConfig>, T['updated'], 'includeName'>,
+    IAdtUpdatable<
+      Partial<IIncludeConfig>,
+      T['updated'],
+      'includeName',
+      'source'
+    >,
     IAdtMetadataUpdatable<
       Partial<IIncludeConfig>,
       T['metadataUpdated'],
-      'includeName'
+      'includeName',
+      'source'
     >,
     IAdtDeletable<
       IIncludeConfig,
@@ -335,7 +343,9 @@ export class AdtInclude<
    */
   async update<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -357,7 +367,7 @@ export class AdtInclude<
           options.headers,
           options.ifMatch,
           includeName,
-          source as string,
+          source,
           options?.lockHandle,
           config.transportRequest,
         ),
@@ -379,7 +389,9 @@ export class AdtInclude<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'include', 'updateMetadata'>,
     config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -391,7 +403,7 @@ export class AdtInclude<
           options.headers,
           options.ifMatch,
           PROGRAM_INCLUDE.uri(requireName(config)),
-          options?.source as string,
+          options?.source,
           options?.lockHandle,
           config.transportRequest,
         ),

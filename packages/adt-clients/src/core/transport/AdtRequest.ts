@@ -24,6 +24,7 @@
 
 import type {
   AdtObjectIdentity,
+  AdtRequiredUpdateOptions,
   AdtTaskType,
   AdtVariant,
   IAdtAnalyseOptions,
@@ -32,8 +33,9 @@ import type {
   IAdtDeletable,
   IAdtError,
   IAdtHeaders,
+  IAdtLockFreeMetadataUpdatable,
+  IAdtLockFreeWrite,
   IAdtMetadataReadable,
-  IAdtMetadataUpdatable,
   IAdtOperationOptions,
   IAdtRequest,
   IAdtResponse,
@@ -107,10 +109,12 @@ export class AdtRequest<
 > implements
     IAdtCreatable<ITransportConfig, T['created']>,
     IAdtMetadataReadable<ITransportConfig, T['metadata'], 'transportNumber'>,
-    IAdtMetadataUpdatable<
+    // The request's document is written without a lock (C7 of #304).
+    IAdtLockFreeMetadataUpdatable<
       Partial<ITransportConfig>,
       T['metadataUpdated'],
-      'transportNumber'
+      'transportNumber',
+      'source'
     >,
     IAdtDeletable<
       ITransportConfig,
@@ -317,7 +321,10 @@ export class AdtRequest<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'updateMetadata'>,
     config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    // The document travels as options.source (D1 of #304).
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockFreeWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -332,7 +339,7 @@ export class AdtRequest<
           options.headers,
           options.ifMatch,
           number,
-          options?.source as string,
+          options.source,
         ),
       this.results.metadataUpdated,
       options?.analyse,

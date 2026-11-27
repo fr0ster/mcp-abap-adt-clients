@@ -1,4 +1,8 @@
-import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtReadVersion,
+  AdtRequiredUpdateOptions,
+  IAdtLockedWrite,
+} from '@mcp-abap-adt/interfaces-adt';
 /**
  * The testclasses include of a class.
  *
@@ -91,7 +95,7 @@ export class AdtLocalTestClass<
 
   /** Syntax-check the source a caller is about to write. */
   async validate<E extends IAdtError = IAdtError>(
-    config: AdtObjectIdentity<ILocalTestClassConfig, 'className'>,
+    config: AdtObjectIdentity<ILocalTestClassConfig, 'className' | 'source'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -106,7 +110,7 @@ export class AdtLocalTestClass<
           connection,
           CHECK_RUN_HEADERS,
           config.className,
-          config.source as string,
+          config.source,
           'inactive',
           this.contentTypes?.sourceArtifactContentType(),
         ),
@@ -162,29 +166,35 @@ export class AdtLocalTestClass<
    */
   async update<E extends IAdtError = IAdtError>(
     config: AdtObjectIdentity<ILocalTestClassConfig, 'className'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    // The source may come with the options or the config (see delete()).
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> & IAdtLockedWrite,
+  ): Promise<IAdtResponse<T['updated'], E>> {
+    // An empty string is source: writing it is how the include is emptied
+    // (see delete()). Only its absence is an error.
+    const source = options?.source ?? config.source ?? '';
+    return this.#write(config, source, options.lockHandle, options);
+  }
+
+  /** The one write of the include: under the handle given, or none. */
+  #write<E extends IAdtError>(
+    config: AdtObjectIdentity<ILocalTestClassConfig, 'className'>,
+    source: string,
+    lockHandle: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        ifMatch?: string | undefined;
+      },
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
-
-    // An empty string is source: writing it is how the include is emptied
-    // (see delete()). Only its absence is an error.
-
-    const name = config.className;
-    const source = options?.source ?? config.source ?? '';
-
     return answering(
       () =>
         updateClassTestInclude(
           connection,
           options.headers,
           options.ifMatch,
-          name,
+          config.className,
           source,
-          // `as string` because the low-level writer types it required; the
-          // value may be absent, and whether an unlocked write is allowed is
-          // ADT's judgement, not this library's.
-          options?.lockHandle as string,
+          lockHandle,
           config.transportRequest,
         ),
       this.results.updated,
@@ -202,12 +212,19 @@ export class AdtLocalTestClass<
     config: AdtObjectIdentity<ILocalTestClassConfig, 'className'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
-    return await this.update({ ...config, source: '' }, options);
+    // The include written empty, with whatever handle and source the options
+    // carry, as before (the contract's delete names neither).
+    return await this.#write(
+      config,
+      options.source ?? '',
+      options.lockHandle,
+      options,
+    );
   }
 
   /** Syntax-check the include. */
   async check<E extends IAdtError = IAdtError>(
-    config: AdtObjectIdentity<ILocalTestClassConfig, 'className'>,
+    config: AdtObjectIdentity<ILocalTestClassConfig, 'className' | 'source'>,
     status: string = 'inactive',
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['check'], E>> {
@@ -220,7 +237,7 @@ export class AdtLocalTestClass<
           connection,
           options.headers,
           config.className,
-          config.source as string,
+          config.source,
           status === 'active' ? 'active' : 'inactive',
           this.contentTypes?.sourceArtifactContentType(),
         ),

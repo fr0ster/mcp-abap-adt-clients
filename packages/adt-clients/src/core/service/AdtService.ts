@@ -1,6 +1,7 @@
 import type {
   AdtObjectIdentity,
   AdtReadVersion,
+  AdtRequiredUpdateOptions,
   AdtVariant,
   IAdtActivatable,
   IAdtActivationOptions,
@@ -12,6 +13,8 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
+  IAdtLockFreeUpdatable,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
@@ -21,7 +24,6 @@ import type {
   IAdtServiceGroupReadable,
   IAdtSystemContext,
   IAdtTransportAware,
-  IAdtUpdatable,
   IAdtUpdateOptions,
   IAdtValidatable,
   IServiceBindingPublicationConfig,
@@ -89,7 +91,8 @@ export class AdtServiceBinding<
     IAdtCreatable<IServiceBindingConfig, T['created']>,
     IAdtReadable<IServiceBindingConfig, T['source'], 'bindingName'>,
     IAdtMetadataReadable<IServiceBindingConfig, T['metadata'], 'bindingName'>,
-    IAdtUpdatable<
+    // A publication takes no lock (C7 of #304).
+    IAdtLockFreeUpdatable<
       IServiceBindingPublicationConfig,
       T['updated'],
       'bindingName'
@@ -97,7 +100,8 @@ export class AdtServiceBinding<
     IAdtMetadataUpdatable<
       Partial<IServiceBindingConfig>,
       T['metadataUpdated'],
-      'bindingName'
+      'bindingName',
+      'source'
     >,
     IAdtDeletable<
       IServiceBindingConfig,
@@ -638,7 +642,9 @@ export class AdtServiceBinding<
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'serviceBinding', 'updateMetadata'>,
     config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -650,7 +656,7 @@ export class AdtServiceBinding<
           options.headers,
           options.ifMatch,
           SERVICE_BINDING.uri(this.name(config)),
-          options?.source as string,
+          options?.source,
           options?.lockHandle,
           config.transportRequest,
         ),

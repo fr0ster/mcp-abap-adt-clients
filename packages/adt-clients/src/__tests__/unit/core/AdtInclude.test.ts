@@ -134,6 +134,7 @@ describe('AdtInclude', () => {
             new AdtInclude(connection, { logger, results: includeDocuments }),
             'update',
           ),
+          lockHandle: 'H',
           source: '" only in options',
         },
       );
@@ -154,6 +155,7 @@ describe('AdtInclude', () => {
             new AdtInclude(connection, { logger, results: includeDocuments }),
             'update',
           ),
+          lockHandle: 'H',
           source: '" code',
         },
       );
@@ -205,6 +207,7 @@ describe('AdtInclude', () => {
             new AdtInclude(connection, { logger, results: includeDocuments }),
             'update',
           ),
+          lockHandle: 'H',
           source: '',
         },
       );

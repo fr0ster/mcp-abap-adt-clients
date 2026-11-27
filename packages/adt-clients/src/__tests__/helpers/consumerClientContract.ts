@@ -34,7 +34,12 @@ export type IConsumerClass<R extends IClassResults> = IAdtReadable<
   'className'
 > &
   IAdtLockable<IClassConfig, 'className'> &
-  IAdtUpdatable<Partial<IClassConfig>, ReturnType<R['updated']>, 'className'> &
+  IAdtUpdatable<
+    Partial<IClassConfig>,
+    ReturnType<R['updated']>,
+    'className',
+    'source'
+  > &
   IAdtActivatable<IClassConfig, ReturnType<R['activation']>, 'className'>;
 
 /** What the consumer does with a program: read it and check it. */
