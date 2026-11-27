@@ -973,13 +973,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/utils/activationUtils.ts",
-    "rule": "predicate",
-    "kind": "is",
-    "text": "value is Record<string, unknown>",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/utils/adtResponse.ts",
     "rule": "cast",
     "kind": "re-types",
