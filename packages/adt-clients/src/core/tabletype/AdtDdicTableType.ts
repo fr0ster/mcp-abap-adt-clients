@@ -9,6 +9,7 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
+  AdtObjectIdentity,
   IAdtActivatable,
   IAdtActivationOptions,
   IAdtAnalyseOptions,
@@ -126,13 +127,15 @@ export class AdtDdicTableType<
    * from nothing and the server answers — which is a reading a strategy can
    * take, where a sentence composed here would not be.
    */
-  private name(config: Partial<ITableTypeConfig>): string {
-    return config.tableTypeName as string;
+  private name(
+    config: AdtObjectIdentity<ITableTypeConfig, 'tableTypeName'>,
+  ): string {
+    return config.tableTypeName;
   }
 
   /** Validate the name before creating the object. */
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<ITableTypeConfig>,
+    config: AdtObjectIdentity<ITableTypeConfig, 'tableTypeName'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -194,7 +197,7 @@ export class AdtDdicTableType<
 
   /** Read the object's metadata document. */
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<ITableTypeConfig>,
+    config: AdtObjectIdentity<ITableTypeConfig, 'tableTypeName'>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -211,7 +214,7 @@ export class AdtDdicTableType<
 
   /** The transport request the object belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
-    config: Partial<ITableTypeConfig>,
+    config: AdtObjectIdentity<ITableTypeConfig, 'tableTypeName'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -238,7 +241,7 @@ export class AdtDdicTableType<
    * anything left out is gone, because nothing is read here to keep it.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<ITableTypeConfig>,
+    config: AdtObjectIdentity<ITableTypeConfig, 'tableTypeName'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -278,7 +281,7 @@ export class AdtDdicTableType<
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
-    config: Partial<ITableTypeConfig>,
+    config: AdtObjectIdentity<ITableTypeConfig, 'tableTypeName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -306,7 +309,7 @@ export class AdtDdicTableType<
    * `analyse`.
    */
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<ITableTypeConfig>,
+    config: AdtObjectIdentity<ITableTypeConfig, 'tableTypeName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -326,7 +329,7 @@ export class AdtDdicTableType<
 
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
-    config: Partial<ITableTypeConfig>,
+    config: AdtObjectIdentity<ITableTypeConfig, 'tableTypeName'>,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -350,7 +353,7 @@ export class AdtDdicTableType<
 
   /** Check the object. */
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<ITableTypeConfig>,
+    config: AdtObjectIdentity<ITableTypeConfig, 'tableTypeName'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['check'], E>> {
@@ -382,7 +385,7 @@ export class AdtDdicTableType<
    * caller's `analyse` to say.
    */
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<ITableTypeConfig>,
+    config: AdtObjectIdentity<ITableTypeConfig, 'tableTypeName'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
@@ -402,7 +405,7 @@ export class AdtDdicTableType<
 
   /** Unlock the object. */
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<ITableTypeConfig>,
+    config: AdtObjectIdentity<ITableTypeConfig, 'tableTypeName'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {
@@ -425,7 +428,7 @@ export class AdtDdicTableType<
 
   /** Version history of the object's source. */
   async getVersions<E extends IAdtError = IAdtError>(
-    config: Partial<ITableTypeConfig>,
+    config: AdtObjectIdentity<ITableTypeConfig, 'tableTypeName'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['versions'], E>> {
     return answering(

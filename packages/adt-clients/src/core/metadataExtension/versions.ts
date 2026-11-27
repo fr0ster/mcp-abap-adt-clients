@@ -1,3 +1,4 @@
+import type { AdtObjectIdentity } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -21,10 +22,10 @@ const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
  */
 export async function getMetadataExtensionVersions(
   connection: IAbapConnection,
-  config: Partial<IMetadataExtensionConfig>,
+  config: AdtObjectIdentity<IMetadataExtensionConfig, 'name'>,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
-    url: versionsUri(sourceUri(METADATA_EXTENSION.uri(config.name as string))),
+    url: versionsUri(sourceUri(METADATA_EXTENSION.uri(config.name))),
     method: 'GET',
     timeout: 0,
     headers: { Accept: ACCEPT_VERSION_FEED },

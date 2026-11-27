@@ -1,4 +1,7 @@
-import type { EnhancementType } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtObjectIdentity,
+  EnhancementType,
+} from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -18,12 +21,12 @@ const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
 // candidate URI — probe-verify on the ABAP Cloud system
 export async function getEnhancementVersions(
   connection: IAbapConnection,
-  config: Partial<IEnhancementConfig>,
+  config: AdtObjectIdentity<IEnhancementConfig, 'enhancementName'>,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
     url: `${getEnhancementUri(
       config.enhancementType,
-      config.enhancementName as string,
+      config.enhancementName,
     )}/source/main/versions`,
     method: 'GET',
     timeout: 0,

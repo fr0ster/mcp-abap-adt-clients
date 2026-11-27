@@ -1,3 +1,4 @@
+import type { AdtObjectIdentity } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -17,9 +18,9 @@ const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
  */
 export async function getStructureVersions(
   connection: IAbapConnection,
-  config: Partial<IStructureConfig>,
+  config: AdtObjectIdentity<IStructureConfig, 'structureName'>,
 ): Promise<IAdtWireResponse> {
-  const url = `${versionsUri(sourceUri(STRUCTURE.uri(config.structureName as string)))}`;
+  const url = `${versionsUri(sourceUri(STRUCTURE.uri(config.structureName)))}`;
   return connection.makeAdtRequest({
     url,
     method: 'GET',

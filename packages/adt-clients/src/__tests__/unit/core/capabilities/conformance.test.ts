@@ -36,13 +36,13 @@ const cases = [
     name: 'AdtClass',
     make: (c: any) =>
       new AdtClass(c, { logger: noopLogger, results: classDocuments }),
-    cfg: { className: 'ZC' },
+    cfg: { className: 'ZC' } as never,
   },
   {
     name: 'AdtDomain',
     make: (c: any) =>
       new AdtDomain(c, { logger: noopLogger, results: domainDocuments }),
-    cfg: { domainName: 'ZD' },
+    cfg: { domainName: 'ZD' } as never,
   },
   {
     name: 'AdtServiceDefinition',
@@ -51,7 +51,9 @@ const cases = [
         logger: noopLogger,
         results: serviceDefinitionDocuments,
       }),
-    cfg: { serviceDefinitionName: 'ZS' },
+    // `never`: each case's handler takes its own identity, which the
+    // union of the three cannot name; each is the identity of its handler.
+    cfg: { serviceDefinitionName: 'ZS' } as never,
   },
 ];
 

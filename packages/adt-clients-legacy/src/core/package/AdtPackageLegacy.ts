@@ -19,6 +19,7 @@ import {
   type ResultValuesOf,
 } from '@mcp-abap-adt/adt-clients';
 import type {
+  AdtObjectIdentity,
   IAdtAnalyseOptions,
   IAdtError,
   IAdtHeaders,
@@ -91,7 +92,7 @@ export class AdtPackageLegacy<
    * package `delete` refuses as well (§8).
    */
   override async checkDeletion<E extends IAdtError = IAdtError>(
-    _config: Partial<IPackageConfig>,
+    _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     return noDeletionCheckNorDelete<T['deletionCheck'], E>();
@@ -103,14 +104,14 @@ export class AdtPackageLegacy<
    * `404` to. Refused without a request; not measured themselves (spec §8).
    */
   override async lock<E extends IAdtError = IAdtError>(
-    _config: Partial<IPackageConfig>,
+    _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     return legacyRefusal<string, E>('lock', ITEM_RESOURCE);
   }
 
   override async unlock<E extends IAdtError = IAdtError>(
-    _config: Partial<IPackageConfig>,
+    _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     _lockHandle: string,
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {
@@ -118,7 +119,7 @@ export class AdtPackageLegacy<
   }
 
   override async readTransport<E extends IAdtError = IAdtError>(
-    _config: Partial<IPackageConfig>,
+    _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E>> {
     return legacyRefusal<T['transport'], E>(
@@ -128,7 +129,7 @@ export class AdtPackageLegacy<
   }
 
   override async check<E extends IAdtError = IAdtError>(
-    _config: Partial<IPackageConfig>,
+    _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     _status: string | undefined,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['check'], E>> {

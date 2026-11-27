@@ -23,6 +23,7 @@ import {
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
 import type {
+  AdtObjectIdentity,
   IAdtError,
   IAdtHeaders,
   IAdtOperationOptions,
@@ -42,7 +43,7 @@ export class AdtMessageClassLegacy<
   /** Refused without a request: 7.40 has no `/sap/bc/adt/deletion/check` (§5). */
   override async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'messageClass', 'deletionCheck'>,
-    _config: Partial<IMessageClassConfig>,
+    _config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     return noDeletionCheck<T['deletionCheck'], E>();
@@ -58,7 +59,7 @@ export class AdtMessageClassLegacy<
    * free afterwards.
    */
   override async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IMessageClassConfig>,
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E>> {
     const objectUrl = MESSAGE_CLASS.uri(config.name as string);
@@ -83,7 +84,7 @@ export class AdtMessageClassLegacy<
    */
   override async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'messageClass', 'updateMetadata'>,
-    _config: Partial<IMessageClassConfig>,
+    _config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
     _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     return legacyMeasuredRefusal<T['metadataUpdated'], E>(

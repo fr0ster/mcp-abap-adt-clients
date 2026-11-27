@@ -16,6 +16,7 @@ import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
  */
 
 import type {
+  AdtObjectIdentity,
   AdtVariant,
   IAdtActivatable,
   IAdtActivationOptions,
@@ -162,7 +163,7 @@ export class AdtFunctionGroup<
 
   /** Read the host's enhancement elements. */
   async readEnhancementElements<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionGroupConfig>,
+    config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['enhancementElements'], E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -170,7 +171,7 @@ export class AdtFunctionGroup<
       () =>
         getFunctionGroupEnhancementElements(
           connection,
-          config.functionGroupName as string,
+          config.functionGroupName,
         ),
       this.results.enhancementElements,
       options?.analyse,
@@ -179,7 +180,7 @@ export class AdtFunctionGroup<
 
   /** Read the host's enhancement options. */
   async readEnhancementOptions<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionGroupConfig>,
+    config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['enhancementOptions'], E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -187,7 +188,7 @@ export class AdtFunctionGroup<
       () =>
         getFunctionGroupEnhancementOptions(
           connection,
-          config.functionGroupName as string,
+          config.functionGroupName,
         ),
       this.results.enhancementOptions,
       options?.analyse,
@@ -196,7 +197,7 @@ export class AdtFunctionGroup<
 
   /** Validate a function group name before creating it. */
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionGroupConfig>,
+    config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -206,7 +207,7 @@ export class AdtFunctionGroup<
       () =>
         validateFunctionGroupName(
           connection,
-          config.functionGroupName as string,
+          config.functionGroupName,
           config.packageName,
           config.description,
         ),
@@ -271,7 +272,7 @@ export class AdtFunctionGroup<
   /** Read the group's source — the function pool's main program. */
   async read<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionGroup', 'read'>,
-    config: Partial<IFunctionGroupConfig>,
+    config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['source'], E>> {
@@ -282,7 +283,7 @@ export class AdtFunctionGroup<
       () =>
         getFunctionGroupSource(
           connection,
-          config.functionGroupName as string,
+          config.functionGroupName,
           version,
           options,
         ),
@@ -296,19 +297,14 @@ export class AdtFunctionGroup<
    * which reads its source (the function pool's main program).
    */
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionGroupConfig>,
+    config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     return answering(
-      () =>
-        getFunctionGroup(
-          connection,
-          config.functionGroupName as string,
-          options,
-        ),
+      () => getFunctionGroup(connection, config.functionGroupName, options),
       this.results.metadata,
       options?.analyse,
     );
@@ -317,7 +313,7 @@ export class AdtFunctionGroup<
   /** The transport request the group belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionGroup', 'transport'>,
-    config: Partial<IFunctionGroupConfig>,
+    config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -327,7 +323,7 @@ export class AdtFunctionGroup<
       () =>
         getFunctionGroupTransport(
           connection,
-          config.functionGroupName as string,
+          config.functionGroupName,
           options?.withLongPolling !== undefined
             ? { withLongPolling: options.withLongPolling }
             : undefined,
@@ -348,7 +344,7 @@ export class AdtFunctionGroup<
    */
   async update<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionGroup', 'update'>,
-    config: Partial<IFunctionGroupConfig>,
+    config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -360,7 +356,7 @@ export class AdtFunctionGroup<
           connection,
           options.headers,
           options.ifMatch,
-          config.functionGroupName as string,
+          config.functionGroupName,
           options?.source as string,
           options?.lockHandle as string,
           config.transportRequest,
@@ -382,13 +378,13 @@ export class AdtFunctionGroup<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionGroup', 'updateMetadata'>,
-    config: Partial<IFunctionGroupConfig>,
+    config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    const name = config.functionGroupName as string;
+    const name = config.functionGroupName;
 
     return answering(
       () =>
@@ -423,13 +419,13 @@ export class AdtFunctionGroup<
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionGroup', 'deletionCheck'>,
-    config: Partial<IFunctionGroupConfig>,
+    config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    const name = config.functionGroupName as string;
+    const name = config.functionGroupName;
     return answering(
       () =>
         checkDeletion(connection, options.headers, {
@@ -447,13 +443,13 @@ export class AdtFunctionGroup<
    * The deletion check is read, not merely performed — see AdtProgram.delete.
    */
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionGroupConfig>,
+    config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    const name = config.functionGroupName as string;
+    const name = config.functionGroupName;
     return answering(
       () =>
         deleteFunctionGroup(connection, options.headers, {
@@ -467,7 +463,7 @@ export class AdtFunctionGroup<
 
   /** Activate the function group. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionGroupConfig>,
+    config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -479,7 +475,7 @@ export class AdtFunctionGroup<
         activateFunctionGroup(
           sent,
           options.headers,
-          config.functionGroupName as string,
+          config.functionGroupName,
           options.preauditRequested ?? true,
         ),
       this.results.activation,
@@ -489,7 +485,7 @@ export class AdtFunctionGroup<
 
   /** Check the function group. */
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionGroupConfig>,
+    config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['check'], E>> {
@@ -504,7 +500,7 @@ export class AdtFunctionGroup<
         checkFunctionGroup(
           connection,
           options.headers,
-          config.functionGroupName as string,
+          config.functionGroupName,
           version,
         ),
       this.results.check,
@@ -518,10 +514,10 @@ export class AdtFunctionGroup<
    * caller's `analyse` to say.
    */
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionGroupConfig>,
+    config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
-    const name = config.functionGroupName as string;
+    const name = config.functionGroupName;
     const answer = await answering(
       () =>
         inStatefulSession(this.connection, () =>
@@ -538,11 +534,11 @@ export class AdtFunctionGroup<
 
   /** Unlock the function group. */
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionGroupConfig>,
+    config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {
-    const name = config.functionGroupName as string;
+    const name = config.functionGroupName;
 
     return answering(
       async () => {

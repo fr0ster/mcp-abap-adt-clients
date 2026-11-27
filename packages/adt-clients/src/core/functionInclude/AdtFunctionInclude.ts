@@ -187,14 +187,17 @@ export class AdtFunctionInclude<
 
   /** Both names, or the caller's mistake. */
   private names(
-    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
+    config: AdtObjectIdentity<
+      IFunctionIncludeConfig,
+      'functionGroupName' | 'includeName'
+    >,
   ): {
     group: string;
     include: string;
   } {
     return {
       group: config.functionGroupName,
-      include: config.includeName as string,
+      include: config.includeName,
     };
   }
 
@@ -211,7 +214,10 @@ export class AdtFunctionInclude<
   }
 
   private buildDeleteParams(
-    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
+    config: AdtObjectIdentity<
+      IFunctionIncludeConfig,
+      'functionGroupName' | 'includeName'
+    >,
   ): IDeleteFunctionIncludeParams {
     return {
       function_group_name: config.functionGroupName ?? '',
@@ -236,7 +242,10 @@ export class AdtFunctionInclude<
    * thing that can be checked before the POST.
    */
   async validate<E extends IAdtError = IAdtError>(
-    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
+    config: AdtObjectIdentity<
+      IFunctionIncludeConfig,
+      'functionGroupName' | 'includeName'
+    >,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -282,7 +291,10 @@ export class AdtFunctionInclude<
    * function module.
    */
   async read<E extends IAdtError = IAdtError>(
-    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
+    config: AdtObjectIdentity<
+      IFunctionIncludeConfig,
+      'functionGroupName' | 'includeName'
+    >,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['source'], E>> {
@@ -306,7 +318,10 @@ export class AdtFunctionInclude<
    * this rather than the source.
    */
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
+    config: AdtObjectIdentity<
+      IFunctionIncludeConfig,
+      'functionGroupName' | 'includeName'
+    >,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -338,14 +353,17 @@ export class AdtFunctionInclude<
    * anything left out is gone, because nothing is read here to keep it.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
-    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
+    config: AdtObjectIdentity<
+      IFunctionIncludeConfig,
+      'functionGroupName' | 'includeName'
+    >,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const params = this.buildCreateParams({
-      ...(config as IFunctionIncludeConfig),
+      ...config,
     });
 
     return answering(
@@ -375,7 +393,10 @@ export class AdtFunctionInclude<
    * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
-    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
+    config: AdtObjectIdentity<
+      IFunctionIncludeConfig,
+      'functionGroupName' | 'includeName'
+    >,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -415,7 +436,10 @@ export class AdtFunctionInclude<
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionInclude', 'deletionCheck'>,
-    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
+    config: AdtObjectIdentity<
+      IFunctionIncludeConfig,
+      'functionGroupName' | 'includeName'
+    >,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -441,7 +465,10 @@ export class AdtFunctionInclude<
    */
   async delete<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionInclude', 'delete'>,
-    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
+    config: AdtObjectIdentity<
+      IFunctionIncludeConfig,
+      'functionGroupName' | 'includeName'
+    >,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -462,7 +489,10 @@ export class AdtFunctionInclude<
 
   /** Activate the include. */
   async activate<E extends IAdtError = IAdtError>(
-    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
+    config: AdtObjectIdentity<
+      IFunctionIncludeConfig,
+      'functionGroupName' | 'includeName'
+    >,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -487,7 +517,10 @@ export class AdtFunctionInclude<
 
   /** Check the include. */
   async check<E extends IAdtError = IAdtError>(
-    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
+    config: AdtObjectIdentity<
+      IFunctionIncludeConfig,
+      'functionGroupName' | 'includeName'
+    >,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['check'], E>> {
@@ -520,7 +553,10 @@ export class AdtFunctionInclude<
    * caller's `analyse` to say.
    */
   async lock<E extends IAdtError = IAdtError>(
-    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
+    config: AdtObjectIdentity<
+      IFunctionIncludeConfig,
+      'functionGroupName' | 'includeName'
+    >,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     const { group, include } = this.names(config);
@@ -540,7 +576,10 @@ export class AdtFunctionInclude<
 
   /** Unlock the include. */
   async unlock<E extends IAdtError = IAdtError>(
-    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
+    config: AdtObjectIdentity<
+      IFunctionIncludeConfig,
+      'functionGroupName' | 'includeName'
+    >,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {
@@ -562,7 +601,10 @@ export class AdtFunctionInclude<
 
   /** Version history of the object's source. */
   async getVersions<E extends IAdtError = IAdtError>(
-    config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
+    config: AdtObjectIdentity<
+      IFunctionIncludeConfig,
+      'functionGroupName' | 'includeName'
+    >,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['versions'], E>> {
     return answering(

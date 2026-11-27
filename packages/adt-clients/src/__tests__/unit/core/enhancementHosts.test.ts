@@ -105,10 +105,10 @@ for (const [factory, nameKey, base] of hosts) {
           it(`${member}: include context ${context ?? 'omitted'} is a main-program name`, async () => {
             const { client, makeAdtRequest } = fixture();
             const host: IAdtIncludeEnhancementHost<
-              Record<string, string>,
+              { includeName?: string },
               string,
               string,
-              never
+              'includeName'
             > = client.getInclude();
             await host[member]({ includeName: 'ZHOST' }, { context });
             const query =

@@ -22,6 +22,7 @@ import {
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
 import type {
+  AdtObjectIdentity,
   IAdtError,
   IAdtHeaders,
   IAdtOperationOptions,
@@ -43,7 +44,7 @@ export class AdtIncludeLegacy<
   /** Refused without a request: 7.40 has no `/sap/bc/adt/deletion/check` (§5). */
   override async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'include', 'deletionCheck'>,
-    _config: Partial<IIncludeConfig>,
+    _config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     return noDeletionCheck<T['deletionCheck'], E>();
@@ -56,7 +57,7 @@ export class AdtIncludeLegacy<
    */
   override async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'include', 'updateMetadata'>,
-    _config: Partial<IIncludeConfig>,
+    _config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
     _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     return legacyNotMeasuredRefusal<T['metadataUpdated'], E>(
@@ -72,7 +73,7 @@ export class AdtIncludeLegacy<
    */
   override async readMainPrograms<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'include', 'mainPrograms'>,
-    _config: Partial<IIncludeConfig>,
+    _config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
     _options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['mainPrograms'], E>> {
     return legacyNotMeasuredRefusal<T['mainPrograms'], E>(
@@ -91,7 +92,7 @@ export class AdtIncludeLegacy<
    * include afterwards answers `404`.
    */
   override async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IIncludeConfig>,
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E>> {
     const objectUrl = PROGRAM_INCLUDE.uri(config.includeName as string);

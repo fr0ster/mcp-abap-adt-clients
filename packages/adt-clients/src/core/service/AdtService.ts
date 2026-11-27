@@ -1,4 +1,5 @@
 import type {
+  AdtObjectIdentity,
   AdtReadVersion,
   AdtVariant,
   IAdtActivatable,
@@ -148,8 +149,10 @@ export class AdtServiceBinding<
   }
 
   /** The binding name, or the caller's mistake. */
-  private name(config: Partial<IServiceBindingConfig>): string {
-    return config.bindingName as string;
+  private name(
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
+  ): string {
+    return config.bindingName;
   }
 
   private buildServiceBindingCreateXml(
@@ -321,7 +324,7 @@ export class AdtServiceBinding<
    * produces a failure the caller cannot interpret.
    */
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IServiceBindingConfig>,
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -410,7 +413,7 @@ export class AdtServiceBinding<
 
   /** Read the binding document. */
   async read<E extends IAdtError = IAdtError>(
-    config: Partial<IServiceBindingConfig>,
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
     version?: AdtReadVersion,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['source'], E>> {
@@ -435,7 +438,7 @@ export class AdtServiceBinding<
    * separately because the contract asks both of a readable.
    */
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IServiceBindingConfig>,
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
     options?: {
       withLongPolling?: boolean;
       version?: AdtReadVersion;
@@ -561,7 +564,7 @@ export class AdtServiceBinding<
    * See `docs/usage/CLIENT_API_REFERENCE.md` for the shape a consumer writes.
    */
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IServiceBindingConfig>,
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
@@ -591,7 +594,7 @@ export class AdtServiceBinding<
    * `403 ExceptionResourceNoAccess`.
    */
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IServiceBindingConfig>,
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {
@@ -634,7 +637,7 @@ export class AdtServiceBinding<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'serviceBinding', 'updateMetadata'>,
-    config: Partial<IServiceBindingConfig>,
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -665,7 +668,7 @@ export class AdtServiceBinding<
    * the consumer makes and can see the answer to.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
-    config: Partial<IServiceBindingConfig>,
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -681,7 +684,7 @@ export class AdtServiceBinding<
   }
 
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IServiceBindingConfig>,
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -707,7 +710,7 @@ export class AdtServiceBinding<
    * `<msg type="E">` when it refuses.
    */
   async activate<E extends IAdtError = IAdtError>(
-    config: Partial<IServiceBindingConfig>,
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -729,7 +732,7 @@ export class AdtServiceBinding<
 
   /** Check the binding. */
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<IServiceBindingConfig>,
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['check'], E>> {
@@ -757,7 +760,7 @@ export class AdtServiceBinding<
    * transport check, sent with the name and, when given, the package.
    */
   async readTransport<E extends IAdtError = IAdtError>(
-    config: Partial<IServiceBindingConfig>,
+    config: AdtObjectIdentity<IServiceBindingConfig, 'bindingName'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.

@@ -177,6 +177,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — transportable package', () => {
       );
       const metadata = String(
         expectResult(
+          // @ts-expect-error -- no number: what 7.40 answers is what is measured here
           await transports.readMetadata({}, { analyse: analyseException }),
           'readMetadata',
         ),

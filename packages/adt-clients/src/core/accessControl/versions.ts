@@ -1,3 +1,4 @@
+import type { AdtObjectIdentity } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -18,12 +19,12 @@ const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
  */
 export async function getAccessControlVersions(
   connection: IAbapConnection,
-  config: Partial<IAccessControlConfig>,
+  config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
     // ADT's own rel=versions link; /source/main/versions answered 404 "No
     // suitable resource found" on an on-premise and a cloud system (2026-10-01).
-    url: versionsUri(ACCESS_CONTROL.uri(config.accessControlName as string)),
+    url: versionsUri(ACCESS_CONTROL.uri(config.accessControlName)),
     method: 'GET',
     timeout: 0,
     headers: { Accept: ACCEPT_VERSION_FEED },

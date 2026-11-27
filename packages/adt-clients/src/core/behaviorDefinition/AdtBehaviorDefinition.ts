@@ -5,6 +5,7 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
+  AdtObjectIdentity,
   AdtReadVersion,
   AdtVariant,
   IAdtActivatable,
@@ -151,13 +152,15 @@ export class AdtBehaviorDefinition<
    * from nothing and the server answers — which is a reading a strategy can
    * take, where a sentence composed here would not be.
    */
-  private name(config: Partial<IBehaviorDefinitionConfig>): string {
-    return config.name as string;
+  private name(
+    config: AdtObjectIdentity<IBehaviorDefinitionConfig, 'name'>,
+  ): string {
+    return config.name;
   }
 
   /** Validate the name before creating the object. */
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IBehaviorDefinitionConfig>,
+    config: AdtObjectIdentity<IBehaviorDefinitionConfig, 'name'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -231,7 +234,7 @@ export class AdtBehaviorDefinition<
 
   /** Read the object. */
   async read<E extends IAdtError = IAdtError>(
-    config: Partial<IBehaviorDefinitionConfig>,
+    config: AdtObjectIdentity<IBehaviorDefinitionConfig, 'name'>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['source'], E>> {
@@ -259,7 +262,7 @@ export class AdtBehaviorDefinition<
 
   /** Read the object's metadata document. */
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IBehaviorDefinitionConfig>,
+    config: AdtObjectIdentity<IBehaviorDefinitionConfig, 'name'>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -284,7 +287,7 @@ export class AdtBehaviorDefinition<
 
   /** The transport request the object belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
-    config: Partial<IBehaviorDefinitionConfig>,
+    config: AdtObjectIdentity<IBehaviorDefinitionConfig, 'name'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -311,7 +314,7 @@ export class AdtBehaviorDefinition<
    * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
-    config: Partial<IBehaviorDefinitionConfig>,
+    config: AdtObjectIdentity<IBehaviorDefinitionConfig, 'name'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -350,7 +353,7 @@ export class AdtBehaviorDefinition<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'behaviorDefinition', 'updateMetadata'>,
-    config: Partial<IBehaviorDefinitionConfig>,
+    config: AdtObjectIdentity<IBehaviorDefinitionConfig, 'name'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -380,7 +383,7 @@ export class AdtBehaviorDefinition<
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
-    config: Partial<IBehaviorDefinitionConfig>,
+    config: AdtObjectIdentity<IBehaviorDefinitionConfig, 'name'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -404,7 +407,7 @@ export class AdtBehaviorDefinition<
    * `analyse`.
    */
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IBehaviorDefinitionConfig>,
+    config: AdtObjectIdentity<IBehaviorDefinitionConfig, 'name'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -426,7 +429,7 @@ export class AdtBehaviorDefinition<
 
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
-    config: Partial<IBehaviorDefinitionConfig>,
+    config: AdtObjectIdentity<IBehaviorDefinitionConfig, 'name'>,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -450,7 +453,7 @@ export class AdtBehaviorDefinition<
 
   /** Check the object. */
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<IBehaviorDefinitionConfig>,
+    config: AdtObjectIdentity<IBehaviorDefinitionConfig, 'name'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['check'], E>> {
@@ -483,7 +486,7 @@ export class AdtBehaviorDefinition<
    * caller's `analyse` to say.
    */
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IBehaviorDefinitionConfig>,
+    config: AdtObjectIdentity<IBehaviorDefinitionConfig, 'name'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
@@ -503,7 +506,7 @@ export class AdtBehaviorDefinition<
 
   /** Unlock the object. */
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IBehaviorDefinitionConfig>,
+    config: AdtObjectIdentity<IBehaviorDefinitionConfig, 'name'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {
@@ -530,7 +533,7 @@ export class AdtBehaviorDefinition<
 
   /** Version history of the object's source. */
   async getVersions<E extends IAdtError = IAdtError>(
-    config: Partial<IBehaviorDefinitionConfig>,
+    config: AdtObjectIdentity<IBehaviorDefinitionConfig, 'name'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['versions'], E>> {
     return answering(

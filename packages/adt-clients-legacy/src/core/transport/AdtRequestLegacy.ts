@@ -38,6 +38,7 @@ import {
   type transportDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import type {
+  AdtObjectIdentity,
   AdtTaskType,
   IAbapObjectEntry,
   IAdtAnalyseOptions,
@@ -94,7 +95,7 @@ export class AdtRequestLegacy<
    * thrown as a fabricated 404.
    */
   override async readMetadata<E extends IAdtError = IAdtError>(
-    _config: Partial<ITransportConfig>,
+    _config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['metadata'], E>> {
     return answering(
@@ -184,7 +185,7 @@ export class AdtRequestLegacy<
   /** Refused without a request: checking the deletion of a transport request is on `/sap/bc/adt/cts/*`, which 7.40 does not advertise. */
   override async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'deletionCheck'>,
-    _config: Partial<ITransportConfig>,
+    _config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     return failed<T['deletionCheck'], E>(

@@ -8,6 +8,7 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
+  AdtObjectIdentity,
   AdtReadVersion,
   IAdtActivatable,
   IAdtActivationOptions,
@@ -154,13 +155,15 @@ export class AdtAppendStructure<
    * from nothing and the server answers — which is a reading a strategy can
    * take, where a sentence composed here would not be.
    */
-  private name(config: Partial<IAppendStructureConfig>): string {
-    return config.appendStructureName as string;
+  private name(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+  ): string {
+    return config.appendStructureName;
   }
 
   /** Validate the name, where the system offers the resource. */
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -224,7 +227,7 @@ export class AdtAppendStructure<
 
   /** Read the DDL source. */
   async read<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['source'], E>> {
@@ -251,7 +254,7 @@ export class AdtAppendStructure<
 
   /** Read the metadata document. */
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -275,7 +278,7 @@ export class AdtAppendStructure<
 
   /** The transport request the object belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -312,7 +315,7 @@ export class AdtAppendStructure<
    * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -352,7 +355,7 @@ export class AdtAppendStructure<
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -376,7 +379,7 @@ export class AdtAppendStructure<
    * The deletion check is read, not merely performed — see AdtProgram.delete.
    */
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -396,7 +399,7 @@ export class AdtAppendStructure<
 
   /** Activate the append structure. */
   async activate<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -420,7 +423,7 @@ export class AdtAppendStructure<
 
   /** Check the append structure. */
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['check'], E>> {
@@ -444,7 +447,7 @@ export class AdtAppendStructure<
    * caller's `analyse` to say.
    */
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
@@ -464,7 +467,7 @@ export class AdtAppendStructure<
 
   /** Unlock the object. */
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {
@@ -487,7 +490,7 @@ export class AdtAppendStructure<
 
   /** Version history of the object's source. */
   async getVersions<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['versions'], E>> {
     return answering(

@@ -24,6 +24,7 @@ import {
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
 import type {
+  AdtObjectIdentity,
   IAdtAnalyseOptions,
   IAdtError,
   IAdtHeaders,
@@ -57,7 +58,7 @@ export class AdtDdlLegacy<
    * `/sap/bc/adt/deletion/*` does not exist there.
    */
   override async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IDdlConfig>,
+    config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E>> {
     const name = config.ddlName as string;
@@ -98,7 +99,7 @@ export class AdtDdlLegacy<
    */
   override async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'ddl', 'deletionCheck'>,
-    _config: Partial<IDdlConfig>,
+    _config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     return noDeletionCheck<T['deletionCheck'], E>();
@@ -111,7 +112,7 @@ export class AdtDdlLegacy<
    */
   override async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'ddl', 'updateMetadata'>,
-    _config: Partial<IDdlConfig>,
+    _config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
     _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     return legacyNotMeasuredRefusal<T['metadataUpdated'], E>(
@@ -126,7 +127,7 @@ export class AdtDdlLegacy<
    */
   override async readTransport<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'ddl', 'transport'>,
-    config: Partial<IDdlConfig>,
+    config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E>> {
     return noTransportResource<T['transport'], E>(
@@ -140,7 +141,7 @@ export class AdtDdlLegacy<
    */
   override async getVersions<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'ddl', 'versions'>,
-    config: Partial<IDdlConfig>,
+    config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['versions'], E>> {
     return legacyMeasuredRefusal<T['versions'], E>(

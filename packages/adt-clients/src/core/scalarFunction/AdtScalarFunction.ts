@@ -5,6 +5,7 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
+  AdtObjectIdentity,
   AdtReadVersion,
   AdtVariant,
   IAdtActivatable,
@@ -167,13 +168,15 @@ export class AdtScalarFunction<
    * from nothing and the server answers — which is a reading a strategy can
    * take, where a sentence composed here would not be.
    */
-  private name(config: Partial<IScalarFunctionConfig>): string {
-    return config.scalarFunctionName as string;
+  private name(
+    config: AdtObjectIdentity<IScalarFunctionConfig, 'scalarFunctionName'>,
+  ): string {
+    return config.scalarFunctionName;
   }
 
   /** Validate the name before creating the object. */
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionConfig>,
+    config: AdtObjectIdentity<IScalarFunctionConfig, 'scalarFunctionName'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -235,7 +238,7 @@ export class AdtScalarFunction<
 
   /** Read the object. */
   async read<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionConfig>,
+    config: AdtObjectIdentity<IScalarFunctionConfig, 'scalarFunctionName'>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['source'], E>> {
@@ -256,7 +259,7 @@ export class AdtScalarFunction<
 
   /** Read the object's metadata document. */
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionConfig>,
+    config: AdtObjectIdentity<IScalarFunctionConfig, 'scalarFunctionName'>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -273,7 +276,7 @@ export class AdtScalarFunction<
 
   /** The transport request the object belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionConfig>,
+    config: AdtObjectIdentity<IScalarFunctionConfig, 'scalarFunctionName'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -307,7 +310,7 @@ export class AdtScalarFunction<
    * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionConfig>,
+    config: AdtObjectIdentity<IScalarFunctionConfig, 'scalarFunctionName'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -351,7 +354,7 @@ export class AdtScalarFunction<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'scalarFunction', 'updateMetadata'>,
-    config: Partial<IScalarFunctionConfig>,
+    config: AdtObjectIdentity<IScalarFunctionConfig, 'scalarFunctionName'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -381,7 +384,7 @@ export class AdtScalarFunction<
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionConfig>,
+    config: AdtObjectIdentity<IScalarFunctionConfig, 'scalarFunctionName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -409,7 +412,7 @@ export class AdtScalarFunction<
    * `analyse`.
    */
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionConfig>,
+    config: AdtObjectIdentity<IScalarFunctionConfig, 'scalarFunctionName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -429,7 +432,7 @@ export class AdtScalarFunction<
 
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionConfig>,
+    config: AdtObjectIdentity<IScalarFunctionConfig, 'scalarFunctionName'>,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -453,7 +456,7 @@ export class AdtScalarFunction<
 
   /** Check the object. */
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionConfig>,
+    config: AdtObjectIdentity<IScalarFunctionConfig, 'scalarFunctionName'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['check'], E>> {
@@ -484,7 +487,7 @@ export class AdtScalarFunction<
    * caller's `analyse` to say.
    */
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionConfig>,
+    config: AdtObjectIdentity<IScalarFunctionConfig, 'scalarFunctionName'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
@@ -504,7 +507,7 @@ export class AdtScalarFunction<
 
   /** Unlock the object. */
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionConfig>,
+    config: AdtObjectIdentity<IScalarFunctionConfig, 'scalarFunctionName'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {
@@ -527,7 +530,7 @@ export class AdtScalarFunction<
 
   /** Version history of the object's source. */
   async getVersions<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionConfig>,
+    config: AdtObjectIdentity<IScalarFunctionConfig, 'scalarFunctionName'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['versions'], E>> {
     return answering(

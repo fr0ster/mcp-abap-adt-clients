@@ -11,6 +11,7 @@ import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
  */
 
 import type {
+  AdtObjectIdentity,
   AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
@@ -90,7 +91,7 @@ export class AdtLocalMacros<
 
   /** Syntax-check the source a caller is about to write. */
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<ILocalMacrosConfig>,
+    config: AdtObjectIdentity<ILocalMacrosConfig, 'className'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -104,7 +105,7 @@ export class AdtLocalMacros<
         checkClassMacros(
           connection,
           CHECK_RUN_HEADERS,
-          config.className as string,
+          config.className,
           config.source as string,
           'inactive',
           this.contentTypes?.sourceArtifactContentType(),
@@ -116,7 +117,7 @@ export class AdtLocalMacros<
 
   /** Read the include's source. */
   async read<E extends IAdtError = IAdtError>(
-    config: Partial<ILocalMacrosConfig>,
+    config: AdtObjectIdentity<ILocalMacrosConfig, 'className'>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['source'], E>> {
@@ -131,7 +132,7 @@ export class AdtLocalMacros<
       () =>
         getClassMacrosInclude(
           connection,
-          config.className as string,
+          config.className,
           version,
           this.logger,
           options,
@@ -160,7 +161,7 @@ export class AdtLocalMacros<
    * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
-    config: Partial<ILocalMacrosConfig>,
+    config: AdtObjectIdentity<ILocalMacrosConfig, 'className'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -169,7 +170,7 @@ export class AdtLocalMacros<
     // An empty string is source: writing it is how the include is emptied
     // (see delete()). Only its absence is an error.
 
-    const name = config.className as string;
+    const name = config.className;
     const source = options?.source ?? config.source ?? '';
 
     return answering(
@@ -198,7 +199,7 @@ export class AdtLocalMacros<
    * the include empty, so this answers what that write answered.
    */
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<ILocalMacrosConfig>,
+    config: AdtObjectIdentity<ILocalMacrosConfig, 'className'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     return await this.update({ ...config, source: '' }, options);
@@ -206,7 +207,7 @@ export class AdtLocalMacros<
 
   /** Syntax-check the include. */
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<ILocalMacrosConfig>,
+    config: AdtObjectIdentity<ILocalMacrosConfig, 'className'>,
     status: string = 'inactive',
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['check'], E>> {
@@ -218,7 +219,7 @@ export class AdtLocalMacros<
         checkClassMacros(
           connection,
           options.headers,
-          config.className as string,
+          config.className,
           config.source as string,
           status === 'active' ? 'active' : 'inactive',
           this.contentTypes?.sourceArtifactContentType(),
@@ -230,9 +231,9 @@ export class AdtLocalMacros<
 
   /** Version history of this include. */
   async getVersions<E extends IAdtError = IAdtError>(
-    config: Partial<ILocalMacrosConfig>,
+    config: AdtObjectIdentity<ILocalMacrosConfig, 'className'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['versions'], E>> {
-    return this.includeVersions(config.className as string, 'macros', options);
+    return this.includeVersions(config.className, 'macros', options);
   }
 }

@@ -10,6 +10,7 @@
  */
 
 import type {
+  AdtObjectIdentity,
   AdtReadVersion,
   AdtVariant,
   IAdtAnalyseOptions,
@@ -120,8 +121,8 @@ export class AdtMessageClass<
    * from nothing and the server answers — which is a reading a strategy can
    * take, where a sentence composed here would not be.
    */
-  private name(config: Partial<IMessageClassConfig>): string {
-    return config.name as string;
+  private name(config: AdtObjectIdentity<IMessageClassConfig, 'name'>): string {
+    return config.name;
   }
 
   /**
@@ -131,7 +132,7 @@ export class AdtMessageClass<
    * Eclipse sends, and what the other types' validation endpoints take.
    */
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IMessageClassConfig>,
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -208,7 +209,7 @@ export class AdtMessageClass<
 
   /** The same document `read` fetches — there is no metadata resource. */
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IMessageClassConfig>,
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
     options?: {
       withLongPolling?: boolean;
       version?: AdtReadVersion;
@@ -240,7 +241,7 @@ export class AdtMessageClass<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'messageClass', 'updateMetadata'>,
-    config: Partial<IMessageClassConfig>,
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -283,7 +284,7 @@ export class AdtMessageClass<
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'messageClass', 'deletionCheck'>,
-    config: Partial<IMessageClassConfig>,
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -299,7 +300,7 @@ export class AdtMessageClass<
   }
 
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IMessageClassConfig>,
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -326,7 +327,7 @@ export class AdtMessageClass<
    * caller's `analyse` to say.
    */
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IMessageClassConfig>,
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
@@ -346,7 +347,7 @@ export class AdtMessageClass<
 
   /** Unlock the message class. */
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IMessageClassConfig>,
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {

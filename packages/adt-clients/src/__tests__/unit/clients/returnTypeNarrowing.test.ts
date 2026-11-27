@@ -10,7 +10,7 @@ import type { AdtClient } from '../../../clients/AdtClient';
   // @ts-expect-error getVersionSource is not on the narrowed getDomain() type
   c.getDomain().getVersionSource('');
   // a full handler still exposes versions (no error expected):
-  c.getClass().getVersions({});
+  c.getClass().getVersions({ className: 'ZCL_X' });
 };
 
 it('return-type narrowing compiles as asserted', () => expect(true).toBe(true));

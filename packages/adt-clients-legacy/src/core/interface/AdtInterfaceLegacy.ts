@@ -18,6 +18,7 @@ import {
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
 import type {
+  AdtObjectIdentity,
   IAdtError,
   IAdtHeaders,
   IAdtOperationOptions,
@@ -49,7 +50,7 @@ export class AdtInterfaceLegacy<
    * `/sap/bc/adt/deletion/*` does not exist there.
    */
   override async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IInterfaceConfig>,
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E>> {
     const name = config.interfaceName as string;
@@ -76,7 +77,7 @@ export class AdtInterfaceLegacy<
    */
   override async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'interface', 'deletionCheck'>,
-    _config: Partial<IInterfaceConfig>,
+    _config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     return noDeletionCheck<T['deletionCheck'], E>();
@@ -89,7 +90,7 @@ export class AdtInterfaceLegacy<
    */
   override async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'interface', 'updateMetadata'>,
-    _config: Partial<IInterfaceConfig>,
+    _config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
     _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     return legacyNotMeasuredRefusal<T['metadataUpdated'], E>(
@@ -104,7 +105,7 @@ export class AdtInterfaceLegacy<
    */
   override async readTransport<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'interface', 'transport'>,
-    config: Partial<IInterfaceConfig>,
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E>> {
     return noTransportResource<T['transport'], E>(

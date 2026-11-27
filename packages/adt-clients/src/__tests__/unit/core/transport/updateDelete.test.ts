@@ -217,6 +217,7 @@ describe('AdtRequest.delete()', () => {
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
     await new AdtRequest(connection, { results: transportDocuments }).delete(
+      // @ts-expect-error -- a JavaScript caller can still name nothing (#304, D1)
       {},
       {
         headers: headersOf(

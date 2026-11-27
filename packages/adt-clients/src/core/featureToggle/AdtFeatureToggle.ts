@@ -7,6 +7,7 @@
  * what the result set given at construction makes of that endpoint's answer.
  */
 import type {
+  AdtObjectIdentity,
   AdtReadVersion,
   IAdtActivatable,
   IAdtActivationOptions,
@@ -141,8 +142,10 @@ export class AdtFeatureToggle<
    * from nothing and the server answers — which is a reading a strategy can
    * take, where a sentence composed here would not be.
    */
-  private name(config: Partial<IFeatureToggleConfig>): string {
-    return config.featureToggleName as string;
+  private name(
+    config: AdtObjectIdentity<IFeatureToggleConfig, 'featureToggleName'>,
+  ): string {
+    return config.featureToggleName;
   }
 
   /** Map camelCase config to the snake_case low-level params. */
@@ -160,7 +163,7 @@ export class AdtFeatureToggle<
   }
 
   private deleteParams(
-    config: Partial<IFeatureToggleConfig>,
+    config: AdtObjectIdentity<IFeatureToggleConfig, 'featureToggleName'>,
   ): IDeleteFeatureToggleParams {
     return {
       feature_toggle_name: config.featureToggleName ?? '',
@@ -170,7 +173,7 @@ export class AdtFeatureToggle<
 
   /** Validate the name before creating the object. */
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IFeatureToggleConfig>,
+    config: AdtObjectIdentity<IFeatureToggleConfig, 'featureToggleName'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -233,7 +236,7 @@ export class AdtFeatureToggle<
 
   /** Read the object. */
   async read<E extends IAdtError = IAdtError>(
-    config: Partial<IFeatureToggleConfig>,
+    config: AdtObjectIdentity<IFeatureToggleConfig, 'featureToggleName'>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['source'], E>> {
@@ -254,7 +257,7 @@ export class AdtFeatureToggle<
 
   /** Read the object's metadata document. */
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IFeatureToggleConfig>,
+    config: AdtObjectIdentity<IFeatureToggleConfig, 'featureToggleName'>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -281,7 +284,7 @@ export class AdtFeatureToggle<
    * anything left out is gone, because nothing is read here to keep it.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IFeatureToggleConfig>,
+    config: AdtObjectIdentity<IFeatureToggleConfig, 'featureToggleName'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -293,7 +296,7 @@ export class AdtFeatureToggle<
           connection,
           options.headers,
           options.ifMatch,
-          this.createParams(config as IFeatureToggleConfig),
+          this.createParams(config),
           options?.lockHandle,
         ),
       this.results.metadataUpdated,
@@ -314,7 +317,7 @@ export class AdtFeatureToggle<
    * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
-    config: Partial<IFeatureToggleConfig>,
+    config: AdtObjectIdentity<IFeatureToggleConfig, 'featureToggleName'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -347,7 +350,7 @@ export class AdtFeatureToggle<
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
-    config: Partial<IFeatureToggleConfig>,
+    config: AdtObjectIdentity<IFeatureToggleConfig, 'featureToggleName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -374,7 +377,7 @@ export class AdtFeatureToggle<
    * `analyse`.
    */
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IFeatureToggleConfig>,
+    config: AdtObjectIdentity<IFeatureToggleConfig, 'featureToggleName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -397,7 +400,7 @@ export class AdtFeatureToggle<
 
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
-    config: Partial<IFeatureToggleConfig>,
+    config: AdtObjectIdentity<IFeatureToggleConfig, 'featureToggleName'>,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -421,7 +424,7 @@ export class AdtFeatureToggle<
 
   /** Check the object. */
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<IFeatureToggleConfig>,
+    config: AdtObjectIdentity<IFeatureToggleConfig, 'featureToggleName'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['check'], E>> {
@@ -445,7 +448,7 @@ export class AdtFeatureToggle<
    * caller's `analyse` to say.
    */
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IFeatureToggleConfig>,
+    config: AdtObjectIdentity<IFeatureToggleConfig, 'featureToggleName'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
@@ -465,7 +468,7 @@ export class AdtFeatureToggle<
 
   /** Unlock the object. */
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IFeatureToggleConfig>,
+    config: AdtObjectIdentity<IFeatureToggleConfig, 'featureToggleName'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {
@@ -497,7 +500,7 @@ export class AdtFeatureToggle<
    * here; it was not.)
    */
   async switchOn<E extends IAdtError = IAdtError>(
-    config: Partial<IFeatureToggleConfig>,
+    config: AdtObjectIdentity<IFeatureToggleConfig, 'featureToggleName'>,
     opts: { transportRequest: string; userSpecific?: boolean },
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['switched'], E>> {
@@ -506,7 +509,7 @@ export class AdtFeatureToggle<
 
   /** Switch the toggle off — see {@link switchOn}. */
   async switchOff<E extends IAdtError = IAdtError>(
-    config: Partial<IFeatureToggleConfig>,
+    config: AdtObjectIdentity<IFeatureToggleConfig, 'featureToggleName'>,
     opts: { transportRequest: string; userSpecific?: boolean },
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['switched'], E>> {
@@ -514,7 +517,7 @@ export class AdtFeatureToggle<
   }
 
   private async switchTo<E extends IAdtError = IAdtError>(
-    config: Partial<IFeatureToggleConfig>,
+    config: AdtObjectIdentity<IFeatureToggleConfig, 'featureToggleName'>,
     opts: { transportRequest: string; userSpecific?: boolean },
     targetState: 'on' | 'off',
     options?: IAdtAnalyseOptions<E>,
@@ -538,7 +541,7 @@ export class AdtFeatureToggle<
    * `…/states` JSON, read by the `runtimeState` strategy.
    */
   async getRuntimeState<E extends IAdtError = IAdtError>(
-    config: Partial<IFeatureToggleConfig>,
+    config: AdtObjectIdentity<IFeatureToggleConfig, 'featureToggleName'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['runtimeState'], E>> {
     const name = this.name(config);
@@ -554,7 +557,7 @@ export class AdtFeatureToggle<
    * JSON, read by the `checkState` strategy.
    */
   async checkState<E extends IAdtError = IAdtError>(
-    config: Partial<IFeatureToggleConfig>,
+    config: AdtObjectIdentity<IFeatureToggleConfig, 'featureToggleName'>,
     opts: { userSpecific?: boolean } | undefined,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['checkState'], E>> {
@@ -576,7 +579,7 @@ export class AdtFeatureToggle<
    * deciding for everyone.
    */
   async readSource<E extends IAdtError = IAdtError>(
-    config: Partial<IFeatureToggleConfig>,
+    config: AdtObjectIdentity<IFeatureToggleConfig, 'featureToggleName'>,
     version?: AdtReadVersion,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['sourceDocument'], E>> {

@@ -23,6 +23,7 @@
  */
 
 import type {
+  AdtObjectIdentity,
   AdtTaskType,
   AdtVariant,
   IAdtAnalyseOptions,
@@ -156,8 +157,10 @@ export class AdtRequest<
   }
 
   /** The request number, or the caller's mistake. */
-  private number(config: Partial<ITransportConfig>): string {
-    return config.transportNumber as string;
+  private number(
+    config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
+  ): string {
+    return config.transportNumber;
   }
 
   /**
@@ -219,7 +222,7 @@ export class AdtRequest<
    * code.
    */
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<ITransportConfig>,
+    config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -313,7 +316,7 @@ export class AdtRequest<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'updateMetadata'>,
-    config: Partial<ITransportConfig>,
+    config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -363,7 +366,7 @@ export class AdtRequest<
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'deletionCheck'>,
-    config: Partial<ITransportConfig>,
+    config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -380,7 +383,7 @@ export class AdtRequest<
 
   async delete<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'delete'>,
-    config: Partial<ITransportConfig>,
+    config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deleted'], E>> {
     // The caller's deadline, if they set one, on every request below.

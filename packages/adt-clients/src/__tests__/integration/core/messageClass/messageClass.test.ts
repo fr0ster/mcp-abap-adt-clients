@@ -236,15 +236,10 @@ describe('MessageClass (using AdtClient)', () => {
         // cleanupObject: called by BaseTester when a pre-existing object is detected
         cleanupObject: async (config: IMessageClassConfig) => {
           expectResult(
-            await client
-              .getMessageClass()
-              .delete(config as Partial<IMessageClassConfig>, {
-                analyse: judged(analyseDeletion),
-                headers: integrationHeadersOf(
-                  client.getMessageClass(),
-                  'delete',
-                ),
-              }),
+            await client.getMessageClass().delete(config, {
+              analyse: judged(analyseDeletion),
+              headers: integrationHeadersOf(client.getMessageClass(), 'delete'),
+            }),
             `delete message class ${config.name}`,
           );
         },
@@ -573,13 +568,10 @@ describe('MessageClass (using AdtClient)', () => {
         // class — the body failed before creating it — is no refusal.
         let leftover = '';
         try {
-          const removed = await mcHandler.delete(
-            config as Partial<IMessageClassConfig>,
-            {
-              analyse: judged(analyseDeletion),
-              headers: integrationHeadersOf(mcHandler, 'delete'),
-            },
-          );
+          const removed = await mcHandler.delete(config, {
+            analyse: judged(analyseDeletion),
+            headers: integrationHeadersOf(mcHandler, 'delete'),
+          });
           leftover = removed.ok
             ? await untilMessageClassGone(
                 () =>

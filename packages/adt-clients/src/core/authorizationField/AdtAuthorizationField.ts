@@ -8,6 +8,7 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
+  AdtObjectIdentity,
   IAdtActivatable,
   IAdtActivationOptions,
   IAdtAnalyseOptions,
@@ -136,13 +137,21 @@ export class AdtAuthorizationField<
    * from nothing and the server answers — which is a reading a strategy can
    * take, where a sentence composed here would not be.
    */
-  private name(config: Partial<IAuthorizationFieldConfig>): string {
-    return config.authorizationFieldName as string;
+  private name(
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
+  ): string {
+    return config.authorizationFieldName;
   }
 
   /** Validate the name before creating the object. */
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IAuthorizationFieldConfig>,
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -219,7 +228,10 @@ export class AdtAuthorizationField<
 
   /** Read the object's metadata document. */
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IAuthorizationFieldConfig>,
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -246,7 +258,10 @@ export class AdtAuthorizationField<
    * anything left out is gone, because nothing is read here to keep it.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IAuthorizationFieldConfig>,
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -296,7 +311,10 @@ export class AdtAuthorizationField<
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
-    config: Partial<IAuthorizationFieldConfig>,
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -324,7 +342,10 @@ export class AdtAuthorizationField<
    * `analyse`.
    */
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IAuthorizationFieldConfig>,
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -344,7 +365,10 @@ export class AdtAuthorizationField<
 
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
-    config: Partial<IAuthorizationFieldConfig>,
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -368,7 +392,10 @@ export class AdtAuthorizationField<
 
   /** Check the object. */
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<IAuthorizationFieldConfig>,
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['check'], E>> {
@@ -392,7 +419,10 @@ export class AdtAuthorizationField<
    * caller's `analyse` to say.
    */
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IAuthorizationFieldConfig>,
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
@@ -412,7 +442,10 @@ export class AdtAuthorizationField<
 
   /** Unlock the object. */
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IAuthorizationFieldConfig>,
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {

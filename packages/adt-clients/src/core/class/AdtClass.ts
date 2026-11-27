@@ -26,6 +26,7 @@ import {
  */
 
 import type {
+  AdtObjectIdentity,
   AdtVariant,
   IAdtActivatable,
   IAdtActivationOptions,
@@ -121,12 +122,12 @@ export class AdtClass<
 
   /** Read the host's enhancement elements. */
   async readEnhancementElements<E extends IAdtError = IAdtError>(
-    config: Partial<IClassConfig>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['enhancementElements'], E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
-      () => getClassEnhancementElements(connection, config.className as string),
+      () => getClassEnhancementElements(connection, config.className),
       this.results.enhancementElements,
       options?.analyse,
     );
@@ -134,12 +135,12 @@ export class AdtClass<
 
   /** Read the host's enhancement options. */
   async readEnhancementOptions<E extends IAdtError = IAdtError>(
-    config: Partial<IClassConfig>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['enhancementOptions'], E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
-      () => getClassEnhancementOptions(connection, config.className as string),
+      () => getClassEnhancementOptions(connection, config.className),
       this.results.enhancementOptions,
       options?.analyse,
     );
@@ -149,7 +150,7 @@ export class AdtClass<
    * Validate class configuration before creation
    */
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IClassConfig>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -162,7 +163,7 @@ export class AdtClass<
       () =>
         validateClassName(
           connection,
-          config.className as string,
+          config.className,
           config.packageName ?? '',
           config.description,
           config.superclass,
@@ -249,7 +250,7 @@ export class AdtClass<
    * Read class
    */
   async read<E extends IAdtError = IAdtError>(
-    config: Partial<IClassConfig>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['source'], E>> {
@@ -261,13 +262,7 @@ export class AdtClass<
     // whether an empty body *is* absence is the caller's reading, supplied
     // through `analyse`. Returning `undefined` here made every caller guess.
     return answering(
-      () =>
-        getClassSource(
-          connection,
-          config.className as string,
-          version,
-          options,
-        ),
+      () => getClassSource(connection, config.className, version, options),
       this.results.source,
       options?.analyse,
     );
@@ -283,7 +278,7 @@ export class AdtClass<
    * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
-    config: Partial<IClassConfig>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -312,7 +307,7 @@ export class AdtClass<
           connection,
           options.headers,
           options.ifMatch,
-          config.className as string,
+          config.className,
           source as string,
           options?.lockHandle,
           config.transportRequest,
@@ -334,7 +329,7 @@ export class AdtClass<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'class', 'updateMetadata'>,
-    config: Partial<IClassConfig>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -346,7 +341,7 @@ export class AdtClass<
           connection,
           options.headers,
           options.ifMatch,
-          CLASS.uri(config.className as string),
+          CLASS.uri(config.className),
           options?.source as string,
           options?.lockHandle,
           config.transportRequest,
@@ -361,7 +356,7 @@ export class AdtClass<
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'class', 'deletionCheck'>,
-    config: Partial<IClassConfig>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -370,7 +365,7 @@ export class AdtClass<
     return answering(
       () =>
         checkDeletion(connection, options.headers, {
-          class_name: config.className as string,
+          class_name: config.className,
           transport_request: config.transportRequest,
         }),
       this.results.deletionCheck,
@@ -382,7 +377,7 @@ export class AdtClass<
    * Delete class
    */
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IClassConfig>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -394,7 +389,7 @@ export class AdtClass<
     return answering(
       () =>
         deleteClass(connection, options.headers, {
-          class_name: config.className as string,
+          class_name: config.className,
           transport_request: config.transportRequest,
         }),
       this.results.deletion,
@@ -406,7 +401,7 @@ export class AdtClass<
    * Check class
    */
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<IClassConfig>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['check'], E>> {
@@ -426,7 +421,7 @@ export class AdtClass<
         checkClass(
           connection,
           options.headers,
-          config.className as string,
+          config.className,
           version,
           config.source,
           this.contentTypes?.sourceArtifactContentType(),
@@ -441,7 +436,9 @@ export class AdtClass<
    * `activation` strategy. `preauditRequested` is sent as given; absent, `true`.
    */
   async activateTestClasses<E extends IAdtError = IAdtError>(
-    config: Partial<IClassConfig> & { testClassName: string },
+    config: AdtObjectIdentity<IClassConfig, 'className'> & {
+      testClassName: string;
+    },
     options?: IAdtAnalyseOptions<E> &
       Pick<IAdtActivationOptions<E>, 'preauditRequested'>,
   ): Promise<IAdtResponse<T['activation'], E>> {
@@ -450,7 +447,7 @@ export class AdtClass<
       (sent) =>
         activateClassTestClasses(
           sent,
-          config.className as string,
+          config.className,
           config.testClassName,
           options?.preauditRequested ?? true,
         ),
@@ -461,9 +458,9 @@ export class AdtClass<
 
   /** Version history of the class's `main` include. */
   async getVersions<E extends IAdtError = IAdtError>(
-    config: Partial<IClassConfig>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['versions'], E>> {
-    return this.includeVersions(config.className as string, 'main', options);
+    return this.includeVersions(config.className, 'main', options);
   }
 }

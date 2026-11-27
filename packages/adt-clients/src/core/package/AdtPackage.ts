@@ -15,6 +15,7 @@
  */
 
 import type {
+  AdtObjectIdentity,
   IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtCreatable,
@@ -119,13 +120,15 @@ export class AdtPackage<
    * from nothing and the server answers — which is a reading a strategy can
    * take, where a sentence composed here would not be.
    */
-  private name(config: Partial<IPackageConfig>): string {
-    return config.packageName as string;
+  private name(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+  ): string {
+    return config.packageName;
   }
 
   /** Validate the package's configuration before creating it. */
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IPackageConfig>,
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -206,7 +209,7 @@ export class AdtPackage<
 
   /** The same document `read` fetches — a package has no second resource. */
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IPackageConfig>,
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -224,7 +227,7 @@ export class AdtPackage<
 
   /** The transport request the package belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
-    config: Partial<IPackageConfig>,
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -250,7 +253,7 @@ export class AdtPackage<
    * anything left out is gone, because nothing is read here to keep it.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IPackageConfig>,
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -304,7 +307,7 @@ export class AdtPackage<
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
-    config: Partial<IPackageConfig>,
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -340,7 +343,7 @@ export class AdtPackage<
    * docs/usage/STATEFUL_SESSION_GUIDE.md.
    */
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IPackageConfig>,
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -360,7 +363,7 @@ export class AdtPackage<
 
   /** Check the package. */
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<IPackageConfig>,
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['check'], E>> {
@@ -384,7 +387,7 @@ export class AdtPackage<
    * caller's `analyse` to say.
    */
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IPackageConfig>,
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
@@ -404,7 +407,7 @@ export class AdtPackage<
 
   /** Unlock the package. */
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IPackageConfig>,
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {

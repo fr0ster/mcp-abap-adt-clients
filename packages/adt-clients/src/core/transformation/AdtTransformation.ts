@@ -5,6 +5,7 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
+  AdtObjectIdentity,
   AdtReadVersion,
   AdtVariant,
   IAdtActivatable,
@@ -167,13 +168,15 @@ export class AdtTransformation<
    * from nothing and the server answers — which is a reading a strategy can
    * take, where a sentence composed here would not be.
    */
-  private name(config: Partial<ITransformationConfig>): string {
-    return config.transformationName as string;
+  private name(
+    config: AdtObjectIdentity<ITransformationConfig, 'transformationName'>,
+  ): string {
+    return config.transformationName;
   }
 
   /** Validate the name before creating the object. */
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<ITransformationConfig>,
+    config: AdtObjectIdentity<ITransformationConfig, 'transformationName'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -242,7 +245,7 @@ export class AdtTransformation<
 
   /** Read the object. */
   async read<E extends IAdtError = IAdtError>(
-    config: Partial<ITransformationConfig>,
+    config: AdtObjectIdentity<ITransformationConfig, 'transformationName'>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['source'], E>> {
@@ -263,7 +266,7 @@ export class AdtTransformation<
 
   /** Read the object's metadata document. */
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<ITransformationConfig>,
+    config: AdtObjectIdentity<ITransformationConfig, 'transformationName'>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -280,7 +283,7 @@ export class AdtTransformation<
 
   /** The transport request the object belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
-    config: Partial<ITransformationConfig>,
+    config: AdtObjectIdentity<ITransformationConfig, 'transformationName'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -314,7 +317,7 @@ export class AdtTransformation<
    * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
-    config: Partial<ITransformationConfig>,
+    config: AdtObjectIdentity<ITransformationConfig, 'transformationName'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -358,7 +361,7 @@ export class AdtTransformation<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'transformation', 'updateMetadata'>,
-    config: Partial<ITransformationConfig>,
+    config: AdtObjectIdentity<ITransformationConfig, 'transformationName'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -388,7 +391,7 @@ export class AdtTransformation<
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
-    config: Partial<ITransformationConfig>,
+    config: AdtObjectIdentity<ITransformationConfig, 'transformationName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -416,7 +419,7 @@ export class AdtTransformation<
    * `analyse`.
    */
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<ITransformationConfig>,
+    config: AdtObjectIdentity<ITransformationConfig, 'transformationName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -436,7 +439,7 @@ export class AdtTransformation<
 
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
-    config: Partial<ITransformationConfig>,
+    config: AdtObjectIdentity<ITransformationConfig, 'transformationName'>,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -460,7 +463,7 @@ export class AdtTransformation<
 
   /** Check the object. */
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<ITransformationConfig>,
+    config: AdtObjectIdentity<ITransformationConfig, 'transformationName'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['check'], E>> {
@@ -491,7 +494,7 @@ export class AdtTransformation<
    * caller's `analyse` to say.
    */
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<ITransformationConfig>,
+    config: AdtObjectIdentity<ITransformationConfig, 'transformationName'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
@@ -511,7 +514,7 @@ export class AdtTransformation<
 
   /** Unlock the object. */
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<ITransformationConfig>,
+    config: AdtObjectIdentity<ITransformationConfig, 'transformationName'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {
@@ -534,7 +537,7 @@ export class AdtTransformation<
 
   /** Version history of the object's source. */
   async getVersions<E extends IAdtError = IAdtError>(
-    config: Partial<ITransformationConfig>,
+    config: AdtObjectIdentity<ITransformationConfig, 'transformationName'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['versions'], E>> {
     return answering(

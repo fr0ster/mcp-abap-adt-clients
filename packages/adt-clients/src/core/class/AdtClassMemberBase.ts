@@ -14,6 +14,7 @@
  */
 
 import type {
+  AdtObjectIdentity,
   AdtVariant,
   IAdtActivationOptions,
   IAdtAnalyseOptions,
@@ -126,10 +127,10 @@ export abstract class AdtClassMemberBase<
    * include carries the class's handle.
    */
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IClassConfig>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
-    const name = config.className as string;
+    const name = config.className;
     // One LOCK, its handle read by `lockHandleOf`. A 200 carrying no handle
     // reads as `''`; whether that is a refusal is the caller's `analyse` to say.
     // LOCK must run stateful (older BASIS #106); stateless after.
@@ -153,11 +154,11 @@ export abstract class AdtClassMemberBase<
    * Until 23.0.0 this built an empty answer of its own and dropped SAP's.
    */
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IClassConfig>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {
-    const name = config.className as string;
+    const name = config.className;
     return answering(
       async () => {
         // UNLOCK must run stateful (older BASIS #106); stateless after.
@@ -181,7 +182,7 @@ export abstract class AdtClassMemberBase<
    * whatever its includes now contain.
    */
   async activate<E extends IAdtError = IAdtError>(
-    config: Partial<IClassConfig>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -196,7 +197,7 @@ export abstract class AdtClassMemberBase<
         activateClass(
           sent,
           options.headers,
-          config.className as string,
+          config.className,
           options.preauditRequested ?? true,
         ),
       this.results.activation,
@@ -212,7 +213,7 @@ export abstract class AdtClassMemberBase<
    * implying the include carries any of it.
    */
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IClassConfig>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -227,8 +228,7 @@ export abstract class AdtClassMemberBase<
         : options;
 
     return answering(
-      () =>
-        getClassMetadata(connection, config.className as string, readOptions),
+      () => getClassMetadata(connection, config.className, readOptions),
       this.results.metadata,
       options?.analyse,
     );
@@ -242,14 +242,14 @@ export abstract class AdtClassMemberBase<
    */
   async readTransport<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<A, 'transport'>,
-    config: Partial<IClassConfig>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     return answering(
-      () => getClassTransport(connection, config.className as string, options),
+      () => getClassTransport(connection, config.className, options),
       this.results.transport,
       options?.analyse,
     );
@@ -285,7 +285,7 @@ export abstract class AdtClassMemberBase<
 
   /** Version history of whatever the concrete implementation's subject is. */
   abstract getVersions<E extends IAdtError = IAdtError>(
-    config: Partial<IClassConfig>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['versions'], E>>;
 }

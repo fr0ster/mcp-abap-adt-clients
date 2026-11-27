@@ -1,3 +1,4 @@
+import type { AdtObjectIdentity } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -21,10 +22,13 @@ const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
 // candidate URI — probe-verify on the ABAP Cloud system
 export async function getFunctionModuleVersions(
   connection: IAbapConnection,
-  config: Partial<IFunctionModuleConfig>,
+  config: AdtObjectIdentity<
+    IFunctionModuleConfig,
+    'functionGroupName' | 'functionModuleName'
+  >,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
-    url: `${versionsUri(sourceUri(FUNCTION_MODULE.uri(config.functionGroupName as string, config.functionModuleName as string)))}`,
+    url: `${versionsUri(sourceUri(FUNCTION_MODULE.uri(config.functionGroupName, config.functionModuleName)))}`,
     method: 'GET',
     timeout: 0,
     headers: { Accept: ACCEPT_VERSION_FEED },

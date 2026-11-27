@@ -51,6 +51,7 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — transports', () => {
       [
         'readMetadata',
         (s) =>
+          // @ts-expect-error -- no number: what 7.40 answers is what is measured here
           s.client.getRequest().readMetadata({}, { analyse: analyseException }),
       ],
     ];

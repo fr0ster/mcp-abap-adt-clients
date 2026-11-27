@@ -5,6 +5,7 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
+  AdtObjectIdentity,
   AdtReadVersion,
   AdtVariant,
   IAccessControlResults,
@@ -157,13 +158,15 @@ export class AdtAccessControl<
    * from nothing and the server answers — which is a reading a strategy can
    * take, where a sentence composed here would not be.
    */
-  private name(config: Partial<IAccessControlConfig>): string {
-    return config.accessControlName as string;
+  private name(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+  ): string {
+    return config.accessControlName;
   }
 
   /** Validate the name before creating the object. */
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -231,7 +234,7 @@ export class AdtAccessControl<
 
   /** Read the object. */
   async read<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['source'], E>> {
@@ -252,7 +255,7 @@ export class AdtAccessControl<
 
   /** Read the object's metadata document. */
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -269,7 +272,7 @@ export class AdtAccessControl<
 
   /** The transport request the object belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -296,7 +299,7 @@ export class AdtAccessControl<
    * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['updated'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -340,7 +343,7 @@ export class AdtAccessControl<
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'accessControl', 'updateMetadata'>,
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -370,7 +373,7 @@ export class AdtAccessControl<
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -398,7 +401,7 @@ export class AdtAccessControl<
    * `analyse`.
    */
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -418,7 +421,7 @@ export class AdtAccessControl<
 
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -442,7 +445,7 @@ export class AdtAccessControl<
 
   /** Check the object. */
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['check'], E>> {
@@ -473,7 +476,7 @@ export class AdtAccessControl<
    * caller's `analyse` to say.
    */
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
@@ -493,7 +496,7 @@ export class AdtAccessControl<
 
   /** Unlock the object. */
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {
@@ -516,7 +519,7 @@ export class AdtAccessControl<
 
   /** Version history of the object's source. */
   async getVersions<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['versions'], E>> {
     return answering(

@@ -180,7 +180,7 @@ export class AdtEnhancement<
    * to discover from a 404.
    */
   private enhancementType(
-    config: Partial<IEnhancementConfig>,
+    config: AdtObjectIdentity<IEnhancementConfig, 'enhancementName'>,
   ): EnhancementType | undefined {
     // Not required beyond create (D1 of #304): an absent type is carried as
     // `undefined`, which a URI writes as the text `undefined`, as before.
@@ -195,13 +195,15 @@ export class AdtEnhancement<
    * from nothing and the server answers — which is a reading a strategy can
    * take, where a sentence composed here would not be.
    */
-  private name(config: Partial<IEnhancementConfig>): string {
-    return config.enhancementName as string;
+  private name(
+    config: AdtObjectIdentity<IEnhancementConfig, 'enhancementName'>,
+  ): string {
+    return config.enhancementName;
   }
 
   /** Validate the name before creating the object. */
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IEnhancementConfig>,
+    config: AdtObjectIdentity<IEnhancementConfig, 'enhancementName'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -313,7 +315,7 @@ export class AdtEnhancement<
 
   /** Read the object's metadata document. */
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IEnhancementConfig>,
+    config: AdtObjectIdentity<IEnhancementConfig, 'enhancementName'>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -344,7 +346,7 @@ export class AdtEnhancement<
    * (its discovery template allows it).
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IEnhancementConfig>,
+    config: AdtObjectIdentity<IEnhancementConfig, 'enhancementName'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
@@ -367,7 +369,7 @@ export class AdtEnhancement<
 
   /** The transport request the object belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
-    config: Partial<IEnhancementConfig>,
+    config: AdtObjectIdentity<IEnhancementConfig, 'enhancementName'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -445,7 +447,7 @@ export class AdtEnhancement<
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
-    config: Partial<IEnhancementConfig>,
+    config: AdtObjectIdentity<IEnhancementConfig, 'enhancementName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -474,7 +476,7 @@ export class AdtEnhancement<
    * `analyse`.
    */
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IEnhancementConfig>,
+    config: AdtObjectIdentity<IEnhancementConfig, 'enhancementName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -495,7 +497,7 @@ export class AdtEnhancement<
 
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
-    config: Partial<IEnhancementConfig>,
+    config: AdtObjectIdentity<IEnhancementConfig, 'enhancementName'>,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -520,7 +522,7 @@ export class AdtEnhancement<
 
   /** Check the object. */
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<IEnhancementConfig>,
+    config: AdtObjectIdentity<IEnhancementConfig, 'enhancementName'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['check'], E>> {
@@ -552,7 +554,7 @@ export class AdtEnhancement<
    * caller's `analyse` to say.
    */
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IEnhancementConfig>,
+    config: AdtObjectIdentity<IEnhancementConfig, 'enhancementName'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
@@ -576,7 +578,7 @@ export class AdtEnhancement<
 
   /** Unlock the object. */
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IEnhancementConfig>,
+    config: AdtObjectIdentity<IEnhancementConfig, 'enhancementName'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {
@@ -605,7 +607,7 @@ export class AdtEnhancement<
 
   /** Version history of the object's source. */
   async getVersions<E extends IAdtError = IAdtError>(
-    config: Partial<IEnhancementConfig>,
+    config: AdtObjectIdentity<IEnhancementConfig, 'enhancementName'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['versions'], E>> {
     return answering(

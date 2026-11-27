@@ -37,7 +37,10 @@ export class AdtFunctionIncludeLegacy<
   /** Refused without a request: 7.40 has no `/sap/bc/adt/deletion/check` (§5). */
   override async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionInclude', 'deletionCheck'>,
-    _config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
+    _config: AdtObjectIdentity<
+      IFunctionIncludeConfig,
+      'functionGroupName' | 'includeName'
+    >,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     return noDeletionCheckNorDelete<T['deletionCheck'], E>();
@@ -46,7 +49,10 @@ export class AdtFunctionIncludeLegacy<
   /** Refused without a request: 7.40 has no `/sap/bc/adt/deletion/delete` (§4.3). */
   override async delete<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionInclude', 'delete'>,
-    _config: AdtObjectIdentity<IFunctionIncludeConfig, 'functionGroupName'>,
+    _config: AdtObjectIdentity<
+      IFunctionIncludeConfig,
+      'functionGroupName' | 'includeName'
+    >,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E>> {
     return noDeletionApi<T['deletion'], E>();

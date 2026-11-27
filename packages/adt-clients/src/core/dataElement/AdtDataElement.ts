@@ -9,6 +9,7 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
+  AdtObjectIdentity,
   IAdtActivatable,
   IAdtActivationOptions,
   IAdtAnalyseOptions,
@@ -119,13 +120,15 @@ export class AdtDataElement<
    * from nothing and the server answers — which is a reading a strategy can
    * take, where a sentence composed here would not be.
    */
-  private name(config: Partial<IDataElementConfig>): string {
-    return config.dataElementName as string;
+  private name(
+    config: AdtObjectIdentity<IDataElementConfig, 'dataElementName'>,
+  ): string {
+    return config.dataElementName;
   }
 
   /** Validate the name before creating the object. */
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IDataElementConfig>,
+    config: AdtObjectIdentity<IDataElementConfig, 'dataElementName'>,
     options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['validation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -195,7 +198,7 @@ export class AdtDataElement<
 
   /** Read the object's metadata document. */
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IDataElementConfig>,
+    config: AdtObjectIdentity<IDataElementConfig, 'dataElementName'>,
     options?: IReadOptions & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['metadata'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -212,7 +215,7 @@ export class AdtDataElement<
 
   /** The transport request the object belongs to. */
   async readTransport<E extends IAdtError = IAdtError>(
-    config: Partial<IDataElementConfig>,
+    config: AdtObjectIdentity<IDataElementConfig, 'dataElementName'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -239,7 +242,7 @@ export class AdtDataElement<
    * anything left out is gone, because nothing is read here to keep it.
    */
   async updateMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IDataElementConfig>,
+    config: AdtObjectIdentity<IDataElementConfig, 'dataElementName'>,
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -277,7 +280,7 @@ export class AdtDataElement<
    * refusal means.
    */
   async checkDeletion<E extends IAdtError = IAdtError>(
-    config: Partial<IDataElementConfig>,
+    config: AdtObjectIdentity<IDataElementConfig, 'dataElementName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -305,7 +308,7 @@ export class AdtDataElement<
    * `analyse`.
    */
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IDataElementConfig>,
+    config: AdtObjectIdentity<IDataElementConfig, 'dataElementName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -325,7 +328,7 @@ export class AdtDataElement<
 
   /** Activate the object. Needs no stateful session. */
   async activate<E extends IAdtError = IAdtError>(
-    config: Partial<IDataElementConfig>,
+    config: AdtObjectIdentity<IDataElementConfig, 'dataElementName'>,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -349,7 +352,7 @@ export class AdtDataElement<
 
   /** Check the object. */
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<IDataElementConfig>,
+    config: AdtObjectIdentity<IDataElementConfig, 'dataElementName'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['check'], E>> {
@@ -373,7 +376,7 @@ export class AdtDataElement<
    * caller's `analyse` to say.
    */
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IDataElementConfig>,
+    config: AdtObjectIdentity<IDataElementConfig, 'dataElementName'>,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E>> {
     const name = this.name(config);
@@ -393,7 +396,7 @@ export class AdtDataElement<
 
   /** Unlock the object. */
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IDataElementConfig>,
+    config: AdtObjectIdentity<IDataElementConfig, 'dataElementName'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E>> {

@@ -52,7 +52,10 @@ export class AdtFunctionModuleLegacy<
    * `/sap/bc/adt/deletion/*` does not exist there.
    */
   override async delete<E extends IAdtError = IAdtError>(
-    config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
+    config: AdtObjectIdentity<
+      IFunctionModuleConfig,
+      'functionGroupName' | 'functionModuleName'
+    >,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E>> {
     const group = config.functionGroupName as string;
@@ -80,7 +83,10 @@ export class AdtFunctionModuleLegacy<
    */
   override async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionModule', 'deletionCheck'>,
-    _config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
+    _config: AdtObjectIdentity<
+      IFunctionModuleConfig,
+      'functionGroupName' | 'functionModuleName'
+    >,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     return noDeletionCheck<T['deletionCheck'], E>();
@@ -93,7 +99,10 @@ export class AdtFunctionModuleLegacy<
    */
   override async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionModule', 'updateMetadata'>,
-    _config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
+    _config: AdtObjectIdentity<
+      IFunctionModuleConfig,
+      'functionGroupName' | 'functionModuleName'
+    >,
     _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
     return legacyNotMeasuredRefusal<T['metadataUpdated'], E>(
@@ -108,7 +117,10 @@ export class AdtFunctionModuleLegacy<
    */
   override async readTransport<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionModule', 'transport'>,
-    config: AdtObjectIdentity<IFunctionModuleConfig, 'functionGroupName'>,
+    config: AdtObjectIdentity<
+      IFunctionModuleConfig,
+      'functionGroupName' | 'functionModuleName'
+    >,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E>> {
     return noTransportResource<T['transport'], E>(

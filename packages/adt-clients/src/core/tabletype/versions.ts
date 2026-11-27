@@ -1,3 +1,4 @@
+import type { AdtObjectIdentity } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -17,12 +18,12 @@ const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
  */
 export async function getTableTypeVersions(
   connection: IAbapConnection,
-  config: Partial<ITableTypeConfig>,
+  config: AdtObjectIdentity<ITableTypeConfig, 'tableTypeName'>,
 ): Promise<IAdtWireResponse> {
   // A table type has no /source/main: discovery documents none for it on an
   // on-premise or a cloud system, and its rel=versions link is on the object.
   // <object>/source/main/versions answered 404 "No suitable resource found".
-  const url = versionsUri(TABLE_TYPE.uri(config.tableTypeName as string));
+  const url = versionsUri(TABLE_TYPE.uri(config.tableTypeName));
   return connection.makeAdtRequest({
     url,
     method: 'GET',

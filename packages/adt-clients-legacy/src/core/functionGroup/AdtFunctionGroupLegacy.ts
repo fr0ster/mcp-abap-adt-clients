@@ -26,6 +26,7 @@ import {
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
 import type {
+  AdtObjectIdentity,
   IAdtActivationOptions,
   IAdtError,
   IAdtHeaders,
@@ -53,7 +54,7 @@ export class AdtFunctionGroupLegacy<
    * `/sap/bc/adt/deletion/*` does not exist there.
    */
   override async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionGroupConfig>,
+    config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E>> {
     const name = config.functionGroupName as string;
@@ -80,7 +81,7 @@ export class AdtFunctionGroupLegacy<
    */
   override async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionGroup', 'deletionCheck'>,
-    _config: Partial<IFunctionGroupConfig>,
+    _config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E>> {
     return noDeletionCheck<T['deletionCheck'], E>();
@@ -92,7 +93,7 @@ export class AdtFunctionGroupLegacy<
    */
   override async readTransport<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionGroup', 'transport'>,
-    config: Partial<IFunctionGroupConfig>,
+    config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E>> {
     return noTransportResource<T['transport'], E>(
@@ -113,7 +114,7 @@ export class AdtFunctionGroupLegacy<
    * read once and handed to `analyse`.
    */
   override async activate<E extends IAdtError = IAdtError>(
-    config: Partial<IFunctionGroupConfig>,
+    config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
