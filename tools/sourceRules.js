@@ -3,8 +3,8 @@
 //
 // One definition for the inventory and for the guard test each package runs
 // (`src/__tests__/…/sourceRules.test.ts`). It reads the AST and asks the type
-// checker; it runs no regular expression over source. The rules are spec
-// section 1 of docs/superpowers/specs/2026-11-26-no-casts-no-regex-spec.md:
+// checker; it runs no regular expression over source. The rules are those of
+// #304 (the spec, section 1, deleted once implemented; see git history):
 //
 // - C  a cast: an `as` whose type is not `const`, or a `<T>x` assertion;
 // - Y  `any`: the keyword in a type position, and an expression typed `any`
