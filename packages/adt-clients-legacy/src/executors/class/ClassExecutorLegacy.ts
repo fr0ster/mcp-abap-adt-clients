@@ -55,7 +55,7 @@ export class ClassExecutorLegacy<
     _target: IClassExecutionTarget,
     _options?: IClassExecuteOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['run'], E | IAdtError>> {
-    return legacyRefusal<T['run'], E>('run', CLASSRUN);
+    return legacyRefusal<T['run']>('run', CLASSRUN);
   }
 
   /** Refused without a request, for the same reason as `run`. */
@@ -75,7 +75,7 @@ export class ClassExecutorLegacy<
     _target: IClassExecutionTarget,
     _options: IClassExecuteWithProfilerOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['run'], E | IAdtError>> {
-    return legacyRefusal<T['run'], E>('runWithProfiler', CLASSRUN);
+    return legacyRefusal<T['run']>('runWithProfiler', CLASSRUN);
   }
 
   /** Refused until measured: 7.40 does not advertise the catalogue. */
@@ -88,10 +88,7 @@ export class ClassExecutorLegacy<
   override async listObjectTypes<E extends IAdtError = IAdtError>(
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['types'], E | IAdtError>> {
-    return legacyUnmeasuredRefusal<T['types'], E>(
-      'listObjectTypes',
-      OBJECT_TYPES,
-    );
+    return legacyUnmeasuredRefusal<T['types']>('listObjectTypes', OBJECT_TYPES);
   }
 
   /** Refused until measured: 7.40 does not advertise the catalogue. */
@@ -104,7 +101,7 @@ export class ClassExecutorLegacy<
   override async listProcessTypes<E extends IAdtError = IAdtError>(
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['types'], E | IAdtError>> {
-    return legacyUnmeasuredRefusal<T['types'], E>(
+    return legacyUnmeasuredRefusal<T['types']>(
       'listProcessTypes',
       PROCESS_TYPES,
     );

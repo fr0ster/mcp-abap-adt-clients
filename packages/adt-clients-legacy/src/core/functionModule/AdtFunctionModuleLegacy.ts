@@ -124,7 +124,7 @@ export class AdtFunctionModuleLegacy<
     >,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
-    return noDeletionCheck<T['deletionCheck'], E>();
+    return noDeletionCheck<T['deletionCheck']>();
   }
 
   /**
@@ -158,7 +158,7 @@ export class AdtFunctionModuleLegacy<
     >,
     _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
-    return legacyNotMeasuredRefusal<T['metadataUpdated'], E>(
+    return legacyNotMeasuredRefusal<T['metadataUpdated']>(
       'updateMetadata',
       'PUT /sap/bc/adt/functions/groups/{group}/fmodules/{name}',
     );
@@ -194,7 +194,7 @@ export class AdtFunctionModuleLegacy<
     >,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
-    return noTransportResource<T['transport'], E>(
+    return noTransportResource<T['transport']>(
       FUNCTION_MODULE.uri(config.functionGroupName, config.functionModuleName),
     );
   }

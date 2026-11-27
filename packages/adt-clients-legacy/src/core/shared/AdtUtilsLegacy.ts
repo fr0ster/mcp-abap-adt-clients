@@ -165,13 +165,10 @@ function refusedFor(
  * absent from discovery, not measured, so its refusal says that; the other
  * families answered `404`.
  */
-function refuseRead<T, E extends IAdtError>(
-  operation: string,
-  endpoint: string,
-): IAdtResponse<T, E> {
+function refuseRead<T>(operation: string, endpoint: string): IAdtResponse<T> {
   return endpoint === TABLE_TYPE.collection
-    ? legacyUnmeasuredRefusal<T, E>(operation, endpoint)
-    : legacyRefusal<T, E>(operation, endpoint);
+    ? legacyUnmeasuredRefusal<T>(operation, endpoint)
+    : legacyRefusal<T>(operation, endpoint);
 }
 
 function unsupportedError(operation: string, endpoint: string): string {
@@ -195,11 +192,8 @@ const CODES_740: ReadonlySet<string> = new Set(
  * A code 7.40's table does not list, from a caller outside the type system:
  * refused, as every legacy refusal is, and nothing is sent.
  */
-function refuseCode<T, E extends IAdtError>(
-  operation: string,
-  code: string,
-): IAdtResponse<T, E> {
-  return legacyRefusal<T, E>(
+function refuseCode<T>(operation: string, code: string): IAdtResponse<T> {
+  return legacyRefusal<T>(
     `${operation}(${code})`,
     `${code} in ADT_TYPES_BASIS_740`,
     'Nothing is sent.',
@@ -232,7 +226,7 @@ export class AdtUtilsLegacy<
     _preauditRequested: boolean = false,
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['activation'], E | IAdtError>> {
-    return legacyRefusal<T['activation'], E>(
+    return legacyRefusal<T['activation']>(
       'activateObjectsGroup',
       ACTIVATION_RUNS,
       GROUP_ACTIVATION_ON_740,
@@ -396,7 +390,7 @@ export class AdtUtilsLegacy<
     _objects: IAdtCodedReference<AdtDeletionCheckCode<'basis740'>>[],
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
-    return noDeletionCheck<T['deletionCheck'], E>('checkDeletionGroup');
+    return noDeletionCheck<T['deletionCheck']>('checkDeletionGroup');
   }
 
   /**
@@ -421,7 +415,7 @@ export class AdtUtilsLegacy<
     _transportRequest: string | undefined,
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
-    return noDeletionApi<T['deletion'], E>(
+    return noDeletionApi<T['deletion']>(
       'deleteObjectsGroup',
       "Delete each object through its handler's delete() with the object's lock handle, from lock().",
     );
@@ -446,7 +440,7 @@ export class AdtUtilsLegacy<
     _params: IGetWhereUsedParams<AdtWhereUsedCode<'basis740'>>,
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['whereUsed'], E | IAdtError>> {
-    return legacyRefusal<T['whereUsed'], E>(
+    return legacyRefusal<T['whereUsed']>(
       'getWhereUsed',
       WHERE_USED,
       WHERE_USED_ON_740,
@@ -468,7 +462,7 @@ export class AdtUtilsLegacy<
     _params: IGetWhereUsedScopeParams<AdtWhereUsedCode<'basis740'>>,
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['whereUsedScope'], E | IAdtError>> {
-    return legacyRefusal<T['whereUsedScope'], E>(
+    return legacyRefusal<T['whereUsedScope']>(
       'getWhereUsedScope',
       WHERE_USED_SCOPE,
       WHERE_USED_ON_740,
@@ -494,7 +488,7 @@ export class AdtUtilsLegacy<
     _params: IGetVirtualFoldersContentsParams,
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['folders'], E | IAdtError>> {
-    return legacyRefusal<T['folders'], E>(
+    return legacyRefusal<T['folders']>(
       'getVirtualFoldersContents',
       VIRTUAL_FOLDERS,
       "A package's contents: fetchNodeStructure with the package and type DEVC/K.",
@@ -523,7 +517,7 @@ export class AdtUtilsLegacy<
     _data?: string,
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['types'], E | IAdtError>> {
-    return legacyRefusal<T['types'], E>(
+    return legacyRefusal<T['types']>(
       'getAllTypes',
       OBJECT_TYPES,
       OBJECT_TYPES_ON_740,
@@ -552,7 +546,7 @@ export class AdtUtilsLegacy<
       withLongPolling?: boolean | undefined;
     } & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['run'], E | IAdtError>> {
-    return legacyRefusal<T['run'], E>(
+    return legacyRefusal<T['run']>(
       'getActivationRun',
       ACTIVATION_RUNS,
       NO_RUN_ID,
@@ -572,7 +566,7 @@ export class AdtUtilsLegacy<
     _runId: string,
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['results'], E | IAdtError>> {
-    return legacyRefusal<T['results'], E>(
+    return legacyRefusal<T['results']>(
       'getActivationResults',
       ACTIVATION_RESULTS,
       NO_RUN_ID,
@@ -614,12 +608,12 @@ export class AdtUtilsLegacy<
   ): Promise<IAdtResponse<T['metadata'], E | IAdtError>> {
     const endpoint = refusedFor(METADATA_REFUSED, objectType);
     if (endpoint)
-      return refuseRead<T['metadata'], E>(
+      return refuseRead<T['metadata']>(
         `readObjectMetadata(${objectType})`,
         endpoint,
       );
     if (!CODES_740.has(objectType))
-      return refuseCode<T['metadata'], E>('readObjectMetadata', objectType);
+      return refuseCode<T['metadata']>('readObjectMetadata', objectType);
     return super.readObjectMetadata(objectType, objectName, ...rest);
   }
 
@@ -664,12 +658,12 @@ export class AdtUtilsLegacy<
   ): Promise<IAdtResponse<T['source'], E | IAdtError>> {
     const endpoint = refusedFor(SOURCE_REFUSED, objectType);
     if (endpoint)
-      return refuseRead<T['source'], E>(
+      return refuseRead<T['source']>(
         `readObjectSource(${objectType})`,
         endpoint,
       );
     if (!CODES_740.has(objectType))
-      return refuseCode<T['source'], E>('readObjectSource', objectType);
+      return refuseCode<T['source']>('readObjectSource', objectType);
     return super.readObjectSource(objectType, objectName, ...rest);
   }
 
@@ -695,7 +689,7 @@ export class AdtUtilsLegacy<
       criteria.objectType !== undefined &&
       !Object.hasOwn(ADT_SEARCH_TYPES_BASIS_740, criteria.objectType)
     )
-      return legacyRefusal<T['search'], E>(
+      return legacyRefusal<T['search']>(
         `search(${criteria.objectType})`,
         `${criteria.objectType} in ADT_SEARCH_TYPES_BASIS_740`,
         'Nothing is sent.',
@@ -726,7 +720,7 @@ export class AdtUtilsLegacy<
       IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['node'], E | IAdtError>> {
     if (!CODES_740.has(parentType) && parentType !== 'DEVC/K')
-      return refuseCode<T['node'], E>('fetchNodeStructure', parentType);
+      return refuseCode<T['node']>('fetchNodeStructure', parentType);
     return super.fetchNodeStructure(parentType, parentName, options);
   }
 
@@ -747,23 +741,17 @@ export class AdtUtilsLegacy<
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['objectStructure'], E | IAdtError>> {
     if (!CODES_740.has(objectType) && objectType !== 'DEVC/K')
-      return refuseCode<T['objectStructure'], E>(
-        'getObjectStructure',
-        objectType,
-      );
+      return refuseCode<T['objectStructure']>('getObjectStructure', objectType);
     return super.getObjectStructure(objectType, objectName, options);
   }
 
-  private refuse<T, E extends IAdtError>(
-    operation: string,
-    endpoint: string,
-  ): IAdtResponse<T, E> {
+  private refuse<T>(operation: string, endpoint: string): IAdtResponse<T> {
     // The library's own verdict, so `E` is its default `IAdtError` here — the
     // same cast `answering` makes when no strategy supplied one.
-    return failed<T, E>({
+    return failed<T>({
       origin: 'refusal',
       code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
       message: unsupportedError(operation, endpoint),
-    } as E);
+    });
   }
 }

@@ -107,7 +107,7 @@ export class AdtClassLegacy<
     _config: AdtObjectIdentity<IClassConfig, 'className'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
-    return noDeletionCheck<T['deletionCheck'], E>();
+    return noDeletionCheck<T['deletionCheck']>();
   }
 
   /**
@@ -136,7 +136,7 @@ export class AdtClassLegacy<
       IAdtLockedWrite &
       AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
-    return legacyNotMeasuredRefusal<T['metadataUpdated'], E>(
+    return legacyNotMeasuredRefusal<T['metadataUpdated']>(
       'updateMetadata',
       'PUT /sap/bc/adt/oo/classes/{name}',
     );
@@ -163,6 +163,6 @@ export class AdtClassLegacy<
     config: AdtObjectIdentity<IClassConfig, 'className'>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
-    return noTransportResource<T['transport'], E>(CLASS.uri(config.className));
+    return noTransportResource<T['transport']>(CLASS.uri(config.className));
   }
 }

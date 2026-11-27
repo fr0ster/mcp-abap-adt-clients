@@ -62,7 +62,7 @@ export class AdtIncludeLegacy<
     _config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
-    return noDeletionCheck<T['deletionCheck'], E>();
+    return noDeletionCheck<T['deletionCheck']>();
   }
 
   /**
@@ -91,7 +91,7 @@ export class AdtIncludeLegacy<
       IAdtLockedWrite &
       AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
-    return legacyNotMeasuredRefusal<T['metadataUpdated'], E>(
+    return legacyNotMeasuredRefusal<T['metadataUpdated']>(
       'updateMetadata',
       'PUT /sap/bc/adt/programs/includes/{name}',
     );
@@ -117,7 +117,7 @@ export class AdtIncludeLegacy<
     _config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
     _options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['mainPrograms'], E | IAdtError>> {
-    return legacyNotMeasuredRefusal<T['mainPrograms'], E>(
+    return legacyNotMeasuredRefusal<T['mainPrograms']>(
       'readMainPrograms',
       'GET /sap/bc/adt/programs/includes/{name}/mainprograms',
     );

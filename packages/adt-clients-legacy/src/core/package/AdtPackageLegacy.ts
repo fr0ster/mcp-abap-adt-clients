@@ -58,33 +58,33 @@ export class AdtPackageLegacy<
   T extends PackageValues = ResultValuesOf<typeof packageDocuments>,
 > extends AdtPackage<T> {
   override async create<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<T['created'], E>
+    IAdtResponse<T['created'], E | IAdtError>
   > {
-    return failed<T['created'], E>(UNSUPPORTED as E);
+    return failed<T['created']>(UNSUPPORTED);
   }
 
   override async readMetadata<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<T['metadata'], E>
+    IAdtResponse<T['metadata'], E | IAdtError>
   > {
-    return failed<T['metadata'], E>(UNSUPPORTED as E);
+    return failed<T['metadata']>(UNSUPPORTED);
   }
 
   override async validate<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<T['validation'], E>
+    IAdtResponse<T['validation'], E | IAdtError>
   > {
-    return failed<T['validation'], E>(UNSUPPORTED as E);
+    return failed<T['validation']>(UNSUPPORTED);
   }
 
   override async updateMetadata<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<T['metadataUpdated'], E>
+    IAdtResponse<T['metadataUpdated'], E | IAdtError>
   > {
-    return failed<T['metadataUpdated'], E>(UNSUPPORTED as E);
+    return failed<T['metadataUpdated']>(UNSUPPORTED);
   }
 
   override async delete<E extends IAdtError = IAdtError>(): Promise<
-    IAdtResponse<T['deletion'], E>
+    IAdtResponse<T['deletion'], E | IAdtError>
   > {
-    return failed<T['deletion'], E>(UNSUPPORTED as E);
+    return failed<T['deletion']>(UNSUPPORTED);
   }
 
   /**
@@ -106,7 +106,7 @@ export class AdtPackageLegacy<
     _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
-    return noDeletionCheckNorDelete<T['deletionCheck'], E>();
+    return noDeletionCheckNorDelete<T['deletionCheck']>();
   }
 
   /**
@@ -126,7 +126,7 @@ export class AdtPackageLegacy<
     _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E | IAdtError>> {
-    return legacyRefusal<string, E>('lock', ITEM_RESOURCE);
+    return legacyRefusal<string>('lock', ITEM_RESOURCE);
   }
 
   override unlock<E extends IAdtError>(
@@ -144,7 +144,7 @@ export class AdtPackageLegacy<
     _lockHandle: string,
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E | IAdtError>> {
-    return legacyRefusal<void, E>('unlock', ITEM_RESOURCE);
+    return legacyRefusal<void>('unlock', ITEM_RESOURCE);
   }
 
   override readTransport<E extends IAdtError>(
@@ -161,7 +161,7 @@ export class AdtPackageLegacy<
     _config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
-    return legacyRefusal<T['transport'], E>(
+    return legacyRefusal<T['transport']>(
       'readTransport',
       `${ITEM_RESOURCE}/transport`,
     );
@@ -184,7 +184,7 @@ export class AdtPackageLegacy<
     _status: string | undefined,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['check'], E | IAdtError>> {
-    return legacyRefusal<T['check'], E>(
+    return legacyRefusal<T['check']>(
       'check',
       `${ITEM_RESOURCE} to check (the check run names it)`,
     );

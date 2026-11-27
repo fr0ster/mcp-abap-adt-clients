@@ -105,7 +105,7 @@ export class AdtInterfaceLegacy<
     _config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
-    return noDeletionCheck<T['deletionCheck'], E>();
+    return noDeletionCheck<T['deletionCheck']>();
   }
 
   /**
@@ -134,7 +134,7 @@ export class AdtInterfaceLegacy<
       IAdtLockedWrite &
       AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
-    return legacyNotMeasuredRefusal<T['metadataUpdated'], E>(
+    return legacyNotMeasuredRefusal<T['metadataUpdated']>(
       'updateMetadata',
       'PUT /sap/bc/adt/oo/interfaces/{name}',
     );
@@ -161,7 +161,7 @@ export class AdtInterfaceLegacy<
     config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
-    return noTransportResource<T['transport'], E>(
+    return noTransportResource<T['transport']>(
       INTERFACE.uri(config.interfaceName),
     );
   }

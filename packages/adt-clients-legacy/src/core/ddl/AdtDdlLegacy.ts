@@ -107,12 +107,12 @@ export class AdtDdlLegacy<
     _cdsViewName: string,
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['testDoubles'], E | IAdtError>> {
-    return failed<T['testDoubles'], E>({
+    return failed<T['testDoubles']>({
       origin: 'refusal',
       code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
       message:
         'The CDS test-doubles check needs BASIS 7.50 or later; this system has no such endpoint.',
-    } as E);
+    });
   }
 
   /**
@@ -137,7 +137,7 @@ export class AdtDdlLegacy<
     _config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
-    return noDeletionCheck<T['deletionCheck'], E>();
+    return noDeletionCheck<T['deletionCheck']>();
   }
 
   /**
@@ -166,7 +166,7 @@ export class AdtDdlLegacy<
       IAdtLockedWrite &
       AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
-    return legacyNotMeasuredRefusal<T['metadataUpdated'], E>(
+    return legacyNotMeasuredRefusal<T['metadataUpdated']>(
       'updateMetadata',
       'PUT /sap/bc/adt/ddic/ddl/sources/{name}',
     );
@@ -193,9 +193,7 @@ export class AdtDdlLegacy<
     config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
-    return noTransportResource<T['transport'], E>(
-      DDL_SOURCE.uri(config.ddlName),
-    );
+    return noTransportResource<T['transport']>(DDL_SOURCE.uri(config.ddlName));
   }
 
   /**
@@ -217,7 +215,7 @@ export class AdtDdlLegacy<
     config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['versions'], E | IAdtError>> {
-    return legacyMeasuredRefusal<T['versions'], E>(
+    return legacyMeasuredRefusal<T['versions']>(
       'getVersions',
       `GET ${versionsUri(DDL_SOURCE.uri(config.ddlName))} answers 404.`,
     );
@@ -242,7 +240,7 @@ export class AdtDdlLegacy<
     _contentUri: string,
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['versionSource'], E | IAdtError>> {
-    return legacyMeasuredRefusal<T['versionSource'], E>(
+    return legacyMeasuredRefusal<T['versionSource']>(
       'getVersionSource',
       'the DDL version list (GET <DDL URI>/versions) answers 404, so there is no version to read.',
     );

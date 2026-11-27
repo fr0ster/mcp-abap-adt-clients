@@ -35,24 +35,24 @@ export class AbapUnitTestRunnerLegacy<
   /** Refused without a request: see the class's comment. */
   override async run<E extends IAdtError = IAdtError>(
     this: this & IAdtServedOn<AdtModernVariant>,
-  ): Promise<IAdtResponse<T['run'], E>> {
-    return failed<T['run'], E>({
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>> {
+    return failed<T['run']>({
       origin: 'refusal',
       code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
       message:
         'run: a legacy system has no /sap/bc/adt/abapunit/runs, where an object or a package target runs — name the objects by their ADT URIs with runSync, which runs on /sap/bc/adt/abapunit/testruns.',
-    } as E);
+    });
   }
 
   override async getStatus<E extends IAdtError = IAdtError>(
     this: this & IAdtServedOn<AdtModernVariant>,
-  ): Promise<IAdtResponse<T['status'], E>> {
-    return noRunToPoll<T['status'], E>();
+  ): Promise<IAdtResponse<T['status'], E | IAdtError>> {
+    return noRunToPoll<T['status']>();
   }
 
   override async getResult<E extends IAdtError = IAdtError>(
     this: this & IAdtServedOn<AdtModernVariant>,
-  ): Promise<IAdtResponse<T['result'], E>> {
-    return noResultToFetch<T['result'], E>();
+  ): Promise<IAdtResponse<T['result'], E | IAdtError>> {
+    return noResultToFetch<T['result']>();
   }
 }

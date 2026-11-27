@@ -61,7 +61,7 @@ export class AdtMessageClassLegacy<
     _config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
-    return noDeletionCheck<T['deletionCheck'], E>();
+    return noDeletionCheck<T['deletionCheck']>();
   }
 
   /**
@@ -128,7 +128,7 @@ export class AdtMessageClassLegacy<
       IAdtLockedWrite &
       AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
-    return legacyMeasuredRefusal<T['metadataUpdated'], E>(
+    return legacyMeasuredRefusal<T['metadataUpdated']>(
       'updateMetadata',
       'PUT of the message class document answers 400 ExceptionInvalidData (7.40 expects another root element).',
     );

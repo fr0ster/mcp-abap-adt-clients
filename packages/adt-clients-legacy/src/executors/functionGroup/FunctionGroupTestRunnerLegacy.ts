@@ -61,13 +61,13 @@ export class FunctionGroupTestRunnerLegacy<
 
   override async getStatus<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionGroup', 'unitTestStatus'>,
-  ): Promise<IAdtResponse<T['status'], E>> {
-    return noRunToPoll<T['status'], E>();
+  ): Promise<IAdtResponse<T['status'], E | IAdtError>> {
+    return noRunToPoll<T['status']>();
   }
 
   override async getResult<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionGroup', 'unitTestResult'>,
-  ): Promise<IAdtResponse<T['result'], E>> {
-    return noResultToFetch<T['result'], E>();
+  ): Promise<IAdtResponse<T['result'], E | IAdtError>> {
+    return noResultToFetch<T['result']>();
   }
 }

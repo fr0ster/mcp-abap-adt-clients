@@ -50,6 +50,6 @@ export class AdtLocalMacrosLegacy<
     config: AdtObjectIdentity<IClassConfig, 'className'>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
-    return noTransportResource<T['transport'], E>(CLASS.uri(config.className));
+    return noTransportResource<T['transport']>(CLASS.uri(config.className));
   }
 }

@@ -76,14 +76,14 @@ export class ClassTestRunnerLegacy<
    */
   override async getStatus<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'class', 'unitTestStatus'>,
-  ): Promise<IAdtResponse<T['status'], E>> {
-    return noRunToPoll<T['status'], E>();
+  ): Promise<IAdtResponse<T['status'], E | IAdtError>> {
+    return noRunToPoll<T['status']>();
   }
 
   /** Refused for the same reason: `run`'s answer is the result document. */
   override async getResult<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'class', 'unitTestResult'>,
-  ): Promise<IAdtResponse<T['result'], E>> {
-    return noResultToFetch<T['result'], E>();
+  ): Promise<IAdtResponse<T['result'], E | IAdtError>> {
+    return noResultToFetch<T['result']>();
   }
 }

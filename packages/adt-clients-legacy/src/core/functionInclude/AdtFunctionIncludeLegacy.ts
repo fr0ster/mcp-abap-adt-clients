@@ -62,7 +62,7 @@ export class AdtFunctionIncludeLegacy<
     >,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
-    return noDeletionCheckNorDelete<T['deletionCheck'], E>();
+    return noDeletionCheckNorDelete<T['deletionCheck']>();
   }
 
   /** Refused without a request: 7.40 has no `/sap/bc/adt/deletion/delete` (§4.3). */
@@ -92,6 +92,6 @@ export class AdtFunctionIncludeLegacy<
     >,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
-    return noDeletionApi<T['deletion'], E>();
+    return noDeletionApi<T['deletion']>();
   }
 }

@@ -107,7 +107,7 @@ export class AdtFunctionGroupLegacy<
     _config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
-    return noDeletionCheck<T['deletionCheck'], E>();
+    return noDeletionCheck<T['deletionCheck']>();
   }
 
   /**
@@ -131,7 +131,7 @@ export class AdtFunctionGroupLegacy<
     config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
-    return noTransportResource<T['transport'], E>(
+    return noTransportResource<T['transport']>(
       FUNCTION_GROUP.uri(config.functionGroupName),
     );
   }

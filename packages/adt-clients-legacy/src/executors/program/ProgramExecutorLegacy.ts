@@ -53,7 +53,7 @@ export class ProgramExecutorLegacy<
     _target: IProgramExecutionTarget,
     _options?: IProgramExecuteOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['run'], E | IAdtError>> {
-    return legacyUnmeasuredRefusal<T['run'], E>('run', PROGRAMRUN);
+    return legacyUnmeasuredRefusal<T['run']>('run', PROGRAMRUN);
   }
 
   /** Refused without a request, for the same reason as `run`. */
@@ -74,7 +74,7 @@ export class ProgramExecutorLegacy<
     _target: IProgramExecutionTarget,
     _options: IProgramExecuteWithProfilerOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['run'], E | IAdtError>> {
-    return legacyUnmeasuredRefusal<T['run'], E>('runWithProfiler', PROGRAMRUN);
+    return legacyUnmeasuredRefusal<T['run']>('runWithProfiler', PROGRAMRUN);
   }
 
   /** Refused until measured: 7.40 does not advertise the catalogue. */
@@ -87,10 +87,7 @@ export class ProgramExecutorLegacy<
   override async listObjectTypes<E extends IAdtError = IAdtError>(
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['types'], E | IAdtError>> {
-    return legacyUnmeasuredRefusal<T['types'], E>(
-      'listObjectTypes',
-      OBJECT_TYPES,
-    );
+    return legacyUnmeasuredRefusal<T['types']>('listObjectTypes', OBJECT_TYPES);
   }
 
   /** Refused until measured: 7.40 does not advertise the catalogue. */
@@ -103,7 +100,7 @@ export class ProgramExecutorLegacy<
   override async listProcessTypes<E extends IAdtError = IAdtError>(
     _options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['types'], E | IAdtError>> {
-    return legacyUnmeasuredRefusal<T['types'], E>(
+    return legacyUnmeasuredRefusal<T['types']>(
       'listProcessTypes',
       PROCESS_TYPES,
     );

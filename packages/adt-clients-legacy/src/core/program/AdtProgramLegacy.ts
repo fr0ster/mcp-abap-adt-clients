@@ -105,7 +105,7 @@ export class AdtProgramLegacy<
     _config: AdtObjectIdentity<IProgramConfig, 'programName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
-    return noDeletionCheck<T['deletionCheck'], E>();
+    return noDeletionCheck<T['deletionCheck']>();
   }
 
   /**
@@ -134,7 +134,7 @@ export class AdtProgramLegacy<
       IAdtLockedWrite &
       AdtRequiredUpdateOptions<'source'>,
   ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
-    return legacyNotMeasuredRefusal<T['metadataUpdated'], E>(
+    return legacyNotMeasuredRefusal<T['metadataUpdated']>(
       'updateMetadata',
       'PUT /sap/bc/adt/programs/programs/{name}',
     );
@@ -161,8 +161,6 @@ export class AdtProgramLegacy<
     config: AdtObjectIdentity<IProgramConfig, 'programName'>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
-    return noTransportResource<T['transport'], E>(
-      PROGRAM.uri(config.programName),
-    );
+    return noTransportResource<T['transport']>(PROGRAM.uri(config.programName));
   }
 }

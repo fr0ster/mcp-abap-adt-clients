@@ -76,12 +76,12 @@ export class AdtRequestLegacy<
    */
   override async create<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'create'>,
-  ): Promise<IAdtResponse<T['created'], E>> {
-    return failed<T['created'], E>(
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>> {
+    return failed<T['created']>(
       unsupported(
         'Creating transport requests',
         `The ${TRANSPORT_REQUEST_LEGACY.collection} endpoint rejects every create payload.`,
-      ) as E,
+      ),
     );
   }
 
@@ -152,11 +152,11 @@ export class AdtRequestLegacy<
         ? 'user'
         : undefined;
     if (refused !== undefined) {
-      return failed<T['list'], E>(
+      return failed<T['list']>(
         unsupported(
           refused,
           `${TRANSPORT_REQUEST_LEGACY.collection} is not a saved-configuration search, reads no query, and always returns the full list for the current user.`,
-        ) as E,
+        ),
       );
     }
 
@@ -170,24 +170,24 @@ export class AdtRequestLegacy<
   /** Refused: the legacy endpoint's update shape has never been captured. */
   override async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'updateMetadata'>,
-  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
-    return failed<T['metadataUpdated'], E>(
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
+    return failed<T['metadataUpdated']>(
       unsupported(
         'Updating transport requests',
         `The legacy ${TRANSPORT_REQUEST_LEGACY.collection} endpoint has never been captured, so whether or how it supports changing a description is unknown.`,
-      ) as E,
+      ),
     );
   }
 
   /** Refused: the legacy endpoint's delete shape has never been captured. */
   override async delete<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'request', 'delete'>,
-  ): Promise<IAdtResponse<T['deleted'], E>> {
-    return failed<T['deleted'], E>(
+  ): Promise<IAdtResponse<T['deleted'], E | IAdtError>> {
+    return failed<T['deleted']>(
       unsupported(
         'Deleting transport requests',
         `The legacy ${TRANSPORT_REQUEST_LEGACY.collection} endpoint has never been captured, so whether it supports deleting a request is unknown.`,
-      ) as E,
+      ),
     );
   }
 
@@ -204,8 +204,8 @@ export class AdtRequestLegacy<
     this: this & AdtPerformedBy<'request', 'searchConfigurations'>,
     _options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['searchConfigurations'], E | IAdtError>> {
-    return failed<T['searchConfigurations'], E>(
-      unsupported('Searching transport configurations', NOT_ADVERTISED) as E,
+    return failed<T['searchConfigurations']>(
+      unsupported('Searching transport configurations', NOT_ADVERTISED),
     );
   }
 
@@ -227,11 +227,11 @@ export class AdtRequestLegacy<
     _config: AdtObjectIdentity<ITransportConfig, 'transportNumber'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
-    return failed<T['deletionCheck'], E>(
+    return failed<T['deletionCheck']>(
       unsupported(
         'Checking the deletion of a transport request',
         NOT_ADVERTISED,
-      ) as E,
+      ),
     );
   }
 
@@ -251,11 +251,8 @@ export class AdtRequestLegacy<
     _transportNumber: string,
     _options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['objects'], E | IAdtError>> {
-    return failed<T['objects'], E>(
-      unsupported(
-        'Reading the objects of a transport request',
-        NOT_ADVERTISED,
-      ) as E,
+    return failed<T['objects']>(
+      unsupported('Reading the objects of a transport request', NOT_ADVERTISED),
     );
   }
 
@@ -275,11 +272,11 @@ export class AdtRequestLegacy<
     _transportNumber: string,
     _options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['actionLog'], E | IAdtError>> {
-    return failed<T['actionLog'], E>(
+    return failed<T['actionLog']>(
       unsupported(
         'Reading the action log of a transport request',
         NOT_ADVERTISED,
-      ) as E,
+      ),
     );
   }
 
@@ -304,11 +301,8 @@ export class AdtRequestLegacy<
     _object: IAbapObjectEntry,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['addedObject'], E | IAdtError>> {
-    return failed<T['addedObject'], E>(
-      unsupported(
-        'Adding an object to a transport request',
-        NOT_ADVERTISED,
-      ) as E,
+    return failed<T['addedObject']>(
+      unsupported('Adding an object to a transport request', NOT_ADVERTISED),
     );
   }
 
@@ -333,11 +327,11 @@ export class AdtRequestLegacy<
     _object: IAbapObjectEntry & { position: string },
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['removedObject'], E | IAdtError>> {
-    return failed<T['removedObject'], E>(
+    return failed<T['removedObject']>(
       unsupported(
         'Removing an object from a transport request',
         NOT_ADVERTISED,
-      ) as E,
+      ),
     );
   }
 
@@ -365,11 +359,8 @@ export class AdtRequestLegacy<
     _objects: readonly (IAbapObjectEntry & { position: string })[],
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['movedObjects'], E | IAdtError>> {
-    return failed<T['movedObjects'], E>(
-      unsupported(
-        'Moving objects between transport requests',
-        NOT_ADVERTISED,
-      ) as E,
+    return failed<T['movedObjects']>(
+      unsupported('Moving objects between transport requests', NOT_ADVERTISED),
     );
   }
 
@@ -389,11 +380,8 @@ export class AdtRequestLegacy<
     _taskNumber: string,
     _options?: IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['sortedAndCompressed'], E | IAdtError>> {
-    return failed<T['sortedAndCompressed'], E>(
-      unsupported(
-        'Sorting and compressing a transport task',
-        NOT_ADVERTISED,
-      ) as E,
+    return failed<T['sortedAndCompressed']>(
+      unsupported('Sorting and compressing a transport task', NOT_ADVERTISED),
     );
   }
 
@@ -419,11 +407,8 @@ export class AdtRequestLegacy<
       targetUser: string;
     } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['createdTask'], E | IAdtError>> {
-    return failed<T['createdTask'], E>(
-      unsupported(
-        'Creating a task under a transport request',
-        NOT_ADVERTISED,
-      ) as E,
+    return failed<T['createdTask']>(
+      unsupported('Creating a task under a transport request', NOT_ADVERTISED),
     );
   }
 
@@ -448,8 +433,8 @@ export class AdtRequestLegacy<
     _type: AdtTaskType,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
   ): Promise<IAdtResponse<T['taskTypeChanged'], E | IAdtError>> {
-    return failed<T['taskTypeChanged'], E>(
-      unsupported('Changing the type of a transport task', NOT_ADVERTISED) as E,
+    return failed<T['taskTypeChanged']>(
+      unsupported('Changing the type of a transport task', NOT_ADVERTISED),
     );
   }
 }

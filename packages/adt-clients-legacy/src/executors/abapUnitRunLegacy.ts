@@ -46,21 +46,21 @@ export function runSyncLegacy<T, E extends IAdtError>(
 }
 
 /** `getStatus` on a legacy system: refused without a request. */
-export function noRunToPoll<T, E extends IAdtError>(): IAdtResponse<T, E> {
-  return failed<T, E>({
+export function noRunToPoll<T>(): IAdtResponse<T> {
+  return failed<T>({
     origin: 'refusal',
     code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
     message:
       'getStatus: a legacy system has no run to poll — it has no /sap/bc/adt/abapunit/runs, and run() answers the finished result, with no run id.',
-  } as E);
+  });
 }
 
 /** `getResult` on a legacy system: refused without a request. */
-export function noResultToFetch<T, E extends IAdtError>(): IAdtResponse<T, E> {
-  return failed<T, E>({
+export function noResultToFetch<T>(): IAdtResponse<T> {
+  return failed<T>({
     origin: 'refusal',
     code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
     message:
       'getResult: a legacy system has no result to fetch — it has no /sap/bc/adt/abapunit/results, and run() answers the finished result, with no run id.',
-  } as E);
+  });
 }
