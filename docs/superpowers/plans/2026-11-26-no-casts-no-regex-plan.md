@@ -399,6 +399,16 @@ upgrade.
        inactive `GET` and then the `PUT` (`unit/core/tableSettings/tableSettings.test.ts`,
        `patchMetadata`).
 
+43f. **The type-only proofs, rerun with the corrected `compare-emit`** (#333
+     review F5): each commit's parent against the commit, in worktrees of
+     their own, every package the commit touches — all identical. K1
+     `9a9e5661` (clients 549 files), K7 `5f70cf9e` (550), D1 `e26d3466`
+     (clients 552, legacy 31), D3 `977e96e8` (552, 31), the comment change
+     `e2799440` (552), the `source` casts `a252de22` (552), the enhancement
+     `b9af5efd` and `809f420a` (552), the strategies' K1 `a442b259` (30), and
+     the legacy K1 `50266755` and C3 `cd8b1ba9` (31). Two runtime commits the
+     list once held, `ecdba580` and `63d8b610`, change the emit by design and
+     carry equivalence tests instead.
 44. **Public surface.** Compare strategies' `.d.ts` with step 14's snapshot again, now after
     its interfaces-adt upgrade in step 40. The only differences allowed are the
     interfaces-adt types it uses or re-exports. Then compare clients' `.d.ts` with step 26's
