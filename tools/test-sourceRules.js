@@ -86,7 +86,8 @@ const cases = [
   [
     'Y: JSON.parse read as a property',
     { 'a.ts': "export const x = JSON.parse('{}').a;" },
-    ['any/flow'],
+    // The call is read (a use), and the read's value is used too.
+    ['any/flow', 'any/flow'],
   ],
   [
     'Y: JSON.parse returned',
@@ -216,7 +217,7 @@ const cases = [
   [
     'R: a literal',
     { 'a.ts': "export const x = /a/.test('a');" },
-    ['regex/literal'],
+    ['regex/literal', 'regex/member'],
   ],
   [
     'R: new RegExp',
@@ -231,7 +232,7 @@ const cases = [
   [
     'R: RegExp aliased',
     { 'a.ts': "const R = RegExp;\nexport const x = new R('a');" },
-    ['regex/RegExp'],
+    ['regex/RegExp', 'regex/constructor', 'regex/value'],
   ],
   [
     'R: a RegExp value from a declaration',
@@ -239,7 +240,7 @@ const cases = [
       'a.ts':
         "declare function pattern(): RegExp;\nexport const x = pattern().test('a');",
     },
-    ['regex/value'],
+    ['regex/value', 'regex/member'],
   ],
   [
     "R: s.match('x')",
@@ -311,6 +312,132 @@ const cases = [
         "export function isText(v: unknown): v is string { return typeof v === 'string'; }",
     },
     ['predicate/is'],
+  ],
+  // Review of #333 (F1–F4, F6): each case below failed against the guard
+  // before its fix.
+  [
+    'N: a typed value returned as unknown, then narrowed',
+    {
+      'a.ts':
+        "function f(): unknown { return 'a'; }\nconst v = f();\nexport const x = typeof v === 'string';",
+    },
+    ['hand-narrowed/widened'],
+  ],
+  [
+    'N: a typed value as an object property declared unknown, then narrowed',
+    {
+      'a.ts':
+        "interface IHolder { v: unknown }\nfunction g(h: IHolder) { return typeof h.v === 'string'; }\nexport const x = g({ v: 1 });",
+    },
+    ['hand-narrowed/widened'],
+  ],
+  [
+    'N: a widening carried on through a second unknown binding',
+    {
+      'a.ts':
+        "function g(a: unknown) { return typeof a === 'string'; }\nfunction f(b: unknown) { return g(b); }\nexport const x = f('s');",
+    },
+    ['hand-narrowed/widened'],
+  ],
+  [
+    'N: an inferred unknown binding reached by a widening',
+    {
+      'a.ts':
+        "function id(v: unknown): unknown { return v; }\nconst u = id('s');\nexport const x = typeof u === 'string';",
+    },
+    ['hand-narrowed/widened'],
+  ],
+  [
+    'N: equality of two values, neither a literal, is not narrowing',
+    {
+      'a.ts':
+        'function g(a: unknown, b: unknown) { return a === b; }\nexport const x = g(1, 2);',
+    },
+    [],
+  ],
+  [
+    'N: an isArray that is not Array.isArray is not narrowing',
+    {
+      'a.ts':
+        'const tools = { isArray: (_v: unknown) => true };\nfunction g(a: unknown) { return tools.isArray(a); }\nexport const x = g(1);',
+    },
+    [],
+  ],
+  [
+    'N: undefined returned for nothing is no widening, allowed',
+    {
+      'a.ts':
+        "declare const outside: unknown;\nfunction f(present: boolean): unknown { if (!present) return undefined; return outside; }\nconst v = f(true);\nexport const x = typeof v === 'string';",
+    },
+    [],
+  ],
+  [
+    'Y: an identifier typed any, used',
+    { 'a.ts': 'declare const a: any;\nexport const x: string = a;' },
+    ['any/keyword', 'any/flow'],
+  ],
+  [
+    'Y: an any operated on before it is bound to unknown',
+    { 'a.ts': "export const x: unknown = JSON.parse('1').a;" },
+    ['any/flow'],
+  ],
+  [
+    'Y: an any called',
+    { 'a.ts': "export const x: unknown = JSON.parse('1')();" },
+    ['any/flow'],
+  ],
+  [
+    'R: a regex value through an identifier',
+    {
+      'a.ts':
+        "declare function p(): RegExp;\nconst re = p();\nexport const x = re.test('a');",
+    },
+    ['regex/value', 'regex/value', 'regex/member'],
+  ],
+  [
+    'R: a type derived from RegExp',
+    {
+      'a.ts':
+        'interface IMine extends RegExp { mine: 1 }\ndeclare const m: IMine;\nexport const y = m.source;',
+    },
+    ['regex/value', 'regex/member'],
+  ],
+  [
+    'R: a union holding RegExp',
+    {
+      'a.ts': 'declare const u: RegExp | string;\nexport const y = u;',
+    },
+    ['regex/value'],
+  ],
+  [
+    'R: a computed element access answering RegExp',
+    {
+      'a.ts':
+        "declare const o: { [k: string]: RegExp };\nexport const y = o['k'];",
+    },
+    ['regex/value'],
+  ],
+  [
+    'R: a constructor alias from a declaration',
+    {
+      'a.ts':
+        "declare const C: RegExpConstructor;\nexport const y = new C('a');",
+    },
+    ['regex/constructor', 'regex/value'],
+  ],
+  [
+    'P: a predicate in a reader whose parameter a typed value reaches',
+    {
+      'reader.ts':
+        "export function isText(v: unknown): v is string { return typeof v === 'string'; }",
+      'a.ts':
+        "import { isText } from './reader';\nexport const x = isText('a');",
+    },
+    ['predicate/is', 'hand-narrowed/widened'],
+    (dir) => ({
+      boundaryModules: [],
+      readerModules: [`${dir.split(path.sep).join('/')}/src/reader.ts`],
+    }),
   ],
 ];
 
