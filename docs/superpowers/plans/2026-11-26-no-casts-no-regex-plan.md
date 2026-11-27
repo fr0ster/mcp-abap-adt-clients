@@ -392,6 +392,12 @@ upgrade.
      inactive-objects read and `AdtTableSettings.patchMetadata` are not
      changed. Each gets a test that pins how many requests it sends today, so a
      later decision by the owner starts from a measured baseline.
+     - Found already pinned, so no test was added: every member in
+       `ACTIVATING_APIS` sends exactly `['POST', 'GET']` after a silent or an
+       unstated checklist, and `['POST']` after any other answer
+       (`unit/utils/activationRead.test.ts`). `patchMetadata` sends exactly the
+       inactive `GET` and then the `PUT` (`unit/core/tableSettings/tableSettings.test.ts`,
+       `patchMetadata`).
 
 44. **Public surface.** Compare strategies' `.d.ts` with step 14's snapshot again, now after
     its interfaces-adt upgrade in step 40. The only differences allowed are the
