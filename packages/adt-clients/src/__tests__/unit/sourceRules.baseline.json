@@ -1078,13 +1078,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/utils/discoveryEndpoints.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/href=\"([^\"]+)\"/g",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/utils/systemInfo.ts",
     "rule": "cast",
     "kind": "re-types",
@@ -1096,13 +1089,6 @@
     "rule": "cast",
     "kind": "re-types",
     "text": "verdict as E",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/utils/systemInfo.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/\\.hana\\.ondemand\\.com/i",
     "count": 1
   }
 ]

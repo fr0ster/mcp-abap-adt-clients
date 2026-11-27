@@ -27,6 +27,7 @@ import {
   succeeded,
 } from './adtResponse';
 import { isElement, isWireResponse, propertyOf } from './ownValue';
+import { namesHanaOnDemand } from './scan';
 
 /**
  * Whether a failure says the endpoint is not there — the one failure
@@ -219,7 +220,7 @@ export async function isCloudEnvironment(
     const baseUrl = await connection.getBaseUrl();
     if (baseUrl) {
       // Cloud systems use specific domain patterns
-      if (/\.hana\.ondemand\.com/i.test(baseUrl)) {
+      if (namesHanaOnDemand(baseUrl)) {
         return true;
       }
       // HTTP with explicit port is typically on-premise

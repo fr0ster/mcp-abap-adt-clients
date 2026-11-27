@@ -411,3 +411,32 @@ export function scopeResultAsScope(text: string): string {
   }
   return out;
 }
+
+/**
+ * Every value of `/href="([^"]+)"/g`, as an `exec` loop found them: each
+ * `href="` (no word boundary, so `xhref="` too), its value to the next `"`; an
+ * empty value is skipped and the search resumes one character later.
+ */
+export function hrefValues(text: string): string[] {
+  const values: string[] = [];
+  const marker = 'href="';
+  let at = text.indexOf(marker);
+  while (at !== -1) {
+    const from = at + marker.length;
+    const close = text.indexOf('"', from);
+    if (close === -1) break;
+    if (close > from) {
+      values.push(text.slice(from, close));
+      at = text.indexOf(marker, close + 1);
+    } else at = text.indexOf(marker, at + 1);
+  }
+  return values;
+}
+
+/** `/\.hana\.ondemand\.com/i.test(text)`: a folded, unanchored search. */
+export function namesHanaOnDemand(text: string): boolean {
+  const host = '.hana.ondemand.com';
+  for (let at = 0; at + host.length <= text.length; at++)
+    if (foldedAt(text, at, host)) return true;
+  return false;
+}
