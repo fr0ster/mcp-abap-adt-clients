@@ -24,7 +24,10 @@ import {
   analyseException,
   objectVersions,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IInterfaceConfig } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtObjectIdentity,
+  IInterfaceConfig,
+} from '@mcp-abap-adt/interfaces-adt';
 import { integrationHeadersOf } from '../../../../../../adt-clients/src/__tests__/helpers/adtHeaders';
 import {
   expectFailure,
@@ -68,7 +71,9 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — interface cycle', () => {
       const { client, recorder } = session as LegacySession;
       const name = param(params, 'interface_name');
       requireOwnNames(CASE, [['interface', name]]);
-      const config: IInterfaceConfig = { interfaceName: name };
+      const config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'> = {
+        interfaceName: name,
+      };
       const uri = `/sap/bc/adt/oo/interfaces/${name.toLowerCase()}`;
       const source = `INTERFACE ${name.toLowerCase()} PUBLIC.\n  METHODS run.\nENDINTERFACE.`;
       const intf = cycleObject({

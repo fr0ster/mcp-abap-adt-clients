@@ -31,7 +31,7 @@ fr0ster/mcp-abap-adt-clients#304: this package's `src` holds no cast but
 `unknown`, no regular expression and no type predicate over a typed value — a
 guard test (`sourceRules.test.ts`, over `tools/sourceRules.js`) refuses each,
 with no baseline. The types now say what each member needs and answers, which
-is the reason for the major. On `@mcp-abap-adt/interfaces-adt` ^32.0.0 and
+is the reason for the major. On `@mcp-abap-adt/interfaces-adt` ^33.0.0 and
 `@mcp-abap-adt/adt-strategies` 0.29.0. The migration note is
 [`docs/usage/MIGRATION-48.md`](docs/usage/MIGRATION-48.md).
 
@@ -88,6 +88,10 @@ is the reason for the major. On `@mcp-abap-adt/interfaces-adt` ^32.0.0 and
   string `method` and `url`; a batch part's `params` a string, a
   `URLSearchParams` or a plain object of string, number or boolean values, else
   `BATCH_REFUSES_PARAMS`.
+- **interfaces-adt ^33.0.0** (was ^31.0.0; 32.0.0 is #304's contract, 33.0.0
+  requires a create's fields in its configs too): a full config literal of
+  those seven types gives the fields, and a partial of one no longer takes an
+  explicit `undefined` for them (`exactOptionalPropertyTypes`).
 - **K5: a rejection with `null` or `undefined`** is rethrown as it came, not as
   a `TypeError` of the library's own.
 - **D2 (adt-strategies 0.29.0): a trace reading throws on a missing required

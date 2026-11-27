@@ -3,7 +3,7 @@
 48.0.0 is fr0ster/mcp-abap-adt-clients#304: this package's source holds no
 cast, no `any`, no value narrowed by hand, no regular expression and no type
 predicate, so its types say what each member needs and answers. It pairs with
-`@mcp-abap-adt/interfaces-adt` ^32.0.0, `@mcp-abap-adt/adt-strategies` 0.29.0
+`@mcp-abap-adt/interfaces-adt` ^33.0.0, `@mcp-abap-adt/adt-strategies` 0.29.0
 and `@mcp-abap-adt/adt-clients-legacy`. Every change below is breaking for a
 consumer that uses what it names; the rest is in [the changelog](../../CHANGELOG.md).
 
@@ -67,8 +67,11 @@ await client.getInterface().create(
 );
 ```
 
-The config types of `@mcp-abap-adt/interfaces-adt` require the same fields from
-its 33.0.0.
+The config types of `@mcp-abap-adt/interfaces-adt` require the same fields
+since its 33.0.0, which this release takes: a config literal typed
+`IInterfaceConfig` (or one of the other six) gives them, and a partial of one —
+an identity — no longer takes an explicit `undefined` for them under
+`exactOptionalPropertyTypes`; leave the key out instead.
 
 ## A write requires its lock handle, and its source
 

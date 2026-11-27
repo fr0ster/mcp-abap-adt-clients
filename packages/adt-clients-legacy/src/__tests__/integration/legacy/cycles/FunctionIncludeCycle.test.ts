@@ -36,6 +36,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type {
+  AdtObjectIdentity,
   IFunctionGroupConfig,
   IFunctionIncludeConfig,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -88,7 +89,10 @@ describeLegacyRfc('Legacy 7.40 SP04 over RFC — function include cycle', () => 
         ['function group', groupName],
         ['function include', includeName],
       ]);
-      const groupConfig: IFunctionGroupConfig = {
+      const groupConfig: AdtObjectIdentity<
+        IFunctionGroupConfig,
+        'functionGroupName'
+      > = {
         functionGroupName: groupName,
       };
       const includeConfig: IFunctionIncludeConfig = {

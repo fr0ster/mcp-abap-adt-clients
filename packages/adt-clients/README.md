@@ -16,7 +16,7 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 > **From 18.x?** Read [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md)
 > first: 19.0.0 is where members became one endpoint call each.
 >
-> **From 47.x?** 48.0.0 (on `interfaces-adt` ^32.0.0, with adt-strategies
+> **From 47.x?** 48.0.0 (on `interfaces-adt` ^33.0.0, with adt-strategies
 > 0.29.0): a member requires the object's name, a create every field its
 > request reads, a write its `lockHandle` (and its `source`); a message class
 > message is four members of one request each, and its write is your recipe;
