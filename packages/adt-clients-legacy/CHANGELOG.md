@@ -33,6 +33,10 @@ source-rules guard asserts none. The migration note is the README's
 
 - The upcasts are deleted (K1); the parented reads (`readObjectSource`,
   `readObjectMetadata`) declare the overload pair.
+- Ranges: the peer range on `@mcp-abap-adt/adt-clients` is `^48.0.0` (was
+  `^46.1.0 || ^47.0.0`: the identity types and overload pairs above are
+  48's), and the dev ranges are `@mcp-abap-adt/adt-clients` `^48.0.0`,
+  `@mcp-abap-adt/adt-strategies` `^0.29.0`.
 
 ## [0.11.2] - 2026-11-22
 
