@@ -19,15 +19,17 @@ export const BATCH_REFUSES_PARAMS =
  * A request's params as the query it adds, or `''` for none. Accepted, as the
  * owner decided (D4 of #304): a string, a `URLSearchParams`, or a plain object
  * (its prototype `Object.prototype` or `null`) whose values are strings,
- * numbers or booleans; anything else throws `BATCH_REFUSES_PARAMS`. An
+ * numbers or booleans, or none (`undefined`); anything else, `null` included,
+ * throws `BATCH_REFUSES_PARAMS`. An
  * accepted value gives the query `new URLSearchParams(params)` gave.
  */
 export function batchQuery(params: unknown): URLSearchParams {
-  if (params === undefined || params === null || params === '')
-    return new URLSearchParams();
+  // Omitted (`undefined`) or empty: no query. `null` is not omitted, and is
+  // not one of the accepted shapes (D4).
+  if (params === undefined || params === '') return new URLSearchParams();
   if (typeof params === 'string' || params instanceof URLSearchParams)
     return new URLSearchParams(params);
-  if (typeof params === 'object') {
+  if (typeof params === 'object' && params !== null) {
     const prototype: unknown = Object.getPrototypeOf(params);
     if (prototype === Object.prototype || prototype === null) {
       const query = new URLSearchParams();

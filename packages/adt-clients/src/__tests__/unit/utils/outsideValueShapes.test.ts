@@ -98,6 +98,8 @@ describe('a batch request’s params', () => {
     ],
     ['an object value', { a: { b: 1 } }],
     ['a number', 5],
+    // Not in D4's list: `null` is a value, not the omission `undefined` is.
+    ['null', null],
   ])('refuses %s with the library’s own error', (_, params) => {
     expect(() => batch().makeAdtRequest(request(params))).toThrow(
       "a batch request's params must be a string, a URLSearchParams or a plain object of string, number or boolean values",
