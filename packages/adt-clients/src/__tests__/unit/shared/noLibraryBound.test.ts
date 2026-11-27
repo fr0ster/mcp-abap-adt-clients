@@ -7,7 +7,9 @@
  *   selections of 163, 249, 1716 and 8466; `rowNumber=0` was refused `400`
  *   ("If UP TO or OFFSET is used, "0" cannot be specified …");
  * - quickSearch without `maxResults` answered 200 hits of 8886, and
- *   `maxResults=0` answered 200 as well.
+ *   `maxResults=0` answered 200 as well;
+ * - the object types list without `maxItemCount` answered 100 of 375, and
+ *   `maxItemCount=0` 100 as well; 999 and 100000 answered all 375.
  *
  * What is asserted is the URL the connection received — the request boundary.
  */
@@ -87,6 +89,24 @@ describe('search sends maxResults as given, and none when none is given', () => 
     await utils.search({ query: 'Z*', maxResults: given });
     expect(onlyUrl(sent)).toBe(
       `/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=Z*&maxResults=${given}`,
+    );
+  });
+});
+
+describe('getAllTypes sends maxItemCount as given, and none when none is given', () => {
+  it('without maxItemCount the URL carries none', async () => {
+    const { utils, sent } = recording();
+    await utils.getAllTypes();
+    expect(onlyUrl(sent)).toBe(
+      '/sap/bc/adt/repository/informationsystem/objecttypes?name=*&data=usedByProvider',
+    );
+  });
+
+  it.each([0, 7])('maxItemCount %p goes out as given', async (given) => {
+    const { utils, sent } = recording();
+    await utils.getAllTypes(given);
+    expect(onlyUrl(sent)).toBe(
+      `/sap/bc/adt/repository/informationsystem/objecttypes?maxItemCount=${given}&name=*&data=usedByProvider`,
     );
   });
 });
