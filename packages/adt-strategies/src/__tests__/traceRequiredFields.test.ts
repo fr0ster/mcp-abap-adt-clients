@@ -63,7 +63,31 @@ const feed = (entry: string) =>
 
 describe('a trace entry that lacks a required field', () => {
   it('reads a complete entry as before', () => {
-    expect(profilerTraceEntries(feed(entryWithout()))).toHaveLength(1);
+    // Captured from the reading before D2 (f845e00c^) over this same feed.
+    expect(profilerTraceEntries(feed(entryWithout()))).toEqual([
+      {
+        id: 'ABCDEF0123456789ABCD',
+        recordedAt: '2026-08-28T10:00:00Z',
+        uri: '/sap/bc/adt/runtime/traces/abaptraces/ABCDEF0123456789ABCD',
+        user: 'SAPUSER01',
+        objectName: 'ZAC_SHR_RUN01=================CP',
+        state: {
+          value: 'R',
+          text: 'Finished',
+        },
+        expiresAt: '2026-09-24T06:09:50Z',
+        system: 'ABC',
+        client: '100',
+        host: 'somehost',
+        size: 8,
+        runtime: 554,
+        runtimeABAP: 553,
+        runtimeSystem: 1,
+        runtimeDatabase: 0,
+        isAggregated: false,
+        amdpFileSize: 0,
+      },
+    ]);
   });
 
   for (const field of Object.keys(PARTS)) {
