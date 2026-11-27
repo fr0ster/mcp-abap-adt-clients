@@ -21,55 +21,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/batch/wire.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/(?:^|\\r?\\n)HTTP\\/1\\.\\d\\s+(\\d{3})\\s*([^\\r\\n]*)\\r?\\n/",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/batch/wire.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/[.*+?^${}()|[\\]\\\\]/g",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/batch/wire.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/\\r?\\n/",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/batch/wire.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/^(?:\\r?\\n)|\\r?\\n\\r?\\n/",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/batch/wire.ts",
-    "rule": "regex",
-    "kind": "literal",
-    "text": "/boundary=(?:\"([^\"]+)\"|([^;\\s]+))/i",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/batch/wire.ts",
-    "rule": "regex",
-    "kind": "String.matchAll",
-    "text": "body.matchAll",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/batch/wire.ts",
-    "rule": "regex",
-    "kind": "RegExp",
-    "text": "new RegExp( `(?:^|\\\\r?\\\\n)--${escaped}(--)?[ \\t]*(?:\\\\r?\\\\n|$)`, 'g', )",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/clients/abapGit/structuredExchange.ts",
     "rule": "cast",
     "kind": "re-types",

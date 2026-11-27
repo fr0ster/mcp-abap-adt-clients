@@ -3,6 +3,13 @@ import type {
   IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import {
+  delimiterLines,
+  headerBodySplit,
+  innerStatusLine,
+  lines,
+  multipartBoundary,
+} from '../utils/scan';
 
 /** The words a batch request with params of another shape is refused in. */
 export const BATCH_REFUSES_PARAMS =
@@ -86,46 +93,30 @@ export function parseBatchResponse(
   const contentType = Object.entries(response.headers).find(
     ([key]) => key.toLowerCase() === 'content-type',
   )?.[1];
-  const boundary = /boundary=(?:"([^"]+)"|([^;\s]+))/i.exec(
-    String(contentType),
-  );
-  if (!boundary)
+  const boundary = multipartBoundary(String(contentType));
+  if (boundary === undefined)
     throw new Error('Invalid ADT batch response: missing multipart boundary');
-  const escaped = (boundary[1] ?? boundary[2]).replace(
-    /[.*+?^${}()|[\]\\]/g,
-    '\\$&',
-  );
   // Only complete delimiter lines count; boundary-like body text is payload.
-  const delimiter = new RegExp(
-    `(?:^|\\r?\\n)--${escaped}(--)?[ \t]*(?:\\r?\\n|$)`,
-    'g',
-  );
   const body = String(response.data);
   const chunks: string[] = [];
   let start: number | undefined;
-  for (const match of body.matchAll(delimiter)) {
-    if (start !== undefined) chunks.push(body.slice(start, match.index));
-    if (match[1]) break;
-    start = match.index + match[0].length;
+  for (const line of delimiterLines(body, boundary)) {
+    if (start !== undefined) chunks.push(body.slice(start, line.index));
+    if (line.closing) break;
+    start = line.index + line.length;
   }
   return chunks.map((part) => {
-    const match = /(?:^|\r?\n)HTTP\/1\.\d\s+(\d{3})\s*([^\r\n]*)\r?\n/.exec(
-      part,
-    );
-    if (!match || match.index === undefined)
+    const match = innerStatusLine(part);
+    if (!match)
       throw new Error('Invalid ADT batch response: missing inner HTTP status');
-    const rest = part.slice(match.index + match[0].length);
+    const rest = part.slice(match.end);
     // A bodyless answer (an UNLOCK's 200) ends right after its headers: the
     // empty line's last CRLF belongs to the next delimiter (RFC 2046), so the
     // part holds one line break, not two. Headers then run to the end.
     // Immediately after the status line, one blank line means no headers.
-    const found = /^(?:\r?\n)|\r?\n\r?\n/.exec(rest);
-    const split =
-      found && found.index !== undefined
-        ? { index: found.index, length: found[0].length }
-        : { index: rest.length, length: 0 };
+    const split = headerBodySplit(rest) ?? { index: rest.length, length: 0 };
     const headers: Record<string, string> = {};
-    for (const line of rest.slice(0, split.index).split(/\r?\n/)) {
+    for (const line of lines(rest.slice(0, split.index))) {
       const colon = line.indexOf(':');
       if (colon > 0)
         headers[line.slice(0, colon).toLowerCase()] = line
@@ -133,8 +124,8 @@ export function parseBatchResponse(
           .trim();
     }
     return {
-      status: Number(match[1]),
-      statusText: match[2].trim(),
+      status: Number(match.status),
+      statusText: match.reason.trim(),
       headers,
       data: rest.slice(split.index + split.length),
     };
