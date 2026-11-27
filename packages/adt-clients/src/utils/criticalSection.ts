@@ -4,44 +4,6 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 
 /**
- * Run the lock window as an uninterruptible critical section.
- *
- * The connector raises the effective timeout while a critical section is open
- * (`Math.max(caller timeout, its critical-section ceiling)`), which is the whole reason
- * the mechanism exists. This package never used it: every request went out with
- * the caller's plain 45s, including the ones between LOCK and UNLOCK.
- *
- * The consequence is a matched pair of problems, and only one half was ever
- * fixed. A request inside the window times out, the handler unlocks and
- * rethrows — so the lock is released, which is the half that was solved. The
- * other half stayed: the update never happened, the object is left exactly as
- * `create()` left it (an empty shell), and nothing says so beyond a timeout
- * message. That is how an append structure came to sit in a package as
- *
- * ```
- * extend type zac_shr_appstru with zadt_s_append_s {
- * }
- * ```
- *
- * `beginCriticalSection` is deliberately NOT part of `IAbapConnection`: how a
- * transport protects a window is its own implementation concern, and an RFC or
- * batch connection has no reason to offer one. So this asks the connection
- * whether it can, and proceeds either way — a transport that cannot protect the
- * window is not blocked from doing the work. The capability is the contract's
- * `ICriticalSection` atom, and the guard reads it with `in`, as published.
- */
-function supportsCriticalSection(
-  connection: IAbapConnection,
-): connection is IAbapConnection & ICriticalSection {
-  return (
-    'beginCriticalSection' in connection &&
-    typeof connection.beginCriticalSection === 'function' &&
-    'endCriticalSection' in connection &&
-    typeof connection.endCriticalSection === 'function'
-  );
-}
-
-/**
  * Open the connection's critical section and return a function that closes it.
  *
  * A disposer rather than a `withCriticalSection(fn)` wrapper on purpose: the
@@ -64,14 +26,25 @@ function supportsCriticalSection(
  * the protection over every later request on the connection.
  */
 export function beginCriticalSection(connection: IAbapConnection): () => void {
-  if (!supportsCriticalSection(connection)) {
+  // `beginCriticalSection` is deliberately NOT part of `IAbapConnection`: how a
+  // transport protects a window is its own implementation concern, and an RFC
+  // or batch connection has no reason to offer one. So this asks the
+  // connection whether it can — the contract's `ICriticalSection` atom, read
+  // with `in` and `typeof`, which the compiler checks — and proceeds either way.
+  if (
+    !('beginCriticalSection' in connection) ||
+    typeof connection.beginCriticalSection !== 'function' ||
+    !('endCriticalSection' in connection) ||
+    typeof connection.endCriticalSection !== 'function'
+  ) {
     return () => {};
   }
-  connection.beginCriticalSection();
+  const { beginCriticalSection: begin, endCriticalSection: end } = connection;
+  begin.call(connection);
   let closed = false;
   return () => {
     if (closed) return;
     closed = true;
-    connection.endCriticalSection();
+    end.call(connection);
   };
 }

@@ -88,9 +88,7 @@ import { updateTransport } from './update';
  * Not a proof of absence — a third-party connection that defers answers without
  * declaring it will still deadlock. It makes the known case honest.
  */
-export function hasDeferredResponses<T extends object>(
-  connection: T,
-): connection is T & IDeferredResponseConnection {
+export function hasDeferredResponses(connection: object): boolean {
   return (
     'responsesAreDeferred' in connection &&
     connection.responsesAreDeferred === true

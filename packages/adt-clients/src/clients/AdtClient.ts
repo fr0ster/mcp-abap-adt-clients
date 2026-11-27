@@ -216,19 +216,6 @@ import type { ResultValuesOf } from '../utils/resultStrategy';
 import type { AdtModernVariant, AdtServedBy } from './variant';
 
 /**
- * Whether the connection answers `isConnected()` — the one member of the
- * contract's `ISessionLifecycleAware` that `assertConnected` calls, and so the
- * one this checks and narrows to (see there for why not the whole atom).
- */
-function answersIsConnected(
-  connection: IAbapConnection,
-): connection is IAbapConnection & Pick<ISessionLifecycleAware, 'isConnected'> {
-  return (
-    'isConnected' in connection && typeof connection.isConnected === 'function'
-  );
-}
-
-/**
  * The settings handler's kind on a client that does not declare one system
  * kind: both newer kinds, without the cloud declaration — whatever else `V`
  * is stays (a subclass's own kind). `AdtClientOnPrem` and `AdtClientCloud`
@@ -313,10 +300,18 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    * the base's and so skip its call — run the same check first.
    */
   protected assertConnected(): void {
+    // Whether the connection answers `isConnected()` — the one member of the
+    // contract's `ISessionLifecycleAware` this calls, so the one it checks:
+    // `in` and `typeof`, which the compiler checks, not a predicate.
     const connection = this.connection;
-    if (!answersIsConnected(connection)) return;
+    if (
+      !('isConnected' in connection) ||
+      typeof connection.isConnected !== 'function'
+    )
+      return;
 
-    if (!connection.isConnected()) {
+    const connected: unknown = connection.isConnected();
+    if (!connected) {
       throw Object.assign(
         new Error(
           'AdtClient: the connection is not connected. Call connect() on it before ' +

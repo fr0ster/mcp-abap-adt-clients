@@ -77,13 +77,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/clients/AdtClient.ts",
-    "rule": "predicate",
-    "kind": "is",
-    "text": "connection is IAbapConnection & Pick<ISessionLifecycleAware, 'isConnected'>",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/core/accessControl/AdtAccessControl.ts",
     "rule": "cast",
     "kind": "asserts-present",
@@ -1001,13 +994,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/core/transport/AdtRequest.ts",
-    "rule": "predicate",
-    "kind": "is",
-    "text": "connection is T & IDeferredResponseConnection",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/endpoints/codes.ts",
     "rule": "predicate",
     "kind": "is",
@@ -1040,13 +1026,6 @@
     "rule": "hand-narrowed",
     "kind": "widened",
     "text": "error: unknown",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/utils/criticalSection.ts",
-    "rule": "predicate",
-    "kind": "is",
-    "text": "connection is IAbapConnection & ICriticalSection",
     "count": 1
   },
   {
