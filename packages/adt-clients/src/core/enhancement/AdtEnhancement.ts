@@ -115,7 +115,11 @@ export class AdtEnhancement<
 > implements
     IAdtCreatable<IEnhancementConfig, T['created']>,
     IAdtReadable<IEnhancementConfig, T['source'], 'enhancementName'>,
-    IAdtMetadataReadable<IEnhancementConfig, T['metadata'], 'enhancementName'>,
+    IAdtMetadataReadable<
+      IEnhancementConfig,
+      T['metadata'],
+      'enhancementName' | 'enhancementType'
+    >,
     IAdtMetadataUpdatable<
       IEnhancementConfig,
       T['metadataUpdated'],
