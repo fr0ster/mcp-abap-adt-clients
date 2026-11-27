@@ -41,6 +41,9 @@ carries none, and SAP's own bound applies. Measured on the BTP ABAP environment
 - **`search` sends `maxResults` as given, and none without one.** A missing or
   `0` bound was sent as 100. Without `maxResults` the quick search answers 200
   hits (of 8886 measured), and `maxResults=0` answers 200 too.
+- **`getAllTypes` sends no `maxItemCount` without one.** A missing one was
+  sent as 999. Without it SAP answers 100 object types of 375, `0` the same;
+  999 and 100000 answer all 375.
 - **`getAtc().startRun` sends no `maximumVerdicts` without one.** A missing cap
   was sent as 100; SAP accepts a run payload without the attribute. A cap given
   is still refused before the request when it is not a positive integer.
