@@ -178,7 +178,7 @@ describe('integrationHeadersOf', () => {
    * inventory (`legacyMemberInventory.test.ts`) calls each of those rows and
    * proves it sends nothing, so this agreement is what carries that proof
    * here. Left out, each for its reason:
-   * - an `absentOnLegacy` object's rows — `isAbsentOnLegacy` recognises those
+   * - an absent type's handler's rows — `isAbsentOnLegacy` recognises those
    *   by their refusal, not by a list;
    * - a row by case (`member[case]`) — that member sends for its other cases,
    *   so a per-member entry would let a sending call go without a pair.

@@ -5,7 +5,7 @@
  *
  * `legacyMemberInventory.test.ts` walks every getter of `AdtClientLegacy` and
  * `AdtExecutorLegacy`, collects the members of what each returns through its
- * whole prototype chain (the own keys of an `absentOnLegacy` object included),
+ * whole prototype chain (an absent type's `*AbsentLegacy` class included),
  * and requires each one in exactly one of {@link LEGACY_REFUSED} and
  * {@link LEGACY_SENDS}, unless {@link NON_PUBLIC} lists it as a member the
  * TypeScript source declares `private` or `protected`.
@@ -351,7 +351,7 @@ function rowsFor(getter: string) {
   };
 }
 
-/** Every member of a handler absentOnLegacy builds, or one Task 6 makes so. */
+/** Every member of an absent type's `*AbsentLegacy` handler, or one Task 6 makes so. */
 function absent(getter: string, members: readonly string[]): Rows<RefusedRow> {
   const { refused } = rowsFor(getter);
   return Object.fromEntries(members.map((m) => refused(m, '§10.1')));
@@ -502,7 +502,7 @@ const INCLUDE_URI = PROGRAM_INCLUDE.uri('ZGUARD_INC');
 const DDL_URI = DDL_SOURCE.uri('ZGUARD_DDL');
 const MSAG_URI = MESSAGE_CLASS.uri('ZGUARD_MSG');
 
-/** The handlers absentOnLegacy builds today (§10.1), by their public members. */
+/** The absent types' `*AbsentLegacy` handlers (§10.1), by their public members. */
 const ABSENT = {
   getAccessControl: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
   getAppendStructure: [...SOURCE_OBJECT_MEMBERS],

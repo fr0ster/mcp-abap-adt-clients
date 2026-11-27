@@ -262,8 +262,9 @@ export const REFUSED_WITHOUT_REQUEST: [IHandlerClass, string[]][] = [
 ];
 
 /**
- * The types `AdtClientLegacy` hands out through `absentOnLegacy`: a plain
- * object whose every member answers a refusal without a request. Each name is
+ * The types `AdtClientLegacy` hands out as `*AbsentLegacy` handlers
+ * (`clients/absentHandlers.ts`, since 0.12.0), whose every public member
+ * answers a refusal without a request. Each name is
  * the handler's `objectType` and its factory's suffix (`getDomain`, …).
  */
 /**

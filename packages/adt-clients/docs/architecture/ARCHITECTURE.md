@@ -254,9 +254,9 @@ Since 36.0.0 (interfaces-adt 19.0.0) the members whose request sets both
 member passes the pair to its wire function as the second parameter, and
 `requestHeaders(headers)` (`src/utils/requestHeaders.ts`) is the one place it
 becomes the request's headers — no constant of the member's own, nothing merged
-in, defaulted or replaced. A chain (the message class message's write) gives
-the pair to its main write, the `PUT`; its read, locks and unlocks keep their
-own. A request outside them that shares a wire function with one (`validate`
+in, defaulted or replaced. No member runs a chain (since 48.0.0; below): the
+message class message's `update` is its `PUT` alone, and its locks and unlocks
+are members with their own pairs. A request outside them that shares a wire function with one (`validate`
 through the check run, `activateTestClasses`) passes its own constant pair
 (`CHECK_RUN_HEADERS`, `ACTIVATION_HEADERS`).
 

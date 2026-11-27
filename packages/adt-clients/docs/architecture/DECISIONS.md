@@ -789,6 +789,12 @@ reading nobody had asked for, applied where nobody could replace it.
 The one exception stands: `AdtMessageClassMessage`'s write, where a message is a
 row inside its class's document.
 
+> **Superseded in 48.0.0** by C7 of fr0ster/mcp-abap-adt-clients#304, the
+> owner's decision: the exception is gone. A message is four members
+> (`lockMessage`, `lockClassForMessage`, `update`, `unlockMessages`), one
+> request each, and the chain is the caller's recipe
+> ([MIGRATION-48](../usage/MIGRATION-48.md#a-message-class-message-is-four-members)).
+
 **Against.**
 
 - *Keep the readings as defaults and let a consumer override them.* It is what

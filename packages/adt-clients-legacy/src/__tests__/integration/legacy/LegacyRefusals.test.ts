@@ -4,7 +4,7 @@
  *
  * Every row of `LEGACY_REFUSED` (`helpers/legacyMembers.ts`) is called on the
  * handler the legacy client or executor hands out — `checkDeletion` on every
- * type, the `absentOnLegacy` handlers, the transport, package, utility, runner
+ * type, the absent types' `*AbsentLegacy` handlers, the transport, package, utility, runner
  * and executor refusals, and each refused type of `readObjectMetadata` /
  * `readObjectSource` — and must answer the refusal (`origin: 'refusal'`,
  * `UNSUPPORTED_OPERATION`) with nothing on the recorder: no request, no session

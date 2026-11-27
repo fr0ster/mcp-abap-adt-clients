@@ -5,8 +5,8 @@
  * **The inventory is built from the handlers, not from the spec.** For every
  * getter of `AdtClientLegacy` and `AdtExecutorLegacy` the handler it returns
  * is walked through its whole prototype chain — the members it inherits from
- * `AdtClassMemberBase` or `AbapUnitRunner` included, and the own keys of an
- * `absentOnLegacy` object — and so are the two clients themselves, accessors
+ * `AdtClassMemberBase` or `AbapUnitRunner` included, and an absent type's
+ * `*AbsentLegacy` class — and so are the two clients themselves, accessors
  * and symbol-keyed members included. Each member must be in exactly one of the
  * tables in `helpers/legacyMembers.ts`: refused (answered without a request)
  * or sending (the request it sends, asserted on a recording connection). A new

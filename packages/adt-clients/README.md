@@ -1761,9 +1761,12 @@ still takes an optional `accept` (`IReadOptions`).
   the requests that sent neither: a transport request's `checkDeletion`, and
   the direct `DELETE` of the legacy client's class, interface, program, DDL
   source, function group and function module (now in `@mcp-abap-adt/adt-clients-legacy`).
-- A message class message's `create`, `update` and `delete` are a chain (read,
-  two locks, the `PUT`, two unlocks): the pair is the `PUT`'s; the chain's own
-  requests keep their types.
+- A message class message's `update` sends one `PUT`, and the pair is its
+  (since 48.0.0; its `create` and `delete`, which ran read, two locks, the
+  `PUT` and two unlocks, are gone). The locks and unlocks are members of their
+  own (`lockMessage`, `lockClassForMessage`, `unlockMessages`), and the chain
+  is the caller's recipe: see
+  [MIGRATION-48](docs/usage/MIGRATION-48.md#a-message-class-message-is-four-members).
 - `AdtContentTypesBase` / `AdtContentTypesModern` still answer pairs for some
   creates (`classCreate()`, `programCreate()`, …), which you can pass as
   `headers`; the members themselves no longer read the `contentTypes` option
@@ -1990,7 +1993,7 @@ Since **9.0.0** no accessor returns the wide type, and since **12.0.0** none ret
 
 Since **24.0.0** there is no unit-test handler at all: every member `getUnitTest()` and `getCdsUnitTest()` had was another handler's request under a second name — the class's create, the local test class's read, update and delete. What was left, running, is `AdtExecutor.getClassTestRunner()` (`IAdtRunnable` plus `ITestRunInformation`), and the CDS test-doubles check is `getDdl().checkCdsTestDoubles()`. See [MIGRATION-24.md](docs/usage/MIGRATION-24.md).
 
-Since **25.0.0** ATC takes programs and every kind of include, `interfaces-adt` is `^12.0.0`, group operations refuse a reference they cannot address before any request, and a legacy client (since 37.4.0 in `@mcp-abap-adt/adt-clients-legacy`) answers a refusal for an object type the system lacks instead of throwing. See [MIGRATION-25.md](docs/usage/MIGRATION-25.md).
+Since **25.0.0** ATC takes programs and every kind of include, `interfaces-adt` was `^12.0.0` in that release (today `^33.0.0`), group operations refuse a reference they cannot address before any request, and a legacy client (since 37.4.0 in `@mcp-abap-adt/adt-clients-legacy`) answers a refusal for an object type the system lacks instead of throwing. See [MIGRATION-25.md](docs/usage/MIGRATION-25.md).
 
 The runtime client narrows the same way. `AdtRuntimeClient.getAtc()` implements `IAtcRunStatusReadable & IAtcFindings & IAtcResultsReadable` (the results SAP keeps by Display ID: `listResults`, `getResult`), plus `resolveCheckVariant`, `listCheckVariants`, `createWorklist` and `startRun` — a check run is three requests, started and then read, never created, locked, activated or versioned, and the type says so rather than offering the rest and throwing. It is not `IAdtRunnable` since 19.0.0: that atom's `run` is one call.
 
