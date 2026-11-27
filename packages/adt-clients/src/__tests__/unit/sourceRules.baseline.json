@@ -7,20 +7,6 @@
     "count": 2
   },
   {
-    "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "read as IAbapGitFactsResultStrategy<FactsValue<T, K>, Facts<K>>",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "this.results as Partial< Record<AbapGitFactsSlot, IAbapGitFactsResultStrategy<unknown, never>> >",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/core/accessControl/AdtAccessControl.ts",
     "rule": "cast",
     "kind": "asserts-present",

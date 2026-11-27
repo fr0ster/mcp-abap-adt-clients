@@ -11,6 +11,7 @@ import { type ResultValuesOf, rawDocument } from '@mcp-abap-adt/adt-clients';
 import {
   AdtAbapGitClient,
   abapGitDocuments,
+  abapGitFactsDefaults,
 } from '@mcp-abap-adt/adt-clients/abapgit';
 import { abapGitRepos, type IAbapGitRepo } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -25,10 +26,17 @@ const results = {
 };
 
 let constructed: AdtAbapGitClient<ResultValuesOf<typeof results>>;
-constructed = new AdtAbapGitClient(connection, { logger, results });
+// A direct `new` passes every facts reader and its values type (#304, D4).
+constructed = new AdtAbapGitClient<ResultValuesOf<typeof results>>(connection, {
+  logger,
+  results: { ...abapGitFactsDefaults, ...results },
+});
 const created: AdtAbapGitClient<ResultValuesOf<typeof results>> =
   AdtAbapGitClient.create(connection, { logger, results });
-const inferred = new AdtAbapGitClient(connection, { logger, results });
+const inferred = new AdtAbapGitClient<ResultValuesOf<typeof results>>(
+  connection,
+  { logger, results: { ...abapGitFactsDefaults, ...results } },
+);
 const shipped = AdtAbapGitClient.create(connection, { logger });
 export const handles = [constructed, created, inferred, shipped, rawDocument];
 

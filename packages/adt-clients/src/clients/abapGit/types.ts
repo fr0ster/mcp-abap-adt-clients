@@ -169,3 +169,49 @@ export type FactsValue<T, K extends AbapGitFactsSlot> = K extends keyof T
     ? Unboxed<T[K]> | AbapGitDefaultFacts<K>
     : Unboxed<T[K]>
   : AbapGitDefaultFacts<K>;
+
+/**
+ * A facts reader for every new-form slot, typed by what a member answers for
+ * the values `T`: the slot's reader when `T` names it, else one answering the
+ * default facts. The constructor takes it beside the result set, so the
+ * compiler checks that each slot has a reader of the value it answers and the
+ * lookup by slot needs no cast (#304, the owner's decision D4).
+ */
+export type FactsReaders<T> = {
+  readonly [K in AbapGitFactsSlot]: IAbapGitFactsResultStrategy<
+    FactsValue<T, K>,
+    IAbapGitFactsOf[K]
+  >;
+};
+
+/** The facts as the reducer made them: what a slot left out answers. */
+const theFacts = <F>(
+  answer: IAbapGitFactsResponse<F>,
+): IAbapGitFactsResponse<F> => answer;
+
+/**
+ * The default facts reader of every new-form slot: each answers the facts
+ * `abapGitFacts` reduced, unchanged. A result set is spread over it, so a slot
+ * the set leaves out answers the default facts.
+ */
+export const abapGitFactsDefaults: {
+  readonly [K in AbapGitFactsSlot]: IAbapGitFactsResultStrategy<
+    AbapGitDefaultFacts<K>,
+    IAbapGitFactsOf[K]
+  >;
+} = {
+  reposFacts: theFacts,
+  linkedFacts: theFacts,
+  externalRepoFacts: theFacts,
+  repoPulled: theFacts,
+  repoPulledInDialog: theFacts,
+  runLog: theFacts,
+  modifiedObjects: theFacts,
+  status: theFacts,
+  staging: theFacts,
+  pushed: theFacts,
+  checked: theFacts,
+  file: theFacts,
+  branchInfo: theFacts,
+  switched: theFacts,
+};

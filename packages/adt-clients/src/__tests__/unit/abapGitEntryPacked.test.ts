@@ -32,7 +32,7 @@ function installed(name: string): string {
 
 const OLD_CONSUMER = `
 import { type ResultValuesOf } from '@mcp-abap-adt/adt-clients';
-import { AdtAbapGitClient, abapGitDocuments } from '@mcp-abap-adt/adt-clients/abapgit';
+import { AdtAbapGitClient, abapGitDocuments, abapGitFactsDefaults } from '@mcp-abap-adt/adt-clients/abapgit';
 import { abapGitRepos, type IAbapGitRepo } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -40,7 +40,8 @@ declare const connection: IAbapConnection;
 declare const logger: ILogger;
 const results = { ...abapGitDocuments, repos: abapGitRepos };
 let git: AdtAbapGitClient<ResultValuesOf<typeof results>>;
-git = new AdtAbapGitClient(connection, { logger, results });
+// A direct new passes every facts reader and its values type (#304, D4).
+git = new AdtAbapGitClient<ResultValuesOf<typeof results>>(connection, { logger, results: { ...abapGitFactsDefaults, ...results } });
 const headers = { accept: 'a', contentType: 'c' };
 export async function calls(): Promise<void> {
   const listed = await git.listRepos();

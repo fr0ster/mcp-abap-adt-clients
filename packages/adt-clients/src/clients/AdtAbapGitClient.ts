@@ -101,6 +101,8 @@ import {
   type AbapGitValues,
   type AbapGitValuesOf,
   abapGitDocuments,
+  abapGitFactsDefaults,
+  type FactsReaders,
   type FactsValue,
   type IAbapGitFactsOf,
   type IAbapGitResults,
@@ -166,6 +168,7 @@ export class AdtAbapGitClient<
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly results: AbapGitStrategiesOf<T>;
+  private readonly facts: FactsReaders<T>;
 
   /**
    * An abapGit client with the shipped documents, or with the caller's results.
@@ -183,10 +186,16 @@ export class AdtAbapGitClient<
   static create(
     connection: IAbapConnection,
     options: Partial<AdtHandlerOptions<IAbapGitResults, 'logger'>> = {},
-  ): AdtAbapGitClient<AbapGitValuesOf<IAbapGitResults>> {
+  ):
+    | AdtAbapGitClient<ResultValuesOf<typeof abapGitDocuments>>
+    | AdtAbapGitClient<AbapGitValuesOf<IAbapGitResults>> {
+    // Every slot the set leaves out answers the default facts.
     return new AdtAbapGitClient<AbapGitValuesOf<IAbapGitResults>>(connection, {
       ...options,
-      results: options.results ?? abapGitDocuments,
+      results: {
+        ...abapGitFactsDefaults,
+        ...(options.results ?? abapGitDocuments),
+      },
     });
   }
 
@@ -194,12 +203,19 @@ export class AdtAbapGitClient<
     connection: IAbapConnection,
     // `contentTypeVersion`, which chose what `link` and `pull` sent, is gone
     // since 36.0.0: those members send the caller's `headers`.
-    options: AdtHandlerOptions<AbapGitStrategiesOf<T>, 'logger'>,
+    // A facts reader for every new-form slot, beside the result set: what each
+    // member answers is then checked by the compiler. `create` spreads the
+    // result set over `abapGitFactsDefaults`; a direct caller does the same.
+    options: AdtHandlerOptions<
+      AbapGitStrategiesOf<T> & NoInfer<FactsReaders<T>>,
+      'logger'
+    >,
   ) {
     const { logger, results } = options;
     this.connection = connection;
     this.logger = logger;
     this.results = results;
+    this.facts = results;
   }
 
   /**
@@ -209,16 +225,7 @@ export class AdtAbapGitClient<
   private factsReader<K extends AbapGitFactsSlot>(
     slot: K,
   ): IAbapGitFactsResultStrategy<FactsValue<T, K>, Facts<K>> {
-    // The one place a slot is looked up by name: `T` is generic, so whether
-    // it names `slot` is known only to `FactsValue`, which types the answer
-    // the same way. Absent, the facts are the answer (`FactsValue`'s default).
-    const given = (
-      this.results as Partial<
-        Record<AbapGitFactsSlot, IAbapGitFactsResultStrategy<unknown, never>>
-      >
-    )[slot];
-    const read = given ?? ((answer: IAbapGitFactsResponse<Facts<K>>) => answer);
-    return read as IAbapGitFactsResultStrategy<FactsValue<T, K>, Facts<K>>;
+    return this.facts[slot];
   }
 
   /** One new-form request through the facts exchange. */
