@@ -241,7 +241,9 @@ upgrade.
       `getErrorLog` and the failure case keep their request tests.
     - `unit/clients/abapGit/credentialWire.test.ts`: reads the new forms only
       (it asserts `remoteUser` is absent from their bodies); unchanged.
-29. **AbapGit slot lookup** (the owner's decision, spec D4). The constructor's options
+29. **AbapGit slot lookup** (the owner's decisions, spec D4: the complete map,
+    `abapGitFactsDefaults`, `create()` filling the defaults; a direct `new` passes all 14
+    readers and an explicit `T`). The constructor's options
     take `& FactsReaders<T>`, a map typed per slot, and the lookup indexes it with no
     cast. The `.d.ts` change is accepted and goes into the migration note; the
     emitted JavaScript is otherwise unchanged.
@@ -290,7 +292,8 @@ upgrade.
     Then add the per-lock datum to `createLockTracker` and remove `lockedTypes`.
 37. **D1, the 29 fields it does not require, an equivalence change.** The owner's
     decision (spec D4): the absent-field failures stay, `TypeError`s included, in a
-    form without a cast; a site with no such form is reported, not invented. For each internal function, a test
+    form without a cast; the 13 sites with no such form become required fields of the
+    members' types (the owner's second decision), each with a type check failing first. For each internal function, a test
     against the old code comes first: called with `undefined` and with a value, it builds
     the same request. Then the parameter takes the contract's type, and the implicit
     conversions are written out.

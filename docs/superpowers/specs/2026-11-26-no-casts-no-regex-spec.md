@@ -707,6 +707,21 @@ above did not settle.
   37). The same inputs give the same results, the `TypeError`s included. Each site
   keeps them in a form without a cast; a site for which none exists is reported to
   the owner with its grounds, and nothing is invented.
+- **The abapGit slot map is complete** (a further decision, replacing the first one's
+  wording): `FactsReaders<T>` names a reader for each of the 14 new-form slots, and
+  `abapGitFactsDefaults` holds the default ones. `create()` spreads the result set over
+  the defaults. A direct `new AdtAbapGitClient(connection, { results })` passes all 14
+  readers and an explicit `T`; the migration note says so, with an example. The casts at
+  `AdtAbapGitClient.ts:226, 231` go.
+- **The 13 absent-field crashes become required fields** (replacing "stay as they are"):
+  a field the request builder always reads is required in the member's type, as D1 does
+  for identity — the description of the behaviour definition, function group, function
+  module, interface, metadata extension, structure and service binding; the service
+  binding's `serviceName`, `serviceDefinitionName`, `serviceVersion` and `bindingVariant`;
+  and the enhancement type of `create`. Omitting one is a compile error instead of a
+  runtime `TypeError`, each pinned by a type check that fails first, and named in the
+  migration note. They are required in adt-clients' own member parameters; a type of
+  interfaces-adt is not changed without the owner's decision (another release).
 - **K5, a rejection with `null` or `undefined`**: the six catch blocks rethrow it as
   it came instead of the `TypeError` of their own. Accepted, and named in the
   migration note.
