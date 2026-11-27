@@ -351,7 +351,8 @@ export class AdtFunctionInclude<
   /**
    * Update the include: its metadata, and its source when source was given.
    *
-   * With `options.lockHandle` the caller holds the lock and owns the chain.
+   * The write, under the lock the caller holds (`options.lockHandle`,
+   * required); the lock and the unlock are the caller's own calls.
    *
    * **The whole content, every time.** This is a replace, never a merge. Read
    * what the object holds, change what you mean to change, and pass the result:

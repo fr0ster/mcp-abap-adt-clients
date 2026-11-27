@@ -274,9 +274,11 @@ export class AdtClass<
   }
 
   /**
-   * Update class with full operation chain
-   * Always starts with lock
-   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
+   * Write the class's main source.
+   *
+   * One request: the write, under the lock the caller holds
+   * (`options.lockHandle`, required). The lock, the check and the unlock are
+   * the caller's own calls of `lock`, `check` and `unlock`.
    *
    * **The whole content, every time.** This is a replace, never a merge. Read
    * what the object holds, change what you mean to change, and pass the result:
@@ -305,9 +307,8 @@ export class AdtClass<
     // them here made a library method out of a sequence that is the caller's,
     // and hid from them which request failed.
     //
-    // The lock handle is passed as given, including not at all. Whether an update
-    // without one is allowed is ADT's judgement, and it answers it — this library
-    // does not stand in front of the server with an opinion of its own.
+    // The lock handle is the caller's, required by the type and passed as
+    // given: whether it still holds is ADT's judgement, and it answers it.
     return answering(
       () =>
         updateClass(

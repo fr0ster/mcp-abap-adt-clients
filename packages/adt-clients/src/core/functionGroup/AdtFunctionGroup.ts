@@ -377,8 +377,9 @@ export class AdtFunctionGroup<
   /**
    * Write the group's metadata document — its description is what it holds.
    *
-   * With `options.lockHandle` the caller holds the lock and owns the chain, so
-   * this is one request.
+   * One request: the write, under the lock the caller holds
+   * (`options.lockHandle`, required). The lock, the check and the unlock are
+   * the caller's own calls of `lock`, `check` and `unlock`.
    *
    * **The whole content, every time.** This is a replace, never a merge. Read
    * what the object holds, change what you mean to change, and pass the result:
