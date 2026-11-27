@@ -101,18 +101,21 @@ export class AdtClientsWS {
     this.eventHandlers.push(handler);
   }
 
+  /**
+   * A request answered by what `options.read` makes of its payload. First, so
+   * options carrying a reader — a literal or a value declared before — pick it.
+   */
+  request<TPayload, TResponse>(
+    operation: string,
+    payload: TPayload | undefined,
+    options: IAdtClientsWSReadOptions<TResponse>,
+  ): Promise<TResponse>;
   /** A request answered by its payload as it came, `unknown`. */
   request<TPayload = unknown>(
     operation: string,
     payload?: TPayload,
     options?: IAdtClientsWSRequestOptions,
   ): Promise<unknown>;
-  /** A request answered by what `options.read` makes of its payload. */
-  request<TPayload, TResponse>(
-    operation: string,
-    payload: TPayload | undefined,
-    options: IAdtClientsWSReadOptions<TResponse>,
-  ): Promise<TResponse>;
   async request<TPayload>(
     operation: string,
     payload?: TPayload,

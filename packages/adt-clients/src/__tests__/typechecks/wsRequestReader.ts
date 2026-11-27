@@ -20,5 +20,9 @@ export async function wsAnswers(): Promise<void> {
   const wrong: string = await ws.request('op', undefined, { read });
   // @ts-expect-error -- no caller-chosen answer type without a reader
   void ws.request<{ x: number }, { ok: boolean }>('op', { x: 1 });
-  void [notTyped, typed, wrong];
+  // A pre-declared options value with a deadline and a reader is the
+  // reader's overload (#333 review: the reader's overload comes first).
+  const options = { timeoutMs: 5000, read };
+  const declared: number = await ws.request('op', undefined, options);
+  void [notTyped, typed, wrong, declared];
 }
