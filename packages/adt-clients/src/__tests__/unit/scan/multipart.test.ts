@@ -18,12 +18,12 @@ const BOUNDARY = /boundary=(?:"([^"]+)"|([^;\s]+))/i;
 const STATUS = /(?:^|\r?\n)HTTP\/1\.\d\s+(\d{3})\s*([^\r\n]*)\r?\n/;
 const SPLIT = /^(?:\r?\n)|\r?\n\r?\n/;
 const LINE = /\r?\n/;
-const escape = (b: string) => b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escapeRegex = (b: string) => b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const delimiterOracle = (body: string, boundary: string) =>
   [
     ...body.matchAll(
       new RegExp(
-        `(?:^|\\r?\\n)--${escape(boundary)}(--)?[ \t]*(?:\\r?\\n|$)`,
+        `(?:^|\\r?\\n)--${escapeRegex(boundary)}(--)?[ \t]*(?:\\r?\\n|$)`,
         'g',
       ),
     ),
@@ -218,7 +218,7 @@ function oldParse(response: IAdtWireResponse) {
   if (!boundary)
     throw new Error('Invalid ADT batch response: missing multipart boundary');
   const delimiter = new RegExp(
-    `(?:^|\\r?\\n)--${escape(boundary[1] ?? boundary[2] ?? '')}(--)?[ \t]*(?:\\r?\\n|$)`,
+    `(?:^|\\r?\\n)--${escapeRegex(boundary[1] ?? boundary[2] ?? '')}(--)?[ \t]*(?:\\r?\\n|$)`,
     'g',
   );
   const body = String(response.data);

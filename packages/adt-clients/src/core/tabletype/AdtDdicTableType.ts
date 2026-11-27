@@ -67,15 +67,29 @@ export class AdtDdicTableType<
   T extends TableTypeValues = ResultValuesOf<typeof tableTypeDocuments>,
 > implements
     IAdtCreatable<ITableTypeConfig, T['created']>,
-    IAdtMetadataReadable<ITableTypeConfig, T['metadata']>,
-    IAdtMetadataUpdatable<Partial<ITableTypeConfig>, T['metadataUpdated']>,
-    IAdtDeletable<ITableTypeConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<ITableTypeConfig, T['validation']>,
-    IAdtCheckable<ITableTypeConfig, T['check']>,
-    IAdtActivatable<ITableTypeConfig, T['activation']>,
-    IAdtLockable<ITableTypeConfig>,
-    IAdtTransportAware<ITableTypeConfig, T['transport']>,
-    IAdtVersionable<ITableTypeConfig, T['versions'], T['versionSource']>
+    IAdtMetadataReadable<ITableTypeConfig, T['metadata'], 'tableTypeName'>,
+    IAdtMetadataUpdatable<
+      Partial<ITableTypeConfig>,
+      T['metadataUpdated'],
+      'tableTypeName'
+    >,
+    IAdtDeletable<
+      ITableTypeConfig,
+      T['deletion'],
+      'tableTypeName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<ITableTypeConfig, T['validation'], 'tableTypeName'>,
+    IAdtCheckable<ITableTypeConfig, T['check'], 'tableTypeName'>,
+    IAdtActivatable<ITableTypeConfig, T['activation'], 'tableTypeName'>,
+    IAdtLockable<ITableTypeConfig, 'tableTypeName'>,
+    IAdtTransportAware<ITableTypeConfig, T['transport'], 'tableTypeName'>,
+    IAdtVersionable<
+      ITableTypeConfig,
+      T['versions'],
+      T['versionSource'],
+      'tableTypeName'
+    >
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;

@@ -66,12 +66,12 @@ export class AdtLocalDefinitions<
   >
   extends AdtClassMemberBase<T, V, 'localDefinitions'>
   implements
-    IAdtReadable<ILocalDefinitionsConfig, T['source']>,
-    IAdtMetadataReadable<ILocalDefinitionsConfig, T['metadata']>,
-    IAdtUpdatable<Partial<ILocalDefinitionsConfig>, T['updated']>,
-    IAdtValidatable<ILocalDefinitionsConfig, T['validation']>,
-    IAdtCheckable<ILocalDefinitionsConfig, T['check']>,
-    IAdtActivatable<ILocalDefinitionsConfig, T['activation']>
+    IAdtReadable<ILocalDefinitionsConfig, T['source'], 'className'>,
+    IAdtMetadataReadable<ILocalDefinitionsConfig, T['metadata'], 'className'>,
+    IAdtUpdatable<Partial<ILocalDefinitionsConfig>, T['updated'], 'className'>,
+    IAdtValidatable<ILocalDefinitionsConfig, T['validation'], 'className'>,
+    IAdtCheckable<ILocalDefinitionsConfig, T['check'], 'className'>,
+    IAdtActivatable<ILocalDefinitionsConfig, T['activation'], 'className'>
 {
   public readonly objectType: string = 'LocalDefinitions';
 

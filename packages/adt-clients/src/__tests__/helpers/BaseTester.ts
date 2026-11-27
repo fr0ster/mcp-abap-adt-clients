@@ -39,14 +39,15 @@ import type {
   IAdtCreatable,
   IAdtCreateOptions,
   IAdtDeletable,
+  IAdtError,
+  IAdtHeaders,
   IAdtLockable,
   IAdtMetadataReadable,
-  IAdtMetadataUpdatable,
   IAdtOperationOptions,
   IAdtReadable,
   IAdtResponse,
-  IAdtUpdatable,
   IAdtValidatable,
+  IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -219,7 +220,10 @@ export interface IBaseTesterSetupOptions {
  * one consumer among several. It reads the values through `expectResult`, which
  * fails the test with SAP's own sentence when there is no value.
  */
-export type TestableObject<TConfig> = IAdtCreatable<TConfig, unknown> &
+export type TestableObject<TConfig extends object> = IAdtCreatable<
+  TConfig,
+  unknown
+> &
   // **Both pairs are optional, and a type has at least one.** Since interfaces
   // 36.0.0 a member is named for the resource it addresses, and eight types
   // have no source at all — a domain, a package, a transport request *are*
@@ -228,20 +232,42 @@ export type TestableObject<TConfig> = IAdtCreatable<TConfig, unknown> &
   // something a TypeScript type can say, so both are optional here and
   // `readWhatItHas`/`writeWhatItHas` below fail loudly when an object turns out
   // to offer neither, which is a defect in that object rather than in a test.
-  Partial<IAdtReadable<TConfig, unknown>> &
-  Partial<IAdtMetadataReadable<TConfig, unknown>> &
-  Partial<IAdtUpdatable<Partial<TConfig>, unknown>> &
-  Partial<IAdtMetadataUpdatable<Partial<TConfig>, unknown>> &
-  IAdtDeletable<TConfig, unknown, unknown> &
-  IAdtValidatable<TConfig, unknown> &
-  Partial<IAdtActivatable<TConfig, unknown>> &
+  Partial<IAdtReadable<TConfig, unknown, never>> &
+  Partial<IAdtMetadataReadable<TConfig, unknown, never>> &
+  // The writes in the harness's own terms: it writes under the lock it took,
+  // and without one where a type has no lock (since #304 the contract's write
+  // requires the handle, so the contract's type cannot say that case).
+  HarnessWrites<TConfig> &
+  IAdtDeletable<TConfig, unknown, never, unknown> &
+  IAdtValidatable<TConfig, unknown, never> &
+  Partial<IAdtActivatable<TConfig, unknown, never>> &
   // Since 18.0.0 `update` takes the handle it is given and issues one request.
   // Acquiring and releasing that handle is the caller's, and this harness is a
   // caller — so the pair belongs in the shape it depends on. Optional because
   // some objects have no lock at all (a message class row, a feature toggle's
   // runtime switch), and the call site falls back to an unlocked write, which
   // is a thing ADT is free to refuse and say why.
-  Partial<IAdtLockable<TConfig>>;
+  Partial<IAdtLockable<TConfig, never>>;
+
+/** The writes the harness calls, typed by what it passes. */
+interface HarnessWrites<TConfig> {
+  update?(
+    config: Partial<TConfig>,
+    options: IHarnessWriteOptions,
+  ): Promise<IAdtResponse<unknown, IAdtMessageFailure>>;
+  updateMetadata?(
+    config: Partial<TConfig>,
+    options: IHarnessWriteOptions,
+  ): Promise<IAdtResponse<unknown, IAdtMessageFailure>>;
+}
+
+interface IHarnessWriteOptions {
+  headers: IAdtHeaders;
+  analyse: IAnalyse<IAdtMessageFailure>;
+  lockHandle?: string;
+  source?: string;
+  timeout?: number;
+}
 
 /** What a write after the update addresses: the flow's config with the update's own fields. */
 function updateTargetOf<TConfig>(
@@ -269,7 +295,7 @@ function describeObject(config: unknown): string {
   return names.length ? names.join('/') : '(unnamed)';
 }
 
-export class BaseTester<TConfig, TState = unknown> {
+export class BaseTester<TConfig extends object, TState = unknown> {
   private adtObject: TestableObject<TConfig>;
   private readonly loggerPrefix: string;
   private readonly testCaseKey: string;

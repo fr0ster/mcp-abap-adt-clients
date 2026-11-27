@@ -30,22 +30,24 @@ import type {
 /** What the consumer does with a class: read it and change it under a lock. */
 export type IConsumerClass<R extends IClassResults> = IAdtReadable<
   IClassConfig,
-  ReturnType<R['source']>
+  ReturnType<R['source']>,
+  'className'
 > &
-  IAdtLockable<IClassConfig> &
-  IAdtUpdatable<Partial<IClassConfig>, ReturnType<R['updated']>> &
-  IAdtActivatable<IClassConfig, ReturnType<R['activation']>>;
+  IAdtLockable<IClassConfig, 'className'> &
+  IAdtUpdatable<Partial<IClassConfig>, ReturnType<R['updated']>, 'className'> &
+  IAdtActivatable<IClassConfig, ReturnType<R['activation']>, 'className'>;
 
 /** What the consumer does with a program: read it and check it. */
 export type IConsumerProgram<R extends IProgramResults> = IAdtReadable<
   IProgramConfig,
-  ReturnType<R['source']>
+  ReturnType<R['source']>,
+  'programName'
 > &
-  IAdtCheckable<IProgramConfig, ReturnType<R['check']>>;
+  IAdtCheckable<IProgramConfig, ReturnType<R['check']>, 'programName'>;
 
 /** What the consumer does with a message: read it. */
 export type IConsumerMessage<R extends IMessageClassMessageResults> =
-  IAdtReadable<IMessageClassMessageConfig, ReturnType<R['read']>>;
+  IAdtReadable<IMessageClassMessageConfig, ReturnType<R['read']>, never>;
 
 /** What the consumer does across objects: read any object's source. */
 export type IConsumerUtils<R extends IUtilResults> = IAdtObjectAccess<

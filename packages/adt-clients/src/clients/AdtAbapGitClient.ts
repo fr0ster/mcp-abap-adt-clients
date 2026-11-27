@@ -25,14 +25,12 @@ import { abapGitFacts } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapGitBranchInfoArgs,
   IAbapGitExternalRepoArgs,
-  IAbapGitExternalRepoCredentials,
   IAbapGitFactsAnalyse,
   IAbapGitFactsOptions,
   IAbapGitFactsResponse,
   IAbapGitFactsResultStrategy,
   IAbapGitFileArgs,
   IAbapGitHeaderOptions,
-  IAbapGitLinkArgs,
   IAbapGitLinkNewArgs,
   IAbapGitNewFormOptions,
   IAbapGitPullArgs,
@@ -77,10 +75,7 @@ import type {
 } from '../core/shared/handlerOptions';
 import { answering } from '../utils/adtResponse';
 import type { ResultValuesOf } from '../utils/resultStrategy';
-import {
-  checkExternalRepo,
-  checkExternalRepoRequest,
-} from './abapGit/checkExternalRepo';
+import { checkExternalRepoRequest } from './abapGit/checkExternalRepo';
 import { checkRepoRequest } from './abapGit/checkRepo';
 import { getBranchInfoRequest } from './abapGit/getBranchInfo';
 import { getErrorLog } from './abapGit/getErrorLog';
@@ -89,7 +84,7 @@ import { getModifiedObjectsRequest } from './abapGit/getModifiedObjects';
 import { getRunLogRequest } from './abapGit/getRunLog';
 import { getStagingRequest } from './abapGit/getStaging';
 import { getStatusRequest } from './abapGit/getStatus';
-import { linkRepo, linkRequest } from './abapGit/link';
+import { linkRequest } from './abapGit/link';
 import { listRepos } from './abapGit/listRepos';
 import { listReposQuietRequest } from './abapGit/listReposQuiet';
 import { logLinkPath, pullLinkPath } from './abapGit/paths';
@@ -143,12 +138,7 @@ type FactsAnswer<
 export class AdtAbapGitClient<
   T extends AbapGitValues = ResultValuesOf<typeof abapGitDocuments>,
 > implements
-    IAdtAbapGitClient<
-      T['repos'],
-      T['errorLog'],
-      T['pulled'],
-      T['externalRepo']
-    >,
+    IAdtAbapGitClient<T['repos'], T['errorLog'], T['pulled']>,
     IAdtAbapGitListReposQuiet<FactsValue<T, 'reposFacts'>, Facts<'reposFacts'>>,
     IAdtAbapGitLinkNewForm<FactsValue<T, 'linkedFacts'>, Facts<'linkedFacts'>>,
     IAdtAbapGitCheckExternalRepoNewForm<
@@ -258,50 +248,13 @@ export class AdtAbapGitClient<
     args: IAbapGitLinkNewArgs,
     options: IAbapGitHeaderOptions &
       IAbapGitNewFormOptions<Facts<'linkedFacts'>, E>,
-  ): FactsAnswer<T, 'linkedFacts', E>;
-  /**
-   * Link a package to a repository.
-   *
-   * @deprecated Since 46.2.0 — use the new form: `credentials` given (a
-   * credential, or `null`), no `remoteUser`/`remotePassword`.
-   */
-  link<E extends IAdtError = IAdtError>(
-    args: IAbapGitLinkArgs,
-    options: DeprecatedOptions<E>,
-  ): Promise<IAdtResponse<void, E>>;
-  async link(
-    args: IAbapGitLinkArgs | IAbapGitLinkNewArgs,
-    options:
-      | DeprecatedOptions<IAdtError>
-      | (IAbapGitHeaderOptions &
-          IAbapGitNewFormOptions<
-            Facts<'linkedFacts'>,
-            IAbapGitStructuredError
-          >),
-  ): Promise<IAdtResponse<unknown, IAdtError>> {
-    if (options.credentials !== undefined) {
-      const request = linkRequest(
-        options.headers,
-        args as IAbapGitLinkNewArgs,
-        options.credentials,
-      );
-      return this.exchange(
-        'linkedFacts',
-        request,
-        abapGitFacts.linkedFacts,
-        (options as IAbapGitNewFormOptions<Facts<'linkedFacts'>>).analyse,
-      );
-    }
-    const given = args as IAbapGitLinkArgs;
-    this.logger?.debug?.(
-      `AdtAbapGitClient.link: package=${given.package} url=${given.url}`,
-    );
-    return answering<void, IAdtError>(
-      () => linkRepo(this.connection, options.headers, given),
-      this.results.linked,
-      (options as DeprecatedOptions<IAdtError>).analyse as
-        | IAnalyse<IAdtError>
-        | undefined,
+  ): FactsAnswer<T, 'linkedFacts', E> {
+    const request = linkRequest(options.headers, args, options.credentials);
+    return this.exchange(
+      'linkedFacts',
+      request,
+      abapGitFacts.linkedFacts,
+      options.analyse,
     );
   }
 
@@ -382,51 +335,17 @@ export class AdtAbapGitClient<
     args: IAbapGitExternalRepoArgs,
     options: IAbapGitHeaderOptions &
       IAbapGitNewFormOptions<Facts<'externalRepoFacts'>, E>,
-  ): FactsAnswer<T, 'externalRepoFacts', E>;
-  /**
-   * What an external repository offers, before linking anything to it.
-   *
-   * @deprecated Since 46.2.0 — use the new form (`credentials` given). This
-   * form writes `remoteUser`/`remotePassword`, which R13 does not read.
-   */
-  checkExternalRepo<E extends IAdtError = IAdtError>(
-    args: IAbapGitExternalRepoCredentials,
-    options: DeprecatedOptions<E>,
-  ): Promise<IAdtResponse<T['externalRepo'], E>>;
-  async checkExternalRepo(
-    args: IAbapGitExternalRepoCredentials | IAbapGitExternalRepoArgs,
-    options:
-      | DeprecatedOptions<IAdtError>
-      | (IAbapGitHeaderOptions &
-          IAbapGitNewFormOptions<
-            Facts<'externalRepoFacts'>,
-            IAbapGitStructuredError
-          >),
-  ): Promise<IAdtResponse<unknown, IAdtError>> {
-    if (options.credentials !== undefined) {
-      const request = checkExternalRepoRequest(
-        options.headers,
-        args as IAbapGitExternalRepoArgs,
-        options.credentials,
-      );
-      return this.exchange(
-        'externalRepoFacts',
-        request,
-        abapGitFacts.externalRepoFacts,
-        (options as IAbapGitNewFormOptions<Facts<'externalRepoFacts'>>).analyse,
-      );
-    }
-    return answering(
-      () =>
-        checkExternalRepo(
-          this.connection,
-          options.headers,
-          args as IAbapGitExternalRepoCredentials,
-        ),
-      this.results.externalRepo,
-      (options as DeprecatedOptions<IAdtError>).analyse as
-        | IAnalyse<IAdtError>
-        | undefined,
+  ): FactsAnswer<T, 'externalRepoFacts', E> {
+    const request = checkExternalRepoRequest(
+      options.headers,
+      args,
+      options.credentials,
+    );
+    return this.exchange(
+      'externalRepoFacts',
+      request,
+      abapGitFacts.externalRepoFacts,
+      options.analyse,
     );
   }
 

@@ -76,7 +76,8 @@ for (const [factory, nameKey, base] of hosts) {
             client[factory] as () => IAdtEnhancementHost<
               Record<string, string>,
               string,
-              string
+              string,
+              never
             >
           )()[member]({ [nameKey]: name });
           expect(answer.ok).toBe(true);
@@ -106,7 +107,8 @@ for (const [factory, nameKey, base] of hosts) {
             const host: IAdtIncludeEnhancementHost<
               Record<string, string>,
               string,
-              string
+              string,
+              never
             > = client.getInclude();
             await host[member]({ includeName: 'ZHOST' }, { context });
             const query =

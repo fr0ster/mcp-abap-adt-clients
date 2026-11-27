@@ -77,16 +77,46 @@ export class AdtAppendStructure<
   >,
 > implements
     IAdtCreatable<IAppendStructureConfig, T['created']>,
-    IAdtReadable<IAppendStructureConfig, T['source']>,
-    IAdtMetadataReadable<IAppendStructureConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IAppendStructureConfig>, T['updated']>,
-    IAdtDeletable<IAppendStructureConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IAppendStructureConfig, T['validation']>,
-    IAdtCheckable<IAppendStructureConfig, T['check']>,
-    IAdtActivatable<IAppendStructureConfig, T['activation']>,
-    IAdtLockable<IAppendStructureConfig>,
-    IAdtTransportAware<IAppendStructureConfig, T['transport']>,
-    IAdtVersionable<IAppendStructureConfig, T['versions'], T['versionSource']>
+    IAdtReadable<IAppendStructureConfig, T['source'], 'appendStructureName'>,
+    IAdtMetadataReadable<
+      IAppendStructureConfig,
+      T['metadata'],
+      'appendStructureName'
+    >,
+    IAdtUpdatable<
+      Partial<IAppendStructureConfig>,
+      T['updated'],
+      'appendStructureName'
+    >,
+    IAdtDeletable<
+      IAppendStructureConfig,
+      T['deletion'],
+      'appendStructureName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<
+      IAppendStructureConfig,
+      T['validation'],
+      'appendStructureName'
+    >,
+    IAdtCheckable<IAppendStructureConfig, T['check'], 'appendStructureName'>,
+    IAdtActivatable<
+      IAppendStructureConfig,
+      T['activation'],
+      'appendStructureName'
+    >,
+    IAdtLockable<IAppendStructureConfig, 'appendStructureName'>,
+    IAdtTransportAware<
+      IAppendStructureConfig,
+      T['transport'],
+      'appendStructureName'
+    >,
+    IAdtVersionable<
+      IAppendStructureConfig,
+      T['versions'],
+      T['versionSource'],
+      'appendStructureName'
+    >
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;

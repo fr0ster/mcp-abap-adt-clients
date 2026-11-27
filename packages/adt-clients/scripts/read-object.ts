@@ -162,7 +162,8 @@ function parseArgs(argv: string[]): Options {
 function getHandler(
   client: AdtClient,
   options: Options,
-): Partial<IAdtReadable<any, any>> & Partial<IAdtMetadataReadable<any, any>> {
+): Partial<IAdtReadable<any, any, never>> &
+  Partial<IAdtMetadataReadable<any, any, never>> {
   switch (options.objectType) {
     case 'class':
       return client.getClass();

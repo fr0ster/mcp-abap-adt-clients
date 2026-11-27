@@ -1,6 +1,5 @@
 import type {
   IAbapGitCredentials,
-  IAbapGitLinkArgs,
   IAbapGitLinkNewArgs,
   IAdtHeaders,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -12,21 +11,7 @@ import type {
 import { requestHeaders } from '../../utils/requestHeaders';
 import { NEW_FORM } from './newForm';
 import { ABAPGIT_REPOS } from './paths';
-import { buildLinkBody, buildLinkBodyNew } from './xmlBuilder';
-
-export async function linkRepo(
-  connection: IAbapConnection,
-  headers: IAdtHeaders,
-  args: IAbapGitLinkArgs,
-): Promise<IAdtWireResponse> {
-  return connection.makeAdtRequest({
-    method: 'POST',
-    url: '/sap/bc/adt/abapgit/repos',
-    timeout: 0,
-    headers: requestHeaders(headers),
-    data: buildLinkBody(args),
-  });
-}
+import { buildLinkBodyNew } from './xmlBuilder';
 
 /** R2, the new form: the credential in the body, the caller's media types. */
 export function linkRequest(

@@ -76,17 +76,26 @@ export class AdtTable<
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<ITableConfig, T['created']>,
-    IAdtReadable<ITableConfig, T['source']>,
-    IAdtMetadataReadable<ITableConfig, T['metadata']>,
-    IAdtUpdatable<Partial<ITableConfig>, T['updated']>,
-    IAdtMetadataUpdatable<Partial<ITableConfig>, T['metadataUpdated']>,
-    IAdtDeletable<ITableConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<ITableConfig, T['validation']>,
-    IAdtCheckable<ITableConfig, T['check']>,
-    IAdtActivatable<ITableConfig, T['activation']>,
-    IAdtLockable<ITableConfig>,
-    IAdtTransportAware<ITableConfig, T['transport']>,
-    IAdtVersionable<ITableConfig, T['versions'], T['versionSource']>
+    IAdtReadable<ITableConfig, T['source'], 'tableName'>,
+    IAdtMetadataReadable<ITableConfig, T['metadata'], 'tableName'>,
+    IAdtUpdatable<Partial<ITableConfig>, T['updated'], 'tableName'>,
+    IAdtMetadataUpdatable<
+      Partial<ITableConfig>,
+      T['metadataUpdated'],
+      'tableName'
+    >,
+    IAdtDeletable<ITableConfig, T['deletion'], 'tableName', T['deletionCheck']>,
+    IAdtValidatable<ITableConfig, T['validation'], 'tableName'>,
+    IAdtCheckable<ITableConfig, T['check'], 'tableName'>,
+    IAdtActivatable<ITableConfig, T['activation'], 'tableName'>,
+    IAdtLockable<ITableConfig, 'tableName'>,
+    IAdtTransportAware<ITableConfig, T['transport'], 'tableName'>,
+    IAdtVersionable<
+      ITableConfig,
+      T['versions'],
+      T['versionSource'],
+      'tableName'
+    >
 {
   /**
    * The release variant this serves, as a type only — never set. The

@@ -107,7 +107,9 @@ export const DIVERGENCES: { readonly [R in RecordedRelease]: IDivergence[] } = {
  * Rule 7, listed apart: the codes an entry creates whose type does not list
  * `CREATE`. `CREATE` reflects what ADT's own create resource offers; these
  * types are created through their own collection (spec 1.2), so the list
- * explains, it does not fill.
+ * explains, it does not fill. A message (`MSAG/NN`) is no longer among them:
+ * since interfaces-adt 32 (C7 of #304) its entry lists no create at all, the
+ * message being written through `update` under the class's lock.
  */
 export const CREATE_WITHOUT_CAPABILITY: {
   readonly [R in RecordedRelease]: readonly string[];
@@ -123,7 +125,6 @@ export const CREATE_WITHOUT_CAPABILITY: {
     'ENHO/XHH',
     'ENHS/XSB',
     'FTG2/FT',
-    'MSAG/NN',
     'SRVB/SVB',
     'SRVD/SRV',
   ],
@@ -137,11 +138,10 @@ export const CREATE_WITHOUT_CAPABILITY: {
     'ENHO/XHB',
     'ENHO/XHH',
     'ENHS/XSB',
-    'MSAG/NN',
     'SRVB/SVB',
     'SRVD/SRV',
   ],
-  'basis-740': ['DDLS/DF', 'MSAG/NN'],
+  'basis-740': ['DDLS/DF'],
 };
 
 /**

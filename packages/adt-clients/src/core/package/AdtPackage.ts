@@ -67,13 +67,22 @@ export class AdtPackage<
   T extends PackageValues = ResultValuesOf<typeof packageDocuments>,
 > implements
     IAdtCreatable<IPackageConfig, T['created']>,
-    IAdtMetadataReadable<IPackageConfig, T['metadata']>,
-    IAdtMetadataUpdatable<Partial<IPackageConfig>, T['metadataUpdated']>,
-    IAdtDeletable<IPackageConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IPackageConfig, T['validation']>,
-    IAdtCheckable<IPackageConfig, T['check']>,
-    IAdtLockable<IPackageConfig>,
-    IAdtTransportAware<IPackageConfig, T['transport']>
+    IAdtMetadataReadable<IPackageConfig, T['metadata'], 'packageName'>,
+    IAdtMetadataUpdatable<
+      Partial<IPackageConfig>,
+      T['metadataUpdated'],
+      'packageName'
+    >,
+    IAdtDeletable<
+      IPackageConfig,
+      T['deletion'],
+      'packageName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<IPackageConfig, T['validation'], 'packageName'>,
+    IAdtCheckable<IPackageConfig, T['check'], 'packageName'>,
+    IAdtLockable<IPackageConfig, 'packageName'>,
+    IAdtTransportAware<IPackageConfig, T['transport'], 'packageName'>
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;

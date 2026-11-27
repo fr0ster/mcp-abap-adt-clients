@@ -9,6 +9,7 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
+  AdtObjectIdentity,
   AdtOperation,
   AdtReadVersion,
   AdtTypeCodeWith,
@@ -110,17 +111,31 @@ export class AdtEnhancement<
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IEnhancementConfig, T['created']>,
-    IAdtReadable<IEnhancementConfig, T['source']>,
-    IAdtMetadataReadable<IEnhancementConfig, T['metadata']>,
-    IAdtMetadataUpdatable<IEnhancementConfig, T['metadataUpdated']>,
-    IAdtUpdatable<Partial<IEnhancementConfig>, T['updated']>,
-    IAdtDeletable<IEnhancementConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IEnhancementConfig, T['validation']>,
-    IAdtCheckable<IEnhancementConfig, T['check']>,
-    IAdtActivatable<IEnhancementConfig, T['activation']>,
-    IAdtLockable<IEnhancementConfig>,
-    IAdtTransportAware<IEnhancementConfig, T['transport']>,
-    IAdtVersionable<IEnhancementConfig, T['versions'], T['versionSource']>
+    IAdtReadable<IEnhancementConfig, T['source'], 'enhancementName'>,
+    IAdtMetadataReadable<IEnhancementConfig, T['metadata'], 'enhancementName'>,
+    IAdtMetadataUpdatable<
+      IEnhancementConfig,
+      T['metadataUpdated'],
+      'enhancementName'
+    >,
+    IAdtUpdatable<Partial<IEnhancementConfig>, T['updated'], 'enhancementName'>,
+    IAdtDeletable<
+      IEnhancementConfig,
+      T['deletion'],
+      'enhancementName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<IEnhancementConfig, T['validation'], 'enhancementName'>,
+    IAdtCheckable<IEnhancementConfig, T['check'], 'enhancementName'>,
+    IAdtActivatable<IEnhancementConfig, T['activation'], 'enhancementName'>,
+    IAdtLockable<IEnhancementConfig, 'enhancementName'>,
+    IAdtTransportAware<IEnhancementConfig, T['transport'], 'enhancementName'>,
+    IAdtVersionable<
+      IEnhancementConfig,
+      T['versions'],
+      T['versionSource'],
+      'enhancementName'
+    >
 {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -265,7 +280,7 @@ export class AdtEnhancement<
 
   /** Read the object. */
   async read<E extends IAdtError = IAdtError>(
-    config: Partial<IEnhancementConfig> & {
+    config: AdtObjectIdentity<IEnhancementConfig, 'enhancementName'> & {
       enhancementType: EnhancementTypeWith<V, 'read'>;
     },
     version?: AdtReadVersion,
@@ -382,7 +397,7 @@ export class AdtEnhancement<
    * anything left out is gone, because nothing is read here to keep it.
    */
   async update<E extends IAdtError = IAdtError>(
-    config: Partial<IEnhancementConfig> & {
+    config: AdtObjectIdentity<IEnhancementConfig, 'enhancementName'> & {
       enhancementType: EnhancementTypeWith<V, 'update'>;
     },
     options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,

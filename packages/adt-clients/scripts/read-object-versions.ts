@@ -37,13 +37,13 @@ import {
   createConnectionLogger,
   createTestsLogger,
 } from '../src/__tests__/helpers/testLogger';
-import { AdtClient } from '../src/clients/AdtClient';
-import type { AdtTypeCode } from '../src/core/shared/types';
 import {
   adtTypeCode,
   metadataReadCode,
   sourceReadCode,
 } from '../src/__tests__/helpers/typeCode';
+import { AdtClient } from '../src/clients/AdtClient';
+import type { AdtTypeCode } from '../src/core/shared/types';
 import { orThrow } from '../src/utils/adtResponse';
 
 const testHelper = require('../src/__tests__/helpers/test-helper');

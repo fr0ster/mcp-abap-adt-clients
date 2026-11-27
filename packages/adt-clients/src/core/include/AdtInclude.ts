@@ -82,18 +82,32 @@ export class AdtInclude<
     IAdtIncludeEnhancementHost<
       IIncludeConfig,
       T['enhancementElements'],
-      T['enhancementOptions']
+      T['enhancementOptions'],
+      'includeName'
     >,
-    IAdtMainProgramsReadable<IIncludeConfig, T['mainPrograms']>,
+    IAdtMainProgramsReadable<IIncludeConfig, T['mainPrograms'], 'includeName'>,
     IAdtCreatable<IIncludeConfig, T['created']>,
-    IAdtReadable<IIncludeConfig, T['source']>,
-    IAdtMetadataReadable<IIncludeConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IIncludeConfig>, T['updated']>,
-    IAdtMetadataUpdatable<Partial<IIncludeConfig>, T['metadataUpdated']>,
-    IAdtDeletable<IIncludeConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IIncludeConfig, T['validation']>,
-    IAdtActivatable<IIncludeConfig, T['activation']>,
-    IAdtLockable<IIncludeConfig>
+    IAdtReadable<IIncludeConfig, T['source'], 'includeName'>,
+    IAdtMetadataReadable<IIncludeConfig, T['metadata'], 'includeName'>,
+    IAdtUpdatable<Partial<IIncludeConfig>, T['updated'], 'includeName'>,
+    IAdtMetadataUpdatable<
+      Partial<IIncludeConfig>,
+      T['metadataUpdated'],
+      'includeName'
+    >,
+    IAdtDeletable<
+      IIncludeConfig,
+      T['deletion'],
+      'includeName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<
+      IIncludeConfig,
+      T['validation'],
+      'includeName' | 'packageName'
+    >,
+    IAdtActivatable<IIncludeConfig, T['activation'], 'includeName'>,
+    IAdtLockable<IIncludeConfig, 'includeName'>
 {
   /**
    * The release variant this serves, as a type only — never set. The

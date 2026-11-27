@@ -80,17 +80,51 @@ export class AdtScalarFunction<
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IScalarFunctionConfig, T['created']>,
-    IAdtReadable<IScalarFunctionConfig, T['source']>,
-    IAdtMetadataReadable<IScalarFunctionConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IScalarFunctionConfig>, T['updated']>,
-    IAdtMetadataUpdatable<Partial<IScalarFunctionConfig>, T['metadataUpdated']>,
-    IAdtDeletable<IScalarFunctionConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IScalarFunctionConfig, T['validation']>,
-    IAdtCheckable<IScalarFunctionConfig, T['check']>,
-    IAdtActivatable<IScalarFunctionConfig, T['activation']>,
-    IAdtLockable<IScalarFunctionConfig>,
-    IAdtTransportAware<IScalarFunctionConfig, T['transport']>,
-    IAdtVersionable<IScalarFunctionConfig, T['versions'], T['versionSource']>
+    IAdtReadable<IScalarFunctionConfig, T['source'], 'scalarFunctionName'>,
+    IAdtMetadataReadable<
+      IScalarFunctionConfig,
+      T['metadata'],
+      'scalarFunctionName'
+    >,
+    IAdtUpdatable<
+      Partial<IScalarFunctionConfig>,
+      T['updated'],
+      'scalarFunctionName'
+    >,
+    IAdtMetadataUpdatable<
+      Partial<IScalarFunctionConfig>,
+      T['metadataUpdated'],
+      'scalarFunctionName'
+    >,
+    IAdtDeletable<
+      IScalarFunctionConfig,
+      T['deletion'],
+      'scalarFunctionName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<
+      IScalarFunctionConfig,
+      T['validation'],
+      'scalarFunctionName'
+    >,
+    IAdtCheckable<IScalarFunctionConfig, T['check'], 'scalarFunctionName'>,
+    IAdtActivatable<
+      IScalarFunctionConfig,
+      T['activation'],
+      'scalarFunctionName'
+    >,
+    IAdtLockable<IScalarFunctionConfig, 'scalarFunctionName'>,
+    IAdtTransportAware<
+      IScalarFunctionConfig,
+      T['transport'],
+      'scalarFunctionName'
+    >,
+    IAdtVersionable<
+      IScalarFunctionConfig,
+      T['versions'],
+      T['versionSource'],
+      'scalarFunctionName'
+    >
 {
   /**
    * The release variant this serves, as a type only — never set. The

@@ -105,9 +105,7 @@ class PackageHierarchyObject
     return this.unsupported<unknown>('readMetadata');
   }
 
-  update() {
-    return this.unsupported<unknown>('update');
-  }
+  // No update: the harness answers a type that offers no write itself.
 
   delete() {
     return this.unsupported<unknown>('delete');

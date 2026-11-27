@@ -65,14 +65,23 @@ export class AdtDataElement<
   T extends DataElementValues = ResultValuesOf<typeof dataElementDocuments>,
 > implements
     IAdtCreatable<IDataElementConfig, T['created']>,
-    IAdtMetadataReadable<IDataElementConfig, T['metadata']>,
-    IAdtMetadataUpdatable<Partial<IDataElementConfig>, T['metadataUpdated']>,
-    IAdtDeletable<IDataElementConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IDataElementConfig, T['validation']>,
-    IAdtCheckable<IDataElementConfig, T['check']>,
-    IAdtActivatable<IDataElementConfig, T['activation']>,
-    IAdtLockable<IDataElementConfig>,
-    IAdtTransportAware<IDataElementConfig, T['transport']>
+    IAdtMetadataReadable<IDataElementConfig, T['metadata'], 'dataElementName'>,
+    IAdtMetadataUpdatable<
+      Partial<IDataElementConfig>,
+      T['metadataUpdated'],
+      'dataElementName'
+    >,
+    IAdtDeletable<
+      IDataElementConfig,
+      T['deletion'],
+      'dataElementName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<IDataElementConfig, T['validation'], 'dataElementName'>,
+    IAdtCheckable<IDataElementConfig, T['check'], 'dataElementName'>,
+    IAdtActivatable<IDataElementConfig, T['activation'], 'dataElementName'>,
+    IAdtLockable<IDataElementConfig, 'dataElementName'>,
+    IAdtTransportAware<IDataElementConfig, T['transport'], 'dataElementName'>
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;

@@ -78,17 +78,31 @@ export class AdtStructure<
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IStructureConfig, T['created']>,
-    IAdtReadable<IStructureConfig, T['source']>,
-    IAdtMetadataReadable<IStructureConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IStructureConfig>, T['updated']>,
-    IAdtMetadataUpdatable<Partial<IStructureConfig>, T['metadataUpdated']>,
-    IAdtDeletable<IStructureConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IStructureConfig, T['validation']>,
-    IAdtCheckable<IStructureConfig, T['check']>,
-    IAdtActivatable<IStructureConfig, T['activation']>,
-    IAdtLockable<IStructureConfig>,
-    IAdtTransportAware<IStructureConfig, T['transport']>,
-    IAdtVersionable<IStructureConfig, T['versions'], T['versionSource']>
+    IAdtReadable<IStructureConfig, T['source'], 'structureName'>,
+    IAdtMetadataReadable<IStructureConfig, T['metadata'], 'structureName'>,
+    IAdtUpdatable<Partial<IStructureConfig>, T['updated'], 'structureName'>,
+    IAdtMetadataUpdatable<
+      Partial<IStructureConfig>,
+      T['metadataUpdated'],
+      'structureName'
+    >,
+    IAdtDeletable<
+      IStructureConfig,
+      T['deletion'],
+      'structureName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<IStructureConfig, T['validation'], 'structureName'>,
+    IAdtCheckable<IStructureConfig, T['check'], 'structureName'>,
+    IAdtActivatable<IStructureConfig, T['activation'], 'structureName'>,
+    IAdtLockable<IStructureConfig, 'structureName'>,
+    IAdtTransportAware<IStructureConfig, T['transport'], 'structureName'>,
+    IAdtVersionable<
+      IStructureConfig,
+      T['versions'],
+      T['versionSource'],
+      'structureName'
+    >
 {
   /**
    * The release variant this serves, as a type only — never set. The

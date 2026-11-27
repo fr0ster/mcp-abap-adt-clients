@@ -96,20 +96,39 @@ export class AdtProgram<
     IAdtEnhancementHost<
       IProgramConfig,
       T['enhancementElements'],
-      T['enhancementOptions']
+      T['enhancementOptions'],
+      'programName'
     >,
     IAdtCreatable<IProgramConfig, T['created']>,
-    IAdtReadable<IProgramConfig, T['source']>,
-    IAdtMetadataReadable<IProgramConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IProgramConfig>, T['updated']>,
-    IAdtMetadataUpdatable<Partial<IProgramConfig>, T['metadataUpdated']>,
-    IAdtDeletable<IProgramConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IProgramConfig, T['validation']>,
-    IAdtCheckable<IProgramConfig, T['check']>,
-    IAdtActivatable<IProgramConfig, T['activation']>,
-    IAdtLockable<IProgramConfig>,
-    IAdtTransportAware<IProgramConfig, T['transport']>,
-    IAdtVersionable<IProgramConfig, T['versions'], T['versionSource']>
+    IAdtReadable<IProgramConfig, T['source'], 'programName'>,
+    IAdtMetadataReadable<IProgramConfig, T['metadata'], 'programName'>,
+    IAdtUpdatable<Partial<IProgramConfig>, T['updated'], 'programName'>,
+    IAdtMetadataUpdatable<
+      Partial<IProgramConfig>,
+      T['metadataUpdated'],
+      'programName'
+    >,
+    IAdtDeletable<
+      IProgramConfig,
+      T['deletion'],
+      'programName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<
+      IProgramConfig,
+      T['validation'],
+      'programName' | 'packageName'
+    >,
+    IAdtCheckable<IProgramConfig, T['check'], 'programName'>,
+    IAdtActivatable<IProgramConfig, T['activation'], 'programName'>,
+    IAdtLockable<IProgramConfig, 'programName'>,
+    IAdtTransportAware<IProgramConfig, T['transport'], 'programName'>,
+    IAdtVersionable<
+      IProgramConfig,
+      T['versions'],
+      T['versionSource'],
+      'programName'
+    >
 {
   /**
    * The release variant this serves, as a type only — never set. The

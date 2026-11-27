@@ -86,23 +86,53 @@ export class AdtScalarFunctionImplementation<
   >,
 > implements
     IAdtCreatable<IScalarFunctionImplementationConfig, T['created']>,
-    IAdtReadable<IScalarFunctionImplementationConfig, T['source']>,
-    IAdtMetadataReadable<IScalarFunctionImplementationConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IScalarFunctionImplementationConfig>, T['updated']>,
+    IAdtReadable<
+      IScalarFunctionImplementationConfig,
+      T['source'],
+      'implementationName'
+    >,
+    IAdtMetadataReadable<
+      IScalarFunctionImplementationConfig,
+      T['metadata'],
+      'implementationName'
+    >,
+    IAdtUpdatable<
+      Partial<IScalarFunctionImplementationConfig>,
+      T['updated'],
+      'implementationName'
+    >,
     IAdtDeletable<
       IScalarFunctionImplementationConfig,
       T['deletion'],
+      'implementationName',
       T['deletionCheck']
     >,
-    IAdtValidatable<IScalarFunctionImplementationConfig, T['validation']>,
-    IAdtCheckable<IScalarFunctionImplementationConfig, T['check']>,
-    IAdtActivatable<IScalarFunctionImplementationConfig, T['activation']>,
-    IAdtLockable<IScalarFunctionImplementationConfig>,
-    IAdtTransportAware<IScalarFunctionImplementationConfig, T['transport']>,
+    IAdtValidatable<
+      IScalarFunctionImplementationConfig,
+      T['validation'],
+      'implementationName'
+    >,
+    IAdtCheckable<
+      IScalarFunctionImplementationConfig,
+      T['check'],
+      'implementationName'
+    >,
+    IAdtActivatable<
+      IScalarFunctionImplementationConfig,
+      T['activation'],
+      'implementationName'
+    >,
+    IAdtLockable<IScalarFunctionImplementationConfig, 'implementationName'>,
+    IAdtTransportAware<
+      IScalarFunctionImplementationConfig,
+      T['transport'],
+      'implementationName'
+    >,
     IAdtVersionable<
       IScalarFunctionImplementationConfig,
       T['versions'],
-      T['versionSource']
+      T['versionSource'],
+      'implementationName'
     >
 {
   protected readonly connection: IAbapConnection;

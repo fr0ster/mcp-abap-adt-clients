@@ -84,23 +84,30 @@ export class AdtBehaviorDefinition<
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IBehaviorDefinitionConfig, T['created']>,
-    IAdtReadable<IBehaviorDefinitionConfig, T['source']>,
-    IAdtMetadataReadable<IBehaviorDefinitionConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IBehaviorDefinitionConfig>, T['updated']>,
+    IAdtReadable<IBehaviorDefinitionConfig, T['source'], 'name'>,
+    IAdtMetadataReadable<IBehaviorDefinitionConfig, T['metadata'], 'name'>,
+    IAdtUpdatable<Partial<IBehaviorDefinitionConfig>, T['updated'], 'name'>,
     IAdtMetadataUpdatable<
       Partial<IBehaviorDefinitionConfig>,
-      T['metadataUpdated']
+      T['metadataUpdated'],
+      'name'
     >,
-    IAdtDeletable<IBehaviorDefinitionConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IBehaviorDefinitionConfig, T['validation']>,
-    IAdtCheckable<IBehaviorDefinitionConfig, T['check']>,
-    IAdtActivatable<IBehaviorDefinitionConfig, T['activation']>,
-    IAdtLockable<IBehaviorDefinitionConfig>,
-    IAdtTransportAware<IBehaviorDefinitionConfig, T['transport']>,
+    IAdtDeletable<
+      IBehaviorDefinitionConfig,
+      T['deletion'],
+      'name',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<IBehaviorDefinitionConfig, T['validation'], 'name'>,
+    IAdtCheckable<IBehaviorDefinitionConfig, T['check'], 'name'>,
+    IAdtActivatable<IBehaviorDefinitionConfig, T['activation'], 'name'>,
+    IAdtLockable<IBehaviorDefinitionConfig, 'name'>,
+    IAdtTransportAware<IBehaviorDefinitionConfig, T['transport'], 'name'>,
     IAdtVersionable<
       IBehaviorDefinitionConfig,
       T['versions'],
-      T['versionSource']
+      T['versionSource'],
+      'name'
     >
 {
   /**

@@ -84,17 +84,31 @@ export class AdtInterface<
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IInterfaceConfig, T['created']>,
-    IAdtReadable<IInterfaceConfig, T['source']>,
-    IAdtMetadataReadable<IInterfaceConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IInterfaceConfig>, T['updated']>,
-    IAdtMetadataUpdatable<Partial<IInterfaceConfig>, T['metadataUpdated']>,
-    IAdtDeletable<IInterfaceConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IInterfaceConfig, T['validation']>,
-    IAdtCheckable<IInterfaceConfig, T['check']>,
-    IAdtActivatable<IInterfaceConfig, T['activation']>,
-    IAdtLockable<IInterfaceConfig>,
-    IAdtTransportAware<IInterfaceConfig, T['transport']>,
-    IAdtVersionable<IInterfaceConfig, T['versions'], T['versionSource']>
+    IAdtReadable<IInterfaceConfig, T['source'], 'interfaceName'>,
+    IAdtMetadataReadable<IInterfaceConfig, T['metadata'], 'interfaceName'>,
+    IAdtUpdatable<Partial<IInterfaceConfig>, T['updated'], 'interfaceName'>,
+    IAdtMetadataUpdatable<
+      Partial<IInterfaceConfig>,
+      T['metadataUpdated'],
+      'interfaceName'
+    >,
+    IAdtDeletable<
+      IInterfaceConfig,
+      T['deletion'],
+      'interfaceName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<IInterfaceConfig, T['validation'], 'interfaceName'>,
+    IAdtCheckable<IInterfaceConfig, T['check'], 'interfaceName'>,
+    IAdtActivatable<IInterfaceConfig, T['activation'], 'interfaceName'>,
+    IAdtLockable<IInterfaceConfig, 'interfaceName'>,
+    IAdtTransportAware<IInterfaceConfig, T['transport'], 'interfaceName'>,
+    IAdtVersionable<
+      IInterfaceConfig,
+      T['versions'],
+      T['versionSource'],
+      'interfaceName'
+    >
 {
   /**
    * The release variant this serves, as a type only — never set. The

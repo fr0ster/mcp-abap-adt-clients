@@ -33,38 +33,28 @@ function installed(name: string): string {
 const OLD_CONSUMER = `
 import { type ResultValuesOf } from '@mcp-abap-adt/adt-clients';
 import { AdtAbapGitClient, abapGitDocuments } from '@mcp-abap-adt/adt-clients/abapgit';
-import { abapGitExternalRepo, abapGitRepos, type IAbapGitRepo } from '@mcp-abap-adt/adt-strategies';
+import { abapGitRepos, type IAbapGitRepo } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 declare const connection: IAbapConnection;
 declare const logger: ILogger;
-const results = { ...abapGitDocuments, repos: abapGitRepos, externalRepo: abapGitExternalRepo };
+const results = { ...abapGitDocuments, repos: abapGitRepos };
 let git: AdtAbapGitClient<ResultValuesOf<typeof results>>;
 git = new AdtAbapGitClient(connection, { logger, results });
 const headers = { accept: 'a', contentType: 'c' };
 export async function calls(): Promise<void> {
   const listed = await git.listRepos();
   const repos: IAbapGitRepo[] = listed.ok ? listed.getResult().value : [];
+  // The old form of link and checkExternalRepo is refused (C4 of #304).
+  // @ts-expect-error -- remoteUser/remotePassword are gone
   await git.link({ package: 'P', url: 'u', remoteUser: 'u', remotePassword: 'p' }, { headers });
-  await git.pull({ package: 'P', pullLink: '/sap/bc/adt/abapgit/repos/K/pull' }, { headers });
+  // @ts-expect-error -- remoteUser is gone
   await git.checkExternalRepo({ url: 'u', remoteUser: 'u' }, { headers });
+  await git.pull({ package: 'P', pullLink: '/sap/bc/adt/abapgit/repos/K/pull' }, { headers });
   await git.unlink({ repositoryId: 'K' });
   await git.getErrorLog('/sap/bc/adt/abapgit/repos/K/log/L');
   void repos;
 }
-
-// A caller that extracts a signature gets 46.1.0's: the deprecated overload
-// is the last one. The 46.1.0 types, written out from its declarations.
-import type { IAbapGitExternalRepoCredentials, IAbapGitLinkArgs, IAdtAnalyseOptions, IAdtError, IAdtHeaders, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-type Mutual<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
-type Options46 = { headers: IAdtHeaders } & IAdtAnalyseOptions<IAdtError>;
-type Shipped = AdtAbapGitClient;
-export const signatures: [
-  Mutual<Parameters<Shipped['link']>, [IAbapGitLinkArgs, Options46]>,
-  Mutual<ReturnType<Shipped['link']>, Promise<IAdtResponse<void, IAdtError>>>,
-  Mutual<Parameters<Shipped['checkExternalRepo']>, [IAbapGitExternalRepoCredentials, Options46]>,
-  Mutual<ReturnType<Shipped['checkExternalRepo']>, Promise<IAdtResponse<string, IAdtError>>>,
-] = [true, true, true, true];
 `;
 
 const NEW_CONSUMER = `
@@ -150,7 +140,7 @@ describe('the packed ./abapgit entry', () => {
     ['node16', ts.ModuleKind.Node16, ts.ModuleResolutionKind.Node16],
     ['node10', ts.ModuleKind.CommonJS, ts.ModuleResolutionKind.Node10],
   ] as const)(
-    'type-checks a 46.x consumer and a new-form one (%s)',
+    'type-checks a 46.x consumer, its old form refused, and a new-form one (%s)',
     (_name, module, moduleResolution) => {
       const program = ts.createProgram(
         [path.join(consumer, 'old.ts'), path.join(consumer, 'new.ts')],

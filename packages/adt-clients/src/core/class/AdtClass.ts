@@ -79,19 +79,29 @@ export class AdtClass<
     IAdtEnhancementHost<
       IClassConfig,
       T['enhancementElements'],
-      T['enhancementOptions']
+      T['enhancementOptions'],
+      'className'
     >,
     IAdtCreatable<IClassConfig, T['created']>,
-    IAdtReadable<IClassConfig, T['source']>,
-    IAdtMetadataReadable<IClassConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IClassConfig>, T['updated']>,
-    IAdtMetadataUpdatable<Partial<IClassConfig>, T['metadataUpdated']>,
-    IAdtDeletable<IClassConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IClassConfig, T['validation']>,
-    IAdtCheckable<IClassConfig, T['check']>,
-    IAdtActivatable<IClassConfig, T['activation']>,
-    IAdtLockable<IClassConfig>,
-    IAdtVersionable<IClassConfig, T['versions'], T['versionSource']>
+    IAdtReadable<IClassConfig, T['source'], 'className'>,
+    IAdtMetadataReadable<IClassConfig, T['metadata'], 'className'>,
+    IAdtUpdatable<Partial<IClassConfig>, T['updated'], 'className'>,
+    IAdtMetadataUpdatable<
+      Partial<IClassConfig>,
+      T['metadataUpdated'],
+      'className'
+    >,
+    IAdtDeletable<IClassConfig, T['deletion'], 'className', T['deletionCheck']>,
+    IAdtValidatable<IClassConfig, T['validation'], 'className'>,
+    IAdtCheckable<IClassConfig, T['check'], 'className'>,
+    IAdtActivatable<IClassConfig, T['activation'], 'className'>,
+    IAdtLockable<IClassConfig, 'className'>,
+    IAdtVersionable<
+      IClassConfig,
+      T['versions'],
+      T['versionSource'],
+      'className'
+    >
 {
   public readonly objectType: string = 'Class';
 

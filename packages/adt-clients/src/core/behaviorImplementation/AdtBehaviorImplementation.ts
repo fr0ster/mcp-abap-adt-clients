@@ -94,23 +94,45 @@ export class AdtBehaviorImplementation<
   T extends ClassValues = ResultValuesOf<typeof classDocuments>,
 > implements
     IAdtCreatable<IBehaviorImplementationConfig, T['created']>,
-    IAdtReadable<IBehaviorImplementationConfig, T['source']>,
-    IAdtMetadataReadable<IBehaviorImplementationConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IBehaviorImplementationConfig>, T['updated']>,
+    IAdtReadable<IBehaviorImplementationConfig, T['source'], 'className'>,
+    IAdtMetadataReadable<
+      IBehaviorImplementationConfig,
+      T['metadata'],
+      'className'
+    >,
+    IAdtUpdatable<
+      Partial<IBehaviorImplementationConfig>,
+      T['updated'],
+      'className'
+    >,
     IAdtDeletable<
       IBehaviorImplementationConfig,
       T['deletion'],
+      'className',
       T['deletionCheck']
     >,
-    IAdtValidatable<IBehaviorImplementationConfig, T['validation']>,
-    IAdtCheckable<IBehaviorImplementationConfig, T['check']>,
-    IAdtActivatable<IBehaviorImplementationConfig, T['activation']>,
-    IAdtLockable<IBehaviorImplementationConfig>,
-    IAdtTransportAware<IBehaviorImplementationConfig, T['transport']>,
+    IAdtValidatable<
+      IBehaviorImplementationConfig,
+      T['validation'],
+      'className'
+    >,
+    IAdtCheckable<IBehaviorImplementationConfig, T['check'], 'className'>,
+    IAdtActivatable<
+      IBehaviorImplementationConfig,
+      T['activation'],
+      'className'
+    >,
+    IAdtLockable<IBehaviorImplementationConfig, 'className'>,
+    IAdtTransportAware<
+      IBehaviorImplementationConfig,
+      T['transport'],
+      'className'
+    >,
     IAdtVersionable<
       IBehaviorImplementationConfig,
       T['versions'],
-      T['versionSource']
+      T['versionSource'],
+      'className'
     >
 {
   private readonly connection: IAbapConnection;

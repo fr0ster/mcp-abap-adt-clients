@@ -84,20 +84,31 @@ export class AdtMetadataExtension<
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IMetadataExtensionConfig, T['created']>,
-    IAdtReadable<IMetadataExtensionConfig, T['source']>,
-    IAdtMetadataReadable<IMetadataExtensionConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IMetadataExtensionConfig>, T['updated']>,
+    IAdtReadable<IMetadataExtensionConfig, T['source'], 'name'>,
+    IAdtMetadataReadable<IMetadataExtensionConfig, T['metadata'], 'name'>,
+    IAdtUpdatable<Partial<IMetadataExtensionConfig>, T['updated'], 'name'>,
     IAdtMetadataUpdatable<
       Partial<IMetadataExtensionConfig>,
-      T['metadataUpdated']
+      T['metadataUpdated'],
+      'name'
     >,
-    IAdtDeletable<IMetadataExtensionConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IMetadataExtensionConfig, T['validation']>,
-    IAdtCheckable<IMetadataExtensionConfig, T['check']>,
-    IAdtActivatable<IMetadataExtensionConfig, T['activation']>,
-    IAdtLockable<IMetadataExtensionConfig>,
-    IAdtTransportAware<IMetadataExtensionConfig, T['transport']>,
-    IAdtVersionable<IMetadataExtensionConfig, T['versions'], T['versionSource']>
+    IAdtDeletable<
+      IMetadataExtensionConfig,
+      T['deletion'],
+      'name',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<IMetadataExtensionConfig, T['validation'], 'name'>,
+    IAdtCheckable<IMetadataExtensionConfig, T['check'], 'name'>,
+    IAdtActivatable<IMetadataExtensionConfig, T['activation'], 'name'>,
+    IAdtLockable<IMetadataExtensionConfig, 'name'>,
+    IAdtTransportAware<IMetadataExtensionConfig, T['transport'], 'name'>,
+    IAdtVersionable<
+      IMetadataExtensionConfig,
+      T['versions'],
+      T['versionSource'],
+      'name'
+    >
 {
   /**
    * The release variant this serves, as a type only — never set. The

@@ -65,12 +65,12 @@ export class AdtLocalTypes<
   >
   extends AdtClassMemberBase<T, V, 'localTypes'>
   implements
-    IAdtReadable<ILocalTypesConfig, T['source']>,
-    IAdtMetadataReadable<ILocalTypesConfig, T['metadata']>,
-    IAdtUpdatable<Partial<ILocalTypesConfig>, T['updated']>,
-    IAdtValidatable<ILocalTypesConfig, T['validation']>,
-    IAdtCheckable<ILocalTypesConfig, T['check']>,
-    IAdtActivatable<ILocalTypesConfig, T['activation']>
+    IAdtReadable<ILocalTypesConfig, T['source'], 'className'>,
+    IAdtMetadataReadable<ILocalTypesConfig, T['metadata'], 'className'>,
+    IAdtUpdatable<Partial<ILocalTypesConfig>, T['updated'], 'className'>,
+    IAdtValidatable<ILocalTypesConfig, T['validation'], 'className'>,
+    IAdtCheckable<ILocalTypesConfig, T['check'], 'className'>,
+    IAdtActivatable<ILocalTypesConfig, T['activation'], 'className'>
 {
   public readonly objectType: string = 'LocalTypes';
 

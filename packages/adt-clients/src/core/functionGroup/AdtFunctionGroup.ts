@@ -89,19 +89,41 @@ export class AdtFunctionGroup<
     IAdtEnhancementHost<
       IFunctionGroupConfig,
       T['enhancementElements'],
-      T['enhancementOptions']
+      T['enhancementOptions'],
+      'functionGroupName'
     >,
     IAdtCreatable<IFunctionGroupConfig, T['created']>,
-    IAdtReadable<IFunctionGroupConfig, T['source']>,
-    IAdtMetadataReadable<IFunctionGroupConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IFunctionGroupConfig>, T['updated']>,
-    IAdtMetadataUpdatable<Partial<IFunctionGroupConfig>, T['metadataUpdated']>,
-    IAdtDeletable<IFunctionGroupConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IFunctionGroupConfig, T['validation']>,
-    IAdtCheckable<IFunctionGroupConfig, T['check']>,
-    IAdtActivatable<IFunctionGroupConfig, T['activation']>,
-    IAdtLockable<IFunctionGroupConfig>,
-    IAdtTransportAware<IFunctionGroupConfig, T['transport']>
+    IAdtReadable<IFunctionGroupConfig, T['source'], 'functionGroupName'>,
+    IAdtMetadataReadable<
+      IFunctionGroupConfig,
+      T['metadata'],
+      'functionGroupName'
+    >,
+    IAdtUpdatable<
+      Partial<IFunctionGroupConfig>,
+      T['updated'],
+      'functionGroupName'
+    >,
+    IAdtMetadataUpdatable<
+      Partial<IFunctionGroupConfig>,
+      T['metadataUpdated'],
+      'functionGroupName'
+    >,
+    IAdtDeletable<
+      IFunctionGroupConfig,
+      T['deletion'],
+      'functionGroupName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<IFunctionGroupConfig, T['validation'], 'functionGroupName'>,
+    IAdtCheckable<IFunctionGroupConfig, T['check'], 'functionGroupName'>,
+    IAdtActivatable<IFunctionGroupConfig, T['activation'], 'functionGroupName'>,
+    IAdtLockable<IFunctionGroupConfig, 'functionGroupName'>,
+    IAdtTransportAware<
+      IFunctionGroupConfig,
+      T['transport'],
+      'functionGroupName'
+    >
 {
   /**
    * The release variant this serves, as a type only — never set. The

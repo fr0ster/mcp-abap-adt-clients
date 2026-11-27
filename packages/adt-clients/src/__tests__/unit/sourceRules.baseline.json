@@ -9,62 +9,6 @@
   {
     "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
     "rule": "cast",
-    "kind": "redundant",
-    "text": "(options as DeprecatedOptions<IAdtError>).analyse as | IAnalyse<IAdtError> | undefined",
-    "count": 2
-  },
-  {
-    "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "args as IAbapGitExternalRepoArgs",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "args as IAbapGitExternalRepoCredentials",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "args as IAbapGitLinkArgs",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
-    "rule": "cast",
-    "kind": "re-types",
-    "text": "args as IAbapGitLinkNewArgs",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "options as DeprecatedOptions<IAdtError>",
-    "count": 2
-  },
-  {
-    "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "options as IAbapGitNewFormOptions<Facts<'externalRepoFacts'>>",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
-    "rule": "cast",
-    "kind": "redundant",
-    "text": "options as IAbapGitNewFormOptions<Facts<'linkedFacts'>>",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/clients/AdtAbapGitClient.ts",
-    "rule": "cast",
     "kind": "re-types",
     "text": "read as IAbapGitFactsResultStrategy<FactsValue<T, K>, Facts<K>>",
     "count": 1

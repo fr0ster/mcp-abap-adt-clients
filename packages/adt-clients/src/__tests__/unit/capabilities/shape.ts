@@ -77,35 +77,35 @@ type Contract<H extends keyof typeof HANDLERS> = ReturnType<
 type Offers<T, A> = T extends A ? true : false;
 
 type OffersAtom<T, A extends string> = A extends 'enhancementHost'
-  ? Offers<T, IAdtEnhancementHost<any, any, any>>
+  ? Offers<T, IAdtEnhancementHost<any, any, any, never>>
   : A extends 'includeEnhancementHost'
-    ? Offers<T, IAdtIncludeEnhancementHost<any, any, any>>
+    ? Offers<T, IAdtIncludeEnhancementHost<any, any, any, never>>
     : A extends 'mainProgramsReadable'
-      ? Offers<T, IAdtMainProgramsReadable<any, any>>
+      ? Offers<T, IAdtMainProgramsReadable<any, any, never>>
       : A extends 'creatable'
         ? Offers<T, IAdtCreatable<any, any>>
         : A extends 'readable'
-          ? Offers<T, IAdtReadable<any, any>>
+          ? Offers<T, IAdtReadable<any, any, never>>
           : A extends 'metadataReadable'
-            ? Offers<T, IAdtMetadataReadable<any, any>>
+            ? Offers<T, IAdtMetadataReadable<any, any, never>>
             : A extends 'updatable'
-              ? Offers<T, IAdtUpdatable<any, any>>
+              ? Offers<T, IAdtUpdatable<any, any, never>>
               : A extends 'metadataUpdatable'
-                ? Offers<T, IAdtMetadataUpdatable<any, any>>
+                ? Offers<T, IAdtMetadataUpdatable<any, any, never>>
                 : A extends 'deletable'
-                  ? Offers<T, IAdtDeletable<any, any>>
+                  ? Offers<T, IAdtDeletable<any, any, never>>
                   : A extends 'validatable'
-                    ? Offers<T, IAdtValidatable<any, any>>
+                    ? Offers<T, IAdtValidatable<any, any, never>>
                     : A extends 'checkable'
-                      ? Offers<T, IAdtCheckable<any, any>>
+                      ? Offers<T, IAdtCheckable<any, any, never>>
                       : A extends 'activatable'
-                        ? Offers<T, IAdtActivatable<any, any>>
+                        ? Offers<T, IAdtActivatable<any, any, never>>
                         : A extends 'lockable'
-                          ? Offers<T, IAdtLockable<any>>
+                          ? Offers<T, IAdtLockable<any, never>>
                           : A extends 'versionable'
-                            ? Offers<T, IAdtVersionable<any, any, any>>
+                            ? Offers<T, IAdtVersionable<any, any, any, never>>
                             : A extends 'transportAware'
-                              ? Offers<T, IAdtTransportAware<any, any>>
+                              ? Offers<T, IAdtTransportAware<any, any, never>>
                               : // An atom this chain does not know resolves to
                                 // `never`, and `never extends true` is vacuously true
                                 // — so it would drop out of the product and be checked

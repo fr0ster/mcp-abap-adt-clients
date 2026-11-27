@@ -90,17 +90,64 @@ export class AdtFunctionModule<
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IFunctionModuleConfig, T['created']>,
-    IAdtReadable<IFunctionModuleConfig, T['source']>,
-    IAdtMetadataReadable<IFunctionModuleConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IFunctionModuleConfig>, T['updated']>,
-    IAdtMetadataUpdatable<Partial<IFunctionModuleConfig>, T['metadataUpdated']>,
-    IAdtDeletable<IFunctionModuleConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IFunctionModuleConfig, T['validation']>,
-    IAdtCheckable<IFunctionModuleConfig, T['check']>,
-    IAdtActivatable<IFunctionModuleConfig, T['activation']>,
-    IAdtLockable<IFunctionModuleConfig>,
-    IAdtTransportAware<IFunctionModuleConfig, T['transport']>,
-    IAdtVersionable<IFunctionModuleConfig, T['versions'], T['versionSource']>
+    IAdtReadable<
+      IFunctionModuleConfig,
+      T['source'],
+      'functionGroupName' | 'functionModuleName'
+    >,
+    IAdtMetadataReadable<
+      IFunctionModuleConfig,
+      T['metadata'],
+      'functionGroupName' | 'functionModuleName'
+    >,
+    IAdtUpdatable<
+      Partial<IFunctionModuleConfig>,
+      T['updated'],
+      'functionGroupName' | 'functionModuleName'
+    >,
+    IAdtMetadataUpdatable<
+      Partial<IFunctionModuleConfig>,
+      T['metadataUpdated'],
+      'functionGroupName' | 'functionModuleName'
+    >,
+    IAdtDeletable<
+      IFunctionModuleConfig,
+      T['deletion'],
+      'functionGroupName' | 'functionModuleName',
+      T['deletionCheck']
+    >,
+    // The validation names the module's group and its description; the
+    // module's own name is what it validates.
+    IAdtValidatable<
+      IFunctionModuleConfig,
+      T['validation'],
+      'functionGroupName' | 'functionModuleName' | 'description'
+    >,
+    IAdtCheckable<
+      IFunctionModuleConfig,
+      T['check'],
+      'functionGroupName' | 'functionModuleName'
+    >,
+    IAdtActivatable<
+      IFunctionModuleConfig,
+      T['activation'],
+      'functionGroupName' | 'functionModuleName'
+    >,
+    IAdtLockable<
+      IFunctionModuleConfig,
+      'functionGroupName' | 'functionModuleName'
+    >,
+    IAdtTransportAware<
+      IFunctionModuleConfig,
+      T['transport'],
+      'functionGroupName' | 'functionModuleName'
+    >,
+    IAdtVersionable<
+      IFunctionModuleConfig,
+      T['versions'],
+      T['versionSource'],
+      'functionGroupName' | 'functionModuleName'
+    >
 {
   /**
    * The release variant this serves, as a type only — never set. The

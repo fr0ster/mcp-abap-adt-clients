@@ -64,11 +64,20 @@ export class AdtMessageClass<
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IMessageClassConfig, T['created']>,
-    IAdtMetadataReadable<IMessageClassConfig, T['metadata']>,
-    IAdtMetadataUpdatable<Partial<IMessageClassConfig>, T['metadataUpdated']>,
-    IAdtDeletable<IMessageClassConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IMessageClassConfig, T['validation']>,
-    IAdtLockable<IMessageClassConfig>
+    IAdtMetadataReadable<IMessageClassConfig, T['metadata'], 'name'>,
+    IAdtMetadataUpdatable<
+      Partial<IMessageClassConfig>,
+      T['metadataUpdated'],
+      'name'
+    >,
+    IAdtDeletable<
+      IMessageClassConfig,
+      T['deletion'],
+      'name',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<IMessageClassConfig, T['validation'], 'name'>,
+    IAdtLockable<IMessageClassConfig, 'name'>
 {
   /**
    * The release variant this serves, as a type only — never set. The

@@ -75,16 +75,29 @@ export class AdtFeatureToggle<
   T extends FeatureToggleValues = ResultValuesOf<typeof featureToggleDocuments>,
 > implements
     IAdtCreatable<IFeatureToggleConfig, T['created']>,
-    IAdtReadable<IFeatureToggleConfig, T['source']>,
-    IAdtMetadataReadable<IFeatureToggleConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IFeatureToggleConfig>, T['updated']>,
-    IAdtDeletable<IFeatureToggleConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IFeatureToggleConfig, T['validation']>,
-    IAdtCheckable<IFeatureToggleConfig, T['check']>,
-    IAdtActivatable<IFeatureToggleConfig, T['activation']>,
+    IAdtReadable<IFeatureToggleConfig, T['source'], 'featureToggleName'>,
+    IAdtMetadataReadable<
+      IFeatureToggleConfig,
+      T['metadata'],
+      'featureToggleName'
+    >,
+    IAdtUpdatable<
+      Partial<IFeatureToggleConfig>,
+      T['updated'],
+      'featureToggleName'
+    >,
+    IAdtDeletable<
+      IFeatureToggleConfig,
+      T['deletion'],
+      'featureToggleName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<IFeatureToggleConfig, T['validation'], 'featureToggleName'>,
+    IAdtCheckable<IFeatureToggleConfig, T['check'], 'featureToggleName'>,
+    IAdtActivatable<IFeatureToggleConfig, T['activation'], 'featureToggleName'>,
     // No IAdtTransportAware: a feature toggle has no transport resource of its
     // own, and the member that claimed one read the toggle's document instead.
-    IAdtLockable<IFeatureToggleConfig>,
+    IAdtLockable<IFeatureToggleConfig, 'featureToggleName'>,
     IFeatureToggleObject<{
       switched: T['switched'];
       runtimeState: T['runtimeState'];

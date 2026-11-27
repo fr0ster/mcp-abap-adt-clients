@@ -130,7 +130,10 @@ const ALLOWED_OVERLAY_KEYS = Object.freeze(
     ['environment.default_transport', { required: true, empty: true }],
     ['environment.default_master_system', { required: true, empty: true }],
     // The wire: stated, never guessed (absent was HTTP until 44.0.0).
-    ['environment.connection_type', { required: true, values: ['rfc', 'http'] }],
+    [
+      'environment.connection_type',
+      { required: true, values: ['rfc', 'http'] },
+    ],
     // Checks whose outcome depends on how the system routes sessions: stated
     // per system, required, never defaulted. On, any refusal fails; off, the
     // check is not made and the run says so.
@@ -209,7 +212,10 @@ const ALLOWED_OVERLAY_KEYS = Object.freeze(
     // with the local package its objects go into (a `$` package on premise).
     // The request's object list needs a package that takes a transport; a
     // system whose test package is local turns the case off.
-    ['create_transport.test_cases[transport_object_list].enabled', { type: 'boolean' }],
+    [
+      'create_transport.test_cases[transport_object_list].enabled',
+      { type: 'boolean' },
+    ],
     [`${ABAP_UNIT}[adt_abap_unit_class_run].enabled`, { type: 'boolean' }],
     [`${ABAP_UNIT}[adt_abap_unit_class_run].params.package_name`, {}],
     [`${ABAP_UNIT}[adt_abap_unit_cds_run].enabled`, { type: 'boolean' }],

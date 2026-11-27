@@ -80,17 +80,51 @@ export class AdtTransformation<
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<ITransformationConfig, T['created']>,
-    IAdtReadable<ITransformationConfig, T['source']>,
-    IAdtMetadataReadable<ITransformationConfig, T['metadata']>,
-    IAdtUpdatable<Partial<ITransformationConfig>, T['updated']>,
-    IAdtMetadataUpdatable<Partial<ITransformationConfig>, T['metadataUpdated']>,
-    IAdtDeletable<ITransformationConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<ITransformationConfig, T['validation']>,
-    IAdtCheckable<ITransformationConfig, T['check']>,
-    IAdtActivatable<ITransformationConfig, T['activation']>,
-    IAdtLockable<ITransformationConfig>,
-    IAdtTransportAware<ITransformationConfig, T['transport']>,
-    IAdtVersionable<ITransformationConfig, T['versions'], T['versionSource']>
+    IAdtReadable<ITransformationConfig, T['source'], 'transformationName'>,
+    IAdtMetadataReadable<
+      ITransformationConfig,
+      T['metadata'],
+      'transformationName'
+    >,
+    IAdtUpdatable<
+      Partial<ITransformationConfig>,
+      T['updated'],
+      'transformationName'
+    >,
+    IAdtMetadataUpdatable<
+      Partial<ITransformationConfig>,
+      T['metadataUpdated'],
+      'transformationName'
+    >,
+    IAdtDeletable<
+      ITransformationConfig,
+      T['deletion'],
+      'transformationName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<
+      ITransformationConfig,
+      T['validation'],
+      'transformationName'
+    >,
+    IAdtCheckable<ITransformationConfig, T['check'], 'transformationName'>,
+    IAdtActivatable<
+      ITransformationConfig,
+      T['activation'],
+      'transformationName'
+    >,
+    IAdtLockable<ITransformationConfig, 'transformationName'>,
+    IAdtTransportAware<
+      ITransformationConfig,
+      T['transport'],
+      'transformationName'
+    >,
+    IAdtVersionable<
+      ITransformationConfig,
+      T['versions'],
+      T['versionSource'],
+      'transformationName'
+    >
 {
   /**
    * The release variant this serves, as a type only — never set. The

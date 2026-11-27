@@ -83,20 +83,59 @@ export class AdtServiceDefinition<
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IServiceDefinitionConfig, T['created']>,
-    IAdtReadable<IServiceDefinitionConfig, T['source']>,
-    IAdtMetadataReadable<IServiceDefinitionConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IServiceDefinitionConfig>, T['updated']>,
+    IAdtReadable<
+      IServiceDefinitionConfig,
+      T['source'],
+      'serviceDefinitionName'
+    >,
+    IAdtMetadataReadable<
+      IServiceDefinitionConfig,
+      T['metadata'],
+      'serviceDefinitionName'
+    >,
+    IAdtUpdatable<
+      Partial<IServiceDefinitionConfig>,
+      T['updated'],
+      'serviceDefinitionName'
+    >,
     IAdtMetadataUpdatable<
       Partial<IServiceDefinitionConfig>,
-      T['metadataUpdated']
+      T['metadataUpdated'],
+      'serviceDefinitionName'
     >,
-    IAdtDeletable<IServiceDefinitionConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IServiceDefinitionConfig, T['validation']>,
-    IAdtCheckable<IServiceDefinitionConfig, T['check']>,
-    IAdtActivatable<IServiceDefinitionConfig, T['activation']>,
-    IAdtLockable<IServiceDefinitionConfig>,
-    IAdtTransportAware<IServiceDefinitionConfig, T['transport']>,
-    IAdtVersionable<IServiceDefinitionConfig, T['versions'], T['versionSource']>
+    IAdtDeletable<
+      IServiceDefinitionConfig,
+      T['deletion'],
+      'serviceDefinitionName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<
+      IServiceDefinitionConfig,
+      T['validation'],
+      'serviceDefinitionName'
+    >,
+    IAdtCheckable<
+      IServiceDefinitionConfig,
+      T['check'],
+      'serviceDefinitionName'
+    >,
+    IAdtActivatable<
+      IServiceDefinitionConfig,
+      T['activation'],
+      'serviceDefinitionName'
+    >,
+    IAdtLockable<IServiceDefinitionConfig, 'serviceDefinitionName'>,
+    IAdtTransportAware<
+      IServiceDefinitionConfig,
+      T['transport'],
+      'serviceDefinitionName'
+    >,
+    IAdtVersionable<
+      IServiceDefinitionConfig,
+      T['versions'],
+      T['versionSource'],
+      'serviceDefinitionName'
+    >
 {
   /**
    * The release variant this serves, as a type only — never set. The

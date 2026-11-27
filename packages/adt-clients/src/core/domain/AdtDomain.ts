@@ -64,14 +64,23 @@ export class AdtDomain<
   T extends DomainValues = ResultValuesOf<typeof domainDocuments>,
 > implements
     IAdtCreatable<IDomainConfig, T['created']>,
-    IAdtMetadataReadable<IDomainConfig, T['metadata']>,
-    IAdtMetadataUpdatable<Partial<IDomainConfig>, T['metadataUpdated']>,
-    IAdtDeletable<IDomainConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IDomainConfig, T['validation']>,
-    IAdtCheckable<IDomainConfig, T['check']>,
-    IAdtActivatable<IDomainConfig, T['activation']>,
-    IAdtLockable<IDomainConfig>,
-    IAdtTransportAware<IDomainConfig, T['transport']>
+    IAdtMetadataReadable<IDomainConfig, T['metadata'], 'domainName'>,
+    IAdtMetadataUpdatable<
+      Partial<IDomainConfig>,
+      T['metadataUpdated'],
+      'domainName'
+    >,
+    IAdtDeletable<
+      IDomainConfig,
+      T['deletion'],
+      'domainName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<IDomainConfig, T['validation'], 'domainName'>,
+    IAdtCheckable<IDomainConfig, T['check'], 'domainName'>,
+    IAdtActivatable<IDomainConfig, T['activation'], 'domainName'>,
+    IAdtLockable<IDomainConfig, 'domainName'>,
+    IAdtTransportAware<IDomainConfig, T['transport'], 'domainName'>
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;

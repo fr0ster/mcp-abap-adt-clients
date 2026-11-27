@@ -89,15 +89,49 @@ export class AdtFunctionInclude<
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IFunctionIncludeConfig, T['created']>,
-    IAdtReadable<IFunctionIncludeConfig, T['source']>,
-    IAdtMetadataReadable<IFunctionIncludeConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IFunctionIncludeConfig>, T['updated']>,
-    IAdtDeletable<IFunctionIncludeConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IFunctionIncludeConfig, T['validation']>,
-    IAdtCheckable<IFunctionIncludeConfig, T['check']>,
-    IAdtActivatable<IFunctionIncludeConfig, T['activation']>,
-    IAdtLockable<IFunctionIncludeConfig>,
-    IAdtVersionable<IFunctionIncludeConfig, T['versions'], T['versionSource']>
+    IAdtReadable<
+      IFunctionIncludeConfig,
+      T['source'],
+      'functionGroupName' | 'includeName'
+    >,
+    IAdtMetadataReadable<
+      IFunctionIncludeConfig,
+      T['metadata'],
+      'functionGroupName' | 'includeName'
+    >,
+    IAdtUpdatable<
+      Partial<IFunctionIncludeConfig>,
+      T['updated'],
+      'functionGroupName' | 'includeName'
+    >,
+    IAdtDeletable<
+      IFunctionIncludeConfig,
+      T['deletion'],
+      'functionGroupName' | 'includeName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<
+      IFunctionIncludeConfig,
+      T['validation'],
+      'functionGroupName' | 'includeName'
+    >,
+    IAdtCheckable<
+      IFunctionIncludeConfig,
+      T['check'],
+      'functionGroupName' | 'includeName'
+    >,
+    IAdtActivatable<
+      IFunctionIncludeConfig,
+      T['activation'],
+      'functionGroupName' | 'includeName'
+    >,
+    IAdtLockable<IFunctionIncludeConfig, 'functionGroupName' | 'includeName'>,
+    IAdtVersionable<
+      IFunctionIncludeConfig,
+      T['versions'],
+      T['versionSource'],
+      'functionGroupName' | 'includeName'
+    >
 {
   /**
    * The release variant this serves, as a type only — never set. The

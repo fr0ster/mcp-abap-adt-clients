@@ -164,9 +164,9 @@ export class AdtTableSettings<
   T extends TableSettingsValues = ResultValuesOf<typeof tableSettingsDocuments>,
   V extends AdtVariant = AdtModernVariant,
 > implements
-    IAdtMetadataReadable<ITableSettingsConfig, T['metadata']>,
+    IAdtMetadataReadable<ITableSettingsConfig, T['metadata'], 'tableName'>,
     IAdtTableSettingsUpdatable<T['metadataUpdated'], SettingsVariant<V>>,
-    IAdtLockable<ITableSettingsConfig>
+    IAdtLockable<ITableSettingsConfig, 'tableName'>
 {
   /**
    * The release variant this serves, as a type only — never set. The

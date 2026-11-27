@@ -78,17 +78,17 @@ export class AdtDdl<
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IDdlConfig, T['created']>,
-    IAdtReadable<IDdlConfig, T['source']>,
-    IAdtMetadataReadable<IDdlConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IDdlConfig>, T['updated']>,
-    IAdtMetadataUpdatable<Partial<IDdlConfig>, T['metadataUpdated']>,
-    IAdtDeletable<IDdlConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IDdlConfig, T['validation']>,
-    IAdtCheckable<IDdlConfig, T['check']>,
-    IAdtActivatable<IDdlConfig, T['activation']>,
-    IAdtLockable<IDdlConfig>,
-    IAdtTransportAware<IDdlConfig, T['transport']>,
-    IAdtVersionable<IDdlConfig, T['versions'], T['versionSource']>,
+    IAdtReadable<IDdlConfig, T['source'], 'ddlName'>,
+    IAdtMetadataReadable<IDdlConfig, T['metadata'], 'ddlName'>,
+    IAdtUpdatable<Partial<IDdlConfig>, T['updated'], 'ddlName'>,
+    IAdtMetadataUpdatable<Partial<IDdlConfig>, T['metadataUpdated'], 'ddlName'>,
+    IAdtDeletable<IDdlConfig, T['deletion'], 'ddlName', T['deletionCheck']>,
+    IAdtValidatable<IDdlConfig, T['validation'], 'ddlName'>,
+    IAdtCheckable<IDdlConfig, T['check'], 'ddlName'>,
+    IAdtActivatable<IDdlConfig, T['activation'], 'ddlName'>,
+    IAdtLockable<IDdlConfig, 'ddlName'>,
+    IAdtTransportAware<IDdlConfig, T['transport'], 'ddlName'>,
+    IAdtVersionable<IDdlConfig, T['versions'], T['versionSource'], 'ddlName'>,
     ICdsTestDoubleCheckable<T['testDoubles']>
 {
   /**

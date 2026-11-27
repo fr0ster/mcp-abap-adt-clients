@@ -67,16 +67,38 @@ export class AdtAuthorizationField<
   >,
 > implements
     IAdtCreatable<IAuthorizationFieldConfig, T['created']>,
-    IAdtMetadataReadable<IAuthorizationFieldConfig, T['metadata']>,
+    IAdtMetadataReadable<
+      IAuthorizationFieldConfig,
+      T['metadata'],
+      'authorizationFieldName'
+    >,
     IAdtMetadataUpdatable<
       Partial<IAuthorizationFieldConfig>,
-      T['metadataUpdated']
+      T['metadataUpdated'],
+      'authorizationFieldName'
     >,
-    IAdtDeletable<IAuthorizationFieldConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IAuthorizationFieldConfig, T['validation']>,
-    IAdtCheckable<IAuthorizationFieldConfig, T['check']>,
-    IAdtActivatable<IAuthorizationFieldConfig, T['activation']>,
-    IAdtLockable<IAuthorizationFieldConfig>
+    IAdtDeletable<
+      IAuthorizationFieldConfig,
+      T['deletion'],
+      'authorizationFieldName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<
+      IAuthorizationFieldConfig,
+      T['validation'],
+      'authorizationFieldName'
+    >,
+    IAdtCheckable<
+      IAuthorizationFieldConfig,
+      T['check'],
+      'authorizationFieldName'
+    >,
+    IAdtActivatable<
+      IAuthorizationFieldConfig,
+      T['activation'],
+      'authorizationFieldName'
+    >,
+    IAdtLockable<IAuthorizationFieldConfig, 'authorizationFieldName'>
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;

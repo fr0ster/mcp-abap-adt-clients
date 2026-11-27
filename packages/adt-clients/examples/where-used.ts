@@ -10,9 +10,9 @@
  */
 
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
+import type { AdtClient } from '../src/clients/AdtClient';
 import type { AdtModernVariant } from '../src/clients/variant';
 import type { AdtWhereUsedCode } from '../src/core/shared/codeSets';
-import type { AdtClient } from '../src/clients/AdtClient';
 
 // Since 36.0.0 a request's Accept and Content-Type are the caller's
 // (`options.headers`): the member sends exactly this pair. These are the ones

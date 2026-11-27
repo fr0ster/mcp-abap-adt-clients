@@ -65,12 +65,12 @@ export class AdtLocalMacros<
   >
   extends AdtClassMemberBase<T, V, 'localMacros'>
   implements
-    IAdtReadable<ILocalMacrosConfig, T['source']>,
-    IAdtMetadataReadable<ILocalMacrosConfig, T['metadata']>,
-    IAdtUpdatable<Partial<ILocalMacrosConfig>, T['updated']>,
-    IAdtValidatable<ILocalMacrosConfig, T['validation']>,
-    IAdtCheckable<ILocalMacrosConfig, T['check']>,
-    IAdtActivatable<ILocalMacrosConfig, T['activation']>
+    IAdtReadable<ILocalMacrosConfig, T['source'], 'className'>,
+    IAdtMetadataReadable<ILocalMacrosConfig, T['metadata'], 'className'>,
+    IAdtUpdatable<Partial<ILocalMacrosConfig>, T['updated'], 'className'>,
+    IAdtValidatable<ILocalMacrosConfig, T['validation'], 'className'>,
+    IAdtCheckable<ILocalMacrosConfig, T['check'], 'className'>,
+    IAdtActivatable<ILocalMacrosConfig, T['activation'], 'className'>
 {
   public readonly objectType: string = 'LocalMacros';
 

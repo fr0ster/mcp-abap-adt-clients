@@ -105,9 +105,18 @@ export class AdtRequest<
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<ITransportConfig, T['created']>,
-    IAdtMetadataReadable<ITransportConfig, T['metadata']>,
-    IAdtMetadataUpdatable<Partial<ITransportConfig>, T['metadataUpdated']>,
-    IAdtDeletable<ITransportConfig, T['deleted'], T['deletionCheck']>,
+    IAdtMetadataReadable<ITransportConfig, T['metadata'], 'transportNumber'>,
+    IAdtMetadataUpdatable<
+      Partial<ITransportConfig>,
+      T['metadataUpdated'],
+      'transportNumber'
+    >,
+    IAdtDeletable<
+      ITransportConfig,
+      T['deleted'],
+      'transportNumber',
+      T['deletionCheck']
+    >,
     IAdtRequest<T['list']>,
     IAdtTransportObjectActions<
       T['removedObject'],

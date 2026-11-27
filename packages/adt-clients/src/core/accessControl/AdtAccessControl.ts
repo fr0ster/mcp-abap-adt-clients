@@ -78,17 +78,43 @@ export class AdtAccessControl<
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IAccessControlConfig, T['created']>,
-    IAdtReadable<IAccessControlConfig, T['source']>,
-    IAdtMetadataReadable<IAccessControlConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IAccessControlConfig>, T['updated']>,
-    IAdtMetadataUpdatable<Partial<IAccessControlConfig>, T['metadataUpdated']>,
-    IAdtDeletable<IAccessControlConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IAccessControlConfig, T['validation']>,
-    IAdtCheckable<IAccessControlConfig, T['check']>,
-    IAdtActivatable<IAccessControlConfig, T['activation']>,
-    IAdtLockable<IAccessControlConfig>,
-    IAdtTransportAware<IAccessControlConfig, T['transport']>,
-    IAdtVersionable<IAccessControlConfig, T['versions'], T['versionSource']>
+    IAdtReadable<IAccessControlConfig, T['source'], 'accessControlName'>,
+    IAdtMetadataReadable<
+      IAccessControlConfig,
+      T['metadata'],
+      'accessControlName'
+    >,
+    IAdtUpdatable<
+      Partial<IAccessControlConfig>,
+      T['updated'],
+      'accessControlName'
+    >,
+    IAdtMetadataUpdatable<
+      Partial<IAccessControlConfig>,
+      T['metadataUpdated'],
+      'accessControlName'
+    >,
+    IAdtDeletable<
+      IAccessControlConfig,
+      T['deletion'],
+      'accessControlName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<IAccessControlConfig, T['validation'], 'accessControlName'>,
+    IAdtCheckable<IAccessControlConfig, T['check'], 'accessControlName'>,
+    IAdtActivatable<IAccessControlConfig, T['activation'], 'accessControlName'>,
+    IAdtLockable<IAccessControlConfig, 'accessControlName'>,
+    IAdtTransportAware<
+      IAccessControlConfig,
+      T['transport'],
+      'accessControlName'
+    >,
+    IAdtVersionable<
+      IAccessControlConfig,
+      T['versions'],
+      T['versionSource'],
+      'accessControlName'
+    >
 {
   /**
    * The release variant this serves, as a type only — never set. The

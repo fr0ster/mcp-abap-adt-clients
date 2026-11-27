@@ -84,9 +84,17 @@ export class AdtMessageClassMessage<
   T extends MessageClassMessageValues = ResultValuesOf<typeof messageDocuments>,
 > implements
     IAdtCreatable<IMessageClassMessageConfig, T['written']>,
-    IAdtReadable<IMessageClassMessageConfig, T['read']>,
-    IAdtMetadataReadable<IMessageClassMessageConfig, T['read']>,
-    IAdtUpdatable<Partial<IMessageClassMessageConfig>, T['written']>
+    IAdtReadable<IMessageClassMessageConfig, T['read'], 'className' | 'msgno'>,
+    IAdtMetadataReadable<
+      IMessageClassMessageConfig,
+      T['read'],
+      'className' | 'msgno'
+    >,
+    IAdtUpdatable<
+      Partial<IMessageClassMessageConfig>,
+      T['written'],
+      'className' | 'msgno'
+    >
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;

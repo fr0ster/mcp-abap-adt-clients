@@ -86,16 +86,29 @@ export class AdtServiceBinding<
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IServiceBindingConfig, T['created']>,
-    IAdtReadable<IServiceBindingConfig, T['source']>,
-    IAdtMetadataReadable<IServiceBindingConfig, T['metadata']>,
-    IAdtUpdatable<IServiceBindingPublicationConfig, T['updated']>,
-    IAdtMetadataUpdatable<Partial<IServiceBindingConfig>, T['metadataUpdated']>,
-    IAdtDeletable<IServiceBindingConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IServiceBindingConfig, T['validation']>,
-    IAdtCheckable<IServiceBindingConfig, T['check']>,
-    IAdtActivatable<IServiceBindingConfig, T['activation']>,
-    IAdtTransportAware<IServiceBindingConfig, T['transport']>,
-    IAdtLockable<IServiceBindingConfig>,
+    IAdtReadable<IServiceBindingConfig, T['source'], 'bindingName'>,
+    IAdtMetadataReadable<IServiceBindingConfig, T['metadata'], 'bindingName'>,
+    IAdtUpdatable<
+      IServiceBindingPublicationConfig,
+      T['updated'],
+      'bindingName'
+    >,
+    IAdtMetadataUpdatable<
+      Partial<IServiceBindingConfig>,
+      T['metadataUpdated'],
+      'bindingName'
+    >,
+    IAdtDeletable<
+      IServiceBindingConfig,
+      T['deletion'],
+      'bindingName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<IServiceBindingConfig, T['validation'], 'bindingName'>,
+    IAdtCheckable<IServiceBindingConfig, T['check'], 'bindingName'>,
+    IAdtActivatable<IServiceBindingConfig, T['activation'], 'bindingName'>,
+    IAdtTransportAware<IServiceBindingConfig, T['transport'], 'bindingName'>,
+    IAdtLockable<IServiceBindingConfig, 'bindingName'>,
     IAdtServiceBindingTypes<T['bindingTypes']>,
     IAdtServiceGroupReadable<T['odata']>
 {

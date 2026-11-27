@@ -81,12 +81,10 @@ export type IAbapGitFactsResults = {
 };
 
 export interface IAbapGitResults extends IAbapGitFactsResults {
-  readonly linked: IResultStrategy<unknown>;
   readonly pulled: IResultStrategy<unknown>;
   readonly unlinked: IResultStrategy<unknown>;
   readonly repos: IResultStrategy<unknown>;
   readonly errorLog: IResultStrategy<unknown>;
-  readonly externalRepo: IResultStrategy<unknown>;
 }
 
 /**
@@ -96,12 +94,10 @@ export interface IAbapGitResults extends IAbapGitFactsResults {
  * `satisfies`, never an annotation — see `classDocuments` for why.
  */
 export const abapGitDocuments = {
-  linked: rawDocument,
   pulled: rawDocument,
   unlinked: nothing,
   repos: rawDocument,
   errorLog: rawDocument,
-  externalRepo: rawDocument,
 } satisfies IAbapGitResults;
 
 /** What each slot of an abapGit client's result set answers. */

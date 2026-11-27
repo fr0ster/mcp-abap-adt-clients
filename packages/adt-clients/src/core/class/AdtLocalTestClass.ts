@@ -65,12 +65,12 @@ export class AdtLocalTestClass<
   >
   extends AdtClassMemberBase<T, V, 'localTestClass'>
   implements
-    IAdtReadable<ILocalTestClassConfig, T['source']>,
-    IAdtMetadataReadable<ILocalTestClassConfig, T['metadata']>,
-    IAdtUpdatable<Partial<ILocalTestClassConfig>, T['updated']>,
-    IAdtValidatable<ILocalTestClassConfig, T['validation']>,
-    IAdtCheckable<ILocalTestClassConfig, T['check']>,
-    IAdtActivatable<ILocalTestClassConfig, T['activation']>
+    IAdtReadable<ILocalTestClassConfig, T['source'], 'className'>,
+    IAdtMetadataReadable<ILocalTestClassConfig, T['metadata'], 'className'>,
+    IAdtUpdatable<Partial<ILocalTestClassConfig>, T['updated'], 'className'>,
+    IAdtValidatable<ILocalTestClassConfig, T['validation'], 'className'>,
+    IAdtCheckable<ILocalTestClassConfig, T['check'], 'className'>,
+    IAdtActivatable<ILocalTestClassConfig, T['activation'], 'className'>
 {
   public readonly objectType: string = 'LocalTestClass';
 

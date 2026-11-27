@@ -50,6 +50,9 @@ readings.
   an element was expected) reads as nothing, as it did.
 - **A type code is looked up in a typed map** (`answeredObject`), built from
   the tables' own keys; every text reads as before.
+- **`@mcp-abap-adt/interfaces-adt` is `^32.0.0`** (was `^31.0.0`), the
+  release of #304's contract. This package's declarations (`dist/index.d.ts`)
+  are unchanged by it.
 
 ## [0.28.3] - 2026-11-25
 
