@@ -1,0 +1,1486 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`an absent legacy handler refuses every operation, as before getAccessControl: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": "AccessControl",
+  "refusals": {
+    "activate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AccessControl is not supported on this SAP system: /sap/bc/adt/acm/dcl/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "check": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AccessControl is not supported on this SAP system: /sap/bc/adt/acm/dcl/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "checkDeletion": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AccessControl is not supported on this SAP system: /sap/bc/adt/acm/dcl/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "create": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AccessControl is not supported on this SAP system: /sap/bc/adt/acm/dcl/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "delete": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AccessControl is not supported on this SAP system: /sap/bc/adt/acm/dcl/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "getVersionSource": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AccessControl is not supported on this SAP system: /sap/bc/adt/acm/dcl/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "getVersions": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AccessControl is not supported on this SAP system: /sap/bc/adt/acm/dcl/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "lock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AccessControl is not supported on this SAP system: /sap/bc/adt/acm/dcl/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "read": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AccessControl is not supported on this SAP system: /sap/bc/adt/acm/dcl/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "readMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AccessControl is not supported on this SAP system: /sap/bc/adt/acm/dcl/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "readTransport": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AccessControl is not supported on this SAP system: /sap/bc/adt/acm/dcl/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "unlock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AccessControl is not supported on this SAP system: /sap/bc/adt/acm/dcl/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "update": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AccessControl is not supported on this SAP system: /sap/bc/adt/acm/dcl/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "updateMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AccessControl is not supported on this SAP system: /sap/bc/adt/acm/dcl/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "validate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AccessControl is not supported on this SAP system: /sap/bc/adt/acm/dcl/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+  },
+}
+`;
+
+exports[`an absent legacy handler refuses every operation, as before getAppendStructure: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": "AppendStructure",
+  "refusals": {
+    "activate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AppendStructure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "check": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AppendStructure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "checkDeletion": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AppendStructure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "create": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AppendStructure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "delete": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AppendStructure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "getVersionSource": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AppendStructure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "getVersions": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AppendStructure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "lock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AppendStructure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "read": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AppendStructure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "readMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AppendStructure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "readTransport": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AppendStructure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "unlock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AppendStructure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "update": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AppendStructure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "validate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AppendStructure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+  },
+}
+`;
+
+exports[`an absent legacy handler refuses every operation, as before getAuthorizationField: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": "AuthorizationField",
+  "refusals": {
+    "activate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AuthorizationField is not supported on this SAP system: /sap/bc/adt/aps/iam/auth, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "check": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AuthorizationField is not supported on this SAP system: /sap/bc/adt/aps/iam/auth, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "checkDeletion": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AuthorizationField is not supported on this SAP system: /sap/bc/adt/aps/iam/auth, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "create": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AuthorizationField is not supported on this SAP system: /sap/bc/adt/aps/iam/auth, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "delete": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AuthorizationField is not supported on this SAP system: /sap/bc/adt/aps/iam/auth, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "lock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AuthorizationField is not supported on this SAP system: /sap/bc/adt/aps/iam/auth, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "readMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AuthorizationField is not supported on this SAP system: /sap/bc/adt/aps/iam/auth, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "unlock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AuthorizationField is not supported on this SAP system: /sap/bc/adt/aps/iam/auth, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "updateMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AuthorizationField is not supported on this SAP system: /sap/bc/adt/aps/iam/auth, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "validate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "AuthorizationField is not supported on this SAP system: /sap/bc/adt/aps/iam/auth, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+  },
+}
+`;
+
+exports[`an absent legacy handler refuses every operation, as before getBehaviorDefinition: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": "BehaviorDefinition",
+  "refusals": {
+    "activate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorDefinition is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "check": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorDefinition is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "checkDeletion": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorDefinition is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "create": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorDefinition is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "delete": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorDefinition is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "getVersionSource": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorDefinition is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "getVersions": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorDefinition is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "lock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorDefinition is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "read": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorDefinition is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "readMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorDefinition is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "readTransport": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorDefinition is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "unlock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorDefinition is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "update": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorDefinition is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "updateMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorDefinition is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "validate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorDefinition is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+  },
+}
+`;
+
+exports[`an absent legacy handler refuses every operation, as before getBehaviorImplementation: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": "BehaviorImplementation",
+  "refusals": {
+    "activate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorImplementation is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "check": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorImplementation is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "checkDeletion": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorImplementation is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "create": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorImplementation is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "delete": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorImplementation is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "getVersionSource": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorImplementation is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "getVersions": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorImplementation is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "lock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorImplementation is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "read": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorImplementation is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "readImplementations": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorImplementation is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "readMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorImplementation is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "readTransport": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorImplementation is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "unlock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorImplementation is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "update": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorImplementation is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "validate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "BehaviorImplementation is not supported on this SAP system: /sap/bc/adt/bo/behaviordefinitions, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+  },
+}
+`;
+
+exports[`an absent legacy handler refuses every operation, as before getDataElement: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": "DataElement",
+  "refusals": {
+    "activate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "DataElement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dataelements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "check": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "DataElement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dataelements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "checkDeletion": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "DataElement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dataelements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "create": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "DataElement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dataelements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "delete": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "DataElement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dataelements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "lock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "DataElement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dataelements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "readMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "DataElement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dataelements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "readTransport": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "DataElement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dataelements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "unlock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "DataElement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dataelements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "updateMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "DataElement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dataelements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "validate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "DataElement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dataelements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+  },
+}
+`;
+
+exports[`an absent legacy handler refuses every operation, as before getDomain: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": "Domain",
+  "refusals": {
+    "activate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Domain is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/domains, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "check": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Domain is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/domains, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "checkDeletion": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Domain is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/domains, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "create": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Domain is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/domains, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "delete": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Domain is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/domains, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "lock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Domain is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/domains, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "readMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Domain is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/domains, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "readTransport": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Domain is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/domains, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "unlock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Domain is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/domains, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "updateMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Domain is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/domains, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "validate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Domain is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/domains, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+  },
+}
+`;
+
+exports[`an absent legacy handler refuses every operation, as before getEnhancement: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": "Enhancement",
+  "refusals": {
+    "activate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Enhancement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/enhancements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "check": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Enhancement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/enhancements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "checkDeletion": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Enhancement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/enhancements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "create": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Enhancement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/enhancements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "delete": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Enhancement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/enhancements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "getVersionSource": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Enhancement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/enhancements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "getVersions": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Enhancement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/enhancements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "lock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Enhancement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/enhancements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "read": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Enhancement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/enhancements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "readMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Enhancement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/enhancements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "readTransport": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Enhancement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/enhancements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "unlock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Enhancement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/enhancements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "update": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Enhancement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/enhancements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "updateMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Enhancement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/enhancements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "validate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Enhancement is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/enhancements, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+  },
+}
+`;
+
+exports[`an absent legacy handler refuses every operation, as before getFeatureToggle: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": "FeatureToggle",
+  "refusals": {
+    "activate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "FeatureToggle is not supported on this SAP system: /sap/bc/adt/sfw/featuretoggles, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "check": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "FeatureToggle is not supported on this SAP system: /sap/bc/adt/sfw/featuretoggles, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "checkDeletion": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "FeatureToggle is not supported on this SAP system: /sap/bc/adt/sfw/featuretoggles, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "checkState": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "FeatureToggle is not supported on this SAP system: /sap/bc/adt/sfw/featuretoggles, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "create": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "FeatureToggle is not supported on this SAP system: /sap/bc/adt/sfw/featuretoggles, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "delete": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "FeatureToggle is not supported on this SAP system: /sap/bc/adt/sfw/featuretoggles, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "getRuntimeState": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "FeatureToggle is not supported on this SAP system: /sap/bc/adt/sfw/featuretoggles, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "lock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "FeatureToggle is not supported on this SAP system: /sap/bc/adt/sfw/featuretoggles, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "read": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "FeatureToggle is not supported on this SAP system: /sap/bc/adt/sfw/featuretoggles, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "readMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "FeatureToggle is not supported on this SAP system: /sap/bc/adt/sfw/featuretoggles, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "readSource": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "FeatureToggle is not supported on this SAP system: /sap/bc/adt/sfw/featuretoggles, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "switchOff": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "FeatureToggle is not supported on this SAP system: /sap/bc/adt/sfw/featuretoggles, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "switchOn": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "FeatureToggle is not supported on this SAP system: /sap/bc/adt/sfw/featuretoggles, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "unlock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "FeatureToggle is not supported on this SAP system: /sap/bc/adt/sfw/featuretoggles, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "update": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "FeatureToggle is not supported on this SAP system: /sap/bc/adt/sfw/featuretoggles, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "updateMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "FeatureToggle is not supported on this SAP system: /sap/bc/adt/sfw/featuretoggles, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "validate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "FeatureToggle is not supported on this SAP system: /sap/bc/adt/sfw/featuretoggles, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+  },
+}
+`;
+
+exports[`an absent legacy handler refuses every operation, as before getMetadataExtension: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": "MetadataExtension",
+  "refusals": {
+    "activate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "MetadataExtension is not supported on this SAP system: /sap/bc/adt/ddic/ddlx/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "check": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "MetadataExtension is not supported on this SAP system: /sap/bc/adt/ddic/ddlx/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "checkDeletion": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "MetadataExtension is not supported on this SAP system: /sap/bc/adt/ddic/ddlx/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "create": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "MetadataExtension is not supported on this SAP system: /sap/bc/adt/ddic/ddlx/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "delete": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "MetadataExtension is not supported on this SAP system: /sap/bc/adt/ddic/ddlx/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "getVersionSource": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "MetadataExtension is not supported on this SAP system: /sap/bc/adt/ddic/ddlx/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "getVersions": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "MetadataExtension is not supported on this SAP system: /sap/bc/adt/ddic/ddlx/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "lock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "MetadataExtension is not supported on this SAP system: /sap/bc/adt/ddic/ddlx/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "read": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "MetadataExtension is not supported on this SAP system: /sap/bc/adt/ddic/ddlx/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "readMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "MetadataExtension is not supported on this SAP system: /sap/bc/adt/ddic/ddlx/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "readTransport": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "MetadataExtension is not supported on this SAP system: /sap/bc/adt/ddic/ddlx/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "unlock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "MetadataExtension is not supported on this SAP system: /sap/bc/adt/ddic/ddlx/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "update": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "MetadataExtension is not supported on this SAP system: /sap/bc/adt/ddic/ddlx/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "updateMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "MetadataExtension is not supported on this SAP system: /sap/bc/adt/ddic/ddlx/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "validate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "MetadataExtension is not supported on this SAP system: /sap/bc/adt/ddic/ddlx/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+  },
+}
+`;
+
+exports[`an absent legacy handler refuses every operation, as before getScalarFunction: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": "ScalarFunction",
+  "refusals": {
+    "activate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunction is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dsfd/sources, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "check": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunction is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dsfd/sources, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "checkDeletion": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunction is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dsfd/sources, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "create": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunction is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dsfd/sources, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "delete": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunction is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dsfd/sources, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "getVersionSource": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunction is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dsfd/sources, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "getVersions": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunction is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dsfd/sources, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "lock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunction is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dsfd/sources, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "read": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunction is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dsfd/sources, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "readMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunction is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dsfd/sources, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "readTransport": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunction is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dsfd/sources, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "unlock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunction is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dsfd/sources, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "update": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunction is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dsfd/sources, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "updateMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunction is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dsfd/sources, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "validate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunction is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/dsfd/sources, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+  },
+}
+`;
+
+exports[`an absent legacy handler refuses every operation, as before getScalarFunctionImplementation: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": "ScalarFunctionImplementation",
+  "refusals": {
+    "activate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunctionImplementation is not supported on this SAP system: /sap/bc/adt/ddic/dsfi, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "check": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunctionImplementation is not supported on this SAP system: /sap/bc/adt/ddic/dsfi, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "checkDeletion": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunctionImplementation is not supported on this SAP system: /sap/bc/adt/ddic/dsfi, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "create": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunctionImplementation is not supported on this SAP system: /sap/bc/adt/ddic/dsfi, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "delete": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunctionImplementation is not supported on this SAP system: /sap/bc/adt/ddic/dsfi, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "getVersionSource": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunctionImplementation is not supported on this SAP system: /sap/bc/adt/ddic/dsfi, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "getVersions": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunctionImplementation is not supported on this SAP system: /sap/bc/adt/ddic/dsfi, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "lock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunctionImplementation is not supported on this SAP system: /sap/bc/adt/ddic/dsfi, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "read": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunctionImplementation is not supported on this SAP system: /sap/bc/adt/ddic/dsfi, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "readMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunctionImplementation is not supported on this SAP system: /sap/bc/adt/ddic/dsfi, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "readTransport": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunctionImplementation is not supported on this SAP system: /sap/bc/adt/ddic/dsfi, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "unlock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunctionImplementation is not supported on this SAP system: /sap/bc/adt/ddic/dsfi, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "update": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunctionImplementation is not supported on this SAP system: /sap/bc/adt/ddic/dsfi, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "updateMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunctionImplementation is not supported on this SAP system: /sap/bc/adt/ddic/dsfi, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "validate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ScalarFunctionImplementation is not supported on this SAP system: /sap/bc/adt/ddic/dsfi, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+  },
+}
+`;
+
+exports[`an absent legacy handler refuses every operation, as before getServiceBinding: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": "ServiceBinding",
+  "refusals": {
+    "activate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceBinding is not supported on this SAP system: /sap/bc/adt/businessservices/bindings, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "check": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceBinding is not supported on this SAP system: /sap/bc/adt/businessservices/bindings, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "checkDeletion": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceBinding is not supported on this SAP system: /sap/bc/adt/businessservices/bindings, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "create": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceBinding is not supported on this SAP system: /sap/bc/adt/businessservices/bindings, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "delete": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceBinding is not supported on this SAP system: /sap/bc/adt/businessservices/bindings, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "getServiceBindingTypes": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceBinding is not supported on this SAP system: /sap/bc/adt/businessservices/bindings, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "getServiceGroup": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceBinding is not supported on this SAP system: /sap/bc/adt/businessservices/bindings, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "lock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceBinding is not supported on this SAP system: /sap/bc/adt/businessservices/bindings, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "read": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceBinding is not supported on this SAP system: /sap/bc/adt/businessservices/bindings, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "readMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceBinding is not supported on this SAP system: /sap/bc/adt/businessservices/bindings, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "readTransport": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceBinding is not supported on this SAP system: /sap/bc/adt/businessservices/bindings, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "unlock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceBinding is not supported on this SAP system: /sap/bc/adt/businessservices/bindings, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "update": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceBinding is not supported on this SAP system: /sap/bc/adt/businessservices/bindings, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "updateMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceBinding is not supported on this SAP system: /sap/bc/adt/businessservices/bindings, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "validate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceBinding is not supported on this SAP system: /sap/bc/adt/businessservices/bindings, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+  },
+}
+`;
+
+exports[`an absent legacy handler refuses every operation, as before getServiceDefinition: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": "ServiceDefinition",
+  "refusals": {
+    "activate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceDefinition is not supported on this SAP system: /sap/bc/adt/ddic/srvd/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "check": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceDefinition is not supported on this SAP system: /sap/bc/adt/ddic/srvd/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "checkDeletion": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceDefinition is not supported on this SAP system: /sap/bc/adt/ddic/srvd/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "create": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceDefinition is not supported on this SAP system: /sap/bc/adt/ddic/srvd/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "delete": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceDefinition is not supported on this SAP system: /sap/bc/adt/ddic/srvd/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "getVersionSource": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceDefinition is not supported on this SAP system: /sap/bc/adt/ddic/srvd/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "getVersions": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceDefinition is not supported on this SAP system: /sap/bc/adt/ddic/srvd/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "lock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceDefinition is not supported on this SAP system: /sap/bc/adt/ddic/srvd/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "read": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceDefinition is not supported on this SAP system: /sap/bc/adt/ddic/srvd/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "readMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceDefinition is not supported on this SAP system: /sap/bc/adt/ddic/srvd/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "readTransport": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceDefinition is not supported on this SAP system: /sap/bc/adt/ddic/srvd/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "unlock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceDefinition is not supported on this SAP system: /sap/bc/adt/ddic/srvd/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "update": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceDefinition is not supported on this SAP system: /sap/bc/adt/ddic/srvd/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "updateMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceDefinition is not supported on this SAP system: /sap/bc/adt/ddic/srvd/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "validate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ServiceDefinition is not supported on this SAP system: /sap/bc/adt/ddic/srvd/sources, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+  },
+}
+`;
+
+exports[`an absent legacy handler refuses every operation, as before getStructure: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": "Structure",
+  "refusals": {
+    "activate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Structure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "check": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Structure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "checkDeletion": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Structure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "create": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Structure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "delete": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Structure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "getVersionSource": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Structure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "getVersions": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Structure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "lock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Structure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "read": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Structure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "readMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Structure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "readTransport": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Structure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "unlock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Structure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "update": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Structure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "updateMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Structure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "validate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Structure is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/structures, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+  },
+}
+`;
+
+exports[`an absent legacy handler refuses every operation, as before getTable: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": "Table",
+  "refusals": {
+    "activate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Table is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/tables, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "check": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Table is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/tables, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "checkDeletion": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Table is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/tables, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "create": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Table is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/tables, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "delete": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Table is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/tables, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "getVersionSource": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Table is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/tables, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "getVersions": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Table is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/tables, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "lock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Table is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/tables, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "read": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Table is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/tables, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "readMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Table is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/tables, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "readTransport": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Table is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/tables, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "unlock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Table is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/tables, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "update": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Table is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/tables, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "updateMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Table is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/tables, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "validate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Table is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/ddic/tables, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+  },
+}
+`;
+
+exports[`an absent legacy handler refuses every operation, as before getTableSettings: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": "TableSettings",
+  "refusals": {
+    "lock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TableSettings is not supported on this SAP system: /sap/bc/adt/ddic/db/settings, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "patchMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TableSettings is not supported on this SAP system: /sap/bc/adt/ddic/db/settings, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "readMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TableSettings is not supported on this SAP system: /sap/bc/adt/ddic/db/settings, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "unlock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TableSettings is not supported on this SAP system: /sap/bc/adt/ddic/db/settings, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "updateMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TableSettings is not supported on this SAP system: /sap/bc/adt/ddic/db/settings, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+  },
+}
+`;
+
+exports[`an absent legacy handler refuses every operation, as before getTableType: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": "TableType",
+  "refusals": {
+    "activate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TableType is not supported on this SAP system: /sap/bc/adt/ddic/tabletypes, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "check": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TableType is not supported on this SAP system: /sap/bc/adt/ddic/tabletypes, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "checkDeletion": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TableType is not supported on this SAP system: /sap/bc/adt/ddic/tabletypes, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "create": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TableType is not supported on this SAP system: /sap/bc/adt/ddic/tabletypes, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "delete": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TableType is not supported on this SAP system: /sap/bc/adt/ddic/tabletypes, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "getVersionSource": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TableType is not supported on this SAP system: /sap/bc/adt/ddic/tabletypes, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "getVersions": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TableType is not supported on this SAP system: /sap/bc/adt/ddic/tabletypes, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "lock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TableType is not supported on this SAP system: /sap/bc/adt/ddic/tabletypes, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "readMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TableType is not supported on this SAP system: /sap/bc/adt/ddic/tabletypes, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "readTransport": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TableType is not supported on this SAP system: /sap/bc/adt/ddic/tabletypes, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "unlock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TableType is not supported on this SAP system: /sap/bc/adt/ddic/tabletypes, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "updateMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TableType is not supported on this SAP system: /sap/bc/adt/ddic/tabletypes, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "validate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TableType is not supported on this SAP system: /sap/bc/adt/ddic/tabletypes, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+  },
+}
+`;
+
+exports[`an absent legacy handler refuses every operation, as before getTextElements: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": "TextElements",
+  "refusals": {
+    "lock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TextElements is not supported on this SAP system: /sap/bc/adt/textelements/programs, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "read": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TextElements is not supported on this SAP system: /sap/bc/adt/textelements/programs, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "unlock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TextElements is not supported on this SAP system: /sap/bc/adt/textelements/programs, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "update": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TextElements is not supported on this SAP system: /sap/bc/adt/textelements/programs, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+  },
+}
+`;
+
+exports[`an absent legacy handler refuses every operation, as before getTransformation: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": "Transformation",
+  "refusals": {
+    "activate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Transformation is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/xslt/transformations, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "check": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Transformation is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/xslt/transformations, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "checkDeletion": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Transformation is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/xslt/transformations, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "create": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Transformation is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/xslt/transformations, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "delete": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Transformation is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/xslt/transformations, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "getVersionSource": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Transformation is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/xslt/transformations, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "getVersions": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Transformation is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/xslt/transformations, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "lock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Transformation is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/xslt/transformations, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "read": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Transformation is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/xslt/transformations, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "readMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Transformation is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/xslt/transformations, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "readTransport": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Transformation is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/xslt/transformations, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "unlock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Transformation is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/xslt/transformations, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "update": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Transformation is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/xslt/transformations, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "updateMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Transformation is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/xslt/transformations, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+    "validate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "Transformation is not supported on this SAP system: a legacy system (7.40 SP04) was measured not to serve /sap/bc/adt/xslt/transformations, the endpoint this type needs.",
+      "origin": "refusal",
+    },
+  },
+}
+`;
