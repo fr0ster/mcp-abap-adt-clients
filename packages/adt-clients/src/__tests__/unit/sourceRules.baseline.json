@@ -1,19 +1,5 @@
 [
   {
-    "file": "packages/adt-clients/src/batch/wire.ts",
-    "rule": "any",
-    "kind": "flow",
-    "text": "Object.getPrototypeOf(params)",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/batch/wire.ts",
-    "rule": "hand-narrowed",
-    "kind": "widened",
-    "text": "params: unknown",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/clients/abapGit/structuredExchange.ts",
     "rule": "cast",
     "kind": "re-types",

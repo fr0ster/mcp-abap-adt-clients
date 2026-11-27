@@ -28,7 +28,7 @@ export function batchQuery(params: unknown): URLSearchParams {
   if (typeof params === 'string' || params instanceof URLSearchParams)
     return new URLSearchParams(params);
   if (typeof params === 'object') {
-    const prototype: object | null = Object.getPrototypeOf(params);
+    const prototype: unknown = Object.getPrototypeOf(params);
     if (prototype === Object.prototype || prototype === null) {
       const query = new URLSearchParams();
       for (const [key, value] of Object.entries(params)) {
@@ -78,7 +78,8 @@ export function innerRequest(request: IAbapRequestOptions): string {
       if (key.toLowerCase() === 'content-length') delete headers[key];
     headers['Content-Length'] = String(Buffer.byteLength(body));
   }
-  const params = request.params ? batchQuery(request.params).toString() : '';
+  // No params (or empty ones) add no query.
+  const params = batchQuery(request.params).toString();
   const url =
     request.url +
     (params ? `${request.url.includes('?') ? '&' : '?'}${params}` : '');
