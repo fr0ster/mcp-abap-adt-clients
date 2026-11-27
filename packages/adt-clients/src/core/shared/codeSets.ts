@@ -90,12 +90,12 @@ export const SOURCE_READ = {
 export type AdtSourceReadCode = keyof typeof SOURCE_READ;
 
 /** Whether text from outside the types is a code `readObjectMetadata` reads. */
-export function isMetadataReadCode(code: string): code is AdtMetadataReadCode {
+export function isMetadataReadCode(code: string): boolean {
   return Object.hasOwn(METADATA_READ, code);
 }
 
 /** Whether text from outside the types is a code `readObjectSource` reads. */
-export function isSourceReadCode(code: string): code is AdtSourceReadCode {
+export function isSourceReadCode(code: string): boolean {
   return Object.hasOwn(SOURCE_READ, code);
 }
 

@@ -25,8 +25,7 @@ import { fetchInactiveObjects } from '../core/shared/getInactiveObjects';
 import {
   type AdtAddressableCode,
   codeEntries,
-  GROUP_ONLY_ADDRESS,
-  isGroupOnlyCode,
+  GROUP_ONLY_ADDRESS_OF,
   NO_OWN_ADDRESS,
   PARENTED_SEGMENT,
   parentEntry,
@@ -73,7 +72,8 @@ export function buildObjectUri<C extends AdtAddressableCode>(
   type: C,
   ...[parentName]: ParentArgument<C>
 ): string {
-  if (isGroupOnlyCode(type)) return GROUP_ONLY_ADDRESS[type](name);
+  const groupOnly = GROUP_ONLY_ADDRESS_OF.get(type);
+  if (groupOnly) return groupOnly(name);
   const [first] = codeEntries(type);
   // Only a caller outside the type system reaches this: a code no table names
   // is no `AdtTypeCode`. It is their argument, refused before any request.

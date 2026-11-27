@@ -847,20 +847,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/core/shared/codeSets.ts",
-    "rule": "predicate",
-    "kind": "is",
-    "text": "code is AdtMetadataReadCode",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/shared/codeSets.ts",
-    "rule": "predicate",
-    "kind": "is",
-    "text": "code is AdtSourceReadCode",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/core/shared/LockRegistry.ts",
     "rule": "hand-narrowed",
     "kind": "widened",
@@ -991,13 +977,6 @@
     "rule": "cast",
     "kind": "asserts-present",
     "text": "options?.source as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/endpoints/codes.ts",
-    "rule": "predicate",
-    "kind": "is",
-    "text": "code is AdtGroupOnlyCode",
     "count": 1
   },
   {
