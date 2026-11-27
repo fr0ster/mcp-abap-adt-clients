@@ -101,7 +101,9 @@ export const appendStructureDocuments = {
 
 export interface ICreateAppendStructureParams {
   append_structure_name: string;
-  base_object: string; // name of the base table OR structure being extended
+  // The name of the base table or structure being extended; the create
+  // refuses its absence in its own words.
+  base_object: string | undefined;
   description?: string;
   package_name: string;
   transport_request?: string;

@@ -126,8 +126,8 @@ export interface IBehaviorDefinitionCreateParams {
   description: string;
   /** Package name */
   package: string;
-  /** Implementation type */
-  implementationType: BehaviorDefinitionImplementationType;
+  /** Implementation type; absent, the property reads `undefined`, as before */
+  implementationType: BehaviorDefinitionImplementationType | undefined;
   /** Language (default: EN) */
   language?: string;
   /** Responsible user */

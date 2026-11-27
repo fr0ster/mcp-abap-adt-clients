@@ -176,10 +176,10 @@ export class AdtAppendStructure<
       () =>
         createAppendStructure(connection, options.headers, {
           append_structure_name: name,
-          base_object: config.baseObject as string,
+          base_object: config.baseObject,
           package_name: config.packageName,
           transport_request: config.transportRequest,
-          description: config.description as string,
+          description: config.description,
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,
           masterLanguage: createLanguage(

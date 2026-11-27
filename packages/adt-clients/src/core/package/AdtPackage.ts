@@ -128,7 +128,7 @@ export class AdtPackage<
       () =>
         validatePackageBasic(connection, {
           package_name: name,
-          super_package: config.superPackage as string,
+          super_package: config.superPackage,
           description: config.description,
           package_type: config.packageType,
           software_component: config.softwareComponent,
@@ -175,7 +175,7 @@ export class AdtPackage<
       () =>
         createPackage(connection, options.headers, {
           package_name: name,
-          super_package: config.superPackage as string,
+          super_package: config.superPackage,
           description: config.description,
           package_type: config.packageType,
           software_component: config.softwareComponent,
@@ -248,7 +248,7 @@ export class AdtPackage<
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    const superPackage = config.superPackage as string;
+    const superPackage = config.superPackage;
     const softwareComponent = config.softwareComponent;
 
     const fields = {

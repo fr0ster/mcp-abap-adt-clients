@@ -178,7 +178,7 @@ export class AdtMessageClass<
       () =>
         createMessageClass(connection, options.headers, {
           name,
-          description: config.description as string,
+          description: config.description,
           package_name: config.packageName,
           // config → global systemContext; none invented: without one SAP
           // takes the logon language.

@@ -192,20 +192,6 @@
     "file": "packages/adt-clients/src/core/appendStructure/AdtAppendStructure.ts",
     "rule": "cast",
     "kind": "asserts-present",
-    "text": "config.baseObject as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/appendStructure/AdtAppendStructure.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "config.description as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/appendStructure/AdtAppendStructure.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
     "text": "options?.lockHandle as string",
     "count": 1
   },
@@ -235,13 +221,6 @@
     "rule": "cast",
     "kind": "asserts-present",
     "text": "config.description as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/behaviorDefinition/AdtBehaviorDefinition.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "config.implementationType as BehaviorDefinitionImplementationType",
     "count": 1
   },
   {
@@ -451,13 +430,6 @@
     "file": "packages/adt-clients/src/core/domain/AdtDomain.ts",
     "rule": "cast",
     "kind": "asserts-present",
-    "text": "config.description as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/domain/AdtDomain.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
     "text": "config.domainName as string",
     "count": 1
   },
@@ -504,13 +476,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/core/enhancement/versions.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "config.enhancementType as EnhancementType",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/core/featureToggle/AdtFeatureToggle.ts",
     "rule": "cast",
     "kind": "re-types",
@@ -522,13 +487,6 @@
     "rule": "cast",
     "kind": "asserts-present",
     "text": "config.featureToggleName as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/featureToggle/AdtFeatureToggle.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "source as IFeatureToggleSource",
     "count": 1
   },
   {
@@ -717,13 +675,6 @@
     "file": "packages/adt-clients/src/core/messageClass/AdtMessageClass.ts",
     "rule": "cast",
     "kind": "asserts-present",
-    "text": "config.description as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/messageClass/AdtMessageClass.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
     "text": "config.name as string",
     "count": 1
   },
@@ -787,13 +738,6 @@
     "file": "packages/adt-clients/src/core/package/AdtPackage.ts",
     "rule": "cast",
     "kind": "asserts-present",
-    "text": "config.superPackage as string",
-    "count": 3
-  },
-  {
-    "file": "packages/adt-clients/src/core/package/AdtPackage.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
     "text": "options?.lockHandle as string",
     "count": 1
   },
@@ -802,13 +746,6 @@
     "rule": "cast",
     "kind": "asserts-present",
     "text": "options?.source as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/package/create.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "params.master_system as string",
     "count": 1
   },
   {
@@ -850,13 +787,6 @@
     "file": "packages/adt-clients/src/core/scalarFunction/AdtScalarFunction.ts",
     "rule": "cast",
     "kind": "asserts-present",
-    "text": "config.description as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/scalarFunction/AdtScalarFunction.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
     "text": "config.scalarFunctionName as string",
     "count": 1
   },
@@ -879,13 +809,6 @@
     "rule": "cast",
     "kind": "asserts-present",
     "text": "config.scalarFunctionName as string",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/scalarFunctionImplementation/AdtScalarFunctionImplementation.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "config.description as string",
     "count": 1
   },
   {
@@ -1215,13 +1138,6 @@
     "rule": "predicate",
     "kind": "is",
     "text": "connection is T & IDeferredResponseConnection",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/core/transport/create.ts",
-    "rule": "cast",
-    "kind": "asserts-present",
-    "text": "params.owner as string",
     "count": 1
   },
   {

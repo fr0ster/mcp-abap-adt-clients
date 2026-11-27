@@ -12,7 +12,8 @@ export async function uploadFeatureToggleSource(
   headers: IAdtHeaders,
   ifMatch: string | undefined,
   name: string,
-  source: IFeatureToggleSource,
+  // Absent, the body is what `JSON.stringify(undefined)` gives, as before.
+  source: IFeatureToggleSource | undefined,
   lockHandle?: string,
   transportRequest?: string,
 ): Promise<IAdtWireResponse> {

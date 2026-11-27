@@ -186,7 +186,7 @@ export class AdtScalarFunction<
           scalar_function_name: name,
           package_name: config.packageName,
           transport_request: config.transportRequest,
-          description: config.description as string,
+          description: config.description,
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,
           masterLanguage: createLanguage(

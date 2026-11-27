@@ -98,7 +98,7 @@ export const packageDocuments = {
 export interface ICreatePackageParams {
   package_name: string;
   description?: string;
-  super_package: string;
+  super_package: string | undefined;
   package_type?: string;
   software_component?: string;
   transport_layer?: string;

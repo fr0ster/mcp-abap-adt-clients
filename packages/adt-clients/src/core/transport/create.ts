@@ -17,7 +17,7 @@ import type { ICreateTransportParams } from './types';
  */
 function buildCreateTransportXml(
   args: ICreateTransportParams,
-  username: string,
+  username: string | undefined,
 ): string {
   // The request type is CTS's code (DD07T of domain TRFUNCTION, read on
   // premise): K Workbench Request, W Customizing Request, T Transport of
@@ -55,7 +55,7 @@ export async function createTransport(
   headers: IAdtHeaders,
   params: ICreateTransportParams,
 ): Promise<IAdtWireResponse> {
-  const username = params.owner as string;
+  const username = params.owner;
 
   const url = TRANSPORT_REQUEST.collection;
 

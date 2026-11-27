@@ -22,7 +22,7 @@ export async function getEnhancementVersions(
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
     url: `${getEnhancementUri(
-      config.enhancementType as EnhancementType,
+      config.enhancementType,
       config.enhancementName as string,
     )}/source/main/versions`,
     method: 'GET',

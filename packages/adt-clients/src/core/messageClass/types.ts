@@ -92,7 +92,7 @@ export const messageDocuments = {
 
 export interface ICreateMessageClassParams {
   name: string;
-  description: string;
+  description: string | undefined;
   package_name: string;
   transport_request?: string;
   master_language?: string;

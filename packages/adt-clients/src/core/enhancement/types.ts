@@ -37,14 +37,20 @@ export const ENHANCEMENT_TYPE_CODES = {
 /**
  * Get ADT base URL for enhancement type
  */
-export function getEnhancementBaseUrl(type: EnhancementType): string {
+export function getEnhancementBaseUrl(
+  type: EnhancementType | undefined,
+): string {
   return ENHANCEMENT.collection(type);
 }
 
 /**
  * Get ADT object URI for specific enhancement
  */
-export function getEnhancementUri(type: EnhancementType, name: string): string {
+/** An absent type is written as the text `undefined`, as a template writes it. */
+export function getEnhancementUri(
+  type: EnhancementType | undefined,
+  name: string,
+): string {
   return ENHANCEMENT.uri(type, name);
 }
 

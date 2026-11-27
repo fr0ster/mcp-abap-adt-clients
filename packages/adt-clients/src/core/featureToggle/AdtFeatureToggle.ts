@@ -317,7 +317,7 @@ export class AdtFeatureToggle<
           options.headers,
           options.ifMatch,
           name,
-          source as IFeatureToggleSource,
+          source,
           options?.lockHandle,
           config.transportRequest,
         ),

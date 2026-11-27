@@ -206,8 +206,7 @@ export class AdtBehaviorDefinition<
           name,
           package: config.packageName,
           description: config.description as string,
-          implementationType:
-            config.implementationType as BehaviorDefinitionImplementationType,
+          implementationType: config.implementationType,
           transportRequest: config.transportRequest,
           language: createLanguage(
             config.masterLanguage,
