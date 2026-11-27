@@ -11,6 +11,7 @@
  * interrupting the lock→unlock critical section is the caller's responsibility.
  */
 
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { isUnansweredCredentialRefusal } from '../../utils/adtResponse';
 
 /**
@@ -44,6 +45,13 @@ export function failedStatus(answer: unknown): boolean {
   }
   const { status } = answer;
   return typeof status === 'number' && (status < 200 || status >= 300);
+}
+
+/**
+ * {@link failedStatus} for an answer the contract types: a status outside 2xx.
+ */
+export function failedWireStatus(answer: IAdtWireResponse): boolean {
+  return answer.status < 200 || answer.status >= 300;
 }
 
 export class LockRegistry {

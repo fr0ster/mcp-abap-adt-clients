@@ -95,7 +95,7 @@ import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import {
   createLockTracker,
-  failedStatus,
+  failedWireStatus,
   type LockTracker,
 } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
@@ -339,7 +339,7 @@ export class AdtTableSettings<
         });
         // A refusal SAP answered, which a connection resolved: the default
         // verdict reads it, as for every member.
-        if (failedStatus(read)) return { answer: read };
+        if (failedWireStatus(read)) return { answer: read };
         const etag = headerValue(read.headers, 'etag');
         if (etag === undefined) {
           return refusal('the read answered no ETag to guard the write', read);
@@ -411,7 +411,7 @@ export class AdtTableSettings<
         // The registry follows the wire, before any `analyse` runs: a handle
         // SAP answered with a 2xx status is tracked whatever a caller rules,
         // so `unlockAll()` can release what the wire holds.
-        const refused = failedStatus(locked);
+        const refused = failedWireStatus(locked);
         const held = refused ? '' : lockHandleOf(locked);
         if (held) this.lockTracker.track(name, held);
         // A LOCK SAP refused keeps SAP's classification (the default verdict
@@ -456,7 +456,7 @@ export class AdtTableSettings<
         // Released on the wire — SAP answered the UNLOCK with a 2xx status —
         // and untracked then, before any `analyse` runs. A connection that
         // resolves a 403 or a 500 released nothing.
-        if (!failedStatus(unlocked)) this.lockTracker.untrack(name);
+        if (!failedWireStatus(unlocked)) this.lockTracker.untrack(name);
         return unlocked;
       },
       nothing,

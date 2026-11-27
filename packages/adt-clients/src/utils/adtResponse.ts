@@ -285,6 +285,21 @@ export function markOf(
 }
 
 /**
+ * The verdict on a refusal a connection resolved instead of rejecting: what
+ * {@link recogniseFailure} made of `{ message, response }`, read from the typed
+ * answer instead of through `unknown` — a connection failure naming the
+ * status, with the answer when its status is an integer.
+ */
+function resolvedRefusal(wire: IAdtWireResponse): IAdtError {
+  return {
+    origin: 'connection',
+    message: `Request failed with status code ${wire.status}`,
+    response: Number.isInteger(wire.status) ? wire : undefined,
+    request: undefined,
+  };
+}
+
+/**
  * The default error strategy: what this library recognises as a failure.
  *
  * Origin is not decoration — the two have different remedies, and a caller
@@ -491,10 +506,7 @@ export async function answeringExchange<T, E extends IAdtError = IAdtError>(
       // A refusal a connection resolved instead of rejecting — outside the
       // connection contract, which rejects on SAP's refusal — is still SAP's
       // refusal: the default verdict is the one it would have had thrown.
-      verdict = recogniseFailure({
-        message: `Request failed with status code ${wire.status}`,
-        response: wire,
-      });
+      verdict = resolvedRefusal(wire);
     }
   } catch (error: unknown) {
     // The provider refused before SAP said anything: no answer exists to come

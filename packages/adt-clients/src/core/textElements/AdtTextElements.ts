@@ -73,7 +73,7 @@ import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import {
   createLockTracker,
-  failedStatus,
+  failedWireStatus,
   type LockTracker,
 } from '../shared/LockRegistry';
 import {
@@ -221,7 +221,7 @@ export class AdtTextElements<
         const locked = await inStatefulSession(this.connection, () =>
           lockTextElements(this.connection, objectKind, objectName),
         );
-        const refused = failedStatus(locked);
+        const refused = failedWireStatus(locked);
         const held = refused ? '' : lockHandleOf(locked);
         if (held) this.lockTrackers[objectKind].track(objectName, held);
         // A LOCK SAP refused keeps SAP's classification (the default verdict
@@ -264,7 +264,7 @@ export class AdtTextElements<
             lockHandle,
           ),
         );
-        if (!failedStatus(unlocked)) {
+        if (!failedWireStatus(unlocked)) {
           this.lockTrackers[objectKind].untrack(objectName);
         }
         return unlocked;

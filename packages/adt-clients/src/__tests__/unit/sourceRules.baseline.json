@@ -847,13 +847,6 @@
     "count": 1
   },
   {
-    "file": "packages/adt-clients/src/core/shared/LockRegistry.ts",
-    "rule": "hand-narrowed",
-    "kind": "widened",
-    "text": "answer: unknown",
-    "count": 1
-  },
-  {
     "file": "packages/adt-clients/src/core/structure/AdtStructure.ts",
     "rule": "cast",
     "kind": "asserts-present",
@@ -998,13 +991,6 @@
     "rule": "cast",
     "kind": "re-types",
     "text": "verdict as E",
-    "count": 1
-  },
-  {
-    "file": "packages/adt-clients/src/utils/adtResponse.ts",
-    "rule": "hand-narrowed",
-    "kind": "widened",
-    "text": "error: unknown",
     "count": 1
   },
   {
