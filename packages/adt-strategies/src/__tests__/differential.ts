@@ -38,23 +38,19 @@ function collectStrings(value: unknown, into: string[]): void {
     for (const v of Object.values(value)) collectStrings(v, into);
 }
 
-/** Every string of length 0..maxLength over the alphabet. */
+/**
+ * Every string of length 0..maxLength over the alphabet, depth first: one
+ * prefix is held at a time, so memory grows with `maxLength`, not with the
+ * number of strings.
+ */
 export function* everyString(
   alphabet: readonly string[],
   maxLength: number,
+  prefix = '',
 ): Generator<string> {
-  let layer = [''];
-  yield '';
-  for (let length = 1; length <= maxLength; length++) {
-    const next: string[] = [];
-    for (const prefix of layer)
-      for (const c of alphabet) {
-        const s = prefix + c;
-        next.push(s);
-        yield s;
-      }
-    layer = next;
-  }
+  yield prefix;
+  if (prefix.length >= maxLength) return;
+  for (const c of alphabet) yield* everyString(alphabet, maxLength, prefix + c);
 }
 
 /** mulberry32: a fixed seed gives the same strings on every run. */
