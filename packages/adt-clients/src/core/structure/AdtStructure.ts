@@ -170,6 +170,8 @@ export class AdtStructure<
     config: Omit<IStructureConfig, 'source'> & {
       source?: never;
       packageName: string;
+      // Read by the request builder, so required (#304, D4).
+      description: string;
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<T['created'], E>> {
@@ -197,7 +199,7 @@ export class AdtStructure<
           structureName: name,
           packageName: config.packageName,
           transportRequest: config.transportRequest,
-          description: config.description as string,
+          description: config.description,
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,
           masterLanguage: createLanguage(

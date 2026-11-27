@@ -23,7 +23,7 @@ import { type EnhancementType, getEnhancementUri } from './types';
  */
 export async function unlockEnhancement(
   connection: IAbapConnection,
-  enhancementType: EnhancementType,
+  enhancementType: EnhancementType | undefined,
   enhancementName: string,
   lockHandle: string,
 ): Promise<IAdtWireResponse> {

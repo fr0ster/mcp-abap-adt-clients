@@ -355,6 +355,12 @@ export class AdtServiceBinding<
     config: Omit<IServiceBindingConfig, 'source'> & {
       source?: never;
       packageName: string;
+      // Read by the request builder, so required (#304, D4).
+      description: string;
+      serviceName: string;
+      serviceDefinitionName: string;
+      serviceVersion: string;
+      bindingVariant: NonNullable<IServiceBindingConfig['bindingVariant']>;
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<T['created'], E>> {
@@ -378,20 +384,20 @@ export class AdtServiceBinding<
     const name = this.name(config);
     const packageName = config.packageName;
     const description = config.description;
-    const serviceName = config.serviceName as string;
+    const serviceName = config.serviceName;
     const serviceVersion = config.serviceVersion;
-    const serviceDefinitionName = config.serviceDefinitionName as string;
+    const serviceDefinitionName = config.serviceDefinitionName;
     const bindingVariant = config.bindingVariant;
     return answering(
       () =>
         this.createRequest(connection, options.headers, {
           bindingName: name,
           packageName,
-          description: description as string,
+          description,
           serviceDefinitionName,
           serviceName,
-          serviceVersion: serviceVersion as string,
-          bindingVariant: bindingVariant as ServiceBindingVariant,
+          serviceVersion,
+          bindingVariant,
           masterLanguage: config.masterLanguage,
           masterSystem: config.masterSystem,
           responsible: config.responsible,

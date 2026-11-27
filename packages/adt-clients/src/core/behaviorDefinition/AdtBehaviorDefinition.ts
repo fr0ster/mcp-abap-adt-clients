@@ -186,6 +186,8 @@ export class AdtBehaviorDefinition<
     config: Omit<IBehaviorDefinitionConfig, 'source'> & {
       source?: never;
       packageName: string;
+      // Read by the request builder, so required (#304, D4).
+      description: string;
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<T['created'], E>> {
@@ -212,7 +214,7 @@ export class AdtBehaviorDefinition<
         createBehaviorDefinition(connection, options.headers, {
           name,
           package: config.packageName,
-          description: config.description as string,
+          description: config.description,
           implementationType: config.implementationType,
           transportRequest: config.transportRequest,
           language: createLanguage(

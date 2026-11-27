@@ -247,7 +247,11 @@ export class AdtFunctionModule<
 
   /** Create the function module. */
   async create<E extends IAdtError = IAdtError>(
-    config: Omit<IFunctionModuleConfig, 'source'> & { source?: never },
+    config: Omit<IFunctionModuleConfig, 'source'> & {
+      source?: never;
+      // Read by the request builder, so required (#304, D4).
+      description: string;
+    },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<T['created'], E>> {
     // The caller's deadline, if they set one, on every request below.
@@ -260,7 +264,7 @@ export class AdtFunctionModule<
           functionGroupName: group,
           functionModuleName: module,
           transportRequest: config.transportRequest,
-          description: config.description as string,
+          description: config.description,
           masterSystem: config.masterSystem ?? this.systemContext.masterSystem,
           responsible: config.responsible ?? this.systemContext.responsible,
         }),

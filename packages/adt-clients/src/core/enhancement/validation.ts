@@ -7,8 +7,8 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
-  ENHANCEMENT_TYPE_CODES,
   type EnhancementType,
+  enhancementTypeCode,
   getEnhancementBaseUrl,
   type IValidateEnhancementParams,
 } from './types';
@@ -30,7 +30,8 @@ export async function validateEnhancementName(
   const { enhancement_name, enhancement_type, package_name, description } =
     params;
 
-  const typeCode = ENHANCEMENT_TYPE_CODES[enhancement_type];
+  // An absent type is written as `undefined`, as the record wrote it.
+  const typeCode = `${enhancementTypeCode(enhancement_type)}`;
 
   // Build query parameters for validation
   const queryParams = new URLSearchParams({
@@ -73,7 +74,7 @@ export async function validateEnhancementName(
  */
 export async function validate(
   connection: IAbapConnection,
-  enhancementType: EnhancementType,
+  enhancementType: EnhancementType | undefined,
   enhancementName: string,
   packageName?: string,
   description?: string,

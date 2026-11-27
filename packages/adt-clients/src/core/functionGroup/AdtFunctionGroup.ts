@@ -220,6 +220,8 @@ export class AdtFunctionGroup<
     config: Omit<IFunctionGroupConfig, 'source'> & {
       source?: never;
       packageName: string;
+      // Read by the request builder, so required (#304, D4).
+      description: string;
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<T['created'], E>> {
@@ -250,7 +252,7 @@ export class AdtFunctionGroup<
             functionGroupName: name,
             packageName: config.packageName,
             transportRequest: config.transportRequest,
-            description: config.description as string,
+            description: config.description,
             masterSystem:
               config.masterSystem ?? this.systemContext.masterSystem,
             responsible: config.responsible ?? this.systemContext.responsible,

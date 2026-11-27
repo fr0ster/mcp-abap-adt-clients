@@ -90,7 +90,7 @@ export async function checkEnhancement(
 export async function check(
   connection: IAbapConnection,
   headers: IAdtHeaders,
-  enhancementType: EnhancementType,
+  enhancementType: EnhancementType | undefined,
   enhancementName: string,
   version: 'active' | 'inactive' = 'inactive',
   sourceCode?: string,

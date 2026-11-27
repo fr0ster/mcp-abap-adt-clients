@@ -182,6 +182,8 @@ export class AdtMetadataExtension<
     config: Omit<IMetadataExtensionConfig, 'source'> & {
       source?: never;
       packageName: string;
+      // Read by the request builder, so required (#304, D4).
+      description: string;
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
   ): Promise<IAdtResponse<T['created'], E>> {
@@ -207,7 +209,7 @@ export class AdtMetadataExtension<
       () =>
         createMetadataExtension(connection, options.headers, {
           name,
-          description: config.description as string,
+          description: config.description,
           packageName: config.packageName,
           transportRequest: config.transportRequest,
           masterLanguage: createLanguage(

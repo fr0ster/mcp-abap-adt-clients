@@ -20,7 +20,7 @@ import { type EnhancementType, getEnhancementUri } from './types';
  */
 export async function lockEnhancement(
   connection: IAbapConnection,
-  enhancementType: EnhancementType,
+  enhancementType: EnhancementType | undefined,
   enhancementName: string,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({

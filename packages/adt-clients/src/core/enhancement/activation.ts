@@ -24,7 +24,7 @@ import { type EnhancementType, getEnhancementUri } from './types';
 export async function activateEnhancement(
   connection: IAbapConnection,
   headers: IAdtHeaders,
-  enhancementType: EnhancementType,
+  enhancementType: EnhancementType | undefined,
   enhancementName: string,
   preauditRequested: boolean,
 ): Promise<IAdtWireResponse> {

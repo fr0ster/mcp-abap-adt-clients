@@ -145,7 +145,7 @@ export class AdtEnhancement<
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
-  private readonly lockTracker: LockTracker<EnhancementType>;
+  private readonly lockTracker: LockTracker<EnhancementType | undefined>;
   /** The enhancement type each held lock was taken with. */
   public readonly objectType: string = 'Enhancement';
 
@@ -163,7 +163,7 @@ export class AdtEnhancement<
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
-    this.lockTracker = createLockTracker<EnhancementType>(
+    this.lockTracker = createLockTracker<EnhancementType | undefined>(
       lockRegistry,
       this.objectType,
       // The type the lock was taken with, carried with the lock.
@@ -181,8 +181,10 @@ export class AdtEnhancement<
    */
   private enhancementType(
     config: Partial<IEnhancementConfig>,
-  ): EnhancementType {
-    return config.enhancementType as EnhancementType;
+  ): EnhancementType | undefined {
+    // Not required beyond create (D1 of #304): an absent type is carried as
+    // `undefined`, which a URI writes as the text `undefined`, as before.
+    return config.enhancementType;
   }
 
   /**
@@ -248,7 +250,8 @@ export class AdtEnhancement<
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    const type = this.enhancementType(config);
+    // Required by the create's type (#304, D4): its builder reads it.
+    const type = config.enhancementType;
     return answering(
       () =>
         createEnhancement(
@@ -298,7 +301,7 @@ export class AdtEnhancement<
       () =>
         getEnhancementSource(
           connection,
-          this.enhancementType(config),
+          config.enhancementType,
           name,
           version,
           options,
@@ -322,7 +325,9 @@ export class AdtEnhancement<
       () =>
         getEnhancementMetadata(
           connection,
-          this.enhancementType(config),
+          // Kept for the owner (#304): an absent type sends `Accept: undefined`,
+          // which the request type cannot hold without this assertion.
+          config.enhancementType as EnhancementType,
           name,
           options,
           this.logger,
