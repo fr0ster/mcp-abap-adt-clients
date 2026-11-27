@@ -89,7 +89,7 @@ describe('the legacy registrations', () => {
       } else {
         expect(pair).toThrow('AdtClassLegacy.delete');
         expect(refusal).toThrow('AdtPackageLegacy.create');
-        expect(absent).toThrow('Object.create');
+        expect(absent).toThrow('AdtDomainAbsentLegacy.create');
       }
     },
   );

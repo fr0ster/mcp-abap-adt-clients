@@ -199,7 +199,15 @@ describe('integrationHeadersOf', () => {
     for (const [getter, rows] of Object.entries(LEGACY_REFUSED)) {
       const handler = owners[getter];
       if (!handler) throw new Error(`No legacy getter ${getter}`);
-      if (Object.getPrototypeOf(handler) === Object.prototype) continue;
+      // An absent handler (C5) refuses every operation and sends nothing.
+      if (
+        (
+          Object.getPrototypeOf(handler) as {
+            constructor?: { name?: string };
+          }
+        ).constructor?.name?.endsWith('AbsentLegacy')
+      )
+        continue;
       for (const member of Object.keys(rows)) {
         if (member.endsWith(']')) continue;
         let proto: object | null = handler;

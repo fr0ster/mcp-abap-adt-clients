@@ -196,6 +196,14 @@ function rowsOf<T>(
 
 // ---------------------------------------------------------------------------
 
+/** An absent legacy handler (C5): an instance of a `*AbsentLegacy` class. */
+function isAbsentHandler(target: object): boolean {
+  const name = (
+    Object.getPrototypeOf(target) as { constructor?: { name?: string } }
+  ).constructor?.name;
+  return typeof name === 'string' && name.endsWith('AbsentLegacy');
+}
+
 describe('legacy member inventory', () => {
   const inventory = owners(recordingConnection().connection);
 
@@ -290,11 +298,12 @@ describe('legacy member inventory', () => {
         problems.push(`${key} (not handed out)`);
         continue;
       }
-      // A class's member is checked where the runtime finds it; an
-      // absentOnLegacy object copies the names of the modern class it stands
-      // for, so the source is the only place to read its visibility.
+      // A class's member is checked where the runtime finds it; an absent
+      // legacy handler (C5) keeps the modern class's private helpers, so the
+      // source is the only place to read their visibility.
       if (
-        Object.getPrototypeOf(target) !== Object.prototype &&
+        target !== undefined &&
+        !isAbsentHandler(target) &&
         (declaredBy as { constructor?: { name?: string } }).constructor
           ?.name !== className
       ) {

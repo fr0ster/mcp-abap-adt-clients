@@ -13,6 +13,7 @@ import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtClientLegacy } from '../../../clients/AdtClientLegacy';
+import { PRIVATE_HELPERS } from '../../helpers/absentHandlers';
 
 const logger = {
   log: jest.fn(),
@@ -132,7 +133,8 @@ describe('AdtClientLegacy: object types absent on legacy', () => {
     '%s answers a refusal from every member, without a request',
     async (getter) => {
       const handler = handlerOf(legacy, getter);
-      const members = membersOf(handler);
+      // The public operations: the private helpers stay the modern ones (C5).
+      const members = membersOf(handler).filter((m) => !PRIVATE_HELPERS.has(m));
       expect(members.length).toBeGreaterThan(0);
 
       for (const member of members) {
