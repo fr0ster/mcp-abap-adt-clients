@@ -48,8 +48,15 @@ import { answeredObject } from './answeredObject';
  * when the ADT type tables know it, else `unknownType` as ADT sent it.
  */
 export type ITraceProgramRef = IAdtAnsweredObject & {
-  name: string;
-  uri: string;
+  /**
+   * Absent on a reference with no ABAP source behind it — the "Runtime
+   * analysis" root, an object's creation, a call from the kernel: SAP sends
+   * the element with no `adtcore:name`, `adtcore:uri` or `adtcore:type`
+   * (measured on premise, #333; the recording is the strategies' fixture).
+   */
+  name?: string | undefined;
+  /** Absent where `name` is. */
+  uri?: string | undefined;
   context?: string;
   byteCodeOffset?: number;
   /** Present on a statement's calling program: a query URI, not a plain URI. */
@@ -553,9 +560,11 @@ function programRef(node: unknown): ITraceProgramRef | undefined {
     return undefined;
   }
   return {
-    name: required(attr(ref, 'name'), 'program.name'),
+    // Not always sent: a reference without a program behind it carries
+    // neither (measured, #333), so neither is required.
+    name: attr(ref, 'name'),
     ...answeredObject(attr(ref, 'type') ?? ''),
-    uri: required(attr(ref, 'uri'), 'program.uri'),
+    uri: attr(ref, 'uri'),
     context: attr(ref, 'context'),
     byteCodeOffset: attrNum(ref, 'byteCodeOffset'),
     objectReferenceQuery: attr(ref, 'objectReferenceQuery'),

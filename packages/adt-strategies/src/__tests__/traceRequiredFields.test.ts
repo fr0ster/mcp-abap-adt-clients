@@ -125,24 +125,6 @@ describe('a view row that lacks a required field', () => {
         ),
     ],
     [
-      'program.name',
-      () =>
-        profilerHitList(
-          hitlist(
-            '<trc:entry trc:index="1"><trc:callingProgram adtcore:uri="/u"/></trc:entry>',
-          ),
-        ),
-    ],
-    [
-      'program.uri',
-      () =>
-        profilerHitList(
-          hitlist(
-            '<trc:entry trc:index="1"><trc:callingProgram adtcore:name="ZCL_X"/></trc:entry>',
-          ),
-        ),
-    ],
-    [
       'statement.id',
       () =>
         profilerStatements(
@@ -202,4 +184,28 @@ describe('a view row that lacks a required field', () => {
       expect(read).toThrow(`traces: ${field} is missing`);
     });
   }
+});
+
+describe('a program reference without a name or uri (measured, #333)', () => {
+  it.each([
+    [
+      'no uri',
+      '<trc:entry trc:index="1"><trc:callingProgram adtcore:name="ZCL_X"/></trc:entry>',
+    ],
+    [
+      'no name',
+      '<trc:entry trc:index="1"><trc:callingProgram adtcore:uri="/u"/></trc:entry>',
+    ],
+    [
+      'neither',
+      '<trc:entry trc:index="1"><trc:callingProgram adtcore:context=""/></trc:entry>',
+    ],
+  ])('%s reads as absent, not a throw', (_what, entry) => {
+    const [row] = profilerHitList(
+      response(
+        `<?xml version="1.0"?><trc:hitlist xmlns:trc="x" xmlns:adtcore="y">${entry}</trc:hitlist>`,
+      ),
+    ).entries;
+    expect(row?.callingProgram).toBeDefined();
+  });
 });

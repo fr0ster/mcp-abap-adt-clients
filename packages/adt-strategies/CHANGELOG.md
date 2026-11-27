@@ -34,6 +34,11 @@ readings.
   transcribed from carries every such field; the other documents and the
   cloud's answers are not recorded, so that SAP always sends them is not
   measured. See the README's "Migrating to 0.29.0".
+- **`ITraceProgramRef.name` and `uri` are optional.** The #333 live run's
+  onprem hit list carried references with neither (the "Runtime analysis"
+  root, an object's creation, a call from the kernel); they read as absent.
+  The recorded views are a fixture (`src/__tests__/fixtures/traces/`), and
+  each field kept required is on every one of their rows.
 
 ### Changed
 

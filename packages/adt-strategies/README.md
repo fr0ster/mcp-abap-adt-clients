@@ -307,8 +307,8 @@ reading's exception surface as itself.
 each field their result type requires — a trace entry's id, time, user,
 object, state, expiry, system, client, host, sizes, runtimes and
 `isAggregated`; a row's `index` (and a statement's `id`); a timing's `time`
-and `percentage`; a program reference's `name` and `uri`; a catalogue item's
-`name` and `description`; a stored request's `id` — and throw
+and `percentage`; a catalogue item's `name` and `description`; a stored
+request's `id` — and throw
 `traces: <field> is missing` (`traces: state.value is missing`,
 `traces: hitlist.index is missing`, …) when the answer lacks one. Before,
 such a field read as `undefined` under a type that said `string` or `number`.
@@ -316,7 +316,7 @@ The on-premise trace feed the reading was transcribed from carries every one
 of these fields in each of its sixty entries; the other documents and the
 cloud's answers are not in the corpus, so that they always carry them is not
 measured. An optional field absent from the answer is still absent from the
-reading.
+reading. A program reference's `name` and `uri` are optional (measured on premise for #333): SAP sends a reference with no ABAP source behind it — the "Runtime analysis" root, an object's creation, a call from the kernel — as an element with no `adtcore:name`, `adtcore:uri` or `adtcore:type`, and the reading answers both absent. The fields kept required are on every row of the recorded hit list (11), statements (15) and DB accesses (2): a row's `index`, a statement's `id`, a timing's `time` and `percentage`.
 
 **Values are text as written** (0.28.0, every util and transport reading): no
 tag or attribute is coerced to a number (`007` stays `007`, a position
@@ -340,8 +340,11 @@ description absent.
   `adt-clients` it surfaces from the member call as itself. A caller that
   wants the old reading of a partial document supplies its own result
   strategy for that slot.
+- **`ITraceProgramRef.name` and `uri` are optional**: SAP leaves both out of
+  a reference with no ABAP source behind it (measured). Code that read them as
+  `string` handles `undefined`.
 - Nothing else of the public surface changed: the declarations
-  (`dist/index.d.ts`) are those of 0.28.3.
+  (`dist/index.d.ts`) are those of 0.28.3 but for `ITraceProgramRef`.
 
 ## How the defaults are justified
 

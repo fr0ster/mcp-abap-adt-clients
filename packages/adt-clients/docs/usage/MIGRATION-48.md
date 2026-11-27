@@ -279,4 +279,7 @@ and `url`. A value of another shape no longer reaches the failure as it was.
 With adt-strategies 0.29.0 the profiler and scheduling readings throw
 `traces: <field> is missing` for an answer without a field their type
 requires, where the field read as `undefined` before. See adt-strategies'
-README, "Migrating to 0.29.0".
+README, "Migrating to 0.29.0". A program reference's `name` and `uri` are not
+among them: SAP leaves both out of a reference with no ABAP source behind it
+(measured on premise), so they are optional (`name?: string`, `uri?: string`);
+read them as possibly absent.

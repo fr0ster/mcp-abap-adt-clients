@@ -217,6 +217,7 @@ declared.
 `traceSchedulingRequests` throw `traces: <field> is missing` naming the field
 (`traces: state.value is missing`, `traces: hitlist.index is missing`). The
 throw surfaces from the member call as itself, as every reading's does.
+A program reference's `name` and `uri` are optional (measured on premise for #333): SAP sends a reference with no ABAP source behind it — the "Runtime analysis" root, an object's creation, a call from the kernel — as an element with no `adtcore:name`, `adtcore:uri` or `adtcore:type`, and the reading answers both absent. The fields kept required are on every row of the recorded hit list (11), statements (15) and DB accesses (2): a row's `index`, a statement's `id`, a timing's `time` and `percentage`.
 
 ## abapGit: what an answer says
 
