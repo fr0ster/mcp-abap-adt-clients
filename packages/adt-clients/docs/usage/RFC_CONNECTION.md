@@ -45,7 +45,7 @@ RFC transport is provided by `@mcp-abap-adt/sap-rfc-lite`, which is pulled in au
 
 It is an **optional** dependency with no install script (sap-rfc-lite 0.3.x and
 later, `@mcp-abap-adt/connection` 19 and later; this package's tests use
-connection 24, with sap-rfc-lite 0.4): `npm install` compiles nothing and needs
+connection `^25.2.0`, with sap-rfc-lite 0.4): `npm install` compiles nothing and needs
 no SDK. It ships prebuilt bindings for linux-x64 (glibc), win32-x64 and
 darwin-arm64. On any other platform the install succeeds without a binding and
 the RFC connection fails when it loads sap-rfc-lite; build the binding from

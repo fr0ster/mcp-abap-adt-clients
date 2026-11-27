@@ -586,7 +586,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   // --- Types absent from legacy /sap/bc/adt/discovery ---
   //
   // Handed out all the same: every member answers a refusal and sends no
-  // request (see absentOnLegacy).
+  // request (see the `*AbsentLegacy` classes in ./absentHandlers).
 
   override getDomain(
     this: this & AdtServedBy<'domain'>,

@@ -564,7 +564,6 @@ import {
 } from '@mcp-abap-adt/adt-clients';
 import {
   abapGitErrorLog,
-  abapGitExternalRepo,
   abapGitRepos,
 } from '@mcp-abap-adt/adt-strategies';
 
@@ -598,7 +597,8 @@ const abapGit = AdtAbapGitClient.create(connection, {
     ...abapGitDocuments,
     repos: abapGitRepos,
     errorLog: abapGitErrorLog,
-    externalRepo: abapGitExternalRepo,
+    // `checkExternalRepo` answers through its facts slot, `externalRepoFacts`
+    // (the `externalRepo` document slot left in 48.0.0).
   },
 });
 // `AdtAbapGitClient.create(connection)` answers the documents as they arrived.
