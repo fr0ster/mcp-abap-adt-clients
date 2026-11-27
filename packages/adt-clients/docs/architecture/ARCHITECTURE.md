@@ -191,6 +191,7 @@ subject at different resources, and neither takes the other's identifier.
 WebSocket abstraction around `IWebSocketTransport`:
 - request/response with correlation IDs and a pending map; a request waits for its answer unless the caller set a deadline (`requestTimeoutMs`, or `timeoutMs` per request).
 - event dispatch for unsolicited messages.
+- `request(…)` answers `unknown`; `request(…, { read })` answers what the caller's reader makes of the payload, run before the promise settles (48.0.0: no caller-chosen response type).
 
 ### 4) `AdtExecutor`
 
@@ -206,8 +207,8 @@ member that joined them (`runWithProfiling`) left in 19.0.0.
 
 Object implementations follow a common shape:
 - `validate`, `create`, `read`, `readMetadata`, `readTransport`, `update`, `delete`, `checkDeletion`, `activate`, `check`, `lock`, `unlock`, and `getVersions`/`getVersionSource` where the type has version history — each an atom, each one request.
-- typed `config` input; the answer is `IAdtResponse<T, E>`, `T` from the result set, `E` from the `analyse` passed.
-- `update` carries `options.lockHandle` as given.
+- typed `config` input, the object's identity required (48.0.0); the answer is `IAdtResponse<T, E | IAdtError>` with `analyse` given (the overload pair of interfaces-adt 32: `E` from the `analyse` passed, `IAdtError` where the library's own verdict stands), `IAdtResponse<T>` without.
+- `update` requires `options.lockHandle` (`IAdtLockedWrite`) and sends it as given; the writes that take no lock (a binding's publication, a transport's document) refuse one by type.
 
 An update is the caller's sequence:
 1. `lock` — answers the handle SAP sent (`''` when it sent none, never a throw).
@@ -315,9 +316,11 @@ Common behaviors in implementations:
   `response` whole, and the shipped readings are the document.
 - The one reading an implementation owns is `lockHandleOf`, because the
   contract fixes what `lock` answers.
-- `chain()` survives in one place, `AdtMessageClassMessage`, the approved
-  exception to one-request-per-member: `onScopeEnd` runs cleanup on every path,
-  `onFailure` a rollback only when the chain fails, both in reverse order.
+- No member runs a chain since 48.0.0: `AdtMessageClassMessage`, the last one,
+  is four members of one request each (`lockMessage`, `lockClassForMessage`,
+  `update`, `unlockMessages`), and the chain is the caller's recipe
+  (`docs/usage/MIGRATION-48.md`). `chain()` stays as an internal helper, used by
+  no member.
 
 ## Type System and Exports
 

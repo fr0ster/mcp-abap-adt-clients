@@ -16,6 +16,16 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 > **From 18.x?** Read [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md)
 > first: 19.0.0 is where members became one endpoint call each.
 >
+> **From 47.x?** 48.0.0 (on `interfaces-adt` ^32.0.0, with adt-strategies
+> 0.29.0): a member requires the object's name, a create every field its
+> request reads, a write its `lockHandle` (and its `source`); a message class
+> message is four members of one request each, and its write is your recipe;
+> a call naming `E` passes `analyse`, and its answer is `E | IAdtError`;
+> `AdtBatchConnection.makeAdtRequest` takes no type parameters and
+> `AdtClientsWS.request` is typed by a reader; the old abapGit `link` and
+> `checkExternalRepo` forms are gone. See
+> [`docs/usage/MIGRATION-48.md`](docs/usage/MIGRATION-48.md).
+>
 > **From 46.x?** 47.0.0 (with adt-strategies 0.28.0): `INamedItem.description`
 > is optional; `SystemMessages.getById` is gone (SAP routes no single
 > message); the system-message and gateway-error readings answer what SAP
@@ -250,7 +260,8 @@ npm install @mcp-abap-adt/adt-clients
 
 4. **AdtAbapGitClient**
    - Standalone, not a factory on `AdtClient`: `AdtAbapGitClient.create(connection, { logger? })` answers the shipped documents (`abapGitDocuments`), `AdtAbapGitClient.create(connection, { logger?, results })` the caller's (since 38.0.0); `new AdtAbapGitClient(connection, { logger?, results })` takes its results always (the options argument, `contentTypeVersion`, was removed in 36.0.0)
-   - `link`, `pull`, `unlink({ repositoryId })`, `listRepos`, `getErrorLog(logLink)`, `checkExternalRepo` — one request each; `pull` does not wait
+   - `pull`, `unlink({ repositoryId })`, `listRepos`, `getErrorLog(logLink)` — one request each; `pull` does not wait. The legacy `link` and `checkExternalRepo` forms are gone since 48.0.0
+   - `new AdtAbapGitClient(connection, { results })` takes a facts reader for every one of the 14 new-form slots (`FactsReaders<T>`; spread `abapGitFactsDefaults`) and names `T`; `create` fills them (48.0.0)
    - Since 46.2.0, the new forms, addressed by the repository's key: `listReposQuiet`, `pullRepo`, `pullRepoInDialog`, `getModifiedObjects`, `getStatus`, `getRunLog`, `getStaging`, `push`, `checkRepo`, `getFile`, `getBranchInfo`, `switchBranch`, and `link` / `checkExternalRepo` given `options.credentials` (`IAbapGitCredentials`, or `null` for an anonymous call). Each answers the facts `abapGitFacts` of `@mcp-abap-adt/adt-strategies` reduces SAP's answer to, and fails with an `IAbapGitStructuredError` (fixed words, the status, the T100 key) — never SAP's text; each sends `timeout: 0`, `noLog`, `noResend` and `stateless`. `getFile` returns the file's exact text over HTTP only with `@mcp-abap-adt/connection` 25.2.0 or later, which honours its `rawText` flag. The legacy forms (`pull({ pullLink })`, `getErrorLog(logLink)`, `remoteUser`/`remotePassword`) keep 46.1.0's behaviour, deprecated; `pull` and `getErrorLog` send only the link a key would build. See [CLIENT_API_REFERENCE.md](docs/usage/CLIENT_API_REFERENCE.md#abapgit-new-forms-4620)
 
 5. **AdtClientsWS**
@@ -482,7 +493,10 @@ const wsClient = new AdtClientsWS(transport, console);
 
 await wsClient.connect('wss://your-realtime-endpoint');
 
-const answer = await wsClient.request('<operation>', { /* payload */ });
+const answer = await wsClient.request('<operation>', { /* payload */ }); // unknown
+// Typed by what your reader makes of the payload (48.0.0); a reader that
+// throws rejects this request alone.
+const status = await wsClient.request('<operation>', undefined, { read: readStatus });
 ```
 
 ### Using AdtExecutor (Execution API)
@@ -739,6 +753,15 @@ reads at all.
 issue one request each and make no follow-up read of their own since 19.0.0.
 
 ### `update()` writes the whole content
+
+**The lock is yours** (48.0.0): every `update` and `updateMetadata` requires
+`options.lockHandle` and sends it as given, and `options.source` where the
+member sends one — a member never locks, checks or unlocks for itself. The two
+writes that take no lock, a service binding's publication
+(`getServiceBinding().update`) and a transport request's document
+(`getRequest().updateMetadata`), refuse a `lockHandle` by type. A message class
+message is the one write whose sequence has several locks: see
+[MIGRATION-48.md](docs/usage/MIGRATION-48.md#a-message-class-message-is-four-members).
 
 **Every type, every time: `update` replaces. It never merges.** Read the object,
 change what you mean to change, pass the result. Anything you leave out is gone,
@@ -1537,6 +1560,21 @@ await client
     { packageName: 'ZPKG' },
     { headers: DELETION, analyse: analyseDeletion },
   );
+```
+
+**The failure type follows `analyse`** (48.0.0). Every member is the overload
+pair of interfaces-adt 32: with `analyse` given, the answer is
+`IAdtResponse<T, E | IAdtError>` — `E` the strategy's, `IAdtError` where the
+library's own verdict stands because no answer came back for `analyse` to clear
+— and without it `IAdtResponse<T>`. A call that names `E` passes `analyse`.
+Read your strategy's own fields after narrowing:
+
+```typescript
+const answer = await cls.activate(target, { headers: ACTIVATION, analyse: analyseActivation });
+if (!answer.ok) {
+  const failure = answer.getError();
+  if ('stillInactive' in failure) report(failure.stillInactive);
+}
 ```
 
 ### The reading is yours, and you choose it once

@@ -398,7 +398,7 @@ to approve.
 | type | what "removing" means |
 |---|---|
 | `getLocalTestClass()`, `getLocalTypes()`, `getLocalDefinitions()`, `getLocalMacros()` | `update()` with an empty source — the class include is emptied, not removed |
-| `getMessageClassMessage()` | the message class is written without that row |
+| `getMessageClassMessage()` | `update()` with `removeMessage: true`: the class document is written without that row (48.0.0) |
 
 Measured beside it: the deletion service resolves a *message class*
 (`adtcore:type="MSAG/N"`) and knows nothing of the rows inside it. The same holds
@@ -571,11 +571,11 @@ of its own: in the trace above, `LOCK_MSG` on `messages/001` answers `200`
 *before* message 001 exists, because the PUT on the next line is what creates
 it. There is nothing to ask about a row, so nothing refuses.
 
-This is why `getMessageClassMessage().read()` decides for itself: it fetches the
-class document and looks for the number, answering `OBJECT_NOT_FOUND` when it is
-not among the messages. That verdict is this library reading content, not SAP
-reporting absence — and a consumer replacing the reading replaces the verdict
-with it.
+This is why `getMessageClassMessage().read()` answers the class document, and
+whether the number is there is a reading of its content: `analyseMessageClassMessage(msgno)`
+(`@mcp-abap-adt/adt-strategies`) turns a number the class does not carry into a
+failure; without it, the class answering is a success. That verdict is a
+strategy reading content, not SAP reporting absence.
 
 The third exception is the **transport request**, which is not a locked object at
 all: it is changed and deleted directly.

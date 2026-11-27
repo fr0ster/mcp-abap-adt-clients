@@ -712,7 +712,7 @@ The new forms are addressed by the repository's key, which `listRepos` / `listRe
 
 **What SAP does with them** — read from its handlers and measured on both systems — is in [ERRATA.md](ERRATA.md#abapgit-what-an-answer-says). Three things a caller meets first: before 46.2.0 a push with an attribute present and empty was refused (measured on premise: 400, T100 `00`/`001`; a selective pull falls under the same rule by its transformation, not measured); a cloud pull imports inactive, so activating is the caller's; and on the on-premise test system `checkRepo` cannot succeed — SAP's handler `ZCL_ABAPGIT_RES_REPO_CHECKS` does not compile (its syntax check: no value for the mandatory parameter `IV_SERVICE`, L53), every call ends in `SYNTAX_ERROR` and is answered `500` with no T100 key. The member returns that answer as it is: a failure with `facts.status` `500`.
 
-`link` and `checkExternalRepo` choose their form by `options.credentials`: given — a credential, or `null` for an anonymous call — it is the new form; absent, the legacy one, whose options carry `credentials?: never`, so the two never mix. The legacy `checkExternalRepo` writes `remoteUser` / `remotePassword`, which SAP does not read on R13: a private repository was checked anonymously. The new form writes `user` / `password`.
+`link` and `checkExternalRepo` take `options.credentials`, required: a credential, or `null` for an anonymous call. Their legacy forms are gone since 48.0.0 (interfaces-adt 32): the legacy `checkExternalRepo` wrote `remoteUser` / `remotePassword`, which SAP does not read on R13, so a private repository was checked anonymously; the form left writes `user` / `password`.
 
 **Facts, not documents.** Every new form goes through the facts exchange: SAP's answer is reduced by `abapGitFacts` (`@mcp-abap-adt/adt-strategies`) to the route's kept fields before the result strategy, the analyser or the client's logger sees it. A result slot is optional: left out, the member answers `IAbapGitFactsResponse<F>` (`{ status, facts }`); given, it is a facts reader `(answer: IAbapGitFactsResponse<F>) => T` — a wire reader (`IResultStrategy`) does not fit it. A failure is an `IAbapGitStructuredError`: `message` one of `ABAPGIT_ERROR_MESSAGES`, `facts` the status, `messageClass` / `messageNumber` (the T100 key) and R11's `gitHttpStatus`, `request` the method and the path without the query — no response, no SAP text, no thrown message. Strict by default: every non-2xx is the error; an analyser `(verdict, answer?)` may judge, and clears a failure only where there are facts to read. With no answer at all the message is `noResponse`, status `0`.
 
@@ -1300,9 +1300,10 @@ complete depends on what your system accepts, which is a question it answers
 itself, on the write, in its own words. So there is no guard here to catch a
 short document — which is exactly why a caller has to know the rule.
 
-One read-modify-write stays, and it is the one no endpoint can replace:
-`AdtMessageClassMessage` writes a message that is a row inside its class's
-document.
+A message class message is a row inside its class's document, so its write
+is a read-modify-write — and since 48.0.0 the caller's: `update` PUTs the class
+document the caller read, with the message upserted or removed. See "Message
+class (MSAG) and its messages".
 
 ### `update()` writes only if unchanged, when given `ifMatch`
 
@@ -1314,8 +1315,8 @@ One place builds the header (`updateRequestHeaders`, beside `requestHeaders`),
 so every such member sends it the same way. Reads and creates never send it,
 and the service binding's `update` — its publication job, which writes no
 document — keeps `IAdtOperationOptions` and sends none. The message class
-message's `update` sends it on the `PUT` of the class document, not on the
-chain's read, locks or unlocks.
+message's `update` sends it on its one request, the `PUT` of the class
+document.
 
 The ETag is a header of the read's answer (`etag`): read with a result strategy
 that keeps the answer (`wireItself` in the slot), then pass it on.
@@ -1552,7 +1553,10 @@ that second request is the caller's: no member takes a second step.
 
 ```typescript
 const first = await client.getClass().activate(config, { headers, analyse: analyseActivation });
-if (!first.ok && first.getError().stillInactive.length > 0) {
+// The failure is analyseActivation's, or the library's own when no answer came
+// back (48.0.0: the union): narrow before reading its fields.
+const failure = first.ok ? undefined : first.getError();
+if (failure && 'stillInactive' in failure && failure.stillInactive.length > 0) {
   // The objects SAP listed may include ones you did not name: choose what to send.
   await client.getClass().activate(config, {
     headers,
@@ -2014,10 +2018,15 @@ Gone in 27.0.0, with what to call instead:
 
 Message classes and their individual messages are two separate handlers.
 `getMessageClass()` manages the class shell (name, description, package,
-`masterLanguage`); `getMessageClassMessage()` manages a single message, which is
-read-modify-write over the parent class (a message has no independent write
-endpoint — the one exception to "one member, one request"). Message classes are
-**not activated**, and the handler carries no `activate()` or `check()` at all.
+`masterLanguage`); `getMessageClassMessage()` addresses a single message. A
+message has no write endpoint of its own: it is a row of its class's document.
+Since 48.0.0 its members are one request each — `lockMessage`,
+`lockClassForMessage`, `update` (the `PUT` of the class document, the message
+upserted or, with `removeMessage: true`, removed) and `unlockMessages`, beside
+`read` and `readMetadata` — and the write's sequence is the caller's (the recipe
+is in [MIGRATION-48.md](MIGRATION-48.md#a-message-class-message-is-four-members)).
+Message classes are **not activated**, and the handler carries no `activate()`
+or `check()` at all.
 
 `getMessageClass().updateMetadata()` is one `PUT` of the document you pass in
 `options.source`, under your `options.lockHandle`. Until 23.0.0 it read the
@@ -2034,19 +2043,27 @@ await client.getMessageClass().create({
   packageName: 'ZMY_PKG',
 }, { headers });
 
-await client.getMessageClassMessage().create({
-  className: 'ZMY_MSG',
-  msgno: '001',
-  msgtext: 'Order &1 not found',
-  selfExplanatory: true,
-}, { headers });
-
-// Update only the text (other message attributes round-trip unchanged).
-await client.getMessageClassMessage().update({
-  className: 'ZMY_MSG',
-  msgno: '001',
-  msgtext: 'Order &1 does not exist',
-}, { headers });
+// Add or change a message: the class document read, both locks taken, one PUT,
+// both released (the 403 fallbacks of MIGRATION-48.md left out here).
+const message = client.getMessageClassMessage();
+const address = { className: 'ZMY_MSG', msgno: '001' };
+const read = await client.getMessageClass().readMetadata({ name: 'ZMY_MSG' }, { version: 'workingArea' });
+const messageLock = await message.lockMessage(address);
+const classLock = await message.lockClassForMessage(address);
+if (read.ok && messageLock.ok && classLock.ok) {
+  // Fields not named round-trip unchanged from the document.
+  await message.update(
+    { ...address, msgtext: 'Order &1 not found', selfExplanatory: true },
+    {
+      headers,
+      classDocument: String(read.getResult().value),
+      classLockHandle: classLock.getResult().value,
+      messageLockHandle: messageLock.getResult().value,
+    },
+  );
+  await client.getMessageClass().unlock({ name: 'ZMY_MSG' }, classLock.getResult().value);
+}
+await message.unlockMessages(address);
 
 // Read one message. The answer is the class's document — there is no resource
 // for a single message. analyseMessageClassMessage (@mcp-abap-adt/adt-strategies)
@@ -2060,9 +2077,8 @@ const msg = await client.getMessageClassMessage().read(
 );
 if (msg.ok) console.log(msg.getResult().value);   // the class document
 
-// Remove a single message, then delete the whole class.
-// `getMessageClassMessage()` answers the class, `delete` included.
-await client.getMessageClassMessage().delete({ className: 'ZMY_MSG', msgno: '001' }, { headers });
+// Remove a single message: the same sequence, with
+// `message.update({ ...address, removeMessage: true }, …)`. Then delete the class.
 await client.getMessageClass().delete({ name: 'ZMY_MSG' }, { headers });
 ```
 

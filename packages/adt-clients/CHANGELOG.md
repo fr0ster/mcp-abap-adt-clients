@@ -24,6 +24,98 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [48.0.0] - 2026-11-27
+
+fr0ster/mcp-abap-adt-clients#304: this package's `src` holds no cast but
+`as const`, no `any`, no value narrowed by hand after it was widened to
+`unknown`, no regular expression and no type predicate over a typed value — a
+guard test (`sourceRules.test.ts`, over `tools/sourceRules.js`) refuses each,
+with no baseline. The types now say what each member needs and answers, which
+is the reason for the major. On `@mcp-abap-adt/interfaces-adt` ^32.0.0 and
+`@mcp-abap-adt/adt-strategies` 0.29.0. The migration note is
+[`docs/usage/MIGRATION-48.md`](docs/usage/MIGRATION-48.md).
+
+### Changed (breaking)
+
+- **D1: a member requires what addresses the object.** Every member that
+  addresses one object takes interfaces-adt's identity: the object's own name,
+  its parent where it has one (a function module and a function include name
+  their group), and a field the member sends (a function module's `validate`
+  its description, a program's and an include's their package, the
+  enhancement's `readMetadata` its `enhancementType`, which names the read's
+  Accept).
+- **A create names every field its request builder reads**: `description` on
+  the behaviour definition, function group, function module, interface,
+  metadata extension, structure and service binding; the binding's
+  `serviceName`, `serviceDefinitionName`, `serviceVersion` and
+  `bindingVariant`; the enhancement's `enhancementType`. An absent one was a
+  `TypeError` at run time.
+- **C7: a write requires its lock handle, and its source** (`IAdtLockedWrite`,
+  `AdtRequiredUpdateOptions<'source'>`): no member locks for itself. The
+  binding's publication (`getServiceBinding().update`) and the transport's
+  document (`getRequest().updateMetadata`) are lock-free and refuse a
+  `lockHandle` by type. A function group's and a feature toggle's write send the
+  handle given in every case.
+- **C7: a message class message is four members, one request each** —
+  `lockMessage`, `lockClassForMessage`, `update` (an upsert, or with
+  `removeMessage: true` a removal: one PUT of the class document the caller
+  read, under both handles) and `unlockMessages`. Its `create` and `delete` are
+  gone; the old six-request chain is the caller's recipe, which sends the same
+  requests in the same order, the 403 fallbacks included.
+- **D3: every member generic in its failure is the overload pair** of
+  interfaces-adt 32: generic with `analyse` required, answering
+  `IAdtResponse<T, E | IAdtError>` (abapGit's new forms
+  `E | IAbapGitStructuredError`), and plain, answering `IAdtResponse<T>`. A call
+  naming `E` without `analyse` no longer compiles; a strategy's own failure
+  field is read after narrowing. **C3**: the library's own verdict stands where
+  no answer came back and `analyse` cleared it, and the helpers answer the union
+  without a cast. `getUtils().readObjectSource` / `readObjectMetadata` take the
+  pair with the parent before the options (`ParentedArgumentsBefore`).
+- **C1: `AdtBatchConnection.makeAdtRequest` takes no type parameters**; it
+  answers `IAdtWireResponse`, `data` `unknown`.
+- **C2: `AdtClientsWS.request` is typed by a reader**: plain it answers
+  `unknown`; with `{ read }`, what the reader makes of the payload. A reader that
+  throws rejects that request alone.
+- **C4: the old abapGit `link` and `checkExternalRepo` forms are removed**
+  (interfaces-adt 32).
+- **D4: the abapGit client takes a facts reader for every slot.**
+  `new AdtAbapGitClient(connection, { results })` passes all 14
+  (`FactsReaders<T>`, spread `abapGitFactsDefaults`) and names `T`;
+  `AdtAbapGitClient.create` fills them.
+- **D4: values from outside the type system are shape-checked** where they
+  fill a typed field: a thrown value's `message` only when a string, its
+  `response` only when an object with an integer `status`, its `request` as its
+  string `method` and `url`; a batch part's `params` a string, a
+  `URLSearchParams` or a plain object of string, number or boolean values, else
+  `BATCH_REFUSES_PARAMS`.
+- **K5: a rejection with `null` or `undefined`** is rethrown as it came, not as
+  a `TypeError` of the library's own.
+- **D2 (adt-strategies 0.29.0): a trace reading throws on a missing required
+  field.**
+
+### Changed
+
+- Every regular expression is a scanner (`utils/scan.ts`: the multipart
+  reader, the where-used scope rewrite, the discovery hrefs, the cloud host
+  test), each held to the regex's answers by a differential test.
+- Every parsed document and thrown value is read through typed readers
+  (`utils/ownValue.ts`); the profiler dispatches its views through a map typed
+  per view; an abandoned enhancement lock is released with the type it was
+  taken with.
+
+### Removed
+
+- `lock.ts`'s `lockMessageIfGranted` and `lockClassForMessageOrPlain`; the
+  message's `create` and `delete`.
+
+### Documentation
+
+- `docs/usage/MIGRATION-48.md`; the README's migration list, "Strategies"
+  (the failure type) and "`update()` writes the whole content" (the lock is
+  yours); `CLIENT_API_REFERENCE.md` (the message class, `ifMatch`, the
+  activation example, abapGit's forms), `BATCH.md`, `OBJECT_LIFECYCLE.md`,
+  `CHECK_LOCAL_TEST_CLASS.md` and `docs/architecture/ARCHITECTURE.md`.
+
 ## [47.0.2] - 2026-11-23
 
 Documentation only, released with `@mcp-abap-adt/adt-strategies` 0.28.2 (published

@@ -163,3 +163,11 @@ default 100; `name_prefix`, default `ZAC_BD_`; optional `package_name` and
 Both are disabled by default and support onprem/cloud. The debugger case uses
 the existing `runtime_debugger.adt_abap_debugger` params and debugger_batch fixture.
 The domain test writes timings to a temporary JSON file and logs its path via ILogger.
+
+## A part's request (48.0.0)
+
+`AdtBatchConnection.makeAdtRequest(options)` is the connection contract's:
+it takes no type parameters and answers `IAdtWireResponse`, its `data`
+`unknown` until you read it. A part's `params` is a string, a
+`URLSearchParams` or a plain object of string, number or boolean values;
+anything else throws `BATCH_REFUSES_PARAMS` before anything is queued.
