@@ -8,6 +8,7 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
+  AdtObjectIdentity,
   IAdtActivatable,
   IAdtActivationOptions,
   IAdtAnalyseOptions,
@@ -18,6 +19,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
@@ -25,6 +27,7 @@ import type {
   IAdtSystemContext,
   IAdtUpdateOptions,
   IAdtValidatable,
+  IAnalyse,
   IAuthorizationFieldResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -67,16 +70,38 @@ export class AdtAuthorizationField<
   >,
 > implements
     IAdtCreatable<IAuthorizationFieldConfig, T['created']>,
-    IAdtMetadataReadable<IAuthorizationFieldConfig, T['metadata']>,
+    IAdtMetadataReadable<
+      IAuthorizationFieldConfig,
+      T['metadata'],
+      'authorizationFieldName'
+    >,
     IAdtMetadataUpdatable<
       Partial<IAuthorizationFieldConfig>,
-      T['metadataUpdated']
+      T['metadataUpdated'],
+      'authorizationFieldName'
     >,
-    IAdtDeletable<IAuthorizationFieldConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IAuthorizationFieldConfig, T['validation']>,
-    IAdtCheckable<IAuthorizationFieldConfig, T['check']>,
-    IAdtActivatable<IAuthorizationFieldConfig, T['activation']>,
-    IAdtLockable<IAuthorizationFieldConfig>
+    IAdtDeletable<
+      IAuthorizationFieldConfig,
+      T['deletion'],
+      'authorizationFieldName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<
+      IAuthorizationFieldConfig,
+      T['validation'],
+      'authorizationFieldName'
+    >,
+    IAdtCheckable<
+      IAuthorizationFieldConfig,
+      T['check'],
+      'authorizationFieldName'
+    >,
+    IAdtActivatable<
+      IAuthorizationFieldConfig,
+      T['activation'],
+      'authorizationFieldName'
+    >,
+    IAdtLockable<IAuthorizationFieldConfig, 'authorizationFieldName'>
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
@@ -114,15 +139,37 @@ export class AdtAuthorizationField<
    * from nothing and the server answers — which is a reading a strategy can
    * take, where a sentence composed here would not be.
    */
-  private name(config: Partial<IAuthorizationFieldConfig>): string {
-    return config.authorizationFieldName as string;
+  private name(
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
+  ): string {
+    return config.authorizationFieldName;
   }
 
   /** Validate the name before creating the object. */
+  validate<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>>;
+  validate(
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['validation'], IAdtError>>;
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IAuthorizationFieldConfig>,
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['validation'], E>> {
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -144,13 +191,29 @@ export class AdtAuthorizationField<
   }
 
   /** Create the object. */
+  create<E extends IAdtError>(
+    config: Omit<IAuthorizationFieldConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>>;
+  create(
+    config: Omit<IAuthorizationFieldConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['created'], IAdtError>>;
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IAuthorizationFieldConfig, 'source'> & {
       source?: never;
       packageName: string;
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<T['created'], E>> {
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // The type requires a package; this refuses an empty one, which the type
@@ -196,10 +259,27 @@ export class AdtAuthorizationField<
   }
 
   /** Read the object's metadata document. */
+  readMetadata<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>>;
+  readMetadata(
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['metadata'], IAdtError>>;
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IAuthorizationFieldConfig>,
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['metadata'], E>> {
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -215,18 +295,37 @@ export class AdtAuthorizationField<
   /**
    * Write the object.
    *
-   * With `options.lockHandle` the caller holds the lock and owns the chain, so
-   * this is one request. Without it, this locks, checks, writes and unlocks —
-   * and the unlock happens on every path out.
+   * One request: the write, under the lock the caller holds
+   * (`options.lockHandle`, required). The lock, the check and the unlock are
+   * the caller's own calls of `lock`, `check` and `unlock`.
    *
    * **The whole content, every time.** This is a replace, never a merge. Read
    * what the object holds, change what you mean to change, and pass the result:
    * anything left out is gone, because nothing is read here to keep it.
    */
+  updateMetadata<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>>;
+  updateMetadata(
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite,
+  ): Promise<IAdtResponse<T['metadataUpdated'], IAdtError>>;
   async updateMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IAuthorizationFieldConfig>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> & IAdtLockedWrite,
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -273,10 +372,29 @@ export class AdtAuthorizationField<
    * it: a consumer that wants the check runs this first and decides what a
    * refusal means.
    */
+  checkDeletion<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  checkDeletion(
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   async checkDeletion<E extends IAdtError = IAdtError>(
-    config: Partial<IAuthorizationFieldConfig>,
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -301,10 +419,29 @@ export class AdtAuthorizationField<
    * shipped reading of that answer; a caller who wants another passes their own
    * `analyse`.
    */
+  delete<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>>;
+  delete(
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletion'], IAdtError>>;
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IAuthorizationFieldConfig>,
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletion'], E>> {
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -321,10 +458,29 @@ export class AdtAuthorizationField<
   }
 
   /** Activate the object. Needs no stateful session. */
+  activate<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>>;
+  activate(
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['activation'], IAdtError>>;
   async activate<E extends IAdtError = IAdtError>(
-    config: Partial<IAuthorizationFieldConfig>,
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
-  ): Promise<IAdtResponse<T['activation'], E>> {
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -345,11 +501,32 @@ export class AdtAuthorizationField<
   }
 
   /** Check the object. */
+  check<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>>;
+  check(
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['check'], IAdtError>>;
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<IAuthorizationFieldConfig>,
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['check'], E>> {
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -369,10 +546,27 @@ export class AdtAuthorizationField<
    * carrying no handle reads as `''`; whether that is a refusal is the
    * caller's `analyse` to say.
    */
+  lock<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  lock(
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IAuthorizationFieldConfig>,
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
     const name = this.name(config);
     const answer = await answering(
       () =>
@@ -389,11 +583,30 @@ export class AdtAuthorizationField<
   }
 
   /** Unlock the object. */
+  unlock<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
+    lockHandle: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<void, E | IAdtError>>;
+  unlock(
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
+    lockHandle: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<void, IAdtError>>;
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IAuthorizationFieldConfig>,
+    config: AdtObjectIdentity<
+      IAuthorizationFieldConfig,
+      'authorizationFieldName'
+    >,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<void, E>> {
+  ): Promise<IAdtResponse<void, E | IAdtError>> {
     const name = this.name(config);
     return answering(
       async () => {

@@ -20,7 +20,9 @@ import type {
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
+  IAnalyse,
   IClassUnitTestRunOptions,
+  IUnitTestResultOptions,
 } from '@mcp-abap-adt/interfaces-adt';
 import {
   noResultToFetch,
@@ -34,11 +36,22 @@ export class ProgramTestRunnerLegacy<
   >,
 > extends ProgramTestRunner<T, 'basis740'> {
   /** Run every test class of the report: the `runSync` request, read by `run`. */
+  override run<E extends IAdtError>(
+    this: this & AdtPerformedBy<'program', 'unitTestRun'>,
+    programName: string,
+    options: IClassUnitTestRunOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>>;
+  override run(
+    this: this & AdtPerformedBy<'program', 'unitTestRun'>,
+    programName: string,
+    options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['run'], IAdtError>>;
   override async run<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'program', 'unitTestRun'>,
     programName: string,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['run'], E>> {
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>> {
     return runSyncLegacy(
       this.connection,
       [PROGRAM.uri(programName)],
@@ -47,15 +60,43 @@ export class ProgramTestRunnerLegacy<
     );
   }
 
+  override getStatus<E extends IAdtError>(
+    this: this & AdtPerformedBy<'program', 'unitTestStatus'>,
+    runId: string,
+    withLongPolling: boolean | undefined,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['status'], E | IAdtError>>;
+  override getStatus(
+    this: this & AdtPerformedBy<'program', 'unitTestStatus'>,
+    runId: string,
+    withLongPolling?: boolean | undefined,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['status'], IAdtError>>;
   override async getStatus<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'program', 'unitTestStatus'>,
-  ): Promise<IAdtResponse<T['status'], E>> {
-    return noRunToPoll<T['status'], E>();
+    _runId: string,
+    _withLongPolling?: boolean | undefined,
+    _options?: IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<T['status'], E | IAdtError>> {
+    return noRunToPoll<T['status']>();
   }
 
+  override getResult<E extends IAdtError>(
+    this: this & AdtPerformedBy<'program', 'unitTestResult'>,
+    runId: string,
+    options: IUnitTestResultOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['result'], E | IAdtError>>;
+  override getResult(
+    this: this & AdtPerformedBy<'program', 'unitTestResult'>,
+    runId: string,
+    options?: IUnitTestResultOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['result'], IAdtError>>;
   override async getResult<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'program', 'unitTestResult'>,
-  ): Promise<IAdtResponse<T['result'], E>> {
-    return noResultToFetch<T['result'], E>();
+    _runId: string,
+    _options?: IUnitTestResultOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<T['result'], E | IAdtError>> {
+    return noResultToFetch<T['result']>();
   }
 }

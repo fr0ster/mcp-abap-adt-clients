@@ -13,7 +13,7 @@ Primary public entry points:
 - `AdtAbapGitClient` - standalone client (not a factory on `AdtClient`) wrapping the SAP-official ADT-integrated abapGit (`/sap/bc/adt/abapgit/*`); available on cloud and modern on-prem (ABAP Platform 2022+).
 
 Design constraint:
-- External integrations are interface-driven, and the contracts come from the packages that declare them: the capability atoms, configs, `IAdtResponse`, `IAnalyse` and `IResultStrategy` from `@mcp-abap-adt/interfaces-adt` (`^27.4`), and with them the ADT type tables (`ADT_TYPES_ONPREM`, `ADT_TYPES_CLOUD`, `ADT_TYPES_BASIS_740`) the clients are typed by; `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions` and the connection capability atoms from `@mcp-abap-adt/interfaces-adt-connection` (`^5`, whose `makeAdtRequest` takes no type parameter); `ILogger`/`LogLevel`/`XmlNode` from `-utils`; `IWebSocketTransport` and `HttpError` from `-network`. `IAuthProvider` (`-auth`) and `ISapConfig` (`-auth-sap`) are dev-only, for the test helpers.
+- External integrations are interface-driven, and the contracts come from the packages that declare them: the capability atoms, configs, `IAdtResponse`, `IAnalyse` and `IResultStrategy` from `@mcp-abap-adt/interfaces-adt` (`^33.0.0`), and with them the ADT type tables (`ADT_TYPES_ONPREM`, `ADT_TYPES_CLOUD`, `ADT_TYPES_BASIS_740`) the clients are typed by; `IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions` and the connection capability atoms from `@mcp-abap-adt/interfaces-adt-connection` (`^5.3.0`, whose `makeAdtRequest` takes no type parameter); `ILogger`/`LogLevel`/`XmlNode` from `-utils`; `IWebSocketTransport` and `HttpError` from `-network`. `IAuthProvider` (`-auth`) and `ISapConfig` (`-auth-sap`) are dev-only, for the test helpers.
 - **The library interprets nothing.** Every member makes one ADT request. What the answer becomes is the result strategy the implementation was built with; whether it is a failure is the `analyse` the caller passes with the call. The shipped result sets answer documents as they arrived; the readings and verdicts are in `@mcp-abap-adt/adt-strategies` (`packages/adt-strategies`). Decision 15 in [DECISIONS.md](DECISIONS.md).
 
 ## Layered Structure
@@ -191,6 +191,7 @@ subject at different resources, and neither takes the other's identifier.
 WebSocket abstraction around `IWebSocketTransport`:
 - request/response with correlation IDs and a pending map; a request waits for its answer unless the caller set a deadline (`requestTimeoutMs`, or `timeoutMs` per request).
 - event dispatch for unsolicited messages.
+- `request(…)` answers `unknown`; `request(…, { read })` answers what the caller's reader makes of the payload, run before the promise settles (48.0.0: no caller-chosen response type).
 
 ### 4) `AdtExecutor`
 
@@ -206,8 +207,8 @@ member that joined them (`runWithProfiling`) left in 19.0.0.
 
 Object implementations follow a common shape:
 - `validate`, `create`, `read`, `readMetadata`, `readTransport`, `update`, `delete`, `checkDeletion`, `activate`, `check`, `lock`, `unlock`, and `getVersions`/`getVersionSource` where the type has version history — each an atom, each one request.
-- typed `config` input; the answer is `IAdtResponse<T, E>`, `T` from the result set, `E` from the `analyse` passed.
-- `update` carries `options.lockHandle` as given.
+- typed `config` input, the object's identity required (48.0.0); the answer is `IAdtResponse<T, E | IAdtError>` with `analyse` given (the overload pair of interfaces-adt 32: `E` from the `analyse` passed, `IAdtError` where the library's own verdict stands), `IAdtResponse<T>` without.
+- `update` requires `options.lockHandle` (`IAdtLockedWrite`) and sends it as given; the writes that take no lock (a binding's publication, a transport's document) refuse one by type.
 
 An update is the caller's sequence:
 1. `lock` — answers the handle SAP sent (`''` when it sent none, never a throw).
@@ -253,9 +254,9 @@ Since 36.0.0 (interfaces-adt 19.0.0) the members whose request sets both
 member passes the pair to its wire function as the second parameter, and
 `requestHeaders(headers)` (`src/utils/requestHeaders.ts`) is the one place it
 becomes the request's headers — no constant of the member's own, nothing merged
-in, defaulted or replaced. A chain (the message class message's write) gives
-the pair to its main write, the `PUT`; its read, locks and unlocks keep their
-own. A request outside them that shares a wire function with one (`validate`
+in, defaulted or replaced. No member runs a chain (since 48.0.0; below): the
+message class message's `update` is its `PUT` alone, and its locks and unlocks
+are members with their own pairs. A request outside them that shares a wire function with one (`validate`
 through the check run, `activateTestClasses`) passes its own constant pair
 (`CHECK_RUN_HEADERS`, `ACTIVATION_HEADERS`).
 
@@ -315,13 +316,15 @@ Common behaviors in implementations:
   `response` whole, and the shipped readings are the document.
 - The one reading an implementation owns is `lockHandleOf`, because the
   contract fixes what `lock` answers.
-- `chain()` survives in one place, `AdtMessageClassMessage`, the approved
-  exception to one-request-per-member: `onScopeEnd` runs cleanup on every path,
-  `onFailure` a rollback only when the chain fails, both in reverse order.
+- No member runs a chain since 48.0.0: `AdtMessageClassMessage`, the last one,
+  is four members of one request each (`lockMessage`, `lockClassForMessage`,
+  `update`, `unlockMessages`), and the chain is the caller's recipe
+  (`docs/usage/MIGRATION-48.md`). `chain()` stays as an internal helper, used by
+  no member.
 
 ## Type System and Exports
 
-**Types are defined once, in the contract packages** — `@mcp-abap-adt/interfaces-adt` `^12.0.0`, `@mcp-abap-adt/interfaces-adt-connection` `^1.0.0` and their siblings. As of 7.5.0 this package declares no type it shares with them, and since 22.0.0 it imports from each by name instead of through the facade, which is now deleted. Since 23.0.0 the connection names (`IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions`, `ITimeoutConfig`, the connection capability atoms, `ADT_SESSION_ERROR`) come from `-adt-connection`: `interfaces-adt` 11 no longer exports them. Each `src/core/<object>/types.ts` is a re-export surface:
+**Types are defined once, in the contract packages** — `@mcp-abap-adt/interfaces-adt` (`^33.0.0` today), `@mcp-abap-adt/interfaces-adt-connection` (`^5.3.0` today) and their siblings. As of 7.5.0 this package declares no type it shares with them, and since 22.0.0 it imports from each by name instead of through the facade, which is now deleted. Since 23.0.0 the connection names (`IAbapConnection`, `IAdtWireResponse`, `IAbapRequestOptions`, `ITimeoutConfig`, the connection capability atoms, `ADT_SESSION_ERROR`) come from `-adt-connection`: `interfaces-adt` 11 no longer exports them. Each `src/core/<object>/types.ts` is a re-export surface:
 
 ```ts
 export type { IClassConfig, ICreateClassParams } from '@mcp-abap-adt/interfaces-adt';

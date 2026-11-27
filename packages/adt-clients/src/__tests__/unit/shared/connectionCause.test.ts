@@ -157,7 +157,9 @@ describe('a connection failure names its cause by code', () => {
       connectionCause: 'ECONNRESET',
     });
     expect(failure.response).toBe(response);
-    expect(failure.request).toBe(request);
+    // Its string method and url, read off it (the owner's decision D4 of
+    // #304), so a copy and not the object itself.
+    expect(failure.request).toEqual(request);
   });
 
   it('names no cause for a refusal, whatever the error carries', async () => {

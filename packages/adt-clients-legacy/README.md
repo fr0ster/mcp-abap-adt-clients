@@ -18,7 +18,7 @@ behind each claim, and what is not measured, are in
 npm install @mcp-abap-adt/adt-clients-legacy @mcp-abap-adt/adt-clients
 ```
 
-`@mcp-abap-adt/adt-clients` is a peer dependency (`^46.1.0 || ^47.0.0`): the consumer installs it, and the
+`@mcp-abap-adt/adt-clients` is a peer dependency (`^48.0.0`): the consumer installs it, and the
 legacy classes extend that one copy, so `AdtClientLegacy` is an `AdtClient` of the consumer's own
 version. npm warns when the installed version is outside the range.
 
@@ -48,7 +48,7 @@ const program = client.getProgram();                          // the getters 7.4
   a 7.40 system is not a supported wire (no logon without a workaround, a write
   under a lock answers `423`, some reads disagree with RFC; the records are in
   LEGACY.md). The package does not detect the wire and has no branch for it.
-- The package depends on `@mcp-abap-adt/adt-clients` `^38.0.0`. It also exports
+- The package takes `@mcp-abap-adt/adt-clients` `^48.0.0` as a peer dependency (above). It also exports
   `AdtRequestLegacy`.
 - **Each getter answers a class** (since 0.2.0): its legacy class
   (`getProgram(): AdtProgramLegacy<…>`, `getInclude(): AdtIncludeLegacy<…>`, …)
@@ -292,7 +292,8 @@ Its members take the group (`functionGroupName`), required by type.
 | `updateMetadata` | **refused** — the `PUT` of the class document answered `400 ExceptionInvalidData` (7.40 expects another root element); not sent until that document is measured |
 | `delete` | sends one `DELETE /messageclass/<name>?lockHandle=` under your lock (`200`; the read afterwards `200`, empty) |
 | `checkDeletion` | **refused** |
-| message `create`, `read`, `update`, `delete` | sends — a message is a row in its class's document: a read of the class, two locks, the `PUT`, two unlocks |
+| message `read` | sends — the class's document |
+| message `lockMessage`, `lockClassForMessage`, `update`, `unlockMessages` | sends — one request each (adt-clients 48: the old `create`, `update` and `delete` chain is the caller's recipe, read of the class, two locks, the `PUT`, two unlocks; see adt-clients' `docs/usage/MIGRATION-48.md`) |
 | message `readMetadata` | kept, not measured |
 
 ### Package — `getPackage()`
@@ -364,7 +365,39 @@ types' reads. Member by member: LEGACY.md.
 `getMetadataExtension()`, `getAuthorizationField()`, `getFeatureToggle()`,
 `getTableSettings()`: `ADT_TYPES_BASIS_740` has no such API, so the getter does not compile on
 `AdtClientLegacy` (since 0.2.0). Called from outside the type system, it hands
-out a handler and every member of it is **refused**.
+out a handler and every member of it is **refused**. Since 0.12.0 that handler
+is a subclass of the modern one (`AdtDomainAbsentLegacy` extends `AdtDomain`,
+…): `instanceof` the modern class is true, and each public operation is
+overridden with the refusal.
+
+## Migrating to 0.12.0
+
+0.12.0 goes with `@mcp-abap-adt/adt-clients` 48.0.0 (fr0ster/mcp-abap-adt-clients#304,
+whose [`docs/usage/MIGRATION-48.md`](../adt-clients/docs/usage/MIGRATION-48.md)
+covers the members the legacy classes inherit). For the legacy classes:
+
+- **D1: a member requires what addresses the object.** The overrides take the
+  modern identity types: a call without the object's name (and its group, for a
+  function module or include) no longer compiles; a write requires its
+  `lockHandle` and, where it sends one, its `source`.
+- **D3: every override is the overload pair.** A generic call names its
+  `analyse`; the plain call is unchanged.
+- **C3: a refusal under a generic call is typed `E | IAdtError`.** A legacy
+  refusal is the library's own `IAdtError` (`UNSUPPORTED_OPERATION`): it sends
+  no request and never calls `analyse`, so narrow before reading a field of
+  your own failure type.
+- **C5: an absent type's handler is a subclass.** The 20 handlers of the types
+  7.40 does not have are `*AbsentLegacy` subclasses of the modern handlers, no
+  longer plain objects: `instanceof` the modern class is true, the operations
+  sit on the subclass's prototype, and the modern class's private helpers are
+  reachable from JavaScript as its own. Code that recognised an absent handler
+  by `Object.getPrototypeOf(handler) === Object.prototype` checks the class
+  instead. The refusals' words are the same.
+- **A message class message** is the four members of adt-clients 48
+  (`lockMessage`, `lockClassForMessage`, `update`, `unlockMessages`).
+- The 20 refusing overrides of `AdtPackageLegacy`, `AdtRequestLegacy` and the
+  test runners declare the base's parameters (unused): their functions'
+  `length` is the base's.
 
 ## Development
 

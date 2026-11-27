@@ -29,6 +29,22 @@ export function field(node: unknown, key: string): unknown {
   return isElement(node) ? node[key] : undefined;
 }
 
+/**
+ * A property as a direct read `holder?.key` reads it: inherited properties
+ * and getters included, from an object or a function; `undefined` from a
+ * primitive, `null` or `undefined`. For values from outside the type system
+ * that are no parsed document — a transport's `request` or `config`.
+ */
+export function propertyOf(holder: unknown, key: string): unknown {
+  if (
+    (typeof holder !== 'object' && typeof holder !== 'function') ||
+    holder === null
+  )
+    return undefined;
+  const value: unknown = Reflect.get(holder, key);
+  return value;
+}
+
 /** A field several levels down: `at(root, 'a', 'b')` is `root.a.b`, or `undefined`. */
 export function at(node: unknown, ...keys: string[]): unknown {
   let value = node;
@@ -219,7 +235,8 @@ export function ownText(value: unknown): string | undefined {
  */
 export function parsedOrNothing(parser: XMLParser, text: string): unknown {
   try {
-    return parser.parse(text);
+    const parsed: unknown = parser.parse(text);
+    return parsed;
   } catch {
     return undefined;
   }

@@ -21,6 +21,8 @@
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ACCEPT_DISCOVERY } from '../constants/contentTypes';
+import { propertyOf } from './ownValue';
+import { hrefValues } from './scan';
 
 /**
  * Fetch /sap/bc/adt/discovery and extract all collection href paths.
@@ -44,22 +46,17 @@ export async function fetchDiscoveryEndpoints(
 
     const xml = typeof response.data === 'string' ? response.data : '';
     // Extract all href values from app:collection elements
-    const hrefRegex = /href="([^"]+)"/g;
-    let match: RegExpExecArray | null = hrefRegex.exec(xml);
-    while (match !== null) {
-      const href = match[1];
+    for (const href of hrefValues(xml)) {
       // Only include relative paths (skip absolute URLs like http://...)
       if (href.startsWith('/')) {
         endpoints.add(href);
       }
-      match = hrefRegex.exec(xml);
     }
   } catch (error) {
     // A failed discovery and a system advertising nothing used to come back as
     // the same empty set, which the caller could not tell apart. A system with
     // no discovery resource still answers empty; any other failure is raised.
-    const status = (error as { response?: { status?: number } })?.response
-      ?.status;
+    const status = propertyOf(propertyOf(error, 'response'), 'status');
     if (status !== 404 && status !== 405 && status !== 501) throw error;
   }
 

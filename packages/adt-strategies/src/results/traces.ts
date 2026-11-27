@@ -38,6 +38,9 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
+import type { AdtHeaderMap } from '../headers';
+import { field, isElement } from '../parsed';
+import { leapSecondParts, subMilliDigits, traceIdIn } from '../scan';
 import { answeredObject } from './answeredObject';
 
 /**
@@ -45,8 +48,15 @@ import { answeredObject } from './answeredObject';
  * when the ADT type tables know it, else `unknownType` as ADT sent it.
  */
 export type ITraceProgramRef = IAdtAnsweredObject & {
-  name: string;
-  uri: string;
+  /**
+   * Absent on a reference with no ABAP source behind it — the "Runtime
+   * analysis" root, an object's creation, a call from the kernel: SAP sends
+   * the element with no `adtcore:name`, `adtcore:uri` or `adtcore:type`
+   * (measured on premise, #333; the recording is the strategies' fixture).
+   */
+  name?: string | undefined;
+  /** Absent where `name` is. */
+  uri?: string | undefined;
   context?: string;
   byteCodeOffset?: number;
   /** Present on a statement's calling program: a query URI, not a plain URI. */
@@ -267,9 +277,9 @@ function rootOf(response: IAdtWireResponse, rootName: string): Node {
     return {};
   }
   try {
-    const parsed = parser.parse(body) as Node;
-    const root = parsed?.[rootName];
-    return root && typeof root === 'object' ? (root as Node) : {};
+    const parsed: unknown = parser.parse(body);
+    const root = field(parsed, rootName);
+    return isElement(root) ? root : {};
   } catch {
     return {};
   }
@@ -286,7 +296,7 @@ function presentNode(value: unknown): Node | undefined {
   if (value === undefined || value === null) {
     return undefined;
   }
-  return typeof value === 'object' ? (value as Node) : {};
+  return isElement(value) ? value : {};
 }
 
 /** One node, a list of them, or nothing — always answered as a list. */
@@ -304,10 +314,21 @@ function text(value: unknown): string | undefined {
   }
   // An element with attributes parses to an object whose text is `#text`.
   if (value && typeof value === 'object') {
-    const inner = (value as Node)['#text'];
+    const inner = field(value, '#text');
     return typeof inner === 'string' ? inner : undefined;
   }
   return undefined;
+}
+
+/**
+ * A field the result type requires, or a throw naming it (D2 of #304): an
+ * answer that lacks one is no reading of that type, and a field read as
+ * `undefined` under a type that says `string` was the lie the cast told. What a
+ * reading's throw becomes is the caller's, as for every reading.
+ */
+function required<T>(value: T | undefined, name: string): T {
+  if (value === undefined) throw new Error(`traces: ${name} is missing`);
+  return value;
 }
 
 function attr(node: Node | undefined, name: string): string | undefined {
@@ -377,18 +398,10 @@ function timing(node: unknown): ITraceTiming | undefined {
     return undefined;
   }
   return {
-    time: attrNum(t, 'time') as number,
-    percentage: attrNum(t, 'percentage') as number,
+    time: required(attrNum(t, 'time'), 'timing.time'),
+    percentage: required(attrNum(t, 'percentage'), 'timing.percentage'),
   };
 }
-
-const ID_IN_URI = /abaptraces\/([A-Za-z0-9]{16,})(?:\/|$)/;
-
-/** The fractional digits beyond the millisecond, or '' when there are none. */
-const SUB_MILLI = /\.(\d+)/;
-
-/** Seconds field of `60` — the leap second, which POSIX time cannot hold. */
-const LEAP_SECOND = /^(.*T\d{2}:\d{2}:)60(\D.*)?$/;
 
 /**
  * Milliseconds, with the one legal form `Date.parse` refuses.
@@ -407,9 +420,10 @@ function millisOf(raw: string): number {
   if (!Number.isNaN(direct)) {
     return direct;
   }
-  const leap = LEAP_SECOND.exec(raw);
+  // Seconds field of `60` — the leap second, which POSIX time cannot hold.
+  const leap = leapSecondParts(raw);
   if (leap) {
-    const asFiftyNine = Date.parse(`${leap[1]}59${leap[2] ?? ''}`);
+    const asFiftyNine = Date.parse(`${leap.head}59${leap.tail ?? ''}`);
     if (!Number.isNaN(asFiftyNine)) {
       return asFiftyNine + 1000;
     }
@@ -455,8 +469,9 @@ export function compareRecordedAt(
   }
 
   // Same millisecond: only digits `Date.parse` discarded can separate them.
-  const leftSub = SUB_MILLI.exec(a.recordedAt)?.[1].slice(3) ?? '';
-  const rightSub = SUB_MILLI.exec(b.recordedAt)?.[1].slice(3) ?? '';
+  // The fractional digits beyond the millisecond, or '' when there are none.
+  const leftSub = subMilliDigits(a.recordedAt)?.slice(3) ?? '';
+  const rightSub = subMilliDigits(b.recordedAt)?.slice(3) ?? '';
   const width = Math.max(leftSub.length, rightSub.length);
   return leftSub.padEnd(width, '0').localeCompare(rightSub.padEnd(width, '0'));
 }
@@ -475,7 +490,7 @@ function readTraceEntries(response: IAdtWireResponse): IAbapTraceEntry[] {
       const selfHref =
         asList(entry.link)
           .map((link) => attr(link, 'href') ?? '')
-          .find((href) => ID_IN_URI.test(href)) ?? '';
+          .find((href) => traceIdIn(href) !== undefined) ?? '';
 
       // Under `trc:extendedData`, and only there. The reader used to look on
       // the entry as well, because which of the two nestings was real had never
@@ -486,37 +501,53 @@ function readTraceEntries(response: IAdtWireResponse): IAbapTraceEntry[] {
       const stateNode = presentNode(ext.state);
 
       return {
-        id: (ID_IN_URI.exec(idText)?.[1] ??
-          ID_IN_URI.exec(selfHref)?.[1]) as string,
-        recordedAt: (text(entry.published) ?? text(entry.updated)) as string,
+        id: required(traceIdIn(idText) ?? traceIdIn(selfHref), 'id'),
+        recordedAt: required(
+          text(entry.published) ?? text(entry.updated),
+          'recordedAt',
+        ),
         uri: idText || selfHref || undefined,
 
         // `atom:author/atom:name` carries the same name and is the fallback the
         // feed itself offers.
-        user: (text(ext.user) ??
-          text(presentNode(entry.author)?.name)) as string,
-        objectName: text(ext.objectName) as string,
+        user: required(
+          text(ext.user) ?? text(presentNode(entry.author)?.name),
+          'user',
+        ),
+        objectName: required(text(ext.objectName), 'objectName'),
         state: {
-          value: attr(stateNode, 'value') as string,
-          text: attr(stateNode, 'text') as string,
+          value: required(attr(stateNode, 'value'), 'state.value'),
+          text: required(attr(stateNode, 'text'), 'state.text'),
         },
-        expiresAt: text(ext.expiration) as string,
+        expiresAt: required(text(ext.expiration), 'expiresAt'),
 
-        system: text(ext.system) as string,
+        system: required(text(ext.system), 'system'),
         // Codes, not counts. A client is `010` and an instance is `00`; the
         // leading zero is significant and `Number('010')` destroys it
         // irreversibly. Only what is actually counted is a number below.
-        client: text(ext.client) as string,
-        host: text(ext.host) as string,
+        client: required(text(ext.client), 'client'),
+        host: required(text(ext.host), 'host'),
 
-        size: numberOf(text(ext.size)) as number,
-        runtime: numberOf(text(ext.runtime)) as number,
-        runtimeABAP: numberOf(text(ext.runtimeABAP)) as number,
-        runtimeSystem: numberOf(text(ext.runtimeSystem)) as number,
-        runtimeDatabase: numberOf(text(ext.runtimeDatabase)) as number,
+        size: required(numberOf(text(ext.size)), 'size'),
+        runtime: required(numberOf(text(ext.runtime)), 'runtime'),
+        runtimeABAP: required(numberOf(text(ext.runtimeABAP)), 'runtimeABAP'),
+        runtimeSystem: required(
+          numberOf(text(ext.runtimeSystem)),
+          'runtimeSystem',
+        ),
+        runtimeDatabase: required(
+          numberOf(text(ext.runtimeDatabase)),
+          'runtimeDatabase',
+        ),
 
-        isAggregated: booleanOf(text(ext.isAggregated)) as boolean,
-        amdpFileSize: numberOf(text(ext.amdpFileSize)) as number,
+        isAggregated: required(
+          booleanOf(text(ext.isAggregated)),
+          'isAggregated',
+        ),
+        amdpFileSize: required(
+          numberOf(text(ext.amdpFileSize)),
+          'amdpFileSize',
+        ),
       };
     },
   );
@@ -529,9 +560,11 @@ function programRef(node: unknown): ITraceProgramRef | undefined {
     return undefined;
   }
   return {
-    name: attr(ref, 'name') as string,
+    // Not always sent: a reference without a program behind it carries
+    // neither (measured, #333), so neither is required.
+    name: attr(ref, 'name'),
     ...answeredObject(attr(ref, 'type') ?? ''),
-    uri: attr(ref, 'uri') as string,
+    uri: attr(ref, 'uri'),
     context: attr(ref, 'context'),
     byteCodeOffset: attrNum(ref, 'byteCodeOffset'),
     objectReferenceQuery: attr(ref, 'objectReferenceQuery'),
@@ -543,7 +576,7 @@ function readHitList(response: IAdtWireResponse): IAbapTraceHitList {
     entries: asList(rootOf(response, 'hitlist').entry).map(
       (row): IAbapTraceHitListEntry => ({
         topDownIndex: attrNum(row, 'topDownIndex'),
-        index: attrNum(row, 'index') as number,
+        index: required(attrNum(row, 'index'), 'hitlist.index'),
         hitCount: attrNum(row, 'hitCount'),
         stackCount: attrNum(row, 'stackCount'),
         recursionDepth: attrNum(row, 'recursionDepth'),
@@ -561,8 +594,8 @@ function readStatements(response: IAdtWireResponse): IAbapTraceStatements {
   return {
     statements: asList(rootOf(response, 'statements').statement).map(
       (row): IAbapTraceStatement => ({
-        id: attr(row, 'id') as string,
-        index: attrNum(row, 'index') as number,
+        id: required(attr(row, 'id'), 'statement.id'),
+        index: required(attrNum(row, 'index'), 'statement.index'),
         callLevel: attrNum(row, 'callLevel'),
         text: attr(row, 'text'),
         variable: attr(row, 'variable'),
@@ -596,7 +629,7 @@ function readDbAccesses(response: IAdtWireResponse): IAbapTraceDbAccesses {
   return {
     accesses: asList(rootOf(response, 'dbAccesses').dbAccess).map(
       (row): IAbapTraceDbAccess => ({
-        index: attrNum(row, 'index') as number,
+        index: required(attrNum(row, 'index'), 'dbAccess.index'),
         tableName: attr(row, 'tableName'),
         statement: attr(row, 'statement'),
         type: attr(row, 'type'),
@@ -617,8 +650,8 @@ function readDbAccesses(response: IAdtWireResponse): IAbapTraceDbAccesses {
  */
 function readCatalogue(response: IAdtWireResponse): ITraceCatalogueItem[] {
   return asList(rootOf(response, 'namedItemList').namedItem).map((item) => ({
-    name: text(item.name) as string,
-    description: text(item.description) as string,
+    name: required(text(item.name), 'catalogue.name'),
+    description: required(text(item.description), 'catalogue.description'),
   }));
 }
 
@@ -635,11 +668,12 @@ function readTraceRequests(response: IAdtWireResponse): ITraceRequestEntry[] {
       const executions = presentNode(extended.executions);
       const traceUri = asList(entry.link)
         .filter((link) => (attr(link, 'rel') ?? '').endsWith('/tracefile'))
-        .map((link) => attr(link, 'href'))
-        .find((href): href is string => Boolean(href));
+        // An empty href is none, as before: `|| undefined` drops it.
+        .map((link) => attr(link, 'href') || undefined)
+        .find((href) => href !== undefined);
 
       return {
-        id: text(entry.id) as string,
+        id: required(text(entry.id), 'request.id'),
         index: numberOf(text(extended.requestIndex)),
         description: text(extended.description),
         expiresAt: text(extended.expires),
@@ -673,9 +707,7 @@ function readTraceRequests(response: IAdtWireResponse): ITraceRequestEntry[] {
  * `analyse`, which sees the same answer.
  */
 function readProfilerId(response: IAdtWireResponse): string {
-  const headers = response?.headers as
-    | Record<string, string | string[] | undefined>
-    | undefined;
+  const headers: AdtHeaderMap | undefined = response?.headers;
   const location =
     headers?.location ??
     headers?.Location ??

@@ -12,15 +12,13 @@ export async function uploadFeatureToggleSource(
   headers: IAdtHeaders,
   ifMatch: string | undefined,
   name: string,
-  source: IFeatureToggleSource,
-  lockHandle?: string,
+  // Absent, the body is what `JSON.stringify(undefined)` gives, as before.
+  source: IFeatureToggleSource | undefined,
+  lockHandle: string,
   transportRequest?: string,
 ): Promise<IAdtWireResponse> {
-  // The handle is sent when there is one. Whether an unlocked write is allowed
-  // is ADT's judgement about this toggle on this system, not a refusal to raise
-  // here — the same rule every other write in this package follows.
-  const params: Record<string, string> = {};
-  if (lockHandle) params.lockHandle = lockHandle;
+  // The handle is required, and sent as given (C7 of #304).
+  const params: Record<string, string> = { lockHandle };
   if (transportRequest) params.corrNr = transportRequest;
   return connection.makeAdtRequest({
     method: 'PUT',

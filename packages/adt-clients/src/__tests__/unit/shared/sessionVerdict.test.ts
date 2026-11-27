@@ -445,6 +445,9 @@ describe("a verdict a consumer's strategy answers is answered as it came", () =>
     expect(Object.getPrototypeOf(answer.getError())).toBe(
       ConsumerFailure.prototype,
     );
-    expect(answer.getError().describe()).toBe('the consumer says no');
+    const error = answer.getError();
+    if (!(error instanceof ConsumerFailure))
+      throw new Error('expected the consumer failure');
+    expect(error.describe()).toBe('the consumer says no');
   });
 });

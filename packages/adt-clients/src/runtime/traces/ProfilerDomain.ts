@@ -2,6 +2,7 @@ import type {
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
+  IAnalyse,
   IProfilerListOptions,
   IProfilerTraceDbAccessesOptions,
   IProfilerTraceHitListOptions,
@@ -126,9 +127,16 @@ export class Profiler<
   }
 
   /** What traces exist. */
+  list<E extends IAdtError>(
+    options: IProfilerListOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['list'], E | IAdtError>>;
+  list(
+    options?: IProfilerListOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['list'], IAdtError>>;
   async list<E extends IAdtError = IAdtError>(
     options?: IProfilerListOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['list'], E>> {
+  ): Promise<IAdtResponse<T['list'], E | IAdtError>> {
     return answering(
       () => listTraceFiles(this.connection, options),
       this.results.list,
@@ -142,10 +150,18 @@ export class Profiler<
    * What a missing id answers is not measured; a caller who must tolerate one
    * reads `ok`, or passes an `analyse` that says what it means.
    */
+  delete<E extends IAdtError>(
+    traceId: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<void, E | IAdtError>>;
+  delete(
+    traceId: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<void, IAdtError>>;
   async delete<E extends IAdtError = IAdtError>(
     traceId: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<void, E>> {
+  ): Promise<IAdtResponse<void, E | IAdtError>> {
     return answering(
       () => deleteTrace(this.connection, traceId),
       this.results.deletion,
@@ -154,39 +170,23 @@ export class Profiler<
   }
 
   /**
-   * The request for a view.
-   *
-   * One place that knows which URL and which options a view sends.
+   * The request for each view: one place that knows which URL and which
+   * options a view sends. Typed per view, so a view's options reach its
+   * request as they are, with no cast.
    */
-  private async viewResponse<K extends keyof IProfilerViews<T>>(
-    traceId: string,
-    view: K,
-    options: unknown,
-  ): Promise<IAdtWireResponse> {
-    switch (view) {
-      case 'hitlist':
-        return getTraceHitList(
-          this.connection,
-          traceId,
-          options as IProfilerTraceHitListOptions | undefined,
-        );
-      case 'statements':
-        return getTraceStatements(
-          this.connection,
-          traceId,
-          options as IProfilerTraceStatementsOptions | undefined,
-        );
-      case 'dbAccesses':
-        return getTraceDbAccesses(
-          this.connection,
-          traceId,
-          options as IProfilerTraceDbAccessesOptions | undefined,
-        );
-      default:
-        // Unreachable through the typed surface; reachable from JavaScript.
-        throw new Error(`Unknown trace view: ${String(view)}`);
-    }
-  }
+  private readonly handlers: {
+    readonly [K in keyof IProfilerViews<T>]: (
+      traceId: string,
+      options: ViewOptions<IProfilerViews<T>, K> | undefined,
+    ) => Promise<IAdtWireResponse>;
+  } = {
+    hitlist: (traceId, options) =>
+      getTraceHitList(this.connection, traceId, options),
+    statements: (traceId, options) =>
+      getTraceStatements(this.connection, traceId, options),
+    dbAccesses: (traceId, options) =>
+      getTraceDbAccesses(this.connection, traceId, options),
+  };
 
   /**
    * What is inside one trace.
@@ -195,6 +195,17 @@ export class Profiler<
    * `hitlist` yields what the `hitlist` strategy makes of the hit list, and the
    * compiler refuses a view this family does not have.
    */
+  read<K extends keyof IProfilerViews<T>, E extends IAdtError>(
+    traceId: string,
+    view: K,
+    options: ViewOptions<IProfilerViews<T>, K> &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<IProfilerViews<T>[K]['result'], E | IAdtError>>;
+  read<K extends keyof IProfilerViews<T>>(
+    traceId: string,
+    view: K,
+    options?: ViewOptions<IProfilerViews<T>, K> & IAdtAnalyseOptions,
+  ): Promise<IAdtResponse<IProfilerViews<T>[K]['result']>>;
   async read<
     K extends keyof IProfilerViews<T>,
     E extends IAdtError = IAdtError,
@@ -202,16 +213,20 @@ export class Profiler<
     traceId: string,
     view: K,
     options?: ViewOptions<IProfilerViews<T>, K> & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<IProfilerViews<T>[K]['result'], E>> {
+  ): Promise<IAdtResponse<IProfilerViews<T>[K]['result'], E | IAdtError>> {
     // Before the request, not inside it: a view this family does not have is a
     // caller error, and classified inside `answering` it would come back as
     // `origin: 'connection'` — advice to check the network over a name the
     // compiler already refuses.
-    if (view !== 'hitlist' && view !== 'statements' && view !== 'dbAccesses') {
+    if (!Object.hasOwn(this.handlers, view)) {
       throw new Error(`Unknown trace view: ${String(view)}`);
     }
+    const handler: (
+      traceId: string,
+      options: ViewOptions<IProfilerViews<T>, K> | undefined,
+    ) => Promise<IAdtWireResponse> = this.handlers[view];
     return answering(
-      () => this.viewResponse(traceId, view, options),
+      () => handler(traceId, options),
       this.results[view],
       options?.analyse,
     );

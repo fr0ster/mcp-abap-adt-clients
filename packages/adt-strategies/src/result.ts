@@ -24,7 +24,7 @@ import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
  * so this states the conversion rather than asserting the type.
  */
 export function rawOf(answer: IAdtWireResponse): string {
-  const body = (answer as { data?: unknown }).data;
+  const body = answer.data;
   if (typeof body === 'string') return body;
   if (body === undefined || body === null) return '';
   if (typeof body === 'object') {

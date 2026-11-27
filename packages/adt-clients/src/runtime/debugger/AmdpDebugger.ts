@@ -15,6 +15,7 @@ import type {
   IAmdpBreakpoint,
   IAmdpDebugger,
   IAmdpStepMethod,
+  IAnalyse,
   IGetAmdpDataPreviewOptions,
   IResultStrategy,
   IStartAmdpDebuggerOptions,
@@ -113,10 +114,19 @@ export class AmdpDebugger<
     return this.results[key];
   }
 
+  start<E extends IAdtError>(
+    requestUser: string,
+    options: IStartAmdpDebuggerOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['started'], E | IAdtError>>;
+  start(
+    requestUser: string,
+    options?: IStartAmdpDebuggerOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['started'], IAdtError>>;
   async start<E extends IAdtError = IAdtError>(
     requestUser: string,
     options?: IStartAmdpDebuggerOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['started'], E>> {
+  ): Promise<IAdtResponse<T['started'], E | IAdtError>> {
     return answering(
       () => startAmdpDebugger(this.connection, requestUser, options),
       this.reading('started'),
@@ -124,11 +134,21 @@ export class AmdpDebugger<
     );
   }
 
+  syncBreakpoints<E extends IAdtError>(
+    mainId: string,
+    breakpoints: readonly IAmdpBreakpoint[],
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['command'], E | IAdtError>>;
+  syncBreakpoints(
+    mainId: string,
+    breakpoints: readonly IAmdpBreakpoint[],
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['command'], IAdtError>>;
   async syncBreakpoints<E extends IAdtError = IAdtError>(
     mainId: string,
     breakpoints: readonly IAmdpBreakpoint[],
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['command'], E>> {
+  ): Promise<IAdtResponse<T['command'], E | IAdtError>> {
     return answering(
       () => syncAmdpBreakpoints(this.connection, mainId, breakpoints),
       this.reading('command'),
@@ -136,10 +156,18 @@ export class AmdpDebugger<
     );
   }
 
+  getEvents<E extends IAdtError>(
+    mainId: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['events'], E | IAdtError>>;
+  getEvents(
+    mainId: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['events'], IAdtError>>;
   async getEvents<E extends IAdtError = IAdtError>(
     mainId: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['events'], E>> {
+  ): Promise<IAdtResponse<T['events'], E | IAdtError>> {
     return answering(
       () => getAmdpEvents(this.connection, mainId),
       this.reading('events'),
@@ -147,12 +175,24 @@ export class AmdpDebugger<
     );
   }
 
+  step<E extends IAdtError>(
+    mainId: string,
+    debuggeeId: string,
+    step: IAmdpStepMethod,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['command'], E | IAdtError>>;
+  step(
+    mainId: string,
+    debuggeeId: string,
+    step: IAmdpStepMethod,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['command'], IAdtError>>;
   async step<E extends IAdtError = IAdtError>(
     mainId: string,
     debuggeeId: string,
     step: IAmdpStepMethod,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['command'], E>> {
+  ): Promise<IAdtResponse<T['command'], E | IAdtError>> {
     return answering(
       () => stepAmdpDebuggee(this.connection, mainId, debuggeeId, step),
       this.reading('command'),
@@ -160,11 +200,21 @@ export class AmdpDebugger<
     );
   }
 
+  deleteDebuggee<E extends IAdtError>(
+    mainId: string,
+    debuggeeId: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['command'], E | IAdtError>>;
+  deleteDebuggee(
+    mainId: string,
+    debuggeeId: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['command'], IAdtError>>;
   async deleteDebuggee<E extends IAdtError = IAdtError>(
     mainId: string,
     debuggeeId: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['command'], E>> {
+  ): Promise<IAdtResponse<T['command'], E | IAdtError>> {
     return answering(
       () => deleteAmdpDebuggee(this.connection, mainId, debuggeeId),
       this.reading('command'),
@@ -172,10 +222,20 @@ export class AmdpDebugger<
     );
   }
 
+  stop<E extends IAdtError>(
+    mainId: string,
+    options: ({ hardStop?: boolean } & IAdtAnalyseOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['command'], E | IAdtError>>;
+  stop(
+    mainId: string,
+    options?: { hardStop?: boolean } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['command'], IAdtError>>;
   async stop<E extends IAdtError = IAdtError>(
     mainId: string,
     options?: { hardStop?: boolean } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['command'], E>> {
+  ): Promise<IAdtResponse<T['command'], E | IAdtError>> {
     return answering(
       () => stopAmdpDebugger(this.connection, mainId, options?.hardStop),
       this.reading('command'),
@@ -183,10 +243,18 @@ export class AmdpDebugger<
     );
   }
 
+  getDataPreview<E extends IAdtError>(
+    options: { headers: IAdtHeaders } & IGetAmdpDataPreviewOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['preview'], E | IAdtError>>;
+  getDataPreview(
+    options: { headers: IAdtHeaders } & IGetAmdpDataPreviewOptions &
+      IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['preview'], IAdtError>>;
   async getDataPreview<E extends IAdtError = IAdtError>(
     options: { headers: IAdtHeaders } & IGetAmdpDataPreviewOptions &
       IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['preview'], E>> {
+  ): Promise<IAdtResponse<T['preview'], E | IAdtError>> {
     return answering(
       () => getAmdpDataPreview(this.connection, options.headers, options),
       this.reading('preview'),

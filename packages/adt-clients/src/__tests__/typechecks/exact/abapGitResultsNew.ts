@@ -9,6 +9,7 @@ import {
   type AbapGitValuesOf,
   AdtAbapGitClient,
   abapGitDocuments,
+  abapGitFactsDefaults,
 } from '@mcp-abap-adt/adt-clients/abapgit';
 import type {
   IAbapGitFileFacts,
@@ -31,7 +32,7 @@ const results = {
 const created = AdtAbapGitClient.create(connection, { results });
 const constructed = new AdtAbapGitClient<AbapGitValuesOf<typeof results>>(
   connection,
-  { results },
+  { results: { ...abapGitFactsDefaults, ...results } },
 );
 
 export async function newCalls(): Promise<void> {

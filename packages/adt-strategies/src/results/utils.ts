@@ -26,7 +26,8 @@ import type {
   IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
-import { readInactiveList } from '../inactiveList';
+import { type AdtHeaderMap, type AdtHeaderValue, firstOf } from '../headers';
+import { readInactiveListText } from '../inactiveList';
 import {
   at,
   field,
@@ -39,6 +40,7 @@ import {
   XML_TEXT_OPTIONS,
 } from '../parsed';
 import { rawOf } from '../result';
+import { runIdAfter } from '../scan';
 import { answeredObject } from './answeredObject';
 
 type XmlRecord = Record<string, unknown>;
@@ -475,7 +477,7 @@ export const INACTIVE_OBJECTS_REFUSAL =
 export const utilInactiveObjects: IResultStrategy<IInactiveObjectsResponse> = (
   answer,
 ) => {
-  const listed = readInactiveList(rawOf(answer));
+  const listed = readInactiveListText(rawOf(answer));
   if (listed === null) throw new Error(INACTIVE_OBJECTS_REFUSAL);
   return {
     objects: listed.map(({ name, type, uri, parentUri }) => ({
@@ -549,7 +551,8 @@ export const utilWhereUsedReferences: IResultStrategy<IWhereUsedListResult> = (
 
 /** A header's value, whether the transport gave a string or a list of them. */
 function headerText(value: unknown): string | undefined {
-  if (Array.isArray(value)) return value.length ? String(value[0]) : undefined;
+  if (Array.isArray(value))
+    return value.length ? String(firstOf(value)) : undefined;
   if (value === undefined || value === null || typeof value === 'object') {
     return undefined;
   }
@@ -561,10 +564,22 @@ function headerText(value: unknown): string | undefined {
  * who kept the exchange and reads the id later.
  */
 export function extractRunId(location: unknown): string | null {
-  const text = headerText(location);
+  return runIdOfText(headerText(location));
+}
+
+/** The run id in a header's text, `null` without one. */
+function runIdOfText(text: string | undefined): string | null {
   if (!text) return null;
-  const match = text.match(/\/activation\/runs\/([^/]+)/);
-  return match ? match[1] : null;
+  return runIdAfter(text, '/activation/runs/') ?? null;
+}
+
+/** A typed header's text, as {@link headerText} reads one. */
+function typedHeaderText(value: AdtHeaderValue): string | undefined {
+  if (Array.isArray(value))
+    return value.length ? String(firstOf(value)) : undefined;
+  if (value === undefined || value === null || typeof value === 'object')
+    return undefined;
+  return String(value);
 }
 
 /**
@@ -576,13 +591,13 @@ export function extractRunId(location: unknown): string | null {
  * a start without an id means anything is the caller's question.
  */
 export const utilActivationRunId: IResultStrategy<string> = (answer) => {
-  const headers = (answer.headers ?? {}) as XmlRecord;
+  const headers: AdtHeaderMap = answer.headers ?? {};
   const location =
     headers.location ??
     headers.Location ??
     headers['content-location'] ??
     headers['Content-Location'];
-  return extractRunId(location) ?? '';
+  return runIdOfText(typedHeaderText(location)) ?? '';
 };
 
 // ---------------------------------------------------------------------------

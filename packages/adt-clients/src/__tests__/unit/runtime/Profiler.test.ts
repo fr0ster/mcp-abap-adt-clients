@@ -56,9 +56,20 @@ describe('Profiler', () => {
     // `IProfiler` could reach it. A consumer picks the newest from `list()`
     // with `compareRecordedAt` — the offsets are the point, since 09:00Z is
     // later than 10:00+02:00 and sorts lower as text.
-    const feed = `<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom">
-      <atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/AAAAAAAAAAAAAAAAAAAA</atom:id><atom:published>2026-08-28T10:00:00+02:00</atom:published></atom:entry>
-      <atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/BBBBBBBBBBBBBBBBBBBB</atom:id><atom:published>2026-08-28T09:00:00Z</atom:published></atom:entry>
+    // Complete entries: since adt-strategies 0.29.0 the reading throws on one
+    // that lacks a field its type requires.
+    const extended =
+      '<trc:extendedData><trc:host>h</trc:host><trc:size>1</trc:size>' +
+      '<trc:runtime>1</trc:runtime><trc:runtimeABAP>1</trc:runtimeABAP>' +
+      '<trc:runtimeSystem>0</trc:runtimeSystem><trc:runtimeDatabase>0</trc:runtimeDatabase>' +
+      '<trc:expiration>2026-09-24T06:09:50Z</trc:expiration><trc:system>ABC</trc:system>' +
+      '<trc:client>100</trc:client><trc:user>SOMEONE</trc:user>' +
+      '<trc:isAggregated>false</trc:isAggregated><trc:objectName>ZX</trc:objectName>' +
+      '<trc:state value="R" text="Finished"/><trc:amdpFileSize>0</trc:amdpFileSize>' +
+      '</trc:extendedData>';
+    const feed = `<?xml version="1.0"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom" xmlns:trc="x">
+      <atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/AAAAAAAAAAAAAAAAAAAA</atom:id><atom:published>2026-08-28T10:00:00+02:00</atom:published>${extended}</atom:entry>
+      <atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/BBBBBBBBBBBBBBBBBBBB</atom:id><atom:published>2026-08-28T09:00:00Z</atom:published>${extended}</atom:entry>
     </atom:feed>`;
     const connection = {
       makeAdtRequest: jest

@@ -90,9 +90,26 @@ describe('trace document mapping', () => {
     });
 
     it('finds the trc: fields under extendedData', () => {
+      // A complete entry (a reading of one that lacks a required field throws
+      // since #304), with its state's attributes written with the prefix.
       const entries = profilerTraceEntries(
         FEED(
-          `<atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/${TRACE_ID}</atom:id><atom:published>2026-08-28T10:00:00Z</atom:published><trc:extendedData><trc:user>SOMEONE</trc:user><trc:objectName>ZCL_X=====CP</trc:objectName><trc:state trc:value="R" trc:text="Finished"/><trc:expiration>2026-09-25T10:00:00Z</trc:expiration></trc:extendedData></atom:entry>`,
+          REAL_ENTRY.replace(
+            '<trc:user>SAPUSER01</trc:user>',
+            '<trc:user>SOMEONE</trc:user>',
+          )
+            .replace(
+              '<trc:objectName>ZAC_SHR_RUN01=================CP</trc:objectName>',
+              '<trc:objectName>ZCL_X=====CP</trc:objectName>',
+            )
+            .replace(
+              '<trc:state value="R" text="Finished"/>',
+              '<trc:state trc:value="R" trc:text="Finished"/>',
+            )
+            .replace(
+              '<trc:expiration>2026-09-24T06:09:50Z</trc:expiration>',
+              '<trc:expiration>2026-09-25T10:00:00Z</trc:expiration>',
+            ),
         ),
       );
       expect(entries[0]).toMatchObject({
@@ -108,18 +125,27 @@ describe('trace document mapping', () => {
       // real had never been read end to end. It has been now: sixty entries,
       // every `trc:` field inside the container and not one outside it. A
       // second lookup would be reading for a document nobody has seen.
-      const entries = profilerTraceEntries(
-        FEED(
-          `<atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/${TRACE_ID}</atom:id><atom:published>2026-08-28T10:00:00Z</atom:published><trc:objectName>ON_THE_ENTRY</trc:objectName></atom:entry>`,
-        ),
+      // Since #304 a required field read nowhere is a throw naming it, not
+      // `undefined`: one on the entry, outside the container, still is none.
+      const entry = REAL_ENTRY.replace(
+        '<trc:objectName>ZAC_SHR_RUN01=================CP</trc:objectName>',
+        '',
+      ).replace(
+        '<atom:published>',
+        '<trc:objectName>ON_THE_ENTRY</trc:objectName><atom:published>',
       );
-      expect(entries[0]?.objectName).toBeUndefined();
+      expect(() => profilerTraceEntries(FEED(entry))).toThrow(
+        'traces: objectName is missing',
+      );
     });
 
     it('falls back to atom:author for the user', () => {
       const entries = profilerTraceEntries(
         FEED(
-          `<atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/${TRACE_ID}</atom:id><atom:published>2026-08-28T10:00:00Z</atom:published><atom:author><atom:name>SOMEONE</atom:name></atom:author></atom:entry>`,
+          REAL_ENTRY.replace('<trc:user>SAPUSER01</trc:user>', '').replace(
+            '<atom:name>SAPUSER01</atom:name>',
+            '<atom:name>SOMEONE</atom:name>',
+          ),
         ),
       );
       expect(entries[0]?.user).toBe('SOMEONE');

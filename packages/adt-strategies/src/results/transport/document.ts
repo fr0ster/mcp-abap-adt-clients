@@ -81,6 +81,11 @@ export interface ITmElement {
 /** The namespaces in scope on an element: its parent's, and its own `xmlns` declarations. */
 function scopeOn(element: unknown, parent: TmScope): TmScope {
   if (!isElement(element) || Array.isArray(element)) return parent;
+  return scopeOnElement(element, parent);
+}
+
+/** {@link scopeOn} for what is already known to be an element. */
+function scopeOnElement(element: ParsedElement, parent: TmScope): TmScope {
   let scope: Map<string, string> | undefined;
   for (const [key, value] of Object.entries(element)) {
     if (key !== '@_xmlns' && !key.startsWith('@_xmlns:')) continue;
@@ -94,7 +99,9 @@ function scopeOn(element: unknown, parent: TmScope): TmScope {
 
 /** The document's root as an element with its scope. */
 export function tmRootElement(root: ParsedElement): ITmElement {
-  return { element: root, scope: scopeOn(root, new Map()) };
+  // `root` is an element and no list (`transportRoot` answers no other), so
+  // its scope is read directly.
+  return { element: root, scope: scopeOnElement(root, new Map()) };
 }
 
 /**

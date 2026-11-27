@@ -1,4 +1,9 @@
-import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtReadVersion,
+  AdtRequiredUpdateOptions,
+  IAdtLockedWrite,
+  IAnalyse,
+} from '@mcp-abap-adt/interfaces-adt';
 /**
  * AdtProgram - CRUD for `PROG/P` programs.
  *
@@ -19,6 +24,7 @@ import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
  */
 
 import type {
+  AdtObjectIdentity,
   AdtVariant,
   IAdtActivatable,
   IAdtActivationOptions,
@@ -96,20 +102,45 @@ export class AdtProgram<
     IAdtEnhancementHost<
       IProgramConfig,
       T['enhancementElements'],
-      T['enhancementOptions']
+      T['enhancementOptions'],
+      'programName'
     >,
     IAdtCreatable<IProgramConfig, T['created']>,
-    IAdtReadable<IProgramConfig, T['source']>,
-    IAdtMetadataReadable<IProgramConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IProgramConfig>, T['updated']>,
-    IAdtMetadataUpdatable<Partial<IProgramConfig>, T['metadataUpdated']>,
-    IAdtDeletable<IProgramConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IProgramConfig, T['validation']>,
-    IAdtCheckable<IProgramConfig, T['check']>,
-    IAdtActivatable<IProgramConfig, T['activation']>,
-    IAdtLockable<IProgramConfig>,
-    IAdtTransportAware<IProgramConfig, T['transport']>,
-    IAdtVersionable<IProgramConfig, T['versions'], T['versionSource']>
+    IAdtReadable<IProgramConfig, T['source'], 'programName'>,
+    IAdtMetadataReadable<IProgramConfig, T['metadata'], 'programName'>,
+    IAdtUpdatable<
+      Partial<IProgramConfig>,
+      T['updated'],
+      'programName',
+      'source'
+    >,
+    IAdtMetadataUpdatable<
+      Partial<IProgramConfig>,
+      T['metadataUpdated'],
+      'programName',
+      'source'
+    >,
+    IAdtDeletable<
+      IProgramConfig,
+      T['deletion'],
+      'programName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<
+      IProgramConfig,
+      T['validation'],
+      'programName' | 'packageName'
+    >,
+    IAdtCheckable<IProgramConfig, T['check'], 'programName'>,
+    IAdtActivatable<IProgramConfig, T['activation'], 'programName'>,
+    IAdtLockable<IProgramConfig, 'programName'>,
+    IAdtTransportAware<IProgramConfig, T['transport'], 'programName'>,
+    IAdtVersionable<
+      IProgramConfig,
+      T['versions'],
+      T['versionSource'],
+      'programName'
+    >
 {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -147,38 +178,66 @@ export class AdtProgram<
   }
 
   /** Read the host's enhancement elements. */
+  readEnhancementElements<E extends IAdtError>(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['enhancementElements'], E | IAdtError>>;
+  readEnhancementElements(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['enhancementElements'], IAdtError>>;
   async readEnhancementElements<E extends IAdtError = IAdtError>(
-    config: Partial<IProgramConfig>,
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['enhancementElements'], E>> {
+  ): Promise<IAdtResponse<T['enhancementElements'], E | IAdtError>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
-      () =>
-        getProgramEnhancementElements(connection, config.programName as string),
+      () => getProgramEnhancementElements(connection, config.programName),
       this.results.enhancementElements,
       options?.analyse,
     );
   }
 
   /** Read the host's enhancement options. */
+  readEnhancementOptions<E extends IAdtError>(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['enhancementOptions'], E | IAdtError>>;
+  readEnhancementOptions(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['enhancementOptions'], IAdtError>>;
   async readEnhancementOptions<E extends IAdtError = IAdtError>(
-    config: Partial<IProgramConfig>,
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['enhancementOptions'], E>> {
+  ): Promise<IAdtResponse<T['enhancementOptions'], E | IAdtError>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
-      () =>
-        getProgramEnhancementOptions(connection, config.programName as string),
+      () => getProgramEnhancementOptions(connection, config.programName),
       this.results.enhancementOptions,
       options?.analyse,
     );
   }
 
   /** Validate a program name before creating it. */
+  validate<E extends IAdtError>(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'> & {
+      packageName: string;
+    },
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>>;
+  validate(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'> & {
+      packageName: string;
+    },
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['validation'], IAdtError>>;
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IProgramConfig> & { packageName: string },
+    config: AdtObjectIdentity<IProgramConfig, 'programName'> & {
+      packageName: string;
+    },
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['validation'], E>> {
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -192,7 +251,7 @@ export class AdtProgram<
       () =>
         validateProgramName(
           connection,
-          config.programName as string,
+          config.programName,
           config.packageName,
           config.description,
         ),
@@ -202,6 +261,26 @@ export class AdtProgram<
   }
 
   /** Create the program. */
+  create<E extends IAdtError>(
+    config: Omit<IProgramConfig, 'source'> & {
+      source?: never;
+      /** Not taken: SAP ignores a program type on create (measured). */
+      programType?: never;
+      packageName: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>>;
+  create(
+    config: Omit<IProgramConfig, 'source'> & {
+      source?: never;
+      /** Not taken: SAP ignores a program type on create (measured). */
+      programType?: never;
+      packageName: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['created'], IAdtError>>;
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IProgramConfig, 'source'> & {
       source?: never;
@@ -210,7 +289,7 @@ export class AdtProgram<
       packageName: string;
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<T['created'], E>> {
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // The type requires a package; this refuses an empty one, which the type
@@ -228,7 +307,7 @@ export class AdtProgram<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    const name = config.programName as string;
+    const name = config.programName;
     return answering(
       () =>
         createProgram(connection, options.headers, {
@@ -259,11 +338,21 @@ export class AdtProgram<
   }
 
   /** Read the program's source. */
+  read<E extends IAdtError>(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    version: AdtReadVersion | undefined,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>>;
+  read(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    version?: AdtReadVersion,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['source'], IAdtError>>;
   async read<E extends IAdtError = IAdtError>(
-    config: Partial<IProgramConfig>,
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['source'], E>> {
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -272,29 +361,30 @@ export class AdtProgram<
     // and whether an empty body *is* absence is the caller's reading, supplied
     // through `analyse`.
     return answering(
-      () =>
-        getProgramSource(
-          connection,
-          config.programName as string,
-          version,
-          options,
-        ),
+      () => getProgramSource(connection, config.programName, version, options),
       this.results.source,
       options?.analyse,
     );
   }
 
   /** Read the program's metadata: package, responsible, description. */
+  readMetadata<E extends IAdtError>(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>>;
+  readMetadata(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['metadata'], IAdtError>>;
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IProgramConfig>,
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['metadata'], E>> {
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     return answering(
-      () =>
-        getProgramMetadata(connection, config.programName as string, options),
+      () => getProgramMetadata(connection, config.programName, options),
       this.results.metadata,
       options?.analyse,
     );
@@ -303,22 +393,36 @@ export class AdtProgram<
   /**
    * Write the program's source.
    *
-   * With `options.lockHandle` the caller holds the lock and owns the chain, so
-   * this is one request. Without it, this locks, checks, writes and unlocks —
-   * and the unlock happens on every path out.
+   * One request: the write, under the lock the caller holds
+   * (`options.lockHandle`, required). The lock, the check and the unlock are
+   * the caller's own calls of `lock`, `check` and `unlock`.
    *
    * **The whole content, every time.** This is a replace, never a merge. Read
    * what the object holds, change what you mean to change, and pass the result:
    * anything left out is gone, because nothing is read here to keep it.
    */
+  update<E extends IAdtError>(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>>;
+  update(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['updated'], IAdtError>>;
   async update<E extends IAdtError = IAdtError>(
-    config: Partial<IProgramConfig>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['updated'], E>> {
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    const name = config.programName as string;
+    const name = config.programName;
     // The source is the caller's, through `options.source`. This used to
     // fall back to `config.source` — two channels for one value, where the
     // contract documents one. `config.source` is `check`'s alone now: a
@@ -334,8 +438,8 @@ export class AdtProgram<
           options.headers,
           options.ifMatch,
           name,
-          source as string,
-          options?.lockHandle as string,
+          source,
+          options?.lockHandle,
           sessionId,
           config.transportRequest,
         ),
@@ -354,11 +458,27 @@ export class AdtProgram<
    * and pass the result: anything left out is gone, because nothing is read
    * here to keep it.
    */
+  updateMetadata<E extends IAdtError>(
+    this: this & AdtPerformedBy<'program', 'updateMetadata'>,
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>>;
+  updateMetadata(
+    this: this & AdtPerformedBy<'program', 'updateMetadata'>,
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], IAdtError>>;
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'program', 'updateMetadata'>,
-    config: Partial<IProgramConfig>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -368,8 +488,8 @@ export class AdtProgram<
           connection,
           options.headers,
           options.ifMatch,
-          PROGRAM.uri(config.programName as string),
-          options?.source as string,
+          PROGRAM.uri(config.programName),
+          options?.source,
           options?.lockHandle,
           config.transportRequest,
         ),
@@ -385,15 +505,27 @@ export class AdtProgram<
    * it: a consumer that wants the check runs this first and decides what a
    * refusal means.
    */
+  checkDeletion<E extends IAdtError>(
+    this: this & AdtPerformedBy<'program', 'deletionCheck'>,
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  checkDeletion(
+    this: this & AdtPerformedBy<'program', 'deletionCheck'>,
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'program', 'deletionCheck'>,
-    config: Partial<IProgramConfig>,
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    const name = config.programName as string;
+    const name = config.programName;
     return answering(
       () =>
         checkDeletion(connection, options.headers, {
@@ -414,14 +546,24 @@ export class AdtProgram<
    * shipped reading of that answer; a caller who wants another passes their own
    * `analyse`.
    */
+  delete<E extends IAdtError>(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>>;
+  delete(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletion'], IAdtError>>;
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IProgramConfig>,
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletion'], E>> {
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    const name = config.programName as string;
+    const name = config.programName;
     return answering(
       () =>
         deleteProgram(connection, options.headers, {
@@ -434,10 +576,20 @@ export class AdtProgram<
   }
 
   /** Activate the program. Needs no stateful session. */
+  activate<E extends IAdtError>(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>>;
+  activate(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['activation'], IAdtError>>;
   async activate<E extends IAdtError = IAdtError>(
-    config: Partial<IProgramConfig>,
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
-  ): Promise<IAdtResponse<T['activation'], E>> {
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -447,7 +599,7 @@ export class AdtProgram<
         activateProgram(
           sent,
           options.headers,
-          config.programName as string,
+          config.programName,
           options.preauditRequested ?? true,
         ),
       this.results.activation,
@@ -456,11 +608,23 @@ export class AdtProgram<
   }
 
   /** Check the program. */
+  check<E extends IAdtError>(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>>;
+  check(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['check'], IAdtError>>;
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<IProgramConfig>,
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['check'], E>> {
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -472,7 +636,7 @@ export class AdtProgram<
         checkProgram(
           connection,
           options.headers,
-          config.programName as string,
+          config.programName,
           version,
           config.source,
           this.contentTypes?.sourceArtifactContentType(),
@@ -483,11 +647,23 @@ export class AdtProgram<
   }
 
   /** The transport request the program belongs to. */
+  readTransport<E extends IAdtError>(
+    this: this & AdtPerformedBy<'program', 'transport'>,
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options: ({ withLongPolling?: boolean } & IAdtOperationOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>>;
+  readTransport(
+    this: this & AdtPerformedBy<'program', 'transport'>,
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['transport'], IAdtError>>;
   async readTransport<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'program', 'transport'>,
-    config: Partial<IProgramConfig>,
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['transport'], E>> {
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -495,7 +671,7 @@ export class AdtProgram<
       () =>
         getProgramTransport(
           connection,
-          config.programName as string,
+          config.programName,
           options?.withLongPolling !== undefined
             ? { withLongPolling: options.withLongPolling }
             : undefined,
@@ -510,11 +686,19 @@ export class AdtProgram<
    * carrying no handle reads as `''`; whether that is a refusal is the
    * caller's `analyse` to say.
    */
+  lock<E extends IAdtError>(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  lock(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IProgramConfig>,
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
-    const name = config.programName as string;
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
+    const name = config.programName;
     const answer = await answering(
       () =>
         inStatefulSession(this.connection, () =>
@@ -530,12 +714,22 @@ export class AdtProgram<
   }
 
   /** Unlock the program. */
+  unlock<E extends IAdtError>(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    lockHandle: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<void, E | IAdtError>>;
+  unlock(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    lockHandle: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<void, IAdtError>>;
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IProgramConfig>,
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<void, E>> {
-    const name = config.programName as string;
+  ): Promise<IAdtResponse<void, E | IAdtError>> {
+    const name = config.programName;
 
     return answering(
       async () => {
@@ -552,10 +746,18 @@ export class AdtProgram<
   }
 
   /** Version history of the program's source. */
+  getVersions<E extends IAdtError>(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>>;
+  getVersions(
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versions'], IAdtError>>;
   async getVersions<E extends IAdtError = IAdtError>(
-    config: Partial<IProgramConfig>,
+    config: AdtObjectIdentity<IProgramConfig, 'programName'>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versions'], E>> {
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>> {
     return answering(
       () => getProgramVersions(this.connection, config),
       this.results.versions,
@@ -564,10 +766,18 @@ export class AdtProgram<
   }
 
   /** Source of one version, by the `contentUri` its entry carried. */
+  getVersionSource<E extends IAdtError>(
+    contentUri: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versionSource'], E | IAdtError>>;
+  getVersionSource(
+    contentUri: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versionSource'], IAdtError>>;
   async getVersionSource<E extends IAdtError = IAdtError>(
     contentUri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versionSource'], E>> {
+  ): Promise<IAdtResponse<T['versionSource'], E | IAdtError>> {
     return answering(
       () => getProgramVersionSource(this.connection, contentUri),
       this.results.versionSource,

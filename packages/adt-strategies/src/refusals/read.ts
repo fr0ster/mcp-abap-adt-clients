@@ -12,7 +12,9 @@ import {
   leafText,
   listOf,
   type ParsedElement,
+  parsedOrNothing,
 } from '../parsed';
+import { isT100ValueKey, messageClassKey, unescapedAmpersands } from '../scan';
 import { type AdtSourcePosition, readSourceReference } from '../sourcePosition';
 
 /**
@@ -257,12 +259,8 @@ export interface IAdtRootElement {
 export function readRootElement(document: unknown): IAdtRootElement | null {
   if (typeof document !== 'string') return null;
   if (XMLValidator.validate(document) !== true) return null;
-  let parsed: unknown;
-  try {
-    parsed = namespacedParser.parse(document);
-  } catch {
-    return null;
-  }
+  // A parser that throws reads as nothing, which is no element.
+  const parsed = parsedOrNothing(namespacedParser, document);
   if (!isElement(parsed)) return null;
   const names = Object.keys(parsed).filter(
     (key) => !key.startsWith('?') && !key.startsWith('#'),
@@ -325,7 +323,7 @@ export function readExceptionRefusal(document: unknown): AdtRefusal | null {
   const id = properties.get('T100KEY-ID');
   const no = properties.get('T100KEY-NO');
   const values = [...properties.entries()]
-    .filter(([key]) => /^T100KEY-V\d+$/.test(key))
+    .filter(([key]) => isT100ValueKey(key))
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([, value]) => value);
   const text =
@@ -771,7 +769,7 @@ export function readDeletionRefusal(document: unknown): AdtRefusal | null {
           t100: t100FromLongtext(field(message, 'link')),
         };
       })
-      .filter((m): m is AdtMessage => m !== null);
+      .filter((m) => m !== null);
 
     // Only an `E` SAP actually typed overturns an explicit "true". An untyped
     // message reads as `E` by default, which is right for explaining a refusal
@@ -830,16 +828,16 @@ function t100FromLongtext(link: unknown): AdtMessage['t100'] {
   for (const candidate of asArray(link)) {
     const href = field(candidate, '@href');
     if (typeof href !== 'string') continue;
-    const key = /\/messageclass\/([^/]+)\/messages\/([^/?]+)/i.exec(href);
+    const key = messageClassKey(href);
     if (!key) continue;
     const query = href.includes('?') ? href.slice(href.indexOf('?') + 1) : '';
-    const params = new URLSearchParams(query.replace(/&amp;/g, '&'));
+    const params = new URLSearchParams(unescapedAmpersands(query));
     const values = [1, 2, 3, 4]
       .map((n) => params.get(`msgv${n}`))
-      .filter((v): v is string => v !== null);
+      .filter((v) => v !== null);
     return {
-      id: decodeURIComponent(key[1]),
-      no: decodeURIComponent(key[2]),
+      id: decodeURIComponent(key.id),
+      no: decodeURIComponent(key.no),
       values: values.length ? values : undefined,
     };
   }

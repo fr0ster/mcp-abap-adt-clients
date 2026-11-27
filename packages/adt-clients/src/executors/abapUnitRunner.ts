@@ -15,6 +15,7 @@ import type {
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
+  IAnalyse,
   IClassUnitTestRunOptions,
   IResultStrategy,
   ITestRunInformation,
@@ -98,7 +99,7 @@ export abstract class AbapUnitRunner<
     name: string,
     type: AbapUnitRunObjectType,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['run'], E>> {
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>> {
     return answering(
       () => startUnitTestRunByObject(this.connection, { name, type }, options),
       this.results.run,
@@ -117,7 +118,7 @@ export abstract class AbapUnitRunner<
   protected startSync<E extends IAdtError>(
     objectUris: string[],
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['result'], E>> {
+  ): Promise<IAdtResponse<T['result'], E | IAdtError>> {
     // `runOptions` is an object even when the caller gave none, so the
     // `<options>` element is always sent.
     const { analyse, ...runOptions } = options ?? {};
@@ -132,12 +133,24 @@ export abstract class AbapUnitRunner<
    * Poll a run. Takes the run it is about: nothing here remembers the last one
    * started, because ADT does not either — any holder of the id may ask.
    */
+  getStatus<E extends IAdtError>(
+    this: this & AdtPerformedBy<A, 'unitTestStatus'>,
+    runId: string,
+    withLongPolling: boolean | undefined | undefined,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['status'], E | IAdtError>>;
+  getStatus(
+    this: this & AdtPerformedBy<A, 'unitTestStatus'>,
+    runId: string,
+    withLongPolling?: boolean | undefined,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['status'], IAdtError>>;
   async getStatus<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<A, 'unitTestStatus'>,
     runId: string,
     withLongPolling: boolean | undefined = true,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['status'], E>> {
+  ): Promise<IAdtResponse<T['status'], E | IAdtError>> {
     return answering(
       () =>
         getUnitTestRunStatus(this.connection, runId, withLongPolling ?? true),
@@ -147,11 +160,22 @@ export abstract class AbapUnitRunner<
   }
 
   /** The result document of a finished run. */
+  getResult<E extends IAdtError>(
+    this: this & AdtPerformedBy<A, 'unitTestResult'>,
+    runId: string,
+    options: IUnitTestResultOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['result'], E | IAdtError>>;
+  getResult(
+    this: this & AdtPerformedBy<A, 'unitTestResult'>,
+    runId: string,
+    options?: IUnitTestResultOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['result'], IAdtError>>;
   async getResult<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<A, 'unitTestResult'>,
     runId: string,
     options?: IUnitTestResultOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['result'], E>> {
+  ): Promise<IAdtResponse<T['result'], E | IAdtError>> {
     return answering(
       () => getUnitTestRunResult(this.connection, runId, options),
       this.results.result,

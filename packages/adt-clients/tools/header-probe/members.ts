@@ -19,9 +19,13 @@ import { AdtAbapGitClient } from '../../src/clients/AdtAbapGitClient';
 import { AdtClient } from '../../src/clients/AdtClient';
 import { AdtExecutor } from '../../src/clients/AdtExecutor';
 import { AdtRuntimeClient } from '../../src/clients/AdtRuntimeClient';
-import { abapGitDocuments } from '../../src/clients/abapGit/types';
+import {
+  abapGitDocuments,
+  abapGitFactsDefaults,
+} from '../../src/clients/abapGit/types';
 import { AbapDebugger } from '../../src/runtime/debugger/AbapDebugger';
 import { AmdpDebugger } from '../../src/runtime/debugger/AmdpDebugger';
+import type { ResultValuesOf } from '../../src/utils/resultStrategy';
 import {
   current,
   type ICapture,
@@ -136,7 +140,12 @@ export function clientsOn(
     adt: new AdtClient(connection, undefined, options),
     runtime: new AdtRuntimeClient(connection),
     executor: new AdtExecutor(connection),
-    abapGit: new AdtAbapGitClient(connection, { results: abapGitDocuments }),
+    abapGit: new AdtAbapGitClient<ResultValuesOf<typeof abapGitDocuments>>(
+      connection,
+      {
+        results: { ...abapGitFactsDefaults, ...abapGitDocuments },
+      },
+    ),
     more: Object.fromEntries(
       CLIENT_SETS.flatMap((set) =>
         Object.entries(set.build(connection, options)).map(([key, client]) => [
@@ -617,7 +626,12 @@ export async function recordMembers(): Promise<{
         entry.skipped = capture.failure
           ? `skipped: builds no request from the probe name alone: ${capture.failure}`
           : 'skipped: answers without a request on the probe name alone (it reads its input from a server answer it was not given)';
-      else if (entry.requests.some((request) => request.action === 'LOCK'))
+      else if (
+        entry.requests.some(
+          (request) =>
+            request.action === 'LOCK' || request.action === 'LOCK_MSG',
+        )
+      )
         entry.skipped = LOCK_SKIP;
       else if (
         entry.requests.some(

@@ -67,11 +67,7 @@ export function phase2Refusal(filter: IPhase2Refusal): Refusal {
     [...filter.members]
       .filter(([member]) => member.includes(text))
       .flatMap(([, requests]) => [...requests]);
-  const named = (
-    text: string,
-    request: ISentRequest,
-    path: string,
-  ): boolean =>
+  const named = (text: string, request: ISentRequest, path: string): boolean =>
     path.toLowerCase().includes(text.toLowerCase()) ||
     endpointsOf(text).some((endpoint) => matches(endpoint, request, path));
   return (sent) => {
@@ -81,8 +77,7 @@ export function phase2Refusal(filter: IPhase2Refusal): Refusal {
     const refused = filter.unauthorized.find((endpoint) =>
       matches(endpoint, request, path),
     );
-    if (refused)
-      return `not authorized for this user: ${endpointKey(refused)}`;
+    if (refused) return `not authorized for this user: ${endpointKey(refused)}`;
     const text = except.find((part) => named(part, request, path));
     if (text !== undefined) return `excluded by --except: ${text}`;
     if (only && !only.some((part) => named(part, request, path)))

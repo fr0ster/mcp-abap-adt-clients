@@ -1,3 +1,4 @@
+import type { AdtObjectIdentity } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -18,10 +19,10 @@ const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
  */
 export async function getBehaviorImplementationVersions(
   connection: IAbapConnection,
-  config: Partial<IBehaviorImplementationConfig>,
+  config: AdtObjectIdentity<IBehaviorImplementationConfig, 'className'>,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
-    url: `${versionsUri(CLASS_INCLUDE.uri(config.className as string, 'implementations'))}`,
+    url: `${versionsUri(CLASS_INCLUDE.uri(config.className, 'implementations'))}`,
     method: 'GET',
     timeout: 0,
     headers: { Accept: ACCEPT_VERSION_FEED },

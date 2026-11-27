@@ -45,6 +45,7 @@ import {
   objectVersions,
 } from '@mcp-abap-adt/adt-strategies';
 import type {
+  AdtObjectIdentity,
   IFunctionGroupConfig,
   IFunctionModuleConfig,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -111,10 +112,18 @@ describeLegacyRfc(
           ['function group', groupName],
           ['function module', moduleName],
         ]);
-        const groupConfig: IFunctionGroupConfig = {
+        // Identities: what addresses each object (interfaces-adt 33 requires a
+        // full config's description, which a create alone sends).
+        const groupConfig: AdtObjectIdentity<
+          IFunctionGroupConfig,
+          'functionGroupName'
+        > = {
           functionGroupName: groupName,
         };
-        const moduleConfig: IFunctionModuleConfig = {
+        const moduleConfig: AdtObjectIdentity<
+          IFunctionModuleConfig,
+          'functionGroupName' | 'functionModuleName'
+        > = {
           functionGroupName: groupName,
           functionModuleName: moduleName,
         };

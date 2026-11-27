@@ -84,9 +84,7 @@ export function buildAtcObjectUri(ref: IAtcObjectRef): string {
     case 'class_include':
       return CLASS_INCLUDE.uri(ref.objectName, ref.includeKind);
     default: {
-      const build = NAMED[ref.objectType] as
-        | ((name: string) => string)
-        | undefined;
+      const build = NAMED[ref.objectType];
       if (!build) {
         throw new Error(
           `No ADT URI is known for ATC object type '${String(ref.objectType)}'.`,

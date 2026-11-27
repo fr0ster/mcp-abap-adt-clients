@@ -1,0 +1,31 @@
+{
+  "case": "atc-worklist-class-abap-cloud",
+  "step": 1,
+  "stepTag": "customizing",
+  "capturedAt": "2026-11-26T07:02:55.237Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/atc/customizing",
+    "params": null,
+    "headers": {
+      "Accept": "application/xml, application/vnd.sap.atc.customizing-v1+xml, application/vnd.sap.atc.customizing-v2+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point."
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.atc.customizing-v2+xml; charset=utf-8",
+      "content-length": "659",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "[REDACTED]",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=181992",
+      "sap-server": "true",
+      "sap-perf-fesrec": "188271.000000"
+    },
+    "bodyFile": "atc-worklist-class-abap-cloud--01-customizing.body.xml"
+  }
+}

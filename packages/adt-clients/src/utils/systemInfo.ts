@@ -8,6 +8,7 @@ import type {
   IAdtContentTypes,
   IAdtError,
   IAdtResponse,
+  IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -26,6 +27,8 @@ import {
   sessionLostOf,
   succeeded,
 } from './adtResponse';
+import { isElement, isWireResponse, propertyOf } from './ownValue';
+import { namesHanaOnDemand } from './scan';
 
 /**
  * Whether a failure says the endpoint is not there — the one failure
@@ -37,8 +40,7 @@ import {
  * modern system reached over a broken connection was handed a legacy client.
  */
 function endpointAbsent(error: unknown): boolean {
-  const status = (error as { response?: { status?: number } })?.response
-    ?.status;
+  const status = propertyOf(propertyOf(error, 'response'), 'status');
   return status === 404 || status === 405 || status === 501;
 }
 
@@ -58,15 +60,14 @@ function objectOf(data: unknown): Record<string, unknown> | undefined {
   let value = data;
   if (typeof value === 'string') {
     try {
-      value = JSON.parse(value);
+      const parsed: unknown = JSON.parse(value);
+      value = parsed;
     } catch {
       return undefined;
     }
   }
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    return undefined;
-  }
-  return value as Record<string, unknown>;
+  if (!isElement(value) || Array.isArray(value)) return undefined;
+  return value;
 }
 
 function recordOf(
@@ -116,13 +117,31 @@ const isSuccessStatus = (status: number) => status >= 200 && status <= 299;
  * A credential refusal SAP was never asked about is thrown as it came, as by
  * every member.
  */
+export function getSystemInformation<E extends IAdtError>(
+  connection: IAbapConnection,
+  options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+): Promise<
+  IAdtResponse<
+    { present: true; info: SystemInformationRecord } | { present: false },
+    E | IAdtError
+  >
+>;
+export function getSystemInformation(
+  connection: IAbapConnection,
+  options?: IAdtAnalyseOptions<IAdtError>,
+): Promise<
+  IAdtResponse<
+    { present: true; info: SystemInformationRecord } | { present: false },
+    IAdtError
+  >
+>;
 export async function getSystemInformation<E extends IAdtError = IAdtError>(
   connection: IAbapConnection,
   options?: IAdtAnalyseOptions<E>,
 ): Promise<
   IAdtResponse<
     { present: true; info: SystemInformationRecord } | { present: false },
-    E
+    E | IAdtError
   >
 > {
   const request = { method: 'GET', url: SYSTEM_INFORMATION_URL };
@@ -147,7 +166,8 @@ export async function getSystemInformation<E extends IAdtError = IAdtError>(
     lost = wire.sessionLost;
   } catch (error: unknown) {
     if (isUnansweredCredentialRefusal(error)) throw error;
-    wire = (error as { response?: IAdtWireResponse })?.response;
+    const thrown = propertyOf(error, 'response');
+    wire = isWireResponse(thrown) ? thrown : undefined;
     lost = sessionLostOf(error) ?? wire?.sessionLost;
     if (wire?.status !== 404) {
       const recognised = recogniseFailure(error);
@@ -179,25 +199,25 @@ export async function getSystemInformation<E extends IAdtError = IAdtError>(
     }
   }
 
-  // `E` is given a value only by `analyse`; without one the verdict is the
-  // library's own `IAdtError`, which is `E`'s default — as in `answering`.
+  // The failure is `analyse`'s own `E`, or the library's `IAdtError` where it
+  // falls back to its own verdict — as in `answering` (C3 of #304).
   const analyse = options?.analyse;
   if (analyse) {
     const overruled = analyse(verdict, wire);
     if (overruled !== ADT_NO_FAILURE) return failed(overruled);
   } else if (verdict !== ADT_NO_FAILURE) {
-    return failed(verdict as E);
+    return failed(verdict);
   }
 
   if (!wire) {
     return failed(
-      (verdict === ADT_NO_FAILURE
+      verdict === ADT_NO_FAILURE
         ? {
             origin: 'connection',
             message: 'The request did not complete, and carried no answer',
             request,
           }
-        : verdict) as E,
+        : verdict,
     );
   }
   if (!isSuccessStatus(wire.status)) return succeeded({ present: false }, lost);
@@ -219,7 +239,7 @@ export async function isCloudEnvironment(
     const baseUrl = await connection.getBaseUrl();
     if (baseUrl) {
       // Cloud systems use specific domain patterns
-      if (/\.hana\.ondemand\.com/i.test(baseUrl)) {
+      if (namesHanaOnDemand(baseUrl)) {
         return true;
       }
       // HTTP with explicit port is typically on-premise

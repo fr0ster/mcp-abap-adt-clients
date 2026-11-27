@@ -11,6 +11,7 @@ import type {
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
+  IAnalyse,
   IFeedQueryOptions,
   IResultStrategy,
   ISystemMessages,
@@ -64,9 +65,16 @@ export class SystemMessages<
     this.results = options.results;
   }
 
+  list<E extends IAdtError>(
+    options: IFeedQueryOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['list'], E | IAdtError>>;
+  list(
+    options?: IFeedQueryOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['list'], IAdtError>>;
   async list<E extends IAdtError = IAdtError>(
     options?: IFeedQueryOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['list'], E>> {
+  ): Promise<IAdtResponse<T['list'], E | IAdtError>> {
     return answering(
       () => listSystemMessages(this.connection, options),
       this.results.list,

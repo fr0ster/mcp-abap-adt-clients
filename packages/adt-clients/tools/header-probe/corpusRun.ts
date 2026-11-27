@@ -52,12 +52,12 @@ import {
   type ICorpus,
   type ICorpusRow,
   type IDiscoveryProbe,
+  type IEndpointFilter,
   type IEvidence,
   type IHeaderCorpusFile,
   type ISplit,
   isIsolated,
   isLongPoll,
-  type IEndpointFilter,
   isWrite,
   judge,
   LONG_POLL_SKIP,
@@ -88,10 +88,10 @@ import {
 import {
   baseHandler,
   clientsOn,
+  deletesUnderLock,
   handlerSpecs,
   type IClients,
   type IMemberEndpoint,
-  deletesUnderLock,
   pairOf,
   recordMembers,
   temporaryObjectsSet,
@@ -99,10 +99,7 @@ import {
 } from './members';
 import { coverageOf, runOnTemporaryObjects } from './objectRun';
 import type { ITemporaryContext } from './objects';
-import {
-  type IRefusalHolder,
-  phase2Refusal,
-} from './phase2Refusal';
+import { type IRefusalHolder, phase2Refusal } from './phase2Refusal';
 import { lockHandle } from './probe';
 import {
   endpointKey,
@@ -936,7 +933,7 @@ async function runClients(ctx: IContext): Promise<void> {
       const write = member.requests.some((request) => isWrite(request.method));
       const readable = typeof handlerOf(reference).readMetadata === 'function';
       const locks = member.requests.some(
-        (request) => request.action === 'LOCK',
+        (request) => request.action === 'LOCK' || request.action === 'LOCK_MSG',
       );
       const label = `${member.handler}.${member.member}`;
       const entry: IPlanned<ITarget> = {
@@ -1388,12 +1385,7 @@ export type OwnSession = (
 async function runWith(
   input: Pick<
     ICorpusRunInput,
-    | 'connection'
-    | 'open'
-    | 'close'
-    | 'interrupt'
-    | 'out'
-    | 'recordUnauthorized'
+    'connection' | 'open' | 'close' | 'interrupt' | 'out' | 'recordUnauthorized'
   >,
   body: (connection: IAbapConnection, state: IRunState) => Promise<void>,
   report: (state: IRunState, ended: string) => string[],
@@ -1828,7 +1820,9 @@ export async function runFull(
           updates = measured.updates;
           for (const update of measured.updates ?? [])
             if (update.note?.startsWith('skipped: '))
-              phase2Skipped.push(`${update.type}.${update.member}: ${update.note}`);
+              phase2Skipped.push(
+                `${update.type}.${update.member}: ${update.note}`,
+              );
           phase2Rows.push(...(measured.rows ?? []));
           noteUnauthorized(measured.rows ?? []);
           // Each update went with a bogus Accept: evidence for its Accept.

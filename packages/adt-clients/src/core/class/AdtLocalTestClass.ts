@@ -1,4 +1,9 @@
-import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtReadVersion,
+  AdtRequiredUpdateOptions,
+  IAdtLockedWrite,
+  IAnalyse,
+} from '@mcp-abap-adt/interfaces-adt';
 /**
  * The testclasses include of a class.
  *
@@ -11,6 +16,7 @@ import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
  */
 
 import type {
+  AdtObjectIdentity,
   AdtVariant,
   IAdtActivatable,
   IAdtAnalyseOptions,
@@ -65,12 +71,12 @@ export class AdtLocalTestClass<
   >
   extends AdtClassMemberBase<T, V, 'localTestClass'>
   implements
-    IAdtReadable<ILocalTestClassConfig, T['source']>,
-    IAdtMetadataReadable<ILocalTestClassConfig, T['metadata']>,
-    IAdtUpdatable<Partial<ILocalTestClassConfig>, T['updated']>,
-    IAdtValidatable<ILocalTestClassConfig, T['validation']>,
-    IAdtCheckable<ILocalTestClassConfig, T['check']>,
-    IAdtActivatable<ILocalTestClassConfig, T['activation']>
+    IAdtReadable<ILocalTestClassConfig, T['source'], 'className'>,
+    IAdtMetadataReadable<ILocalTestClassConfig, T['metadata'], 'className'>,
+    IAdtUpdatable<Partial<ILocalTestClassConfig>, T['updated'], 'className'>,
+    IAdtValidatable<ILocalTestClassConfig, T['validation'], 'className'>,
+    IAdtCheckable<ILocalTestClassConfig, T['check'], 'className'>,
+    IAdtActivatable<ILocalTestClassConfig, T['activation'], 'className'>
 {
   public readonly objectType: string = 'LocalTestClass';
 
@@ -89,10 +95,18 @@ export class AdtLocalTestClass<
   }
 
   /** Syntax-check the source a caller is about to write. */
+  validate<E extends IAdtError>(
+    config: AdtObjectIdentity<ILocalTestClassConfig, 'className' | 'source'>,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>>;
+  validate(
+    config: AdtObjectIdentity<ILocalTestClassConfig, 'className' | 'source'>,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['validation'], IAdtError>>;
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<ILocalTestClassConfig>,
+    config: AdtObjectIdentity<ILocalTestClassConfig, 'className' | 'source'>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['validation'], E>> {
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -104,8 +118,8 @@ export class AdtLocalTestClass<
         checkClassLocalTestClass(
           connection,
           CHECK_RUN_HEADERS,
-          config.className as string,
-          config.source as string,
+          config.className,
+          config.source,
           'inactive',
           this.contentTypes?.sourceArtifactContentType(),
         ),
@@ -115,11 +129,21 @@ export class AdtLocalTestClass<
   }
 
   /** Read the include's source. */
+  read<E extends IAdtError>(
+    config: AdtObjectIdentity<ILocalTestClassConfig, 'className'>,
+    version: AdtReadVersion | undefined,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>>;
+  read(
+    config: AdtObjectIdentity<ILocalTestClassConfig, 'className'>,
+    version?: AdtReadVersion,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['source'], IAdtError>>;
   async read<E extends IAdtError = IAdtError>(
-    config: Partial<ILocalTestClassConfig>,
+    config: AdtObjectIdentity<ILocalTestClassConfig, 'className'>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['source'], E>> {
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -131,7 +155,7 @@ export class AdtLocalTestClass<
       () =>
         getClassTestClassesInclude(
           connection,
-          config.className as string,
+          config.className,
           version,
           this.logger,
           options,
@@ -159,31 +183,47 @@ export class AdtLocalTestClass<
    * what the object holds, change what you mean to change, and pass the result:
    * anything left out is gone, because nothing is read here to keep it.
    */
+  update<E extends IAdtError>(
+    config: AdtObjectIdentity<ILocalTestClassConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>>;
+  update(
+    config: AdtObjectIdentity<ILocalTestClassConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite,
+  ): Promise<IAdtResponse<T['updated'], IAdtError>>;
   async update<E extends IAdtError = IAdtError>(
-    config: Partial<ILocalTestClassConfig>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['updated'], E>> {
-    // The caller's deadline, if they set one, on every request below.
-    const connection = withCallTimeout(this.connection, options?.timeout);
-
+    config: AdtObjectIdentity<ILocalTestClassConfig, 'className'>,
+    // The source may come with the options or the config (see delete()).
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> & IAdtLockedWrite,
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>> {
     // An empty string is source: writing it is how the include is emptied
     // (see delete()). Only its absence is an error.
-
-    const name = config.className as string;
     const source = options?.source ?? config.source ?? '';
+    return this.#write(config, source, options.lockHandle, options);
+  }
 
+  /** The one write of the include: under the handle given, or none. */
+  #write<E extends IAdtError>(
+    config: AdtObjectIdentity<ILocalTestClassConfig, 'className'>,
+    source: string,
+    lockHandle: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        ifMatch?: string | undefined;
+      },
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>> {
+    // The caller's deadline, if they set one, on every request below.
+    const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
       () =>
         updateClassTestInclude(
           connection,
           options.headers,
           options.ifMatch,
-          name,
+          config.className,
           source,
-          // `as string` because the low-level writer types it required; the
-          // value may be absent, and whether an unlocked write is allowed is
-          // ADT's judgement, not this library's.
-          options?.lockHandle as string,
+          lockHandle,
           config.transportRequest,
         ),
       this.results.updated,
@@ -197,19 +237,48 @@ export class AdtLocalTestClass<
    * There is no DELETE for a class include: ADT removes test class source by writing
    * the include empty, so this answers what that write answered.
    */
+  delete<E extends IAdtError>(
+    config: AdtObjectIdentity<ILocalTestClassConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>>;
+  delete(
+    config: AdtObjectIdentity<ILocalTestClassConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['updated'], IAdtError>>;
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<ILocalTestClassConfig>,
+    config: AdtObjectIdentity<ILocalTestClassConfig, 'className'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['updated'], E>> {
-    return await this.update({ ...config, source: '' }, options);
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>> {
+    // The include written empty, with whatever handle and source the options
+    // carry, as before (the contract's delete names neither).
+    return await this.#write(
+      config,
+      options.source ?? '',
+      options.lockHandle,
+      options,
+    );
   }
 
   /** Syntax-check the include. */
+  check<E extends IAdtError>(
+    config: AdtObjectIdentity<ILocalTestClassConfig, 'className' | 'source'>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>>;
+  check(
+    config: AdtObjectIdentity<ILocalTestClassConfig, 'className' | 'source'>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['check'], IAdtError>>;
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<ILocalTestClassConfig>,
+    config: AdtObjectIdentity<ILocalTestClassConfig, 'className' | 'source'>,
     status: string = 'inactive',
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['check'], E>> {
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -218,8 +287,8 @@ export class AdtLocalTestClass<
         checkClassLocalTestClass(
           connection,
           options.headers,
-          config.className as string,
-          config.source as string,
+          config.className,
+          config.source,
           status === 'active' ? 'active' : 'inactive',
           this.contentTypes?.sourceArtifactContentType(),
         ),
@@ -229,14 +298,18 @@ export class AdtLocalTestClass<
   }
 
   /** Version history of this include. */
+  getVersions<E extends IAdtError>(
+    config: AdtObjectIdentity<ILocalTestClassConfig, 'className'>,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>>;
+  getVersions(
+    config: AdtObjectIdentity<ILocalTestClassConfig, 'className'>,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versions'], IAdtError>>;
   async getVersions<E extends IAdtError = IAdtError>(
-    config: Partial<ILocalTestClassConfig>,
+    config: AdtObjectIdentity<ILocalTestClassConfig, 'className'>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versions'], E>> {
-    return this.includeVersions(
-      config.className as string,
-      'testclasses',
-      options,
-    );
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>> {
+    return this.includeVersions(config.className, 'testclasses', options);
   }
 }

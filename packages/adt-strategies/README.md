@@ -191,7 +191,7 @@ after this one):
 | `featureToggleRuntimeState`, `featureToggleCheckState` | `getFeatureToggle`: `runtimeState`, `checkState` | the two states |
 | `utilSearchHits`, `utilNamedItems`, `utilNodeContents`, `utilInactiveObjects`, `utilActivationRunId`, `utilWhereUsedReferences` | `getUtils`: `search`, `types`, `node`, `inactive`, `activation`, `whereUsed` | the parsed shapes; `readSearchHits`, `readNamedItems`, `readNodeStructure`, `extractRunId` are the pure functions underneath |
 | `utilDiscoveryCollections`, `ACTIVATION_RUNS_COLLECTION` | `getUtils`: `discovery` | the path of every collection (`app:collection/@href` that is a path) as a `ReadonlySet<string>`, empty for an answer that is no `app:service` document; `has(ACTIVATION_RUNS_COLLECTION)` says whether the system offers `/activation/runs` (exact, never a prefix) |
-| `abapGitRepos`, `abapGitErrorLog`, `abapGitExternalRepo` | `AdtAbapGitClient`: `repos`, `errorLog`, `externalRepo` | `IAbapGitRepo[]` (with `repositoryId`, `pullLink`, `logLink`; since 0.27.0 also `folderLogic`, `createdEmail`, `deserializedBy`, `deserializedEmail`, `deserializedAt` and `links`, every link with its `rel`; `status` and `statusText` stay `''` when SAP writes none), log entries, branches |
+| `abapGitRepos`, `abapGitErrorLog`, `abapGitExternalRepo` | `AdtAbapGitClient`: `repos`, `errorLog`; `abapGitExternalRepo` reads the external-repository document, and fills no client slot since adt-clients 48.0.0, whose `checkExternalRepo` answers facts (`externalRepoFacts`) | `IAbapGitRepo[]` (with `repositoryId`, `pullLink`, `logLink`; since 0.27.0 also `folderLogic`, `createdEmail`, `deserializedBy`, `deserializedEmail`, `deserializedAt` and `links`, every link with its `rel`; `status` and `statusText` stay `''` when SAP writes none), log entries, branches |
 | `abapGitRepoRunStates` | `AdtAbapGitClient`: `repos` | `IAbapGitRepoRunState[]`: `key`, `runStatus`, `statusText`, `appLogKey`, each `undefined` when absent (onprem R1 writes no status); `appLogKey` is the last segment of the `log_link` path `/sap/bc/adt/abapgit/repos/{key}/log/{appLogKey}` and comes from nowhere else |
 | `abapGitObjectResults`, `abapGitModifiedObjects`, `abapGitStaging`, `abapGitBranchInfo` | the wire answers of `link` / `pull` / the run log (R2, R4, R8), `getModifiedObjects` (R6), `getStaging` (R9), `checkExternalRepo` / `getBranchInfo` (R13, R14) | every field SAP sends: object results with `msgText`; both modified-object lists with `action` (an integer) and `actionDescription`; the staging's objects, files, transports, links and comment; branches with `sha1` (read from `sha1` or `sha`), `displayName`, `folderLogic` and links. Each reads its route's root element; any other answer throws `ABAPGIT_ERROR_MESSAGES.unreadableAnswer`, never the document's or the parser's text |
 | `abapGitFacts`, `abapGitErrorFacts` | the new-form slots of `AdtAbapGitClient` (`reposFacts`, `linkedFacts`, `repoPulled`, `repoPulledInDialog`, `modifiedObjects`, `status`, `runLog`, `staging`, `pushed`, `checked`, `file`, `externalRepoFacts`, `branchInfo`, `switched`): the reduction before the slot's strategy | `IAbapGitFactsResponse<F>` (`status`, `facts`); `abapGitErrorFacts` answers `IAbapGitErrorFacts` (below) |
@@ -298,7 +298,25 @@ report something that does not exist: `transportTree` (no `tm:root`, or a root
 that carries nothing), `transportCreated` (no `tm:root`, or no number),
 `transportItem` (not the request or task asked for) and, since 0.28.0,
 `utilInactiveObjects` (neither inactive-list form — an activation is confirmed
-off it). `adt-clients` lets a reading's exception surface as itself.
+off it) and, since 0.29.0, the trace readings (below). `adt-clients` lets a
+reading's exception surface as itself.
+
+**A trace reading throws on a missing required field** (since 0.29.0).
+`profilerTraceEntries`, `profilerHitList`, `profilerStatements`,
+`profilerDbAccesses`, `traceSchedulingTypes` and `traceSchedulingRequests` read
+each field their result type requires — a trace entry's id, time, user,
+object, state, expiry, system, client, host, sizes, runtimes and
+`isAggregated`; a row's `index` (and a statement's `id`); a timing's `time`
+and `percentage`; a catalogue item's `name` and `description`; a stored
+request's `id` — and throw
+`traces: <field> is missing` (`traces: state.value is missing`,
+`traces: hitlist.index is missing`, …) when the answer lacks one. Before,
+such a field read as `undefined` under a type that said `string` or `number`.
+The on-premise trace feed the reading was transcribed from carries every one
+of these fields in each of its sixty entries; the other documents and the
+cloud's answers are not in the corpus, so that they always carry them is not
+measured. An optional field absent from the answer is still absent from the
+reading. A program reference's `name` and `uri` are optional (measured on premise for #333): SAP sends a reference with no ABAP source behind it — the "Runtime analysis" root, an object's creation, a call from the kernel — as an element with no `adtcore:name`, `adtcore:uri` or `adtcore:type`, and the reading answers both absent. The fields kept required are on every row of the recorded hit list (11), statements (15) and DB accesses (2): a row's `index`, a statement's `id`, a timing's `time` and `percentage`.
 
 **Values are text as written** (0.28.0, every util and transport reading): no
 tag or attribute is coerced to a number (`007` stays `007`, a position
@@ -312,6 +330,21 @@ reference, packages included, with `kind`; `utilNodeContents` each object's
 technical name or URI in `incompleteObjects`, the field it lacks absent, and
 each node SAP could not load as `notLoaded` (none of SAP's text); `utilNamedItems` an absent
 description absent.
+
+## Migrating to 0.29.0
+
+- **A trace reading can throw.** A trace reading (above) given an answer that
+  lacks a field its result type requires throws `traces: <field> is missing`
+  instead of answering the field as `undefined`. A caller who read such a
+  field and tested it for `undefined` catches the throw instead; through
+  `adt-clients` it surfaces from the member call as itself. A caller that
+  wants the old reading of a partial document supplies its own result
+  strategy for that slot.
+- **`ITraceProgramRef.name` and `uri` are optional**: SAP leaves both out of
+  a reference with no ABAP source behind it (measured). Code that read them as
+  `string` handles `undefined`.
+- Nothing else of the public surface changed: the declarations
+  (`dist/index.d.ts`) are those of 0.28.3 but for `ITraceProgramRef`.
 
 ## How the defaults are justified
 

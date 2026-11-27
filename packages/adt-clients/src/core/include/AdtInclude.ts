@@ -9,7 +9,9 @@
  */
 
 import type {
+  AdtObjectIdentity,
   AdtReadVersion,
+  AdtRequiredUpdateOptions,
   AdtVariant,
   IAdtActivatable,
   IAdtActivationOptions,
@@ -22,6 +24,7 @@ import type {
   IAdtHeaders,
   IAdtIncludeEnhancementHost,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMainProgramsReadable,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
@@ -32,6 +35,7 @@ import type {
   IAdtUpdatable,
   IAdtUpdateOptions,
   IAdtValidatable,
+  IAnalyse,
   IIncludeConfig,
   IIncludeResults,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -68,8 +72,10 @@ import type { includeDocuments } from './types';
 import { unlockInclude } from './unlock';
 import { uploadIncludeSource } from './update';
 
-function requireName(config: Partial<IIncludeConfig>): string {
-  return config.includeName as string;
+function requireName(
+  config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+): string {
+  return config.includeName;
 }
 
 /** What each slot of an include's result set answers. */
@@ -82,18 +88,38 @@ export class AdtInclude<
     IAdtIncludeEnhancementHost<
       IIncludeConfig,
       T['enhancementElements'],
-      T['enhancementOptions']
+      T['enhancementOptions'],
+      'includeName'
     >,
-    IAdtMainProgramsReadable<IIncludeConfig, T['mainPrograms']>,
+    IAdtMainProgramsReadable<IIncludeConfig, T['mainPrograms'], 'includeName'>,
     IAdtCreatable<IIncludeConfig, T['created']>,
-    IAdtReadable<IIncludeConfig, T['source']>,
-    IAdtMetadataReadable<IIncludeConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IIncludeConfig>, T['updated']>,
-    IAdtMetadataUpdatable<Partial<IIncludeConfig>, T['metadataUpdated']>,
-    IAdtDeletable<IIncludeConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IIncludeConfig, T['validation']>,
-    IAdtActivatable<IIncludeConfig, T['activation']>,
-    IAdtLockable<IIncludeConfig>
+    IAdtReadable<IIncludeConfig, T['source'], 'includeName'>,
+    IAdtMetadataReadable<IIncludeConfig, T['metadata'], 'includeName'>,
+    IAdtUpdatable<
+      Partial<IIncludeConfig>,
+      T['updated'],
+      'includeName',
+      'source'
+    >,
+    IAdtMetadataUpdatable<
+      Partial<IIncludeConfig>,
+      T['metadataUpdated'],
+      'includeName',
+      'source'
+    >,
+    IAdtDeletable<
+      IIncludeConfig,
+      T['deletion'],
+      'includeName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<
+      IIncludeConfig,
+      T['validation'],
+      'includeName' | 'packageName'
+    >,
+    IAdtActivatable<IIncludeConfig, T['activation'], 'includeName'>,
+    IAdtLockable<IIncludeConfig, 'includeName'>
 {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -122,16 +148,26 @@ export class AdtInclude<
   }
 
   /** Read the host's enhancement elements. */
+  readEnhancementElements<E extends IAdtError>(
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options: (IAdtOperationOptions<E> & { context?: string }) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['enhancementElements'], E | IAdtError>>;
+  readEnhancementElements(
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options?: IAdtOperationOptions<IAdtError> & { context?: string },
+  ): Promise<IAdtResponse<T['enhancementElements'], IAdtError>>;
   async readEnhancementElements<E extends IAdtError = IAdtError>(
-    config: Partial<IIncludeConfig>,
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
     options?: IAdtOperationOptions<E> & { context?: string },
-  ): Promise<IAdtResponse<T['enhancementElements'], E>> {
+  ): Promise<IAdtResponse<T['enhancementElements'], E | IAdtError>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
       () =>
         getIncludeEnhancementElements(
           connection,
-          config.includeName as string,
+          config.includeName,
           options?.context,
         ),
       this.results.enhancementElements,
@@ -140,16 +176,26 @@ export class AdtInclude<
   }
 
   /** Read the host's enhancement options. */
+  readEnhancementOptions<E extends IAdtError>(
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options: (IAdtOperationOptions<E> & { context?: string }) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['enhancementOptions'], E | IAdtError>>;
+  readEnhancementOptions(
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options?: IAdtOperationOptions<IAdtError> & { context?: string },
+  ): Promise<IAdtResponse<T['enhancementOptions'], IAdtError>>;
   async readEnhancementOptions<E extends IAdtError = IAdtError>(
-    config: Partial<IIncludeConfig>,
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
     options?: IAdtOperationOptions<E> & { context?: string },
-  ): Promise<IAdtResponse<T['enhancementOptions'], E>> {
+  ): Promise<IAdtResponse<T['enhancementOptions'], E | IAdtError>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
       () =>
         getIncludeEnhancementOptions(
           connection,
-          config.includeName as string,
+          config.includeName,
           options?.context,
         ),
       this.results.enhancementOptions,
@@ -161,11 +207,21 @@ export class AdtInclude<
    * The include's main programs — a program (`PROG/P`), or a function group
    * (`FUGR/F`) for its includes — none when no program includes it directly.
    */
+  readMainPrograms<E extends IAdtError>(
+    this: this & AdtPerformedBy<'include', 'mainPrograms'>,
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['mainPrograms'], E | IAdtError>>;
+  readMainPrograms(
+    this: this & AdtPerformedBy<'include', 'mainPrograms'>,
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['mainPrograms'], IAdtError>>;
   async readMainPrograms<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'include', 'mainPrograms'>,
-    config: Partial<IIncludeConfig>,
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['mainPrograms'], E>> {
+  ): Promise<IAdtResponse<T['mainPrograms'], E | IAdtError>> {
     const connection = withCallTimeout(this.connection, options?.timeout);
     return answering(
       () => getIncludeMainPrograms(connection, requireName(config)),
@@ -182,10 +238,24 @@ export class AdtInclude<
    * optional. Eclipse does not call it in the captured create, so this is
    * available rather than obligatory.
    */
+  validate<E extends IAdtError>(
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'> & {
+      packageName: string;
+    },
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>>;
+  validate(
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'> & {
+      packageName: string;
+    },
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['validation'], IAdtError>>;
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IIncludeConfig> & { packageName: string },
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'> & {
+      packageName: string;
+    },
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['validation'], E>> {
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>> {
     // The package is required: the include validation is the program's
     // handler, which refuses an empty package (SEDI_ADT 003).
     // The caller's deadline, if they set one, on every request below.
@@ -223,13 +293,29 @@ export class AdtInclude<
    * transcript — and a failure in that write is still returned, because it is
    * why the include is not what was asked for.
    */
+  create<E extends IAdtError>(
+    config: Omit<IIncludeConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>>;
+  create(
+    config: Omit<IIncludeConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['created'], IAdtError>>;
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IIncludeConfig, 'source'> & {
       source?: never;
       packageName: string;
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<T['created'], E>> {
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // The type requires a package; this refuses an empty one, which the type
@@ -268,11 +354,23 @@ export class AdtInclude<
   }
 
   /** Read the include's source. */
+  read<E extends IAdtError>(
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    version: AdtReadVersion | undefined,
+    options: ({ withLongPolling?: boolean } & IAdtOperationOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>>;
+  read(
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    version?: AdtReadVersion,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['source'], IAdtError>>;
   async read<E extends IAdtError = IAdtError>(
-    config: Partial<IIncludeConfig>,
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
     version?: AdtReadVersion,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['source'], E>> {
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -285,13 +383,27 @@ export class AdtInclude<
   }
 
   /** Read the include's metadata. */
+  readMetadata<E extends IAdtError>(
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options: ({
+      withLongPolling?: boolean;
+      version?: AdtReadVersion;
+    } & IAdtOperationOptions<E>) & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>>;
+  readMetadata(
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options?: {
+      withLongPolling?: boolean;
+      version?: AdtReadVersion;
+    } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['metadata'], IAdtError>>;
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IIncludeConfig>,
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
     options?: {
       withLongPolling?: boolean;
       version?: AdtReadVersion;
     } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['metadata'], E>> {
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -314,10 +426,24 @@ export class AdtInclude<
    * what the object holds, change what you mean to change, and pass the result:
    * anything left out is gone, because nothing is read here to keep it.
    */
+  update<E extends IAdtError>(
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>>;
+  update(
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['updated'], IAdtError>>;
   async update<E extends IAdtError = IAdtError>(
-    config: Partial<IIncludeConfig>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['updated'], E>> {
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -338,7 +464,7 @@ export class AdtInclude<
           options.headers,
           options.ifMatch,
           includeName,
-          source as string,
+          source,
           options?.lockHandle,
           config.transportRequest,
         ),
@@ -357,11 +483,27 @@ export class AdtInclude<
    * and pass the result: anything left out is gone, because nothing is read
    * here to keep it.
    */
+  updateMetadata<E extends IAdtError>(
+    this: this & AdtPerformedBy<'include', 'updateMetadata'>,
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>>;
+  updateMetadata(
+    this: this & AdtPerformedBy<'include', 'updateMetadata'>,
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], IAdtError>>;
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'include', 'updateMetadata'>,
-    config: Partial<IIncludeConfig>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -372,7 +514,7 @@ export class AdtInclude<
           options.headers,
           options.ifMatch,
           PROGRAM_INCLUDE.uri(requireName(config)),
-          options?.source as string,
+          options?.source,
           options?.lockHandle,
           config.transportRequest,
         ),
@@ -387,11 +529,23 @@ export class AdtInclude<
    * The deletion service is asked by URI, and a standalone include has one of
    * its own — unlike a class include, which is emptied by writing its parent.
    */
+  checkDeletion<E extends IAdtError>(
+    this: this & AdtPerformedBy<'include', 'deletionCheck'>,
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  checkDeletion(
+    this: this & AdtPerformedBy<'include', 'deletionCheck'>,
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'include', 'deletionCheck'>,
-    config: Partial<IIncludeConfig>,
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -416,10 +570,20 @@ export class AdtInclude<
    * service takes an object URI, not a handle. Holding a lock over a delete
    * does not help it through — it is what stops it.
    */
+  delete<E extends IAdtError>(
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>>;
+  delete(
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletion'], IAdtError>>;
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IIncludeConfig>,
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletion'], E>> {
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -439,10 +603,20 @@ export class AdtInclude<
   }
 
   /** Activate the include. */
+  activate<E extends IAdtError>(
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>>;
+  activate(
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['activation'], IAdtError>>;
   async activate<E extends IAdtError = IAdtError>(
-    config: Partial<IIncludeConfig>,
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
-  ): Promise<IAdtResponse<T['activation'], E>> {
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -466,10 +640,18 @@ export class AdtInclude<
    * carrying no handle reads as `''`; whether that is a refusal is the
    * caller's `analyse` to say.
    */
+  lock<E extends IAdtError>(
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  lock(
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IIncludeConfig>,
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
     const includeName = requireName(config);
     const answer = await answering(
       () =>
@@ -497,11 +679,21 @@ export class AdtInclude<
    * `UNLOCK` are stateful for their own request only; everything between them,
    * the source `PUT` included, goes stateless, as Eclipse sends it.
    */
+  unlock<E extends IAdtError>(
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    lockHandle: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<void, E | IAdtError>>;
+  unlock(
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    lockHandle: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<void, IAdtError>>;
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IIncludeConfig>,
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<void, E>> {
+  ): Promise<IAdtResponse<void, E | IAdtError>> {
     const includeName = requireName(config);
     return answering(
       () =>

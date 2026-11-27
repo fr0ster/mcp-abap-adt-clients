@@ -1,0 +1,451 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`an abandoned lock is released as before getAccessControl 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "AccessControl/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/acm/dcl/sources/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getAppendStructure 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "AppendStructure/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/ddic/structures/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getAuthorizationField 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "AuthorizationField/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/aps/iam/auth/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getBehaviorDefinition 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "BehaviorDefinition/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/bo/behaviordefinitions/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getClass 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "Class/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/oo/classes/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getDataElement 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "DataElement/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/ddic/dataelements/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getDdl 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "Ddl/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/ddic/ddl/sources/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getDomain 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "Domain/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/ddic/domains/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getEnhancement, type badi_implementation 1`] = `
+{
+  "locked": true,
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/enhancements/badi_implementation/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getEnhancement, type enhoxh 1`] = `
+{
+  "locked": true,
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/enhancements/enhoxh/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getEnhancement, type enhoxhh 1`] = `
+{
+  "locked": true,
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/enhancements/enhoxhh/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getFeatureToggle 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "FeatureToggle/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": {
+        "_action": "UNLOCK",
+        "lockHandle": "B92E65858E83454C783181344F429D4BFD8E395D",
+      },
+      "url": "/sap/bc/adt/sfw/featuretoggles/zobj",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getFunctionGroup 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "FunctionGroup/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/functions/groups/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getInterface 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "Interface/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/oo/interfaces/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getMessageClass 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "MessageClass/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/messageclass/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getMetadataExtension 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "MetadataExtension/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/ddic/ddlx/sources/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getPackage 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "Package/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/packages/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getProgram 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "Program/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/programs/programs/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getScalarFunction 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "ScalarFunction/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/ddic/dsfd/sources/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getScalarFunctionImplementation 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "ScalarFunctionImplementation/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/ddic/dsfi/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getServiceDefinition 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "ServiceDefinition/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/ddic/srvd/sources/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getStructure 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "Structure/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/ddic/structures/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getTable 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "Table/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/ddic/tables/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getTableSettings 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "TableSettings/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/ddic/db/settings/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getTableType 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "TableType/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/ddic/tabletypes/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getTextElements 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "TextElements/program/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/textelements/programs/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;
+
+exports[`an abandoned lock is released as before getTransformation 1`] = `
+{
+  "failures": 0,
+  "locked": true,
+  "pending": [
+    "Transformation/ZOBJ",
+  ],
+  "released": [
+    {
+      "method": "POST",
+      "params": undefined,
+      "url": "/sap/bc/adt/xslt/transformations/zobj?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D",
+    },
+  ],
+}
+`;

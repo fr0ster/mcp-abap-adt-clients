@@ -5,7 +5,9 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
+  AdtObjectIdentity,
   AdtReadVersion,
+  AdtRequiredUpdateOptions,
   AdtVariant,
   IAccessControlResults,
   IAdtActivatable,
@@ -18,6 +20,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
@@ -29,6 +32,7 @@ import type {
   IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
+  IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -78,17 +82,45 @@ export class AdtAccessControl<
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IAccessControlConfig, T['created']>,
-    IAdtReadable<IAccessControlConfig, T['source']>,
-    IAdtMetadataReadable<IAccessControlConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IAccessControlConfig>, T['updated']>,
-    IAdtMetadataUpdatable<Partial<IAccessControlConfig>, T['metadataUpdated']>,
-    IAdtDeletable<IAccessControlConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IAccessControlConfig, T['validation']>,
-    IAdtCheckable<IAccessControlConfig, T['check']>,
-    IAdtActivatable<IAccessControlConfig, T['activation']>,
-    IAdtLockable<IAccessControlConfig>,
-    IAdtTransportAware<IAccessControlConfig, T['transport']>,
-    IAdtVersionable<IAccessControlConfig, T['versions'], T['versionSource']>
+    IAdtReadable<IAccessControlConfig, T['source'], 'accessControlName'>,
+    IAdtMetadataReadable<
+      IAccessControlConfig,
+      T['metadata'],
+      'accessControlName'
+    >,
+    IAdtUpdatable<
+      Partial<IAccessControlConfig>,
+      T['updated'],
+      'accessControlName',
+      'source'
+    >,
+    IAdtMetadataUpdatable<
+      Partial<IAccessControlConfig>,
+      T['metadataUpdated'],
+      'accessControlName',
+      'source'
+    >,
+    IAdtDeletable<
+      IAccessControlConfig,
+      T['deletion'],
+      'accessControlName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<IAccessControlConfig, T['validation'], 'accessControlName'>,
+    IAdtCheckable<IAccessControlConfig, T['check'], 'accessControlName'>,
+    IAdtActivatable<IAccessControlConfig, T['activation'], 'accessControlName'>,
+    IAdtLockable<IAccessControlConfig, 'accessControlName'>,
+    IAdtTransportAware<
+      IAccessControlConfig,
+      T['transport'],
+      'accessControlName'
+    >,
+    IAdtVersionable<
+      IAccessControlConfig,
+      T['versions'],
+      T['versionSource'],
+      'accessControlName'
+    >
 {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -131,15 +163,25 @@ export class AdtAccessControl<
    * from nothing and the server answers — which is a reading a strategy can
    * take, where a sentence composed here would not be.
    */
-  private name(config: Partial<IAccessControlConfig>): string {
-    return config.accessControlName as string;
+  private name(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+  ): string {
+    return config.accessControlName;
   }
 
   /** Validate the name before creating the object. */
+  validate<E extends IAdtError>(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>>;
+  validate(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['validation'], IAdtError>>;
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['validation'], E>> {
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -159,13 +201,29 @@ export class AdtAccessControl<
   }
 
   /** Create the object. */
+  create<E extends IAdtError>(
+    config: Omit<IAccessControlConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>>;
+  create(
+    config: Omit<IAccessControlConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['created'], IAdtError>>;
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IAccessControlConfig, 'source'> & {
       source?: never;
       packageName: string;
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<T['created'], E>> {
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // The type requires a package; this refuses an empty one, which the type
@@ -204,11 +262,21 @@ export class AdtAccessControl<
   }
 
   /** Read the object. */
+  read<E extends IAdtError>(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    version: AdtReadVersion | undefined,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>>;
+  read(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    version?: AdtReadVersion,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['source'], IAdtError>>;
   async read<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['source'], E>> {
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -225,10 +293,18 @@ export class AdtAccessControl<
   }
 
   /** Read the object's metadata document. */
+  readMetadata<E extends IAdtError>(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>>;
+  readMetadata(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['metadata'], IAdtError>>;
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['metadata'], E>> {
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -242,10 +318,20 @@ export class AdtAccessControl<
   }
 
   /** The transport request the object belongs to. */
+  readTransport<E extends IAdtError>(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    options: ({ withLongPolling?: boolean } & IAdtOperationOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>>;
+  readTransport(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['transport'], IAdtError>>;
   async readTransport<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['transport'], E>> {
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -261,18 +347,32 @@ export class AdtAccessControl<
   /**
    * Write the object.
    *
-   * With `options.lockHandle` the caller holds the lock and owns the chain, so
-   * this is one request. Without it, this locks, checks, writes and unlocks —
-   * and the unlock happens on every path out.
+   * One request: the write, under the lock the caller holds
+   * (`options.lockHandle`, required). The lock, the check and the unlock are
+   * the caller's own calls of `lock`, `check` and `unlock`.
    *
    * **The whole content, every time.** This is a replace, never a merge. Read
    * what the object holds, change what you mean to change, and pass the result:
    * anything left out is gone, because nothing is read here to keep it.
    */
+  update<E extends IAdtError>(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>>;
+  update(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['updated'], IAdtError>>;
   async update<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['updated'], E>> {
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -292,7 +392,7 @@ export class AdtAccessControl<
           options.ifMatch,
           {
             access_control_name: name,
-            source_code: source as string,
+            source_code: source,
             transport_request: config.transportRequest,
           },
           options?.lockHandle,
@@ -312,11 +412,27 @@ export class AdtAccessControl<
    * and pass the result: anything left out is gone, because nothing is read
    * here to keep it.
    */
+  updateMetadata<E extends IAdtError>(
+    this: this & AdtPerformedBy<'accessControl', 'updateMetadata'>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>>;
+  updateMetadata(
+    this: this & AdtPerformedBy<'accessControl', 'updateMetadata'>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], IAdtError>>;
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'accessControl', 'updateMetadata'>,
-    config: Partial<IAccessControlConfig>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -327,7 +443,7 @@ export class AdtAccessControl<
           options.headers,
           options.ifMatch,
           ACCESS_CONTROL.uri(this.name(config)),
-          options?.source as string,
+          options?.source,
           options?.lockHandle,
           config.transportRequest,
         ),
@@ -343,10 +459,20 @@ export class AdtAccessControl<
    * it: a consumer that wants the check runs this first and decides what a
    * refusal means.
    */
+  checkDeletion<E extends IAdtError>(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  checkDeletion(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   async checkDeletion<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -371,10 +497,20 @@ export class AdtAccessControl<
    * shipped reading of that answer; a caller who wants another passes their own
    * `analyse`.
    */
+  delete<E extends IAdtError>(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>>;
+  delete(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletion'], IAdtError>>;
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletion'], E>> {
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -391,10 +527,20 @@ export class AdtAccessControl<
   }
 
   /** Activate the object. Needs no stateful session. */
+  activate<E extends IAdtError>(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>>;
+  activate(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['activation'], IAdtError>>;
   async activate<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
-  ): Promise<IAdtResponse<T['activation'], E>> {
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -415,11 +561,23 @@ export class AdtAccessControl<
   }
 
   /** Check the object. */
+  check<E extends IAdtError>(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>>;
+  check(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['check'], IAdtError>>;
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['check'], E>> {
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -446,10 +604,18 @@ export class AdtAccessControl<
    * carrying no handle reads as `''`; whether that is a refusal is the
    * caller's `analyse` to say.
    */
+  lock<E extends IAdtError>(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  lock(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
     const name = this.name(config);
     const answer = await answering(
       () =>
@@ -466,11 +632,21 @@ export class AdtAccessControl<
   }
 
   /** Unlock the object. */
+  unlock<E extends IAdtError>(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    lockHandle: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<void, E | IAdtError>>;
+  unlock(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    lockHandle: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<void, IAdtError>>;
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<void, E>> {
+  ): Promise<IAdtResponse<void, E | IAdtError>> {
     const name = this.name(config);
     return answering(
       async () => {
@@ -489,10 +665,18 @@ export class AdtAccessControl<
   }
 
   /** Version history of the object's source. */
+  getVersions<E extends IAdtError>(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>>;
+  getVersions(
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versions'], IAdtError>>;
   async getVersions<E extends IAdtError = IAdtError>(
-    config: Partial<IAccessControlConfig>,
+    config: AdtObjectIdentity<IAccessControlConfig, 'accessControlName'>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versions'], E>> {
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>> {
     return answering(
       () => getAccessControlVersions(this.connection, config),
       this.results.versions,
@@ -501,10 +685,18 @@ export class AdtAccessControl<
   }
 
   /** Source of one version, by the `contentUri` its entry carried. */
+  getVersionSource<E extends IAdtError>(
+    contentUri: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versionSource'], E | IAdtError>>;
+  getVersionSource(
+    contentUri: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versionSource'], IAdtError>>;
   async getVersionSource<E extends IAdtError = IAdtError>(
     contentUri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versionSource'], E>> {
+  ): Promise<IAdtResponse<T['versionSource'], E | IAdtError>> {
     return answering(
       () => getAccessControlVersionSource(this.connection, contentUri),
       this.results.versionSource,

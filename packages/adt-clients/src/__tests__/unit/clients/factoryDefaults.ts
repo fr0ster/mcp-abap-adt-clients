@@ -58,11 +58,8 @@ export type _ClassUpdateIsVoid = Assert<Equal<Answer<Class['update']>, void>>;
 export type _MessageReadIsString = Assert<
   Equal<Answer<Message['read']>, string>
 >;
-export type _MessageCreateIsString = Assert<
-  Equal<Answer<Message['create']>, string>
->;
-export type _MessageDeleteIsString = Assert<
-  Equal<Answer<Message['delete']>, string>
+export type _MessageLockIsString = Assert<
+  Equal<Answer<Message['lockMessage']>, string>
 >;
 
 // A consumer's own set is inferred from the argument, as before.

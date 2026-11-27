@@ -80,10 +80,13 @@ describe('the failure type a caller injected', () => {
     expect(answer.ok).toBe(false);
     if (answer.ok) throw new Error('expected a refusal');
 
-    // No cast, no `as`, no guard: `getError()` is typed `IT100Failure` because
-    // `analyse` said so. `.t100` not compiling here is the regression this file
-    // exists to catch.
+    // No cast, no `as`: `getError()` is typed `IT100Failure | IAdtError`
+    // because `analyse` said so, beside the library's own verdict that stands
+    // when no answer came (C3 of #304). The `t100` field narrows it; the
+    // injected type not reaching here is the regression this file exists to
+    // catch.
     const failure = answer.getError();
+    if (!('t100' in failure)) throw new Error('expected the injected failure');
     expect(failure.t100).toEqual({ msgid: 'OO', msgno: '045' });
     expect(failure.origin).toBe('refusal');
     expect(failure.message).toMatch(/TMDIR/);

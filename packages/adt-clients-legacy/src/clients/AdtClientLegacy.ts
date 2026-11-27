@@ -23,39 +23,39 @@
 import {
   ACCESS_CONTROL,
   type AccessControlValues,
-  AdtAccessControl,
-  AdtAppendStructure,
-  AdtAuthorizationField,
-  AdtBehaviorDefinition,
-  AdtBehaviorImplementation,
+  type AdtAccessControl,
+  type AdtAppendStructure,
+  type AdtAuthorizationField,
+  type AdtBehaviorDefinition,
+  type AdtBehaviorImplementation,
   AdtClient,
   AdtContentTypesBase,
-  AdtDataElement,
-  AdtDdicTableType,
-  AdtDomain,
-  AdtEnhancement,
-  AdtFeatureToggle,
-  AdtMetadataExtension,
+  type AdtDataElement,
+  type AdtDdicTableType,
+  type AdtDomain,
+  type AdtEnhancement,
+  type AdtFeatureToggle,
+  type AdtMetadataExtension,
   type AdtModernVariant,
-  AdtScalarFunction,
-  AdtScalarFunctionImplementation,
+  type AdtScalarFunction,
+  type AdtScalarFunctionImplementation,
   type AdtServedBy,
-  AdtServiceBinding,
-  AdtServiceDefinition,
-  AdtStructure,
-  AdtTable,
-  AdtTableSettings,
-  AdtTextElements,
-  AdtTransformation,
+  type AdtServiceBinding,
+  type AdtServiceDefinition,
+  type AdtStructure,
+  type AdtTable,
+  type AdtTableSettings,
+  type AdtTextElements,
+  type AdtTransformation,
   type AppendStructureValues,
   AUTHORIZATION_FIELD,
   type AuthorizationFieldValues,
-  type accessControlDocuments,
-  type appendStructureDocuments,
-  type authorizationFieldDocuments,
+  accessControlDocuments,
+  appendStructureDocuments,
+  authorizationFieldDocuments,
   BEHAVIOR_DEFINITION,
   type BehaviorDefinitionValues,
-  type behaviorDefinitionDocuments,
+  behaviorDefinitionDocuments,
   type ClassValues,
   classDocuments,
   DATA_ELEMENT,
@@ -63,18 +63,18 @@ import {
   type DdlValues,
   DOMAIN,
   type DomainValues,
-  type dataElementDocuments,
+  dataElementDocuments,
   ddlDocuments,
-  type domainDocuments,
+  domainDocuments,
   ENHANCEMENT,
   type EnhancementValues,
-  type enhancementDocuments,
+  enhancementDocuments,
   FEATURE_TOGGLE,
   type FeatureToggleValues,
   type FunctionGroupValues,
   type FunctionIncludeValues,
   type FunctionModuleValues,
-  type featureToggleDocuments,
+  featureToggleDocuments,
   functionGroupDocuments,
   functionIncludeDocuments,
   functionModuleDocuments,
@@ -86,7 +86,7 @@ import {
   type MessageClassValues,
   type MetadataExtensionValues,
   messageClassDocuments,
-  type metadataExtensionDocuments,
+  metadataExtensionDocuments,
   type PackageValues,
   type ProgramValues,
   packageDocuments,
@@ -102,11 +102,11 @@ import {
   type ServiceValues,
   STRUCTURE,
   type StructureValues,
-  type scalarFunctionDocuments,
-  type scalarFunctionImplementationDocuments,
-  type serviceDefinitionDocuments,
-  type serviceDocuments,
-  type structureDocuments,
+  scalarFunctionDocuments,
+  scalarFunctionImplementationDocuments,
+  serviceDefinitionDocuments,
+  serviceDocuments,
+  structureDocuments,
   TABLE,
   TABLE_SETTINGS,
   TABLE_TYPE,
@@ -118,11 +118,11 @@ import {
   TRANSFORMATION,
   type TransformationValues,
   type TransportValues,
-  type tableDocuments,
-  type tableSettingsDocuments,
-  type tableTypeDocuments,
-  type textElementsDocuments,
-  type transformationDocuments,
+  tableDocuments,
+  tableSettingsDocuments,
+  tableTypeDocuments,
+  textElementsDocuments,
+  transformationDocuments,
   transportDocuments,
   type UtilValues,
   utilDocuments,
@@ -179,14 +179,29 @@ import { AdtPackageLegacy } from '../core/package/AdtPackageLegacy';
 import { AdtProgramLegacy } from '../core/program/AdtProgramLegacy';
 import { AdtUtilsLegacy } from '../core/shared/AdtUtilsLegacy';
 import { AdtRequestLegacy } from '../core/transport/AdtRequestLegacy';
-import { absentOnLegacy } from './absentOnLegacy';
-
-/**
- * The kind of the settings handler 7.40 refuses: the base getter's on a
- * client that declares no newer kind (`'basis740'` and both newer kinds),
- * so the refusing handler takes every argument the root's does.
- */
-type LegacySettingsKind = 'basis740' | AdtModernVariant;
+import {
+  AdtAccessControlAbsentLegacy,
+  AdtAppendStructureAbsentLegacy,
+  AdtAuthorizationFieldAbsentLegacy,
+  AdtBehaviorDefinitionAbsentLegacy,
+  AdtBehaviorImplementationAbsentLegacy,
+  AdtDataElementAbsentLegacy,
+  AdtDdicTableTypeAbsentLegacy,
+  AdtDomainAbsentLegacy,
+  AdtEnhancementAbsentLegacy,
+  AdtFeatureToggleAbsentLegacy,
+  AdtMetadataExtensionAbsentLegacy,
+  AdtScalarFunctionAbsentLegacy,
+  AdtScalarFunctionImplementationAbsentLegacy,
+  AdtServiceBindingAbsentLegacy,
+  AdtServiceDefinitionAbsentLegacy,
+  AdtStructureAbsentLegacy,
+  AdtTableAbsentLegacy,
+  AdtTableSettingsAbsentLegacy,
+  AdtTextElementsAbsentLegacy,
+  AdtTransformationAbsentLegacy,
+  type LegacySettingsKind,
+} from './absentHandlers';
 
 export class AdtClientLegacy extends AdtClient<'basis740'> {
   constructor(
@@ -571,7 +586,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   // --- Types absent from legacy /sap/bc/adt/discovery ---
   //
   // Handed out all the same: every member answers a refusal and sends no
-  // request (see absentOnLegacy).
+  // request (see the `*AbsentLegacy` classes in ./absentHandlers).
 
   override getDomain(
     this: this & AdtServedBy<'domain'>,
@@ -582,15 +597,15 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   ): AdtDomain<ResultValuesOf<R>>;
   override getDomain(
     this: this & AdtServedBy<'domain'>,
-    _results?: IDomainResults,
+    results: IDomainResults = domainDocuments,
   ): AdtDomain<DomainValues> {
     this.assertConnected();
-    return absentOnLegacy<AdtDomain<DomainValues>>(
-      AdtDomain,
-      'Domain',
-      DOMAIN.collection,
-      'measured',
-    );
+    return new AdtDomainAbsentLegacy(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
+      results,
+    });
   }
 
   override getDataElement(
@@ -602,15 +617,15 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   ): AdtDataElement<ResultValuesOf<R>>;
   override getDataElement(
     this: this & AdtServedBy<'dataElement'>,
-    _results?: IDataElementResults,
+    results: IDataElementResults = dataElementDocuments,
   ): AdtDataElement<DataElementValues> {
     this.assertConnected();
-    return absentOnLegacy<AdtDataElement<DataElementValues>>(
-      AdtDataElement,
-      'DataElement',
-      DATA_ELEMENT.collection,
-      'measured',
-    );
+    return new AdtDataElementAbsentLegacy(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
+      results,
+    });
   }
 
   override getStructure(
@@ -622,15 +637,15 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   ): AdtStructure<ResultValuesOf<R>, 'basis740'>;
   override getStructure(
     this: this & AdtServedBy<'structure'>,
-    _results?: IStructureResults,
+    results: IStructureResults = structureDocuments,
   ): AdtStructure<StructureValues, 'basis740'> {
     this.assertConnected();
-    return absentOnLegacy<AdtStructure<StructureValues, 'basis740'>>(
-      AdtStructure,
-      'Structure',
-      STRUCTURE.collection,
-      'measured',
-    );
+    return new AdtStructureAbsentLegacy(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
+      results,
+    });
   }
 
   override getTable(
@@ -642,15 +657,15 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   ): AdtTable<ResultValuesOf<R>, 'basis740'>;
   override getTable(
     this: this & AdtServedBy<'table'>,
-    _results?: ITableResults,
+    results: ITableResults = tableDocuments,
   ): AdtTable<TableValues, 'basis740'> {
     this.assertConnected();
-    return absentOnLegacy<AdtTable<TableValues, 'basis740'>>(
-      AdtTable,
-      'Table',
-      TABLE.collection,
-      'measured',
-    );
+    return new AdtTableAbsentLegacy(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
+      results,
+    });
   }
 
   override getTableSettings(
@@ -665,17 +680,14 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   ): AdtTableSettings<ResultValuesOf<R>, LegacySettingsKind>;
   override getTableSettings(
     this: this & AdtServedBy<'tableSettings'>,
-    _results?: ITableSettingsResults,
+    results: ITableSettingsResults = tableSettingsDocuments,
   ): AdtTableSettings<TableSettingsValues, LegacySettingsKind> {
     this.assertConnected();
-    return absentOnLegacy<
-      AdtTableSettings<TableSettingsValues, LegacySettingsKind>
-    >(
-      AdtTableSettings,
-      'TableSettings',
-      TABLE_SETTINGS.collection,
-      'not-advertised',
-    );
+    return new AdtTableSettingsAbsentLegacy(this.connection, {
+      logger: this.logger,
+      lockRegistry: this.lockRegistry,
+      results,
+    });
   }
 
   override getTextElements(
@@ -687,16 +699,14 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   ): AdtTextElements<ResultValuesOf<R>, 'basis740'>;
   override getTextElements(
     this: this & AdtServedBy<'textElements'>,
-    _results?: ITextElementsResults,
+    results: ITextElementsResults = textElementsDocuments,
   ): AdtTextElements<TextElementsValues, 'basis740'> {
     this.assertConnected();
-    // 7.40's discovery has no /sap/bc/adt/textelements collection.
-    return absentOnLegacy<AdtTextElements<TextElementsValues, 'basis740'>>(
-      AdtTextElements,
-      'TextElements',
-      TEXT_ELEMENTS.programs,
-      'not-advertised',
-    );
+    return new AdtTextElementsAbsentLegacy(this.connection, {
+      logger: this.logger,
+      lockRegistry: this.lockRegistry,
+      results,
+    });
   }
 
   override getTableType(
@@ -708,15 +718,15 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   ): AdtDdicTableType<ResultValuesOf<R>>;
   override getTableType(
     this: this & AdtServedBy<'tableType'>,
-    _results?: ITableTypeResults,
+    results: ITableTypeResults = tableTypeDocuments,
   ): AdtDdicTableType<TableTypeValues> {
     this.assertConnected();
-    return absentOnLegacy<AdtDdicTableType<TableTypeValues>>(
-      AdtDdicTableType,
-      'TableType',
-      TABLE_TYPE.collection,
-      'not-advertised',
-    );
+    return new AdtDdicTableTypeAbsentLegacy(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
+      results,
+    });
   }
 
   override getAccessControl(
@@ -731,15 +741,15 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   ): AdtAccessControl<ResultValuesOf<R>, 'basis740'>;
   override getAccessControl(
     this: this & AdtServedBy<'accessControl'>,
-    _results?: IAccessControlResults,
+    results: IAccessControlResults = accessControlDocuments,
   ): AdtAccessControl<AccessControlValues, 'basis740'> {
     this.assertConnected();
-    return absentOnLegacy<AdtAccessControl<AccessControlValues, 'basis740'>>(
-      AdtAccessControl,
-      'AccessControl',
-      ACCESS_CONTROL.collection,
-      'not-advertised',
-    );
+    return new AdtAccessControlAbsentLegacy(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
+      results,
+    });
   }
 
   override getServiceDefinition(
@@ -754,17 +764,15 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   ): AdtServiceDefinition<ResultValuesOf<R>, 'basis740'>;
   override getServiceDefinition(
     this: this & AdtServedBy<'serviceDefinition'>,
-    _results?: IServiceDefinitionResults,
+    results: IServiceDefinitionResults = serviceDefinitionDocuments,
   ): AdtServiceDefinition<ServiceDefinitionValues, 'basis740'> {
     this.assertConnected();
-    return absentOnLegacy<
-      AdtServiceDefinition<ServiceDefinitionValues, 'basis740'>
-    >(
-      AdtServiceDefinition,
-      'ServiceDefinition',
-      SERVICE_DEFINITION.collection,
-      'not-advertised',
-    );
+    return new AdtServiceDefinitionAbsentLegacy(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
+      results,
+    });
   }
 
   override getServiceBinding(
@@ -776,15 +784,14 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   ): AdtServiceBinding<ResultValuesOf<R>, 'basis740'>;
   override getServiceBinding(
     this: this & AdtServedBy<'serviceBinding'>,
-    _results?: IServiceResults,
+    results: IServiceResults = serviceDocuments,
   ): AdtServiceBinding<ServiceValues, 'basis740'> {
     this.assertConnected();
-    return absentOnLegacy<AdtServiceBinding<ServiceValues, 'basis740'>>(
-      AdtServiceBinding,
-      'ServiceBinding',
-      SERVICE_BINDING.collection,
-      'not-advertised',
-    );
+    return new AdtServiceBindingAbsentLegacy(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      results,
+    });
   }
 
   override getBehaviorDefinition(
@@ -799,17 +806,15 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   ): AdtBehaviorDefinition<ResultValuesOf<R>, 'basis740'>;
   override getBehaviorDefinition(
     this: this & AdtServedBy<'behaviorDefinition'>,
-    _results?: IBehaviorDefinitionResults,
+    results: IBehaviorDefinitionResults = behaviorDefinitionDocuments,
   ): AdtBehaviorDefinition<BehaviorDefinitionValues, 'basis740'> {
     this.assertConnected();
-    return absentOnLegacy<
-      AdtBehaviorDefinition<BehaviorDefinitionValues, 'basis740'>
-    >(
-      AdtBehaviorDefinition,
-      'BehaviorDefinition',
-      BEHAVIOR_DEFINITION.collection,
-      'not-advertised',
-    );
+    return new AdtBehaviorDefinitionAbsentLegacy(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
+      results,
+    });
   }
 
   override getBehaviorImplementation(
@@ -821,15 +826,15 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   ): AdtBehaviorImplementation<ResultValuesOf<R>>;
   override getBehaviorImplementation(
     this: this & AdtServedBy<'behaviorImplementation'>,
-    _results?: IClassResults,
+    results: IClassResults = classDocuments,
   ): AdtBehaviorImplementation<ClassValues> {
     this.assertConnected();
-    return absentOnLegacy<AdtBehaviorImplementation<ClassValues>>(
-      AdtBehaviorImplementation,
-      'BehaviorImplementation',
-      BEHAVIOR_DEFINITION.collection,
-      'not-advertised',
-    );
+    return new AdtBehaviorImplementationAbsentLegacy(this.connection, {
+      logger: this.logger,
+      lockRegistry: this.lockRegistry,
+      results,
+      systemContext: this.systemContext,
+    });
   }
 
   override getMetadataExtension(
@@ -844,17 +849,15 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   ): AdtMetadataExtension<ResultValuesOf<R>, 'basis740'>;
   override getMetadataExtension(
     this: this & AdtServedBy<'metadataExtension'>,
-    _results?: IMetadataExtensionResults,
+    results: IMetadataExtensionResults = metadataExtensionDocuments,
   ): AdtMetadataExtension<MetadataExtensionValues, 'basis740'> {
     this.assertConnected();
-    return absentOnLegacy<
-      AdtMetadataExtension<MetadataExtensionValues, 'basis740'>
-    >(
-      AdtMetadataExtension,
-      'MetadataExtension',
-      METADATA_EXTENSION.collection,
-      'not-advertised',
-    );
+    return new AdtMetadataExtensionAbsentLegacy(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
+      results,
+    });
   }
 
   override getEnhancement(
@@ -866,15 +869,15 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   ): AdtEnhancement<ResultValuesOf<R>, 'basis740'>;
   override getEnhancement(
     this: this & AdtServedBy<'enhancement'>,
-    _results?: IEnhancementResults,
+    results: IEnhancementResults = enhancementDocuments,
   ): AdtEnhancement<EnhancementValues, 'basis740'> {
     this.assertConnected();
-    return absentOnLegacy<AdtEnhancement<EnhancementValues, 'basis740'>>(
-      AdtEnhancement,
-      'Enhancement',
-      ENHANCEMENT.root,
-      'measured',
-    );
+    return new AdtEnhancementAbsentLegacy(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
+      results,
+    });
   }
 
   override getAuthorizationField(
@@ -886,15 +889,15 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   ): AdtAuthorizationField<ResultValuesOf<R>>;
   override getAuthorizationField(
     this: this & AdtServedBy<'authorizationField'>,
-    _results?: IAuthorizationFieldResults,
+    results: IAuthorizationFieldResults = authorizationFieldDocuments,
   ): AdtAuthorizationField<AuthorizationFieldValues> {
     this.assertConnected();
-    return absentOnLegacy<AdtAuthorizationField<AuthorizationFieldValues>>(
-      AdtAuthorizationField,
-      'AuthorizationField',
-      AUTHORIZATION_FIELD.collection,
-      'not-advertised',
-    );
+    return new AdtAuthorizationFieldAbsentLegacy(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
+      results,
+    });
   }
 
   override getFeatureToggle(
@@ -906,15 +909,15 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   ): AdtFeatureToggle<ResultValuesOf<R>>;
   override getFeatureToggle(
     this: this & AdtServedBy<'featureToggle'>,
-    _results?: IFeatureToggleResults,
+    results: IFeatureToggleResults = featureToggleDocuments,
   ): AdtFeatureToggle<FeatureToggleValues> {
     this.assertConnected();
-    return absentOnLegacy<AdtFeatureToggle<FeatureToggleValues>>(
-      AdtFeatureToggle,
-      'FeatureToggle',
-      FEATURE_TOGGLE.collection,
-      'not-advertised',
-    );
+    return new AdtFeatureToggleAbsentLegacy(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
+      results,
+    });
   }
 
   override getTransformation(
@@ -929,15 +932,15 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   ): AdtTransformation<ResultValuesOf<R>, 'basis740'>;
   override getTransformation(
     this: this & AdtServedBy<'transformation'>,
-    _results?: ITransformationResults,
+    results: ITransformationResults = transformationDocuments,
   ): AdtTransformation<TransformationValues, 'basis740'> {
     this.assertConnected();
-    return absentOnLegacy<AdtTransformation<TransformationValues, 'basis740'>>(
-      AdtTransformation,
-      'Transformation',
-      TRANSFORMATION.collection,
-      'measured',
-    );
+    return new AdtTransformationAbsentLegacy(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
+      results,
+    });
   }
 
   override getScalarFunction(
@@ -952,15 +955,15 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   ): AdtScalarFunction<ResultValuesOf<R>, 'basis740'>;
   override getScalarFunction(
     this: this & AdtServedBy<'scalarFunction'>,
-    _results?: IScalarFunctionResults,
+    results: IScalarFunctionResults = scalarFunctionDocuments,
   ): AdtScalarFunction<ScalarFunctionValues, 'basis740'> {
     this.assertConnected();
-    return absentOnLegacy<AdtScalarFunction<ScalarFunctionValues, 'basis740'>>(
-      AdtScalarFunction,
-      'ScalarFunction',
-      SCALAR_FUNCTION.collection,
-      'measured',
-    );
+    return new AdtScalarFunctionAbsentLegacy(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
+      results,
+    });
   }
 
   override getScalarFunctionImplementation(
@@ -976,17 +979,15 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   ): AdtScalarFunctionImplementation<ResultValuesOf<R>>;
   override getScalarFunctionImplementation(
     this: this & AdtServedBy<'scalarFunctionImplementation'>,
-    _results?: IScalarFunctionImplementationResults,
+    results: IScalarFunctionImplementationResults = scalarFunctionImplementationDocuments,
   ): AdtScalarFunctionImplementation<ScalarFunctionImplementationValues> {
     this.assertConnected();
-    return absentOnLegacy<
-      AdtScalarFunctionImplementation<ScalarFunctionImplementationValues>
-    >(
-      AdtScalarFunctionImplementation,
-      'ScalarFunctionImplementation',
-      SCALAR_FUNCTION_IMPLEMENTATION.collection,
-      'not-advertised',
-    );
+    return new AdtScalarFunctionImplementationAbsentLegacy(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
+      results,
+    });
   }
 
   override getAppendStructure(
@@ -998,14 +999,14 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   ): AdtAppendStructure<ResultValuesOf<R>>;
   override getAppendStructure(
     this: this & AdtServedBy<'appendStructure'>,
-    _results?: IAppendStructureResults,
+    results: IAppendStructureResults = appendStructureDocuments,
   ): AdtAppendStructure<AppendStructureValues> {
     this.assertConnected();
-    return absentOnLegacy<AdtAppendStructure<AppendStructureValues>>(
-      AdtAppendStructure,
-      'AppendStructure',
-      STRUCTURE.collection,
-      'measured',
-    );
+    return new AdtAppendStructureAbsentLegacy(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
+      results,
+    });
   }
 }

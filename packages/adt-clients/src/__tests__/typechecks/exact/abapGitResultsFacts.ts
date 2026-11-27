@@ -13,6 +13,7 @@ import {
   type AbapGitValuesOf,
   AdtAbapGitClient,
   abapGitDocuments,
+  abapGitFactsDefaults,
 } from '@mcp-abap-adt/adt-clients/abapgit';
 import type { IAbapGitReposFacts } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapGitFactsResponse } from '@mcp-abap-adt/interfaces-adt';
@@ -75,15 +76,18 @@ export const createShipped: Equal<
 // Through `new`, with the values map.
 const newRequired = new AdtAbapGitClient<AbapGitValuesOf<typeof required>>(
   connection,
-  { results: required },
+  { results: { ...abapGitFactsDefaults, ...required } },
 );
-const newOptional = new AdtAbapGitClient<AbapGitValuesOf<typeof optional>>(
+// A direct `new` passes every facts reader (#304, D4): an optional slot is the
+// defaults overlaid by it, and its values are that set's.
+const optionalSet = { ...abapGitFactsDefaults, ...optional };
+const newOptional = new AdtAbapGitClient<AbapGitValuesOf<typeof optionalSet>>(
   connection,
-  { results: optional },
+  { results: optionalSet },
 );
 const newOmitted = new AdtAbapGitClient<AbapGitValuesOf<typeof omitted>>(
   connection,
-  { results: omitted },
+  { results: { ...abapGitFactsDefaults, ...omitted } },
 );
 export const constructRequired: Equal<
   ValueOf<ReturnType<typeof newRequired.listReposQuiet>>,
@@ -113,9 +117,10 @@ const createdRequiredMaybe = AdtAbapGitClient.create(connection, {
 const createdOptionalMaybe = AdtAbapGitClient.create(connection, {
   results: optionalMaybe,
 });
+const optionalMaybeSet = { ...abapGitFactsDefaults, ...optionalMaybe };
 const newOptionalMaybe = new AdtAbapGitClient<
-  AbapGitValuesOf<typeof optionalMaybe>
->(connection, { results: optionalMaybe });
+  AbapGitValuesOf<typeof optionalMaybeSet>
+>(connection, { results: optionalMaybeSet });
 export const requiredKeepsUndefined: Equal<
   ValueOf<ReturnType<typeof createdRequiredMaybe.listReposQuiet>>,
   number | undefined

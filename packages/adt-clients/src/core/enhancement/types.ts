@@ -30,6 +30,13 @@ export const ENHANCEMENT_TYPE_CODES = {
   enhsxsb: 'ENHS/XSB', // BAdI Enhancement Spot
 } as const satisfies Record<EnhancementType, CodeOf<'enhancement'>>;
 
+/** The type code of an enhancement type; `undefined` for none, as an index by `undefined` read. */
+export function enhancementTypeCode(
+  type: EnhancementType | undefined,
+): (typeof ENHANCEMENT_TYPE_CODES)[EnhancementType] | undefined {
+  return type === undefined ? undefined : ENHANCEMENT_TYPE_CODES[type];
+}
+
 /**
  * Low-level function parameters (snake_case) — defined in @mcp-abap-adt/interfaces
  */
@@ -37,35 +44,43 @@ export const ENHANCEMENT_TYPE_CODES = {
 /**
  * Get ADT base URL for enhancement type
  */
-export function getEnhancementBaseUrl(type: EnhancementType): string {
+export function getEnhancementBaseUrl(
+  type: EnhancementType | undefined,
+): string {
   return ENHANCEMENT.collection(type);
 }
 
 /**
  * Get ADT object URI for specific enhancement
  */
-export function getEnhancementUri(type: EnhancementType, name: string): string {
+/** An absent type is written as the text `undefined`, as a template writes it. */
+export function getEnhancementUri(
+  type: EnhancementType | undefined,
+  name: string,
+): string {
   return ENHANCEMENT.uri(type, name);
 }
 
 /**
  * Check if enhancement type supports source code operations
  */
-export function supportsSourceCode(type: EnhancementType): boolean {
+export function supportsSourceCode(type: EnhancementType | undefined): boolean {
   return type === 'enhoxhh';
 }
 
 /**
  * Check if enhancement type is an implementation
  */
-export function isImplementationType(type: EnhancementType): boolean {
+export function isImplementationType(
+  type: EnhancementType | undefined,
+): boolean {
   return type === 'enhoxhb' || type === 'enhoxhh';
 }
 
 /**
  * Check if enhancement type is a spot/definition
  */
-export function isSpotType(type: EnhancementType): boolean {
+export function isSpotType(type: EnhancementType | undefined): boolean {
   return type === 'enhsxsb';
 }
 
@@ -153,7 +168,7 @@ export const enhancementDocuments = {
 
 export interface ICheckEnhancementParams {
   enhancement_name: string;
-  enhancement_type: EnhancementType;
+  enhancement_type: EnhancementType | undefined;
   version?: 'active' | 'inactive';
   source_code?: string;
 }
@@ -175,13 +190,13 @@ export interface ICreateEnhancementParams {
 
 export interface IDeleteEnhancementParams {
   enhancement_name: string;
-  enhancement_type: EnhancementType;
+  enhancement_type: EnhancementType | undefined;
   transport_request?: string;
 }
 
 export interface IUpdateEnhancementParams {
   enhancement_name: string;
-  enhancement_type: EnhancementType;
+  enhancement_type: EnhancementType | undefined;
   source_code: string;
   lock_handle: string;
   transport_request?: string;
@@ -189,7 +204,7 @@ export interface IUpdateEnhancementParams {
 
 export interface IValidateEnhancementParams {
   enhancement_name: string;
-  enhancement_type: EnhancementType;
+  enhancement_type: EnhancementType | undefined;
   package_name?: string;
   description?: string;
 }

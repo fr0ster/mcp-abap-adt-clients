@@ -5,7 +5,9 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
+  AdtObjectIdentity,
   AdtReadVersion,
+  AdtRequiredUpdateOptions,
   AdtVariant,
   IAdtActivatable,
   IAdtActivationOptions,
@@ -17,6 +19,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
@@ -28,6 +31,7 @@ import type {
   IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
+  IAnalyse,
   IServiceDefinitionResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -83,20 +87,61 @@ export class AdtServiceDefinition<
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IServiceDefinitionConfig, T['created']>,
-    IAdtReadable<IServiceDefinitionConfig, T['source']>,
-    IAdtMetadataReadable<IServiceDefinitionConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IServiceDefinitionConfig>, T['updated']>,
+    IAdtReadable<
+      IServiceDefinitionConfig,
+      T['source'],
+      'serviceDefinitionName'
+    >,
+    IAdtMetadataReadable<
+      IServiceDefinitionConfig,
+      T['metadata'],
+      'serviceDefinitionName'
+    >,
+    IAdtUpdatable<
+      Partial<IServiceDefinitionConfig>,
+      T['updated'],
+      'serviceDefinitionName',
+      'source'
+    >,
     IAdtMetadataUpdatable<
       Partial<IServiceDefinitionConfig>,
-      T['metadataUpdated']
+      T['metadataUpdated'],
+      'serviceDefinitionName',
+      'source'
     >,
-    IAdtDeletable<IServiceDefinitionConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IServiceDefinitionConfig, T['validation']>,
-    IAdtCheckable<IServiceDefinitionConfig, T['check']>,
-    IAdtActivatable<IServiceDefinitionConfig, T['activation']>,
-    IAdtLockable<IServiceDefinitionConfig>,
-    IAdtTransportAware<IServiceDefinitionConfig, T['transport']>,
-    IAdtVersionable<IServiceDefinitionConfig, T['versions'], T['versionSource']>
+    IAdtDeletable<
+      IServiceDefinitionConfig,
+      T['deletion'],
+      'serviceDefinitionName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<
+      IServiceDefinitionConfig,
+      T['validation'],
+      'serviceDefinitionName'
+    >,
+    IAdtCheckable<
+      IServiceDefinitionConfig,
+      T['check'],
+      'serviceDefinitionName'
+    >,
+    IAdtActivatable<
+      IServiceDefinitionConfig,
+      T['activation'],
+      'serviceDefinitionName'
+    >,
+    IAdtLockable<IServiceDefinitionConfig, 'serviceDefinitionName'>,
+    IAdtTransportAware<
+      IServiceDefinitionConfig,
+      T['transport'],
+      'serviceDefinitionName'
+    >,
+    IAdtVersionable<
+      IServiceDefinitionConfig,
+      T['versions'],
+      T['versionSource'],
+      'serviceDefinitionName'
+    >
 {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -139,15 +184,37 @@ export class AdtServiceDefinition<
    * from nothing and the server answers — which is a reading a strategy can
    * take, where a sentence composed here would not be.
    */
-  private name(config: Partial<IServiceDefinitionConfig>): string {
-    return config.serviceDefinitionName as string;
+  private name(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+  ): string {
+    return config.serviceDefinitionName;
   }
 
   /** Validate the name before creating the object. */
+  validate<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>>;
+  validate(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['validation'], IAdtError>>;
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IServiceDefinitionConfig>,
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['validation'], E>> {
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -161,13 +228,29 @@ export class AdtServiceDefinition<
   }
 
   /** Create the object. */
+  create<E extends IAdtError>(
+    config: Omit<IServiceDefinitionConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>>;
+  create(
+    config: Omit<IServiceDefinitionConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['created'], IAdtError>>;
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IServiceDefinitionConfig, 'source'> & {
       source?: never;
       packageName: string;
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<T['created'], E>> {
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // The type requires a package; this refuses an empty one, which the type
@@ -206,11 +289,30 @@ export class AdtServiceDefinition<
   }
 
   /** Read the object. */
+  read<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    version: AdtReadVersion | undefined,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>>;
+  read(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    version?: AdtReadVersion,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['source'], IAdtError>>;
   async read<E extends IAdtError = IAdtError>(
-    config: Partial<IServiceDefinitionConfig>,
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['source'], E>> {
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -227,10 +329,27 @@ export class AdtServiceDefinition<
   }
 
   /** Read the object's metadata document. */
+  readMetadata<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>>;
+  readMetadata(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['metadata'], IAdtError>>;
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IServiceDefinitionConfig>,
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['metadata'], E>> {
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -244,10 +363,29 @@ export class AdtServiceDefinition<
   }
 
   /** The transport request the object belongs to. */
+  readTransport<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    options: ({ withLongPolling?: boolean } & IAdtOperationOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>>;
+  readTransport(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['transport'], IAdtError>>;
   async readTransport<E extends IAdtError = IAdtError>(
-    config: Partial<IServiceDefinitionConfig>,
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['transport'], E>> {
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -263,18 +401,41 @@ export class AdtServiceDefinition<
   /**
    * Write the object.
    *
-   * With `options.lockHandle` the caller holds the lock and owns the chain, so
-   * this is one request. Without it, this locks, checks, writes and unlocks —
-   * and the unlock happens on every path out.
+   * One request: the write, under the lock the caller holds
+   * (`options.lockHandle`, required). The lock, the check and the unlock are
+   * the caller's own calls of `lock`, `check` and `unlock`.
    *
    * **The whole content, every time.** This is a replace, never a merge. Read
    * what the object holds, change what you mean to change, and pass the result:
    * anything left out is gone, because nothing is read here to keep it.
    */
+  update<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>>;
+  update(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['updated'], IAdtError>>;
   async update<E extends IAdtError = IAdtError>(
-    config: Partial<IServiceDefinitionConfig>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['updated'], E>> {
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -294,7 +455,7 @@ export class AdtServiceDefinition<
           options.ifMatch,
           {
             service_definition_name: name,
-            source_code: source as string,
+            source_code: source,
             transport_request: config.transportRequest,
           },
           options?.lockHandle,
@@ -314,11 +475,36 @@ export class AdtServiceDefinition<
    * and pass the result: anything left out is gone, because nothing is read
    * here to keep it.
    */
+  updateMetadata<E extends IAdtError>(
+    this: this & AdtPerformedBy<'serviceDefinition', 'updateMetadata'>,
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>>;
+  updateMetadata(
+    this: this & AdtPerformedBy<'serviceDefinition', 'updateMetadata'>,
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], IAdtError>>;
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'serviceDefinition', 'updateMetadata'>,
-    config: Partial<IServiceDefinitionConfig>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -329,7 +515,7 @@ export class AdtServiceDefinition<
           options.headers,
           options.ifMatch,
           SERVICE_DEFINITION.uri(this.name(config)),
-          options?.source as string,
+          options?.source,
           options?.lockHandle,
           config.transportRequest,
         ),
@@ -345,10 +531,29 @@ export class AdtServiceDefinition<
    * it: a consumer that wants the check runs this first and decides what a
    * refusal means.
    */
+  checkDeletion<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  checkDeletion(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   async checkDeletion<E extends IAdtError = IAdtError>(
-    config: Partial<IServiceDefinitionConfig>,
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -373,10 +578,29 @@ export class AdtServiceDefinition<
    * shipped reading of that answer; a caller who wants another passes their own
    * `analyse`.
    */
+  delete<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>>;
+  delete(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletion'], IAdtError>>;
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IServiceDefinitionConfig>,
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletion'], E>> {
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -393,10 +617,29 @@ export class AdtServiceDefinition<
   }
 
   /** Activate the object. Needs no stateful session. */
+  activate<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>>;
+  activate(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['activation'], IAdtError>>;
   async activate<E extends IAdtError = IAdtError>(
-    config: Partial<IServiceDefinitionConfig>,
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
-  ): Promise<IAdtResponse<T['activation'], E>> {
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -417,11 +660,32 @@ export class AdtServiceDefinition<
   }
 
   /** Check the object. */
+  check<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>>;
+  check(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['check'], IAdtError>>;
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<IServiceDefinitionConfig>,
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['check'], E>> {
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -448,10 +712,27 @@ export class AdtServiceDefinition<
    * carrying no handle reads as `''`; whether that is a refusal is the
    * caller's `analyse` to say.
    */
+  lock<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  lock(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IServiceDefinitionConfig>,
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
     const name = this.name(config);
     const answer = await answering(
       () =>
@@ -468,11 +749,30 @@ export class AdtServiceDefinition<
   }
 
   /** Unlock the object. */
+  unlock<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    lockHandle: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<void, E | IAdtError>>;
+  unlock(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    lockHandle: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<void, IAdtError>>;
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IServiceDefinitionConfig>,
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<void, E>> {
+  ): Promise<IAdtResponse<void, E | IAdtError>> {
     const name = this.name(config);
     return answering(
       async () => {
@@ -495,10 +795,27 @@ export class AdtServiceDefinition<
   }
 
   /** Version history of the object's source. */
+  getVersions<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>>;
+  getVersions(
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versions'], IAdtError>>;
   async getVersions<E extends IAdtError = IAdtError>(
-    config: Partial<IServiceDefinitionConfig>,
+    config: AdtObjectIdentity<
+      IServiceDefinitionConfig,
+      'serviceDefinitionName'
+    >,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versions'], E>> {
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>> {
     return answering(
       () => getServiceDefinitionVersions(this.connection, config),
       this.results.versions,
@@ -507,10 +824,18 @@ export class AdtServiceDefinition<
   }
 
   /** Source of one version, by the `contentUri` its entry carried. */
+  getVersionSource<E extends IAdtError>(
+    contentUri: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versionSource'], E | IAdtError>>;
+  getVersionSource(
+    contentUri: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versionSource'], IAdtError>>;
   async getVersionSource<E extends IAdtError = IAdtError>(
     contentUri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versionSource'], E>> {
+  ): Promise<IAdtResponse<T['versionSource'], E | IAdtError>> {
     return answering(
       () => getServiceDefinitionVersionSource(this.connection, contentUri),
       this.results.versionSource,

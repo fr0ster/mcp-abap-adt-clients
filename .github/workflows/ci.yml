@@ -60,6 +60,12 @@ jobs:
       - name: Lint and documentation imports
         run: npm run lint:check
 
+      # The forbidden forms of #304 (casts, any, hand-narrowed values, regular
+      # expressions, predicates): the checker's own cases. Each package's unit
+      # suite runs it over that package's src.
+      - name: Source rules
+        run: npm run check:rules
+
       # No SAP system here, so the integration suites are out of reach — but
       # the unit suites are not, and they carry every invariant this release
       # is built on. `MCP_ENV_PATH` points at nothing so the preflight skips

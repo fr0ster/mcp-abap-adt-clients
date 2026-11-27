@@ -14,6 +14,51 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [0.29.0] - 2026-11-27
+
+The source rules of fr0ster/mcp-abap-adt-clients#304: this package's `src`
+holds no cast but `as const`, no `any`, no value narrowed by hand after it
+was widened to `unknown`, no regular expression and no type predicate over a
+typed value — a guard test (`sourceRules.test.ts`, over
+`tools/sourceRules.js`) refuses each. Breaking for one reason: the trace
+readings.
+
+### Changed (breaking)
+
+- **A trace reading throws on a missing required field.**
+  `profilerTraceEntries`, `profilerHitList`, `profilerStatements`,
+  `profilerDbAccesses`, `traceSchedulingTypes` and `traceSchedulingRequests`
+  throw `traces: <field> is missing` for an answer that lacks a field their
+  result type requires; before, the field read as `undefined` under a type
+  that said `string` or `number`. The on-premise trace feed the reading was
+  transcribed from carries every such field; the other documents and the
+  cloud's answers are not recorded, so that SAP always sends them is not
+  measured. See the README's "Migrating to 0.29.0".
+- **`ITraceProgramRef.name` and `uri` are optional.** The #333 live run's
+  onprem hit list carried references with neither (the "Runtime analysis"
+  root, an object's creation, a call from the kernel); they read as absent.
+  The recorded views are a fixture (`src/__tests__/fixtures/traces/`), and
+  each field kept required is on every one of their rows.
+
+### Changed
+
+- **Every regular expression is a scanner** (`src/scan.ts`): the `/runs/`
+  ids, the `aunit:run` uri and its fallback, the `T100KEY-V` keys, the
+  message class long-text link (with the regex's own `/i` folding) and
+  `&amp;`, trailing slashes, the trace id, the sub-millisecond digits and the
+  leap second. Each answers what its regex answered, held to it by a
+  differential test over SAP's recorded texts, edge cases, every short string
+  over the pattern's characters and seeded random ones.
+- **Parsed documents are read through the parsed readers** (`field`, `at`,
+  `isElement`) instead of being cast to records; a parser's `any` result is
+  bound to `unknown` at once. A parsed item that is no element (text where
+  an element was expected) reads as nothing, as it did.
+- **A type code is looked up in a typed map** (`answeredObject`), built from
+  the tables' own keys; every text reads as before.
+- **`@mcp-abap-adt/interfaces-adt` is `^33.0.0`** (was `^31.0.0`): 32.0.0 is
+  #304's contract, 33.0.0 requires a create's fields in its configs. This
+  package's declarations (`dist/index.d.ts`) are unchanged by either.
+
 ## [0.28.3] - 2026-11-25
 
 An on-premise gateway error's own document was refused: `feedGatewayErrorDetail`

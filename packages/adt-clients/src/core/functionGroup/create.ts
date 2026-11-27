@@ -11,7 +11,12 @@ import type { HttpError } from '@mcp-abap-adt/interfaces-network';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { FUNCTION_GROUP } from '../../endpoints/objects';
-import { limitDescription, safeStringify } from '../../utils/internalUtils';
+import {
+  limitDescription,
+  responseDataHead,
+  safeStringify,
+} from '../../utils/internalUtils';
+import { propertyOf } from '../../utils/ownValue';
 import { createRequestHeaders } from '../../utils/requestHeaders';
 import { escapeXmlAttr, languageAttributes } from '../../utils/xml';
 import type { ICreateFunctionGroupParams } from './types';
@@ -93,23 +98,21 @@ export async function create(
     });
     return response;
   } catch (error: unknown) {
-    const e = error as HttpError;
+    const response = propertyOf(error, 'response');
     // Log error details for debugging (same as class/create.ts)
-    if (e.response && debugEnabled) {
+    if (response && debugEnabled) {
       logger?.error?.(
-        `[ERROR] Create FunctionGroup failed - Status: ${e.response.status}`,
+        `[ERROR] Create FunctionGroup failed - Status: ${propertyOf(response, 'status')}`,
       );
       logger?.error?.(
-        `[ERROR] Create FunctionGroup failed - StatusText: ${e.response.statusText}`,
+        `[ERROR] Create FunctionGroup failed - StatusText: ${propertyOf(response, 'statusText')}`,
       );
       logger?.error?.(
-        `[ERROR] Create FunctionGroup failed - Response headers: ${JSON.stringify(e.response.headers, null, 2)}`,
+        `[ERROR] Create FunctionGroup failed - Response headers: ${JSON.stringify(propertyOf(response, 'headers'), null, 2)}`,
       );
       logger?.error?.(
         `[ERROR] Create FunctionGroup failed - Response data (first 1000 chars):`,
-        typeof e.response.data === 'string'
-          ? e.response.data.substring(0, 1000)
-          : safeStringify(e.response.data).substring(0, 1000),
+        responseDataHead(propertyOf(response, 'data')),
       );
     }
     throw error;

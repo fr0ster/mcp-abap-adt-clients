@@ -5,8 +5,8 @@
  * **The inventory is built from the handlers, not from the spec.** For every
  * getter of `AdtClientLegacy` and `AdtExecutorLegacy` the handler it returns
  * is walked through its whole prototype chain — the members it inherits from
- * `AdtClassMemberBase` or `AbapUnitRunner` included, and the own keys of an
- * `absentOnLegacy` object — and so are the two clients themselves, accessors
+ * `AdtClassMemberBase` or `AbapUnitRunner` included, and an absent type's
+ * `*AbsentLegacy` class — and so are the two clients themselves, accessors
  * and symbol-keyed members included. Each member must be in exactly one of the
  * tables in `helpers/legacyMembers.ts`: refused (answered without a request)
  * or sending (the request it sends, asserted on a recording connection). A new
@@ -196,6 +196,14 @@ function rowsOf<T>(
 
 // ---------------------------------------------------------------------------
 
+/** An absent legacy handler (C5): an instance of a `*AbsentLegacy` class. */
+function isAbsentHandler(target: object): boolean {
+  const name = (
+    Object.getPrototypeOf(target) as { constructor?: { name?: string } }
+  ).constructor?.name;
+  return typeof name === 'string' && name.endsWith('AbsentLegacy');
+}
+
 describe('legacy member inventory', () => {
   const inventory = owners(recordingConnection().connection);
 
@@ -290,11 +298,12 @@ describe('legacy member inventory', () => {
         problems.push(`${key} (not handed out)`);
         continue;
       }
-      // A class's member is checked where the runtime finds it; an
-      // absentOnLegacy object copies the names of the modern class it stands
-      // for, so the source is the only place to read its visibility.
+      // A class's member is checked where the runtime finds it; an absent
+      // legacy handler (C5) keeps the modern class's private helpers, so the
+      // source is the only place to read their visibility.
       if (
-        Object.getPrototypeOf(target) !== Object.prototype &&
+        target !== undefined &&
+        !isAbsentHandler(target) &&
         (declaredBy as { constructor?: { name?: string } }).constructor
           ?.name !== className
       ) {

@@ -62,7 +62,7 @@ export async function getEnhancementMetadata(
  */
 export async function getEnhancementSource(
   connection: IAbapConnection,
-  enhancementType: EnhancementType,
+  enhancementType: EnhancementType | undefined,
   enhancementName: string,
   version?: AdtReadVersion,
   options?: IReadOptions,
@@ -97,7 +97,7 @@ export async function getEnhancementSource(
  */
 export async function getEnhancementTransport(
   connection: IAbapConnection,
-  enhancementType: EnhancementType,
+  enhancementType: EnhancementType | undefined,
   enhancementName: string,
   options?: IReadOptions,
 ): Promise<IAdtWireResponse> {

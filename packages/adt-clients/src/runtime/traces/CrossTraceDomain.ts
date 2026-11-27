@@ -2,6 +2,7 @@ import type {
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
+  IAnalyse,
   ICrossTrace,
   IListCrossTracesOptions,
   IResultStrategy,
@@ -76,9 +77,16 @@ export class CrossTrace<
     this.results = options.results;
   }
 
+  list<E extends IAdtError>(
+    options: IListCrossTracesOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['list'], E | IAdtError>>;
+  list(
+    options?: IListCrossTracesOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['list'], IAdtError>>;
   async list<E extends IAdtError = IAdtError>(
     options?: IListCrossTracesOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['list'], E>> {
+  ): Promise<IAdtResponse<T['list'], E | IAdtError>> {
     return answering(
       () => listCrossTraces(this.connection, options),
       this.results.list,
@@ -86,11 +94,21 @@ export class CrossTrace<
     );
   }
 
+  getById<E extends IAdtError>(
+    traceId: string,
+    includeSensitiveData: boolean | undefined,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['trace'], E | IAdtError>>;
+  getById(
+    traceId: string,
+    includeSensitiveData?: boolean,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['trace'], IAdtError>>;
   async getById<E extends IAdtError = IAdtError>(
     traceId: string,
     includeSensitiveData?: boolean,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['trace'], E>> {
+  ): Promise<IAdtResponse<T['trace'], E | IAdtError>> {
     return answering(
       () => getCrossTrace(this.connection, traceId, includeSensitiveData),
       this.results.trace,
@@ -98,10 +116,18 @@ export class CrossTrace<
     );
   }
 
+  getRecords<E extends IAdtError>(
+    traceId: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['records'], E | IAdtError>>;
+  getRecords(
+    traceId: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['records'], IAdtError>>;
   async getRecords<E extends IAdtError = IAdtError>(
     traceId: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['records'], E>> {
+  ): Promise<IAdtResponse<T['records'], E | IAdtError>> {
     return answering(
       () => getCrossTraceRecords(this.connection, traceId),
       this.results.records,
@@ -109,11 +135,21 @@ export class CrossTrace<
     );
   }
 
+  getRecordContent<E extends IAdtError>(
+    traceId: string,
+    recordNumber: number,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['recordContent'], E | IAdtError>>;
+  getRecordContent(
+    traceId: string,
+    recordNumber: number,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['recordContent'], IAdtError>>;
   async getRecordContent<E extends IAdtError = IAdtError>(
     traceId: string,
     recordNumber: number,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['recordContent'], E>> {
+  ): Promise<IAdtResponse<T['recordContent'], E | IAdtError>> {
     return answering(
       () => getCrossTraceRecordContent(this.connection, traceId, recordNumber),
       this.results.recordContent,
@@ -121,9 +157,15 @@ export class CrossTrace<
     );
   }
 
+  getActivations<E extends IAdtError>(
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['activations'], E | IAdtError>>;
+  getActivations(
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['activations'], IAdtError>>;
   async getActivations<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['activations'], E>> {
+  ): Promise<IAdtResponse<T['activations'], E | IAdtError>> {
     return answering(
       () => getCrossTraceActivations(this.connection),
       this.results.activations,

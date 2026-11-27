@@ -15,6 +15,8 @@
  */
 
 import type {
+  AdtObjectIdentity,
+  AdtRequiredUpdateOptions,
   IAdtAnalyseOptions,
   IAdtCheckable,
   IAdtCreatable,
@@ -23,6 +25,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
@@ -31,6 +34,7 @@ import type {
   IAdtTransportAware,
   IAdtUpdateOptions,
   IAdtValidatable,
+  IAnalyse,
   IPackageResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -67,13 +71,23 @@ export class AdtPackage<
   T extends PackageValues = ResultValuesOf<typeof packageDocuments>,
 > implements
     IAdtCreatable<IPackageConfig, T['created']>,
-    IAdtMetadataReadable<IPackageConfig, T['metadata']>,
-    IAdtMetadataUpdatable<Partial<IPackageConfig>, T['metadataUpdated']>,
-    IAdtDeletable<IPackageConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IPackageConfig, T['validation']>,
-    IAdtCheckable<IPackageConfig, T['check']>,
-    IAdtLockable<IPackageConfig>,
-    IAdtTransportAware<IPackageConfig, T['transport']>
+    IAdtMetadataReadable<IPackageConfig, T['metadata'], 'packageName'>,
+    IAdtMetadataUpdatable<
+      Partial<IPackageConfig>,
+      T['metadataUpdated'],
+      'packageName',
+      'source'
+    >,
+    IAdtDeletable<
+      IPackageConfig,
+      T['deletion'],
+      'packageName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<IPackageConfig, T['validation'], 'packageName'>,
+    IAdtCheckable<IPackageConfig, T['check'], 'packageName'>,
+    IAdtLockable<IPackageConfig, 'packageName'>,
+    IAdtTransportAware<IPackageConfig, T['transport'], 'packageName'>
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
@@ -110,15 +124,25 @@ export class AdtPackage<
    * from nothing and the server answers — which is a reading a strategy can
    * take, where a sentence composed here would not be.
    */
-  private name(config: Partial<IPackageConfig>): string {
-    return config.packageName as string;
+  private name(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+  ): string {
+    return config.packageName;
   }
 
   /** Validate the package's configuration before creating it. */
+  validate<E extends IAdtError>(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>>;
+  validate(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['validation'], IAdtError>>;
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IPackageConfig>,
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['validation'], E>> {
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -128,7 +152,7 @@ export class AdtPackage<
       () =>
         validatePackageBasic(connection, {
           package_name: name,
-          super_package: config.superPackage as string,
+          super_package: config.superPackage,
           description: config.description,
           package_type: config.packageType,
           software_component: config.softwareComponent,
@@ -155,10 +179,20 @@ export class AdtPackage<
    * A package can be saved only once per ABAP session: PAK/058.
    * Over RFC the create counts as that save.
    */
+  create<E extends IAdtError>(
+    config: Omit<IPackageConfig, 'source'> & { source?: never },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>>;
+  create(
+    config: Omit<IPackageConfig, 'source'> & { source?: never },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['created'], IAdtError>>;
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IPackageConfig, 'source'> & { source?: never },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<T['created'], E>> {
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>> {
     // **No guard here, unlike every other create.**
     //
     // Elsewhere `packageName` is the package an object is bound to, and an
@@ -175,7 +209,7 @@ export class AdtPackage<
       () =>
         createPackage(connection, options.headers, {
           package_name: name,
-          super_package: config.superPackage as string,
+          super_package: config.superPackage,
           description: config.description,
           package_type: config.packageType,
           software_component: config.softwareComponent,
@@ -196,10 +230,18 @@ export class AdtPackage<
   }
 
   /** The same document `read` fetches — a package has no second resource. */
+  readMetadata<E extends IAdtError>(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>>;
+  readMetadata(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['metadata'], IAdtError>>;
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IPackageConfig>,
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['metadata'], E>> {
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -214,10 +256,20 @@ export class AdtPackage<
   }
 
   /** The transport request the package belongs to. */
+  readTransport<E extends IAdtError>(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    options: ({ withLongPolling?: boolean } & IAdtOperationOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>>;
+  readTransport(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['transport'], IAdtError>>;
   async readTransport<E extends IAdtError = IAdtError>(
-    config: Partial<IPackageConfig>,
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['transport'], E>> {
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -240,15 +292,29 @@ export class AdtPackage<
    * what the object holds, change what you mean to change, and pass the result:
    * anything left out is gone, because nothing is read here to keep it.
    */
+  updateMetadata<E extends IAdtError>(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>>;
+  updateMetadata(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], IAdtError>>;
   async updateMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IPackageConfig>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     const name = this.name(config);
-    const superPackage = config.superPackage as string;
+    const superPackage = config.superPackage;
     const softwareComponent = config.softwareComponent;
 
     const fields = {
@@ -279,8 +345,8 @@ export class AdtPackage<
           fields,
           // The document the caller built, from the options — see
           // `AdtDomain.updateMetadata`; the fields above describe a create.
-          options?.source as string,
-          options?.lockHandle as string,
+          options?.source,
+          options?.lockHandle,
         ),
       this.results.metadataUpdated,
       options?.analyse,
@@ -294,10 +360,20 @@ export class AdtPackage<
    * it: a consumer that wants the check runs this first and decides what a
    * refusal means.
    */
+  checkDeletion<E extends IAdtError>(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  checkDeletion(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   async checkDeletion<E extends IAdtError = IAdtError>(
-    config: Partial<IPackageConfig>,
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -330,10 +406,20 @@ export class AdtPackage<
    * well. Recycling is the consumer's call. See
    * docs/usage/STATEFUL_SESSION_GUIDE.md.
    */
+  delete<E extends IAdtError>(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>>;
+  delete(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletion'], IAdtError>>;
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IPackageConfig>,
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletion'], E>> {
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -350,11 +436,23 @@ export class AdtPackage<
   }
 
   /** Check the package. */
+  check<E extends IAdtError>(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>>;
+  check(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['check'], IAdtError>>;
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<IPackageConfig>,
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['check'], E>> {
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -374,10 +472,18 @@ export class AdtPackage<
    * carrying no handle reads as `''`; whether that is a refusal is the
    * caller's `analyse` to say.
    */
+  lock<E extends IAdtError>(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  lock(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IPackageConfig>,
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
     const name = this.name(config);
     const answer = await answering(
       () =>
@@ -394,11 +500,21 @@ export class AdtPackage<
   }
 
   /** Unlock the package. */
+  unlock<E extends IAdtError>(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    lockHandle: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<void, E | IAdtError>>;
+  unlock(
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
+    lockHandle: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<void, IAdtError>>;
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IPackageConfig>,
+    config: AdtObjectIdentity<IPackageConfig, 'packageName'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<void, E>> {
+  ): Promise<IAdtResponse<void, E | IAdtError>> {
     const name = this.name(config);
 
     return answering(

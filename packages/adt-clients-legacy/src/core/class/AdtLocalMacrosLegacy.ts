@@ -15,9 +15,11 @@ import {
   type ResultValuesOf,
 } from '@mcp-abap-adt/adt-clients';
 import type {
+  AdtObjectIdentity,
   IAdtError,
   IAdtOperationOptions,
   IAdtResponse,
+  IAnalyse,
   IClassConfig,
 } from '@mcp-abap-adt/interfaces-adt';
 import { noTransportResource } from '../shared/refusalLegacy';
@@ -31,13 +33,23 @@ export class AdtLocalMacrosLegacy<
    * (record B4-cycles-20261026-2019, step c6-readTransport, the same request
    * `AdtClassLegacy.readTransport` refuses).
    */
+  override readTransport<E extends IAdtError>(
+    this: this & AdtPerformedBy<'localMacros', 'transport'>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    _options: ({ withLongPolling?: boolean } & IAdtOperationOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>>;
+  override readTransport(
+    this: this & AdtPerformedBy<'localMacros', 'transport'>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    _options?: { withLongPolling?: boolean } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['transport'], IAdtError>>;
   override async readTransport<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'localMacros', 'transport'>,
-    config: Partial<IClassConfig>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['transport'], E>> {
-    return noTransportResource<T['transport'], E>(
-      CLASS.uri(config.className as string),
-    );
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
+    return noTransportResource<T['transport']>(CLASS.uri(config.className));
   }
 }

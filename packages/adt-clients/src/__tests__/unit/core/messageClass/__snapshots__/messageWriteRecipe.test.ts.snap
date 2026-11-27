@@ -1,0 +1,388 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`a message write sends what the old chain sent remove a message, class-for-message lock refused 1`] = `
+[
+  {
+    "data": undefined,
+    "method": "GET",
+    "session": "stateless",
+    "url": "/sap/bc/adt/messageclass/zmc?version=workingArea",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc/messages/002?_action=LOCK_MSG&accessMode=MODIFY",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc?_action=LOCK&accessMode=MODIFY&msgNo=002&onSave=X",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc?_action=LOCK&accessMode=MODIFY",
+  },
+  {
+    "data": "<?xml version="1.0" encoding="UTF-8"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZMC" adtcore:description="messages" adtcore:type="MSAG/N"><mc:messages mc:msgno="001" mc:msgtext="first"/><mc:deletedmessages mc:msgno="002" mc:msgtext="second" mc:lockhandle="MH"/></mc:messageClass>",
+    "method": "PUT",
+    "session": "stateless",
+    "url": "/sap/bc/adt/messageclass/zmc?lockHandle=PH",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc?_action=UNLOCK&lockHandle=PH",
+  },
+  {
+    "data": "[002]",
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc/messages/002?_action=UNLOCK_ALL",
+  },
+]
+`;
+
+exports[`a message write sends what the old chain sent remove a message, granted 1`] = `
+[
+  {
+    "data": undefined,
+    "method": "GET",
+    "session": "stateless",
+    "url": "/sap/bc/adt/messageclass/zmc?version=workingArea",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc/messages/002?_action=LOCK_MSG&accessMode=MODIFY",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc?_action=LOCK&accessMode=MODIFY&msgNo=002&onSave=X",
+  },
+  {
+    "data": "<?xml version="1.0" encoding="UTF-8"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZMC" adtcore:description="messages" adtcore:type="MSAG/N"><mc:messages mc:msgno="001" mc:msgtext="first"/><mc:deletedmessages mc:msgno="002" mc:msgtext="second" mc:lockhandle="MH"/></mc:messageClass>",
+    "method": "PUT",
+    "session": "stateless",
+    "url": "/sap/bc/adt/messageclass/zmc?lockHandle=CH",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc?_action=UNLOCK&lockHandle=CH",
+  },
+  {
+    "data": "[002]",
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc/messages/002?_action=UNLOCK_ALL",
+  },
+]
+`;
+
+exports[`a message write sends what the old chain sent remove a message, message lock refused 1`] = `
+[
+  {
+    "data": undefined,
+    "method": "GET",
+    "session": "stateless",
+    "url": "/sap/bc/adt/messageclass/zmc?version=workingArea",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc/messages/002?_action=LOCK_MSG&accessMode=MODIFY",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc?_action=LOCK&accessMode=MODIFY&msgNo=002&onSave=X",
+  },
+  {
+    "data": "<?xml version="1.0" encoding="UTF-8"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZMC" adtcore:description="messages" adtcore:type="MSAG/N"><mc:messages mc:msgno="001" mc:msgtext="first"/><mc:deletedmessages mc:msgno="002" mc:msgtext="second" mc:lockhandle="CH"/></mc:messageClass>",
+    "method": "PUT",
+    "session": "stateless",
+    "url": "/sap/bc/adt/messageclass/zmc?lockHandle=CH",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc?_action=UNLOCK&lockHandle=CH",
+  },
+  {
+    "data": "[002]",
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc/messages/002?_action=UNLOCK_ALL",
+  },
+]
+`;
+
+exports[`a message write sends what the old chain sent upsert a new message, class-for-message lock refused 1`] = `
+[
+  {
+    "data": undefined,
+    "method": "GET",
+    "session": "stateless",
+    "url": "/sap/bc/adt/messageclass/zmc?version=workingArea",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc/messages/003?_action=LOCK_MSG&accessMode=MODIFY",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc?_action=LOCK&accessMode=MODIFY&msgNo=003&onSave=X",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc?_action=LOCK&accessMode=MODIFY",
+  },
+  {
+    "data": "<?xml version="1.0" encoding="UTF-8"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZMC" adtcore:description="messages" adtcore:type="MSAG/N"><mc:messages mc:msgno="001" mc:msgtext="first"/><mc:messages mc:msgno="002" mc:msgtext="second"/><mc:messages mc:msgno="003" mc:msgtext="third" mc:lockhandle="MH"/></mc:messageClass>",
+    "method": "PUT",
+    "session": "stateless",
+    "url": "/sap/bc/adt/messageclass/zmc?lockHandle=PH",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc?_action=UNLOCK&lockHandle=PH",
+  },
+  {
+    "data": "[003]",
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc/messages/003?_action=UNLOCK_ALL",
+  },
+]
+`;
+
+exports[`a message write sends what the old chain sent upsert a new message, granted 1`] = `
+[
+  {
+    "data": undefined,
+    "method": "GET",
+    "session": "stateless",
+    "url": "/sap/bc/adt/messageclass/zmc?version=workingArea",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc/messages/003?_action=LOCK_MSG&accessMode=MODIFY",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc?_action=LOCK&accessMode=MODIFY&msgNo=003&onSave=X",
+  },
+  {
+    "data": "<?xml version="1.0" encoding="UTF-8"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZMC" adtcore:description="messages" adtcore:type="MSAG/N"><mc:messages mc:msgno="001" mc:msgtext="first"/><mc:messages mc:msgno="002" mc:msgtext="second"/><mc:messages mc:msgno="003" mc:msgtext="third" mc:lockhandle="MH"/></mc:messageClass>",
+    "method": "PUT",
+    "session": "stateless",
+    "url": "/sap/bc/adt/messageclass/zmc?lockHandle=CH",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc?_action=UNLOCK&lockHandle=CH",
+  },
+  {
+    "data": "[003]",
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc/messages/003?_action=UNLOCK_ALL",
+  },
+]
+`;
+
+exports[`a message write sends what the old chain sent upsert a new message, message lock refused 1`] = `
+[
+  {
+    "data": undefined,
+    "method": "GET",
+    "session": "stateless",
+    "url": "/sap/bc/adt/messageclass/zmc?version=workingArea",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc/messages/003?_action=LOCK_MSG&accessMode=MODIFY",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc?_action=LOCK&accessMode=MODIFY&msgNo=003&onSave=X",
+  },
+  {
+    "data": "<?xml version="1.0" encoding="UTF-8"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZMC" adtcore:description="messages" adtcore:type="MSAG/N"><mc:messages mc:msgno="001" mc:msgtext="first"/><mc:messages mc:msgno="002" mc:msgtext="second"/><mc:messages mc:msgno="003" mc:msgtext="third" mc:lockhandle="CH"/></mc:messageClass>",
+    "method": "PUT",
+    "session": "stateless",
+    "url": "/sap/bc/adt/messageclass/zmc?lockHandle=CH",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc?_action=UNLOCK&lockHandle=CH",
+  },
+  {
+    "data": "[003]",
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc/messages/003?_action=UNLOCK_ALL",
+  },
+]
+`;
+
+exports[`a message write sends what the old chain sent upsert an existing message, class-for-message lock refused 1`] = `
+[
+  {
+    "data": undefined,
+    "method": "GET",
+    "session": "stateless",
+    "url": "/sap/bc/adt/messageclass/zmc?version=workingArea",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc/messages/001?_action=LOCK_MSG&accessMode=MODIFY",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc?_action=LOCK&accessMode=MODIFY&msgNo=001&onSave=X",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc?_action=LOCK&accessMode=MODIFY",
+  },
+  {
+    "data": "<?xml version="1.0" encoding="UTF-8"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZMC" adtcore:description="messages" adtcore:type="MSAG/N"><mc:messages mc:msgno="001" mc:msgtext="changed" mc:lockhandle="MH"/><mc:messages mc:msgno="002" mc:msgtext="second"/></mc:messageClass>",
+    "method": "PUT",
+    "session": "stateless",
+    "url": "/sap/bc/adt/messageclass/zmc?lockHandle=PH",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc?_action=UNLOCK&lockHandle=PH",
+  },
+  {
+    "data": "[001]",
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc/messages/001?_action=UNLOCK_ALL",
+  },
+]
+`;
+
+exports[`a message write sends what the old chain sent upsert an existing message, granted 1`] = `
+[
+  {
+    "data": undefined,
+    "method": "GET",
+    "session": "stateless",
+    "url": "/sap/bc/adt/messageclass/zmc?version=workingArea",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc/messages/001?_action=LOCK_MSG&accessMode=MODIFY",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc?_action=LOCK&accessMode=MODIFY&msgNo=001&onSave=X",
+  },
+  {
+    "data": "<?xml version="1.0" encoding="UTF-8"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZMC" adtcore:description="messages" adtcore:type="MSAG/N"><mc:messages mc:msgno="001" mc:msgtext="changed" mc:lockhandle="MH"/><mc:messages mc:msgno="002" mc:msgtext="second"/></mc:messageClass>",
+    "method": "PUT",
+    "session": "stateless",
+    "url": "/sap/bc/adt/messageclass/zmc?lockHandle=CH",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc?_action=UNLOCK&lockHandle=CH",
+  },
+  {
+    "data": "[001]",
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc/messages/001?_action=UNLOCK_ALL",
+  },
+]
+`;
+
+exports[`a message write sends what the old chain sent upsert an existing message, message lock refused 1`] = `
+[
+  {
+    "data": undefined,
+    "method": "GET",
+    "session": "stateless",
+    "url": "/sap/bc/adt/messageclass/zmc?version=workingArea",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc/messages/001?_action=LOCK_MSG&accessMode=MODIFY",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc?_action=LOCK&accessMode=MODIFY&msgNo=001&onSave=X",
+  },
+  {
+    "data": "<?xml version="1.0" encoding="UTF-8"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZMC" adtcore:description="messages" adtcore:type="MSAG/N"><mc:messages mc:msgno="001" mc:msgtext="changed" mc:lockhandle="CH"/><mc:messages mc:msgno="002" mc:msgtext="second"/></mc:messageClass>",
+    "method": "PUT",
+    "session": "stateless",
+    "url": "/sap/bc/adt/messageclass/zmc?lockHandle=CH",
+  },
+  {
+    "data": null,
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc?_action=UNLOCK&lockHandle=CH",
+  },
+  {
+    "data": "[001]",
+    "method": "POST",
+    "session": "stateful",
+    "url": "/sap/bc/adt/messageclass/zmc/messages/001?_action=UNLOCK_ALL",
+  },
+]
+`;

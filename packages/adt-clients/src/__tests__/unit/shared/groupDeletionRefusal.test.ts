@@ -104,6 +104,8 @@ describe('deleteObjectsGroup', () => {
     if (response.ok) throw new Error('expected a failure');
 
     const failure = response.getError();
+    if (!('messages' in failure))
+      throw new Error('expected the deletion failure');
     expect(failure.origin).toBe('refusal');
     // The name of what refused, and the server's own sentence in the messages.
     expect(failure.message).toContain('ZADT_BLD_PKG03');

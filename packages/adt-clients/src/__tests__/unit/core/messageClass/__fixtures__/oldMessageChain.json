@@ -1,0 +1,462 @@
+{
+  "upsert none": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "ok": true,
+      "value": "W"
+    },
+    "analyseCalls": 1
+  },
+  "upsert read answered": {
+    "sent": ["read"],
+    "outcome": {
+      "threw": "refused"
+    },
+    "analyseCalls": 0
+  },
+  "upsert read unanswered": {
+    "sent": ["read"],
+    "outcome": {
+      "threw": "socket hang up"
+    },
+    "analyseCalls": 0
+  },
+  "upsert read credential": {
+    "sent": ["read"],
+    "outcome": {
+      "threw": "AuthRefusedError"
+    },
+    "analyseCalls": 0
+  },
+  "upsert lockMessage answered": {
+    "sent": ["read", "lockMessage"],
+    "outcome": {
+      "ok": false,
+      "mine": false,
+      "origin": "connection"
+    },
+    "analyseCalls": 0
+  },
+  "upsert lockMessage unanswered": {
+    "sent": ["read", "lockMessage"],
+    "outcome": {
+      "ok": false,
+      "mine": false,
+      "origin": "connection"
+    },
+    "analyseCalls": 0
+  },
+  "upsert lockMessage credential": {
+    "sent": ["read", "lockMessage"],
+    "outcome": {
+      "threw": "AuthRefusedError"
+    },
+    "analyseCalls": 0
+  },
+  "upsert lockClassForMessage answered": {
+    "sent": ["read", "lockMessage", "lockClassForMessage", "unlockMessages"],
+    "outcome": {
+      "ok": false,
+      "mine": false,
+      "origin": "connection"
+    },
+    "analyseCalls": 0
+  },
+  "upsert lockClassForMessage unanswered": {
+    "sent": ["read", "lockMessage", "lockClassForMessage", "unlockMessages"],
+    "outcome": {
+      "ok": false,
+      "mine": false,
+      "origin": "connection"
+    },
+    "analyseCalls": 0
+  },
+  "upsert lockClassForMessage credential": {
+    "sent": ["read", "lockMessage", "lockClassForMessage", "unlockMessages"],
+    "outcome": {
+      "threw": "AuthRefusedError"
+    },
+    "analyseCalls": 0
+  },
+  "upsert put answered": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "ok": false,
+      "mine": true,
+      "origin": "refusal"
+    },
+    "analyseCalls": 1
+  },
+  "upsert put unanswered": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "ok": false,
+      "mine": true,
+      "origin": "refusal"
+    },
+    "analyseCalls": 1
+  },
+  "upsert put credential": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "threw": "AuthRefusedError"
+    },
+    "analyseCalls": 0
+  },
+  "upsert unlockClass answered": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockClass",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "ok": false,
+      "mine": false,
+      "origin": "connection"
+    },
+    "analyseCalls": 1
+  },
+  "upsert unlockClass unanswered": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockClass",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "ok": false,
+      "mine": false,
+      "origin": "connection"
+    },
+    "analyseCalls": 1
+  },
+  "upsert unlockClass credential": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockClass",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "threw": "AuthRefusedError"
+    },
+    "analyseCalls": 1
+  },
+  "upsert unlockMessages answered": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockMessages",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "ok": false,
+      "mine": false,
+      "origin": "connection"
+    },
+    "analyseCalls": 1
+  },
+  "upsert unlockMessages unanswered": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockMessages",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "ok": false,
+      "mine": false,
+      "origin": "connection"
+    },
+    "analyseCalls": 1
+  },
+  "upsert unlockMessages credential": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockMessages",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "threw": "AuthRefusedError"
+    },
+    "analyseCalls": 1
+  },
+  "remove none": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "ok": true,
+      "value": "W"
+    },
+    "analyseCalls": 1
+  },
+  "remove read answered": {
+    "sent": ["read"],
+    "outcome": {
+      "threw": "refused"
+    },
+    "analyseCalls": 0
+  },
+  "remove read unanswered": {
+    "sent": ["read"],
+    "outcome": {
+      "threw": "socket hang up"
+    },
+    "analyseCalls": 0
+  },
+  "remove read credential": {
+    "sent": ["read"],
+    "outcome": {
+      "threw": "AuthRefusedError"
+    },
+    "analyseCalls": 0
+  },
+  "remove lockMessage answered": {
+    "sent": ["read", "lockMessage"],
+    "outcome": {
+      "ok": false,
+      "mine": false,
+      "origin": "connection"
+    },
+    "analyseCalls": 0
+  },
+  "remove lockMessage unanswered": {
+    "sent": ["read", "lockMessage"],
+    "outcome": {
+      "ok": false,
+      "mine": false,
+      "origin": "connection"
+    },
+    "analyseCalls": 0
+  },
+  "remove lockMessage credential": {
+    "sent": ["read", "lockMessage"],
+    "outcome": {
+      "threw": "AuthRefusedError"
+    },
+    "analyseCalls": 0
+  },
+  "remove lockClassForMessage answered": {
+    "sent": ["read", "lockMessage", "lockClassForMessage", "unlockMessages"],
+    "outcome": {
+      "ok": false,
+      "mine": false,
+      "origin": "connection"
+    },
+    "analyseCalls": 0
+  },
+  "remove lockClassForMessage unanswered": {
+    "sent": ["read", "lockMessage", "lockClassForMessage", "unlockMessages"],
+    "outcome": {
+      "ok": false,
+      "mine": false,
+      "origin": "connection"
+    },
+    "analyseCalls": 0
+  },
+  "remove lockClassForMessage credential": {
+    "sent": ["read", "lockMessage", "lockClassForMessage", "unlockMessages"],
+    "outcome": {
+      "threw": "AuthRefusedError"
+    },
+    "analyseCalls": 0
+  },
+  "remove put answered": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "ok": false,
+      "mine": true,
+      "origin": "refusal"
+    },
+    "analyseCalls": 1
+  },
+  "remove put unanswered": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "ok": false,
+      "mine": true,
+      "origin": "refusal"
+    },
+    "analyseCalls": 1
+  },
+  "remove put credential": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "threw": "AuthRefusedError"
+    },
+    "analyseCalls": 0
+  },
+  "remove unlockClass answered": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockClass",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "ok": false,
+      "mine": false,
+      "origin": "connection"
+    },
+    "analyseCalls": 1
+  },
+  "remove unlockClass unanswered": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockClass",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "ok": false,
+      "mine": false,
+      "origin": "connection"
+    },
+    "analyseCalls": 1
+  },
+  "remove unlockClass credential": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockClass",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "threw": "AuthRefusedError"
+    },
+    "analyseCalls": 1
+  },
+  "remove unlockMessages answered": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockMessages",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "ok": false,
+      "mine": false,
+      "origin": "connection"
+    },
+    "analyseCalls": 1
+  },
+  "remove unlockMessages unanswered": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockMessages",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "ok": false,
+      "mine": false,
+      "origin": "connection"
+    },
+    "analyseCalls": 1
+  },
+  "remove unlockMessages credential": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockMessages",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "threw": "AuthRefusedError"
+    },
+    "analyseCalls": 1
+  }
+}

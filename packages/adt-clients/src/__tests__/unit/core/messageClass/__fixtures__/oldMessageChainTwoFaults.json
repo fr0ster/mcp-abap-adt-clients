@@ -1,0 +1,116 @@
+{
+  "put credential + unlockClass credential": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "threw": "put#1"
+    },
+    "analyseCalls": 0
+  },
+  "put credential + unlockMessages credential": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "threw": "put#1"
+    },
+    "analyseCalls": 0
+  },
+  "put credential + unlockClass answered": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "threw": "put#1"
+    },
+    "analyseCalls": 0
+  },
+  "put answered + unlockClass credential": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "threw": "unlockClass#2"
+    },
+    "analyseCalls": 1
+  },
+  "put answered + unlockMessages credential": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "threw": "unlockMessages#2"
+    },
+    "analyseCalls": 1
+  },
+  "lockClassForMessage credential + unlockMessages credential": {
+    "sent": ["read", "lockMessage", "lockClassForMessage", "unlockMessages"],
+    "outcome": {
+      "threw": "lockClassForMessage#1"
+    },
+    "analyseCalls": 0
+  },
+  "lockClassForMessage answered + unlockMessages credential": {
+    "sent": ["read", "lockMessage", "lockClassForMessage", "unlockMessages"],
+    "outcome": {
+      "threw": "unlockMessages#2"
+    },
+    "analyseCalls": 0
+  },
+  "unlockClass credential + unlockMessages credential": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockClass",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "threw": "unlockClass#1"
+    },
+    "analyseCalls": 1
+  },
+  "unlockClass answered + unlockMessages credential": {
+    "sent": [
+      "read",
+      "lockMessage",
+      "lockClassForMessage",
+      "put",
+      "unlockClass",
+      "unlockClass",
+      "unlockMessages"
+    ],
+    "outcome": {
+      "threw": "unlockMessages#2"
+    },
+    "analyseCalls": 1
+  }
+}

@@ -16,6 +16,16 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 > **From 18.x?** Read [`docs/usage/MIGRATION-19.md`](docs/usage/MIGRATION-19.md)
 > first: 19.0.0 is where members became one endpoint call each.
 >
+> **From 47.x?** 48.0.0 (on `interfaces-adt` ^33.0.0, with adt-strategies
+> 0.29.0): a member requires the object's name, a create every field its
+> request reads, a write its `lockHandle` (and its `source`); a message class
+> message is four members of one request each, and its write is your recipe;
+> a call naming `E` passes `analyse`, and its answer is `E | IAdtError`;
+> `AdtBatchConnection.makeAdtRequest` takes no type parameters and
+> `AdtClientsWS.request` is typed by a reader; the old abapGit `link` and
+> `checkExternalRepo` forms are gone. See
+> [`docs/usage/MIGRATION-48.md`](docs/usage/MIGRATION-48.md).
+>
 > **From 46.x?** 47.0.0 (with adt-strategies 0.28.0): `INamedItem.description`
 > is optional; `SystemMessages.getById` is gone (SAP routes no single
 > message); the system-message and gateway-error readings answer what SAP
@@ -181,12 +191,12 @@ This package interacts with external packages **ONLY through interfaces**:
 
   | package | what this package takes from it |
   |---|---|
-  | [`@mcp-abap-adt/interfaces-adt`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt) `^29.0.0` | the ADT type tables (`ADT_TYPES_ONPREM`, `ADT_TYPES_CLOUD`, `ADT_TYPES_BASIS_740`) and their code types (`AdtTypeCode`, …), the ABAP Unit run registry (`ABAP_UNIT_RUN_TYPES`, `AbapUnitRunObjectType`, `AbapUnitRunTarget`), the capability atoms, every object's config, the result-set contracts, `IAdtAnsweredObject`, `IAdtResponse`, `IAnalyse`, `IAdtAnalyseOptions`, `IAdtHeaders`, `IResultStrategy`, `ADT_NO_FAILURE`, `ADT_TASK_TYPE` |
-  | [`@mcp-abap-adt/interfaces-adt-connection`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt-connection) `^5.0.0` | `IAbapConnection` (its `makeAdtRequest(options)` takes no type parameter and answers `IAdtWireResponse`, `data: unknown`), `IAdtWireResponse`, `IAbapRequestOptions`, the connection capability atoms, `ADT_SESSION_ERROR`, `AdtSessionLoss` |
+  | [`@mcp-abap-adt/interfaces-adt`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt) `^33.0.0` | the ADT type tables (`ADT_TYPES_ONPREM`, `ADT_TYPES_CLOUD`, `ADT_TYPES_BASIS_740`) and their code types (`AdtTypeCode`, …), the ABAP Unit run registry (`ABAP_UNIT_RUN_TYPES`, `AbapUnitRunObjectType`, `AbapUnitRunTarget`), the capability atoms, every object's config, the result-set contracts, `IAdtAnsweredObject`, `IAdtResponse`, `IAnalyse`, `IAdtAnalyseOptions`, `IAdtHeaders`, `IResultStrategy`, `ADT_NO_FAILURE`, `ADT_TASK_TYPE` |
+  | [`@mcp-abap-adt/interfaces-adt-connection`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-adt-connection) `^5.3.0` | `IAbapConnection` (its `makeAdtRequest(options)` takes no type parameter and answers `IAdtWireResponse`, `data: unknown`), `IAdtWireResponse`, `IAbapRequestOptions`, the connection capability atoms, `ADT_SESSION_ERROR`, `AdtSessionLoss` |
   | [`@mcp-abap-adt/interfaces-network`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-network) `^2.0.1` | `IWebSocketTransport` and its four companions, `HttpError` |
   | [`@mcp-abap-adt/interfaces-utils`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-utils) `^1.1.1` | `ILogger`, `LogLevel`, `XmlNode` |
   | [`@mcp-abap-adt/interfaces-auth`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-auth) `^7.5.0` — **dev only** | `IAuthProvider`, for the test helpers that open a session |
-  | [`@mcp-abap-adt/interfaces-auth-sap`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-auth-sap) `^3.3.0` — **dev only** | `ISapConfig`, to build a connector in one unit test |
+  | [`@mcp-abap-adt/interfaces-auth-sap`](https://www.npmjs.com/package/@mcp-abap-adt/interfaces-auth-sap) `^4.0.0` — **dev only** | `ISapConfig`, to build a connector in one unit test |
 
   Taking them by name is what keeps a consumer off one release rate for every contract: `interfaces-utils` has had two releases ever, and a package that needs only `ILogger` should move at that pace rather than at ADT's. The `@mcp-abap-adt/interfaces` facade is **deleted** — npm still serves 51.0.0 to anyone pinned to it and nothing further ships there.
 
@@ -232,6 +242,7 @@ npm install @mcp-abap-adt/adt-clients
    - Stable runtime operations for traces, dumps, logs, feeds, ATC check runs, and more
    - Factory accessors: `getProfiler()`, `getCrossTrace()`, `getSt05Trace()`, `getApplicationLog()`, `getAtc()`, `getAtcLog()`, `getDdicActivation()`, `getDumps()`, `getFeeds()`, `getSystemMessages()`, `getGatewayErrorLog()`
    - Each takes an optional result set (`getProfiler({ ...profilerDocuments, list: profilerTraceEntries })`) and builds a fresh implementation per call — nothing is cached, so one caller's readings never become another's
+   - The trace readings of `@mcp-abap-adt/adt-strategies` (0.29.0) throw `traces: <field> is missing` for an answer that lacks a field their result type requires, and the throw surfaces as itself — see [Profiler Traces](docs/usage/CLIENT_API_REFERENCE.md#profiler-traces)
    - `getAtc()` runs ATC checks; `getAtcLog()` reads the execution and check-failure logs. Same subject, different resources — see [ATC check runs](docs/usage/CLIENT_API_REFERENCE.md#atc-check-runs)
 
 3. **AdtExecutor**
@@ -249,7 +260,8 @@ npm install @mcp-abap-adt/adt-clients
 
 4. **AdtAbapGitClient**
    - Standalone, not a factory on `AdtClient`: `AdtAbapGitClient.create(connection, { logger? })` answers the shipped documents (`abapGitDocuments`), `AdtAbapGitClient.create(connection, { logger?, results })` the caller's (since 38.0.0); `new AdtAbapGitClient(connection, { logger?, results })` takes its results always (the options argument, `contentTypeVersion`, was removed in 36.0.0)
-   - `link`, `pull`, `unlink({ repositoryId })`, `listRepos`, `getErrorLog(logLink)`, `checkExternalRepo` — one request each; `pull` does not wait
+   - `pull`, `unlink({ repositoryId })`, `listRepos`, `getErrorLog(logLink)` — one request each; `pull` does not wait. The legacy `link` and `checkExternalRepo` forms are gone since 48.0.0
+   - `new AdtAbapGitClient(connection, { results })` takes a facts reader for every one of the 14 new-form slots (`FactsReaders<T>`; spread `abapGitFactsDefaults`) and names `T`; `create` fills them (48.0.0)
    - Since 46.2.0, the new forms, addressed by the repository's key: `listReposQuiet`, `pullRepo`, `pullRepoInDialog`, `getModifiedObjects`, `getStatus`, `getRunLog`, `getStaging`, `push`, `checkRepo`, `getFile`, `getBranchInfo`, `switchBranch`, and `link` / `checkExternalRepo` given `options.credentials` (`IAbapGitCredentials`, or `null` for an anonymous call). Each answers the facts `abapGitFacts` of `@mcp-abap-adt/adt-strategies` reduces SAP's answer to, and fails with an `IAbapGitStructuredError` (fixed words, the status, the T100 key) — never SAP's text; each sends `timeout: 0`, `noLog`, `noResend` and `stateless`. `getFile` returns the file's exact text over HTTP only with `@mcp-abap-adt/connection` 25.2.0 or later, which honours its `rawText` flag. The legacy forms (`pull({ pullLink })`, `getErrorLog(logLink)`, `remoteUser`/`remotePassword`) keep 46.1.0's behaviour, deprecated; `pull` and `getErrorLog` send only the link a key would build. See [CLIENT_API_REFERENCE.md](docs/usage/CLIENT_API_REFERENCE.md#abapgit-new-forms-4620)
 
 5. **AdtClientsWS**
@@ -258,7 +270,7 @@ npm install @mcp-abap-adt/adt-clients
 
 6. **AbapDebugger, AmdpDebugger, MemorySnapshots**
    - Standalone, from `@mcp-abap-adt/adt-clients/runtime` or the root: `AbapDebugger.create(connection, { logger?, onConflict? })` answers the shipped documents (`abapDebuggerDocuments`), `AbapDebugger.create(connection, { results, logger?, onConflict? })` the caller's; likewise `AmdpDebugger.create` and `MemorySnapshots.create` (`{ logger?, results? }`, since 38.0.0). `new AbapDebugger(connection, { results, logger?, onConflict? })` takes its results always
-   - One member per request, contracts `IAbapDebugger`, `IAmdpDebugger`, `IMemorySnapshots` from `@mcp-abap-adt/interfaces-adt` (contract 18 pairs with clients 32)
+   - One member per request, contracts `IAbapDebugger`, `IAmdpDebugger`, `IMemorySnapshots` from `@mcp-abap-adt/interfaces-adt` (since contract 18 and clients 32)
    - **The identity states its mode.** `{ debuggingMode: 'user', requestUser, terminalId, ideId }`, or `{ debuggingMode: 'terminal', terminalId, ideId }`; `attach` takes the identity, not the user. A terminal-mode listener catches a run that carries its ids: `run(target, { debuggee: { terminalId, ideId } })` sends them in `SAP-PASSPORT` (since 29.1.0)
    - **Breakpoints are replaced, not added to.** `setBreakpoints` and `syncBreakpoints` replace the identity's set, and `stopListener` deletes it: arm the whole set in one call
    - **Two sessions.** The ABAP listener holds one stateful connection; each debuggee caught is attached on a new one, routed to its application server. The AMDP debugger answers events on one session and takes commands on another
@@ -481,7 +493,10 @@ const wsClient = new AdtClientsWS(transport, console);
 
 await wsClient.connect('wss://your-realtime-endpoint');
 
-const answer = await wsClient.request('<operation>', { /* payload */ });
+const answer = await wsClient.request('<operation>', { /* payload */ }); // unknown
+// Typed by what your reader makes of the payload (48.0.0); a reader that
+// throws rejects this request alone.
+const status = await wsClient.request('<operation>', undefined, { read: readStatus });
 ```
 
 ### Using AdtExecutor (Execution API)
@@ -738,6 +753,15 @@ reads at all.
 issue one request each and make no follow-up read of their own since 19.0.0.
 
 ### `update()` writes the whole content
+
+**The lock is yours** (48.0.0): every `update` and `updateMetadata` requires
+`options.lockHandle` and sends it as given, and `options.source` where the
+member sends one — a member never locks, checks or unlocks for itself. The two
+writes that take no lock, a service binding's publication
+(`getServiceBinding().update`) and a transport request's document
+(`getRequest().updateMetadata`), refuse a `lockHandle` by type. A message class
+message is the one write whose sequence has several locks: see
+[MIGRATION-48.md](docs/usage/MIGRATION-48.md#a-message-class-message-is-four-members).
 
 **Every type, every time: `update` replaces. It never merges.** Read the object,
 change what you mean to change, pass the result. Anything you leave out is gone,
@@ -1538,6 +1562,21 @@ await client
   );
 ```
 
+**The failure type follows `analyse`** (48.0.0). Every member is the overload
+pair of interfaces-adt 32: with `analyse` given, the answer is
+`IAdtResponse<T, E | IAdtError>` — `E` the strategy's, `IAdtError` where the
+library's own verdict stands because no answer came back for `analyse` to clear
+— and without it `IAdtResponse<T>`. A call that names `E` passes `analyse`.
+Read your strategy's own fields after narrowing:
+
+```typescript
+const answer = await cls.activate(target, { headers: ACTIVATION, analyse: analyseActivation });
+if (!answer.ok) {
+  const failure = answer.getError();
+  if ('stillInactive' in failure) report(failure.stillInactive);
+}
+```
+
 ### The reading is yours, and you choose it once
 
 What a member's result *becomes* is a strategy — `(answer: IAdtWireResponse) => T`
@@ -1722,9 +1761,12 @@ still takes an optional `accept` (`IReadOptions`).
   the requests that sent neither: a transport request's `checkDeletion`, and
   the direct `DELETE` of the legacy client's class, interface, program, DDL
   source, function group and function module (now in `@mcp-abap-adt/adt-clients-legacy`).
-- A message class message's `create`, `update` and `delete` are a chain (read,
-  two locks, the `PUT`, two unlocks): the pair is the `PUT`'s; the chain's own
-  requests keep their types.
+- A message class message's `update` sends one `PUT`, and the pair is its
+  (since 48.0.0; its `create` and `delete`, which ran read, two locks, the
+  `PUT` and two unlocks, are gone). The locks and unlocks are members of their
+  own (`lockMessage`, `lockClassForMessage`, `unlockMessages`), and the chain
+  is the caller's recipe: see
+  [MIGRATION-48](docs/usage/MIGRATION-48.md#a-message-class-message-is-four-members).
 - `AdtContentTypesBase` / `AdtContentTypesModern` still answer pairs for some
   creates (`classCreate()`, `programCreate()`, …), which you can pass as
   `headers`; the members themselves no longer read the `contentTypes` option
@@ -1903,7 +1945,7 @@ everything else is not.
 
 ### Single Definition Site: the contract packages
 
-Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^29.0.0`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^5.0.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the result-set contracts a factory accepts (`IClassResults`, …, since 38.0.0), the option and response types and the cross-cutting shared types all live there.
+Since **7.5.0**, every contract type is **defined once**, in the contract packages — today `@mcp-abap-adt/interfaces-adt` (`^33.0.0`) for the ADT contracts and `@mcp-abap-adt/interfaces-adt-connection` (`^5.3.0`) for the connection. This package declares no copies of its own — every `IXxxConfig`, the capability atoms, the result-set contracts a factory accepts (`IClassResults`, …, since 38.0.0), the option and response types and the cross-cutting shared types all live there.
 
 **Import them from the package that owns them:**
 
@@ -1951,7 +1993,7 @@ Since **9.0.0** no accessor returns the wide type, and since **12.0.0** none ret
 
 Since **24.0.0** there is no unit-test handler at all: every member `getUnitTest()` and `getCdsUnitTest()` had was another handler's request under a second name — the class's create, the local test class's read, update and delete. What was left, running, is `AdtExecutor.getClassTestRunner()` (`IAdtRunnable` plus `ITestRunInformation`), and the CDS test-doubles check is `getDdl().checkCdsTestDoubles()`. See [MIGRATION-24.md](docs/usage/MIGRATION-24.md).
 
-Since **25.0.0** ATC takes programs and every kind of include, `interfaces-adt` is `^12.0.0`, group operations refuse a reference they cannot address before any request, and a legacy client (since 37.4.0 in `@mcp-abap-adt/adt-clients-legacy`) answers a refusal for an object type the system lacks instead of throwing. See [MIGRATION-25.md](docs/usage/MIGRATION-25.md).
+Since **25.0.0** ATC takes programs and every kind of include, `interfaces-adt` was `^12.0.0` in that release (today `^33.0.0`), group operations refuse a reference they cannot address before any request, and a legacy client (since 37.4.0 in `@mcp-abap-adt/adt-clients-legacy`) answers a refusal for an object type the system lacks instead of throwing. See [MIGRATION-25.md](docs/usage/MIGRATION-25.md).
 
 The runtime client narrows the same way. `AdtRuntimeClient.getAtc()` implements `IAtcRunStatusReadable & IAtcFindings & IAtcResultsReadable` (the results SAP keeps by Display ID: `listResults`, `getResult`), plus `resolveCheckVariant`, `listCheckVariants`, `createWorklist` and `startRun` — a check run is three requests, started and then read, never created, locked, activated or versioned, and the type says so rather than offering the rest and throwing. It is not `IAdtRunnable` since 19.0.0: that atom's `run` is one call.
 
@@ -1983,7 +2025,7 @@ contracts (`IAbapDebugger`, `IAmdpDebugger`, `IMemorySnapshots`, 13.1.0). This
 package no longer declares or exports any contract type — every contract name it uses is
 sourced from the contract packages.
 
-> **Version pairing.** `adt-clients` 32 pairs with `interfaces-adt` 18 and `interfaces-adt-connection` 3 (the enhancement subtype and host contracts), and `adt-strategies` 0.12.0 declares the same ranges. Because the types are sourced rather than copied, `@mcp-abap-adt/interfaces-adt` and `@mcp-abap-adt/interfaces-adt-connection` are hard peers of this package's public API. A major bump there implies a bump here; keep the two in step rather than letting a resolver pick a mismatched pair.
+> **Version pairing.** `adt-clients` 48 pairs with `interfaces-adt` `^33.0.0` and `interfaces-adt-connection` `^5.3.0`, and depends on `adt-strategies` `^0.29.0`, which declares the same `interfaces-adt` range (`^33.0.0`) and `interfaces-adt-connection` `^5.3.0`; its own tests run over `@mcp-abap-adt/connection` `^25.2.0` (a dev dependency: the consumer brings its connection). Because the types are sourced rather than copied, `@mcp-abap-adt/interfaces-adt` and `@mcp-abap-adt/interfaces-adt-connection` are hard peers of this package's public API. A major bump there implies a bump here; keep the two in step rather than letting a resolver pick a mismatched pair.
 
 ### Release variants and type codes
 

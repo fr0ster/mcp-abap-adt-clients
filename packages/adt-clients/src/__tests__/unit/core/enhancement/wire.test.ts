@@ -228,6 +228,7 @@ it.each(rows)(
     const analyse = jest.fn(analyseException);
     const answer = await client.updateMetadata(config(type), {
       headers: headersOf(client, 'updateMetadata'),
+      lockHandle: 'H',
       source: '<document/>',
       analyse,
     });

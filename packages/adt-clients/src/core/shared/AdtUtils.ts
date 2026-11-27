@@ -1,4 +1,4 @@
-import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
+import type { AdtReadVersion, IAnalyse } from '@mcp-abap-adt/interfaces-adt';
 /**
  * AdtUtils - Utility Functions Wrapper
  *
@@ -189,6 +189,7 @@ import {
   isMetadataReadCode,
   METADATA_READ,
   type ParentedArguments,
+  type ParentedArgumentsBefore,
 } from './codeSets';
 import type {
   AdtSourceTypeCode,
@@ -354,10 +355,18 @@ export class AdtUtils<
    * 473 rows and 1.3MB. A caller who wants the hits passes `utilSearchHits`
    * from `@mcp-abap-adt/adt-strategies` for `search` when constructing this.
    */
+  search<E extends IAdtError>(
+    criteria: IAdtSearchObjectsParamsOf<V>,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['search'], E | IAdtError>>;
+  search(
+    criteria: IAdtSearchObjectsParamsOf<V>,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['search'], IAdtError>>;
   async search<E extends IAdtError = IAdtError>(
     criteria: IAdtSearchObjectsParamsOf<V>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['search'], E>> {
+  ): Promise<IAdtResponse<T['search'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -374,10 +383,20 @@ export class AdtUtils<
    * @param params - Virtual folder request parameters
    * @returns Virtual folder contents in XML format
    */
+  getVirtualFoldersContents<E extends IAdtError>(
+    params: IGetVirtualFoldersContentsParams,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['folders'], E | IAdtError>>;
+  getVirtualFoldersContents(
+    params: IGetVirtualFoldersContentsParams,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['folders'], IAdtError>>;
   async getVirtualFoldersContents<E extends IAdtError = IAdtError>(
     params: IGetVirtualFoldersContentsParams,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['folders'], E>> {
+  ): Promise<IAdtResponse<T['folders'], E | IAdtError>> {
     return answering(
       () => getVirtualFoldersContents(this.connection, options.headers, params),
       this.results.folders,
@@ -417,10 +436,20 @@ export class AdtUtils<
    *   scopeXml: scopeXml
    * });
    */
+  getWhereUsedScope<E extends IAdtError>(
+    params: IGetWhereUsedScopeParams<WhereUsedParamCode<V>>,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['whereUsedScope'], E | IAdtError>>;
+  getWhereUsedScope(
+    params: IGetWhereUsedScopeParams<WhereUsedParamCode<V>>,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['whereUsedScope'], IAdtError>>;
   async getWhereUsedScope<E extends IAdtError = IAdtError>(
     params: IGetWhereUsedScopeParams<WhereUsedParamCode<V>>,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['whereUsedScope'], E>> {
+  ): Promise<IAdtResponse<T['whereUsedScope'], E | IAdtError>> {
     // Built before the request: a type where-used cannot address is the
     // caller's argument, not something the server said.
     whereUsedObjectUri(
@@ -511,10 +540,20 @@ export class AdtUtils<
    *   searchInAllTypes: ['CLAS/OC', 'INTF/OI']
    * });
    */
+  getWhereUsed<E extends IAdtError>(
+    params: IGetWhereUsedParams<WhereUsedParamCode<V>>,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['whereUsed'], E | IAdtError>>;
+  getWhereUsed(
+    params: IGetWhereUsedParams<WhereUsedParamCode<V>>,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['whereUsed'], IAdtError>>;
   async getWhereUsed<E extends IAdtError = IAdtError>(
     params: IGetWhereUsedParams<WhereUsedParamCode<V>>,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['whereUsed'], E>> {
+  ): Promise<IAdtResponse<T['whereUsed'], E | IAdtError>> {
     // See getWhereUsedScope: an unknown type is thrown, not asked about.
     whereUsedObjectUri(
       params.object_name,
@@ -535,9 +574,15 @@ export class AdtUtils<
    * One GET, answered as it came; `utilInactiveObjects` in
    * `@mcp-abap-adt/adt-strategies` reads it into references.
    */
+  getInactiveObjects<E extends IAdtError>(
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['inactive'], E | IAdtError>>;
+  getInactiveObjects(
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['inactive'], IAdtError>>;
   async getInactiveObjects<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['inactive'], E>> {
+  ): Promise<IAdtResponse<T['inactive'], E | IAdtError>> {
     return answering(
       () => fetchInactiveObjects(this.connection),
       this.results.inactive,
@@ -555,11 +600,23 @@ export class AdtUtils<
    * `@mcp-abap-adt/adt-strategies` for the `activation` slot (or keeps the
    * exchange with `wireItself` and reads it with `extractRunId`).
    */
+  activateObjectsGroup<E extends IAdtError>(
+    objects: IAdtCodedReference<AdtActivationCode<V>>[],
+    preauditRequested: boolean | undefined,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>>;
+  activateObjectsGroup(
+    objects: IAdtCodedReference<AdtActivationCode<V>>[],
+    preauditRequested: boolean | undefined,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['activation'], IAdtError>>;
   async activateObjectsGroup<E extends IAdtError = IAdtError>(
     objects: IAdtCodedReference<AdtActivationCode<V>>[],
     preauditRequested: boolean = false,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['activation'], E>> {
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>> {
     addressEvery(objects);
     performEvery(
       objects.filter((o) => !isActivatedWithoutTable(o.type)),
@@ -593,11 +650,23 @@ export class AdtUtils<
    * silent checklist (`activationExecuted="false"`, no message) alone, the
    * inactive list is read once and handed to `analyse` (`IAdtAnalyseContext`).
    */
+  activateObjects<E extends IAdtError>(
+    objects: IAdtCodedReference<AdtActivationCode<V>>[],
+    preauditRequested: boolean | undefined,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['objectActivation'], E | IAdtError>>;
+  activateObjects(
+    objects: IAdtCodedReference<AdtActivationCode<V>>[],
+    preauditRequested: boolean | undefined,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['objectActivation'], IAdtError>>;
   async activateObjects<E extends IAdtError = IAdtError>(
     objects: IAdtCodedReference<AdtActivationCode<V>>[],
     preauditRequested: boolean = false,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['objectActivation'], E>> {
+  ): Promise<IAdtResponse<T['objectActivation'], E | IAdtError>> {
     addressEvery(objects);
     performEvery(
       objects.filter((o) => !isActivatedWithoutTable(o.type)),
@@ -620,10 +689,22 @@ export class AdtUtils<
    * document's `runs:status` means — and which value ends their wait — is
    * theirs to read.
    */
+  getActivationRun<E extends IAdtError>(
+    runId: string,
+    options: ({
+      withLongPolling?: boolean | undefined;
+    } & IAdtAnalyseOptions<E>) & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>>;
+  getActivationRun(
+    runId: string,
+    options?: {
+      withLongPolling?: boolean | undefined;
+    } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['run'], IAdtError>>;
   async getActivationRun<E extends IAdtError = IAdtError>(
     runId: string,
     options?: { withLongPolling?: boolean | undefined } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['run'], E>> {
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>> {
     return answering(
       () =>
         getActivationRun(this.connection, runId, {
@@ -640,10 +721,18 @@ export class AdtUtils<
    * One request. How long to wait before asking is the caller's decision, which
    * is why this is a separate member rather than a step inside another.
    */
+  getActivationResults<E extends IAdtError>(
+    runId: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['results'], E | IAdtError>>;
+  getActivationResults(
+    runId: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['results'], IAdtError>>;
   async getActivationResults<E extends IAdtError = IAdtError>(
     runId: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['results'], E>> {
+  ): Promise<IAdtResponse<T['results'], E | IAdtError>> {
     return answering(
       () => getActivationResults(this.connection, runId),
       this.results.results,
@@ -657,10 +746,20 @@ export class AdtUtils<
    * @param objects - Array of object references to check
    * @returns Check result
    */
+  checkDeletionGroup<E extends IAdtError>(
+    objects: IAdtCodedReference<AdtDeletionCheckCode<V>>[],
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  checkDeletionGroup(
+    objects: IAdtCodedReference<AdtDeletionCheckCode<V>>[],
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   async checkDeletionGroup<E extends IAdtError = IAdtError>(
     objects: IAdtCodedReference<AdtDeletionCheckCode<V>>[],
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
     addressEvery(objects);
     performEvery(objects, 'deletionCheck');
     return answering(
@@ -681,11 +780,23 @@ export class AdtUtils<
    * @param objects - Array of object references to delete
    * @param transportRequest - Optional transport request
    */
+  deleteObjectsGroup<E extends IAdtError>(
+    objects: IAdtCodedReference<AdtDeletionCode<V>>[],
+    transportRequest: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>>;
+  deleteObjectsGroup(
+    objects: IAdtCodedReference<AdtDeletionCode<V>>[],
+    transportRequest: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletion'], IAdtError>>;
   async deleteObjectsGroup<E extends IAdtError = IAdtError>(
     objects: IAdtCodedReference<AdtDeletionCode<V>>[],
     transportRequest: string | undefined,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['deletion'], E>> {
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
     addressEvery(objects);
     performEvery(objects, 'delete');
     return answering(
@@ -712,6 +823,22 @@ export class AdtUtils<
    * @param options.accept - Optional Accept override for the metadata request
    * @returns Metadata response
    */
+  readObjectMetadata<C extends AdtMetadataReadCodeOf<V>, E extends IAdtError>(
+    objectType: C,
+    objectName: string,
+    ...[functionGroup, options]: ParentedArgumentsBefore<
+      C,
+      [options: IReadOptions & IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> }]
+    >
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>>;
+  readObjectMetadata<C extends AdtMetadataReadCodeOf<V>>(
+    objectType: C,
+    objectName: string,
+    ...[functionGroup, options]: ParentedArguments<
+      C,
+      [options?: IReadOptions & IAdtAnalyseOptions]
+    >
+  ): Promise<IAdtResponse<T['metadata']>>;
   async readObjectMetadata<
     C extends AdtMetadataReadCodeOf<V>,
     E extends IAdtError = IAdtError,
@@ -722,7 +849,7 @@ export class AdtUtils<
       C,
       [options?: IReadOptions & IAdtAnalyseOptions<E>]
     >
-  ): Promise<IAdtResponse<T['metadata'], E>> {
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>> {
     // Refused before anything is asked: the member reads only the codes whose
     // request it sent before 38.0.0 (`METADATA_READ`), which its type holds; a
     // caller outside the type system gets the refusal, and no request.
@@ -766,6 +893,26 @@ export class AdtUtils<
    * @param options.accept - Optional Accept override for the source request
    * @returns Source code response
    */
+  readObjectSource<C extends AdtSourceReadCodeOf<V>, E extends IAdtError>(
+    objectType: C,
+    objectName: string,
+    ...[functionGroup, version, options]: ParentedArgumentsBefore<
+      C,
+      [
+        version: AdtReadVersion | undefined,
+        options: IReadOptions &
+          IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+      ]
+    >
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>>;
+  readObjectSource<C extends AdtSourceReadCodeOf<V>>(
+    objectType: C,
+    objectName: string,
+    ...[functionGroup, version, options]: ParentedArguments<
+      C,
+      [version?: AdtReadVersion, options?: IReadOptions & IAdtAnalyseOptions]
+    >
+  ): Promise<IAdtResponse<T['source']>>;
   async readObjectSource<
     C extends AdtSourceReadCodeOf<V>,
     E extends IAdtError = IAdtError,
@@ -776,7 +923,7 @@ export class AdtUtils<
       C,
       [version?: AdtReadVersion, options?: IReadOptions & IAdtAnalyseOptions<E>]
     >
-  ): Promise<IAdtResponse<T['source'], E>> {
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>> {
     // Raised before anything is asked, rather than dressed as a verdict about
     // the server: a code this member does not read (`SOURCE_READ`, which its
     // type holds), and a function module with no function group, are both
@@ -846,10 +993,20 @@ export class AdtUtils<
    * @param params - SQL query parameters
    * @returns Query result
    */
+  getSqlQuery<E extends IAdtError>(
+    params: IGetSqlQueryParams,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['query'], E | IAdtError>>;
+  getSqlQuery(
+    params: IGetSqlQueryParams,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['query'], IAdtError>>;
   async getSqlQuery<E extends IAdtError = IAdtError>(
     params: IGetSqlQueryParams,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['query'], E>> {
+  ): Promise<IAdtResponse<T['query'], E | IAdtError>> {
     return answering(
       () => getSqlQuery(this.connection, options.headers, params),
       this.results.query,
@@ -864,10 +1021,18 @@ export class AdtUtils<
    * the statement is the caller's, and this is where they learn what they may
    * name in it.
    */
+  getTableColumns<E extends IAdtError>(
+    tableName: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['columns'], E | IAdtError>>;
+  getTableColumns(
+    tableName: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['columns'], IAdtError>>;
   async getTableColumns<E extends IAdtError = IAdtError>(
     tableName: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['columns'], E>> {
+  ): Promise<IAdtResponse<T['columns'], E | IAdtError>> {
     return answering(
       () => getTableColumns(this.connection, tableName),
       this.results.columns,
@@ -882,10 +1047,20 @@ export class AdtUtils<
    * @param params - Table contents parameters
    * @returns Table contents result
    */
+  getTableContents<E extends IAdtError>(
+    params: IGetTableContentsParams,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['contents'], E | IAdtError>>;
+  getTableContents(
+    params: IGetTableContentsParams,
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['contents'], IAdtError>>;
   async getTableContents<E extends IAdtError = IAdtError>(
     params: IGetTableContentsParams,
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['contents'], E>> {
+  ): Promise<IAdtResponse<T['contents'], E | IAdtError>> {
     return answering(
       () => getTableContents(this.connection, options.headers, params),
       this.results.contents,
@@ -899,10 +1074,18 @@ export class AdtUtils<
    * @param params - Optional request/timeout options
    * @returns Axios response with discovery XML
    */
+  discovery<E extends IAdtError>(
+    params: IGetDiscoveryParams | undefined,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['discovery'], E | IAdtError>>;
+  discovery(
+    params?: IGetDiscoveryParams,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['discovery'], IAdtError>>;
   async discovery<E extends IAdtError = IAdtError>(
     params: IGetDiscoveryParams = {},
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['discovery'], E>> {
+  ): Promise<IAdtResponse<T['discovery'], E | IAdtError>> {
     return answering(
       () => getDiscoveryUtil(this.connection, params),
       this.results.discovery,
@@ -926,12 +1109,24 @@ export class AdtUtils<
    * const response = await utils.fetchNodeStructure('CLAS/OC', 'ZMY_CLASS', '0000');
    * ```
    */
+  fetchNodeStructure<E extends IAdtError>(
+    parentType: AdtStructureCode<V>,
+    parentName: string,
+    options: { headers: IAdtHeaders } & IGetNodeContentsOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['node'], E | IAdtError>>;
+  fetchNodeStructure(
+    parentType: AdtStructureCode<V>,
+    parentName: string,
+    options: { headers: IAdtHeaders } & IGetNodeContentsOptions &
+      IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['node'], IAdtError>>;
   async fetchNodeStructure<E extends IAdtError = IAdtError>(
     parentType: AdtStructureCode<V>,
     parentName: string,
     options: { headers: IAdtHeaders } & IGetNodeContentsOptions &
       IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['node'], E>> {
+  ): Promise<IAdtResponse<T['node'], E | IAdtError>> {
     return answering(
       () =>
         fetchNodeStructureUtil(
@@ -961,11 +1156,21 @@ export class AdtUtils<
    * const response = await utils.getObjectStructure('CLAS/OC', 'ZMY_CLASS');
    * ```
    */
+  getObjectStructure<E extends IAdtError>(
+    objectType: AdtStructureCode<V>,
+    objectName: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['objectStructure'], E | IAdtError>>;
+  getObjectStructure(
+    objectType: AdtStructureCode<V>,
+    objectName: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['objectStructure'], IAdtError>>;
   async getObjectStructure<E extends IAdtError = IAdtError>(
     objectType: AdtStructureCode<V>,
     objectName: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['objectStructure'], E>> {
+  ): Promise<IAdtResponse<T['objectStructure'], E | IAdtError>> {
     return answering(
       () => getObjectStructureUtil(this.connection, objectType, objectName),
       this.results.objectStructure,
@@ -995,6 +1200,22 @@ export class AdtUtils<
    * @param options.accept - The Accept to send; the one every kind answers
    *   is `application/vnd.sap.adt.objectstructure.v2+xml`, the default
    */
+  getObjectOutline<E extends IAdtError>(
+    objectType: AdtOutlineCode,
+    objectName: string,
+    options: ({
+      version?: AdtReadVersion;
+      accept?: string;
+    } & IAdtAnalyseOptions<E>) & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  getObjectOutline(
+    objectType: AdtOutlineCode,
+    objectName: string,
+    options?: {
+      version?: AdtReadVersion;
+      accept?: string;
+    } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   async getObjectOutline<E extends IAdtError = IAdtError>(
     objectType: AdtOutlineCode,
     objectName: string,
@@ -1002,7 +1223,7 @@ export class AdtUtils<
       version?: AdtReadVersion;
       accept?: string;
     } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
     return answering(
       () =>
         getObjectOutlineUtil(this.connection, objectType, objectName, {
@@ -1030,10 +1251,20 @@ export class AdtUtils<
    * @param options.accept - The Accept to send; SAP answers only
    *   `application/vnd.sap.adt.elementinfo+xml`, the default
    */
+  getStructureElementInfo<E extends IAdtError>(
+    structureName: string,
+    options: ({ accept?: string } & IAdtAnalyseOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  getStructureElementInfo(
+    structureName: string,
+    options?: { accept?: string } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   async getStructureElementInfo<E extends IAdtError = IAdtError>(
     structureName: string,
     options?: { accept?: string } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
     return answering(
       () =>
         getStructureElementInfoUtil(this.connection, structureName, {
@@ -1059,10 +1290,20 @@ export class AdtUtils<
    * @param options.accept - The Accept to send; SAP answers only
    *   `application/vnd.sap.adt.elementinfo+xml`, the default
    */
+  getServiceDefinitionElementInfo<E extends IAdtError>(
+    serviceDefinitionName: string,
+    options: ({ accept?: string } & IAdtAnalyseOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  getServiceDefinitionElementInfo(
+    serviceDefinitionName: string,
+    options?: { accept?: string } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   async getServiceDefinitionElementInfo<E extends IAdtError = IAdtError>(
     serviceDefinitionName: string,
     options?: { accept?: string } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
     return answering(
       () =>
         getServiceDefinitionElementInfoUtil(
@@ -1098,10 +1339,18 @@ export class AdtUtils<
    * if (answer.ok) answer.getResult().value; // the opr:objectProperties document
    * ```
    */
+  getObjectProperties<E extends IAdtError>(
+    objectUri: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['objectProperties'], E | IAdtError>>;
+  getObjectProperties(
+    objectUri: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['objectProperties'], IAdtError>>;
   async getObjectProperties<E extends IAdtError = IAdtError>(
     objectUri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['objectProperties'], E>> {
+  ): Promise<IAdtResponse<T['objectProperties'], E | IAdtError>> {
     return answering(
       () => getObjectPropertiesUtil(this.connection, objectUri),
       this.results.objectProperties,
@@ -1123,10 +1372,18 @@ export class AdtUtils<
    * const sourceCode = response.data; // Include source code
    * ```
    */
+  getInclude<E extends IAdtError>(
+    includeName: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['include'], E | IAdtError>>;
+  getInclude(
+    includeName: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['include'], IAdtError>>;
   async getInclude<E extends IAdtError = IAdtError>(
     includeName: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['include'], E>> {
+  ): Promise<IAdtResponse<T['include'], E | IAdtError>> {
     return answering(
       () => getIncludeUtil(this.connection, includeName),
       this.results.include,
@@ -1150,12 +1407,24 @@ export class AdtUtils<
    * // Response contains XML with all ADT object types
    * ```
    */
+  getAllTypes<E extends IAdtError>(
+    maxItemCount: number | undefined,
+    name: string | undefined,
+    data: string | undefined,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['types'], E | IAdtError>>;
+  getAllTypes(
+    maxItemCount?: number,
+    name?: string,
+    data?: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['types'], IAdtError>>;
   async getAllTypes<E extends IAdtError = IAdtError>(
     maxItemCount: number = 999,
     name: string = '*',
     data: string = 'usedByProvider',
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['types'], E>> {
+  ): Promise<IAdtResponse<T['types'], E | IAdtError>> {
     return answering(
       () => getAllTypesUtil(this.connection, maxItemCount, name, data),
       this.results.types,
@@ -1181,9 +1450,17 @@ export class AdtUtils<
    *   list's own Accept, which S/4HANA 2025, ABAP cloud and SAP_BASIS 7.40 SP04
    *   answered, is `ACCEPT_TYPE_STRUCTURE`
    */
+  getTypeStructure<E extends IAdtError>(
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  getTypeStructure(
+    options: { headers: IAdtHeaders } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   async getTypeStructure<E extends IAdtError = IAdtError>(
     options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
     return answering(
       () => getTypeStructureUtil(this.connection, options.headers),
       rawDocument,

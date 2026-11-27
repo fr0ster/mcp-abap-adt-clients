@@ -46,9 +46,19 @@ describe('search: the filter is a search name of the variant', () => {
     ['cloud', 'DEVC'],
     ['cloud', 'STRU'],
   ] as const)('%s sends %s as objectType', async (variant, name) => {
-    const { connection, utils } =
-      variant === 'onprem' ? utilsOf<'onprem'>() : utilsOf<'cloud'>();
-    await utils.search({ query: 'Z*', objectType: name, maxResults: 5 });
+    // Each variant called on its own: a union of two overload sets has no
+    // call signature.
+    const query = { query: 'Z*', objectType: name, maxResults: 5 } as const;
+    let connection: RecordingConnection;
+    if (variant === 'onprem') {
+      const onprem = utilsOf<'onprem'>();
+      await onprem.utils.search(query);
+      connection = onprem.connection;
+    } else {
+      const cloud = utilsOf<'cloud'>();
+      await cloud.utils.search(query);
+      connection = cloud.connection;
+    }
     expect(connection.sent.map((request) => request.url)).toEqual([
       `${SEARCH}&query=Z*&maxResults=5&objectType=${name}`,
     ]);

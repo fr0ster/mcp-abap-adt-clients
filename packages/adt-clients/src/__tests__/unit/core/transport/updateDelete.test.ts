@@ -138,6 +138,7 @@ describe('AdtRequest.update()', () => {
           new AdtRequest(connection, { results: transportDocuments }),
           'updateMetadata',
         ),
+        source: TRANSPORT_ITEM_XML,
       },
     );
 
@@ -159,6 +160,7 @@ describe('AdtRequest.update()', () => {
       {
         transportNumber: 'DEVK900438',
       },
+      // @ts-expect-error -- a JavaScript caller can still pass no document (#304, D1)
       {
         headers: headersOf(
           new AdtRequest(connection, { results: transportDocuments }),
@@ -217,6 +219,7 @@ describe('AdtRequest.delete()', () => {
     const { connection, calls } = connectionOver(() => TRANSPORT_ITEM_XML);
 
     await new AdtRequest(connection, { results: transportDocuments }).delete(
+      // @ts-expect-error -- a JavaScript caller can still name nothing (#304, D1)
       {},
       {
         headers: headersOf(

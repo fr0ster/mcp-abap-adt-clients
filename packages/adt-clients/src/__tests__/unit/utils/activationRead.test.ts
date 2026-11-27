@@ -198,7 +198,10 @@ describe('the read after a silent checklist', () => {
     );
     expect(answer.ok).toBe(false);
     if (answer.ok) return;
-    expect(answer.getError().stillInactive.map((o) => o.uri)).toEqual([
+    const failure = answer.getError();
+    if (!('stillInactive' in failure))
+      throw new Error('expected the activation failure');
+    expect(failure.stillInactive.map((o) => o.uri)).toEqual([
       GROUP,
       `${GROUP}/source/main`,
     ]);
@@ -320,7 +323,10 @@ describe('the read after a checklist with no verdict and warnings alone', () => 
     );
     expect(answer.ok).toBe(false);
     if (answer.ok) return;
-    expect(answer.getError().stillInactive.map((o) => o.uri)).toEqual([
+    const failure = answer.getError();
+    if (!('stillInactive' in failure))
+      throw new Error('expected the activation failure');
+    expect(failure.stillInactive.map((o) => o.uri)).toEqual([
       GROUP,
       `${GROUP}/source/main`,
     ]);

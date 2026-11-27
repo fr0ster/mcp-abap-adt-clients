@@ -23,11 +23,15 @@ import {
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
 import type {
+  AdtObjectIdentity,
+  AdtRequiredUpdateOptions,
   IAdtError,
   IAdtHeaders,
+  IAdtLockedWrite,
   IAdtOperationOptions,
   IAdtResponse,
   IAdtUpdateOptions,
+  IAnalyse,
   IMessageClassConfig,
 } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
@@ -40,12 +44,24 @@ export class AdtMessageClassLegacy<
   T extends MessageClassValues = ResultValuesOf<typeof messageClassDocuments>,
 > extends AdtMessageClass<T, 'basis740'> {
   /** Refused without a request: 7.40 has no `/sap/bc/adt/deletion/check` (§5). */
+  override checkDeletion<E extends IAdtError>(
+    this: this & AdtPerformedBy<'messageClass', 'deletionCheck'>,
+    _config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  override checkDeletion(
+    this: this & AdtPerformedBy<'messageClass', 'deletionCheck'>,
+    _config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   override async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'messageClass', 'deletionCheck'>,
-    _config: Partial<IMessageClassConfig>,
+    _config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
-    return noDeletionCheck<T['deletionCheck'], E>();
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
+    return noDeletionCheck<T['deletionCheck']>();
   }
 
   /**
@@ -57,11 +73,21 @@ export class AdtMessageClassLegacy<
    * this member does not lock. Measured on 7.40 SP04: `200`, and the name is
    * free afterwards.
    */
+  override delete<E extends IAdtError>(
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>>;
+  override delete(
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletion'], IAdtError>>;
   override async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IMessageClassConfig>,
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletion'], E>> {
-    const objectUrl = MESSAGE_CLASS.uri(config.name as string);
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
+    const objectUrl = MESSAGE_CLASS.uri(config.name);
     return answering(
       () =>
         deleteObjectDirect(
@@ -81,12 +107,28 @@ export class AdtMessageClassLegacy<
    * answered `400 ExceptionInvalidData` on 7.40 SP04, which expects another
    * root element; until that document is measured it is not sent.
    */
+  override updateMetadata<E extends IAdtError>(
+    this: this & AdtPerformedBy<'messageClass', 'updateMetadata'>,
+    _config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
+    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>>;
+  override updateMetadata(
+    this: this & AdtPerformedBy<'messageClass', 'updateMetadata'>,
+    _config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
+    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], IAdtError>>;
   override async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'messageClass', 'updateMetadata'>,
-    _config: Partial<IMessageClassConfig>,
-    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
-    return legacyMeasuredRefusal<T['metadataUpdated'], E>(
+    _config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
+    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
+    return legacyMeasuredRefusal<T['metadataUpdated']>(
       'updateMetadata',
       'PUT of the message class document answers 400 ExceptionInvalidData (7.40 expects another root element).',
     );

@@ -22,6 +22,7 @@ import type {
   IAdtError,
   IAdtResponse,
   IAdtRunnable,
+  IAnalyse,
   IClassUnitTestRunOptions,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -59,11 +60,22 @@ export class FunctionGroupTestRunner<
   }
 
   /** Run every test class of the group. One POST. */
+  run<E extends IAdtError>(
+    this: this & AdtPerformedBy<'functionGroup', 'unitTestRun'>,
+    functionGroupName: string,
+    options: IClassUnitTestRunOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>>;
+  run(
+    this: this & AdtPerformedBy<'functionGroup', 'unitTestRun'>,
+    functionGroupName: string,
+    options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['run'], IAdtError>>;
   async run<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionGroup', 'unitTestRun'>,
     functionGroupName: string,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['run'], E>> {
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>> {
     return this.startByObject(functionGroupName, 'FUGR', options);
   }
 
@@ -83,11 +95,22 @@ export class FunctionGroupTestRunner<
    * `result` strategy; whether a failing test is a failure is
    * `options.analyse`'s.
    */
+  runSync<E extends IAdtError>(
+    this: this & AdtPerformedBy<'functionGroup', 'unitTestRunSync'>,
+    functionGroupName: string,
+    options: IClassUnitTestRunOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['result'], E | IAdtError>>;
+  runSync(
+    this: this & AdtPerformedBy<'functionGroup', 'unitTestRunSync'>,
+    functionGroupName: string,
+    options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['result'], IAdtError>>;
   async runSync<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'functionGroup', 'unitTestRunSync'>,
     functionGroupName: string,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['result'], E>> {
+  ): Promise<IAdtResponse<T['result'], E | IAdtError>> {
     return this.startSync([FUNCTION_GROUP.uri(functionGroupName)], options);
   }
 }

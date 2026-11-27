@@ -21,6 +21,7 @@ import type {
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
+  IAnalyse,
   IClassExecuteOptions,
   IClassExecuteWithProfilerOptions,
   IClassExecutionTarget,
@@ -38,38 +39,69 @@ export class ClassExecutorLegacy<
   T extends ClassExecutorValues = ResultValuesOf<typeof classExecutorDocuments>,
 > extends ClassExecutor<T, 'basis740'> {
   /** Refused without a request: 7.40 has no `IF_OO_ADT_CLASSRUN` and no classrun endpoint. */
+  override run<E extends IAdtError>(
+    this: this & AdtPerformedBy<'class', 'run'>,
+    _target: IClassExecutionTarget,
+    _options: IClassExecuteOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>>;
+  override run(
+    this: this & AdtPerformedBy<'class', 'run'>,
+    _target: IClassExecutionTarget,
+    _options?: IClassExecuteOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['run'], IAdtError>>;
   override async run<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'class', 'run'>,
     _target: IClassExecutionTarget,
     _options?: IClassExecuteOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['run'], E>> {
-    return legacyRefusal<T['run'], E>('run', CLASSRUN);
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>> {
+    return legacyRefusal<T['run']>('run', CLASSRUN);
   }
 
   /** Refused without a request, for the same reason as `run`. */
+  override runWithProfiler<E extends IAdtError>(
+    this: this & AdtPerformedBy<'class', 'profile'>,
+    _target: IClassExecutionTarget,
+    _options: IClassExecuteWithProfilerOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>>;
+  override runWithProfiler(
+    this: this & AdtPerformedBy<'class', 'profile'>,
+    _target: IClassExecutionTarget,
+    _options: IClassExecuteWithProfilerOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['run'], IAdtError>>;
   override async runWithProfiler<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'class', 'profile'>,
     _target: IClassExecutionTarget,
     _options: IClassExecuteWithProfilerOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['run'], E>> {
-    return legacyRefusal<T['run'], E>('runWithProfiler', CLASSRUN);
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>> {
+    return legacyRefusal<T['run']>('runWithProfiler', CLASSRUN);
   }
 
   /** Refused until measured: 7.40 does not advertise the catalogue. */
+  override listObjectTypes<E extends IAdtError>(
+    _options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['types'], E | IAdtError>>;
+  override listObjectTypes(
+    _options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['types'], IAdtError>>;
   override async listObjectTypes<E extends IAdtError = IAdtError>(
     _options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['types'], E>> {
-    return legacyUnmeasuredRefusal<T['types'], E>(
-      'listObjectTypes',
-      OBJECT_TYPES,
-    );
+  ): Promise<IAdtResponse<T['types'], E | IAdtError>> {
+    return legacyUnmeasuredRefusal<T['types']>('listObjectTypes', OBJECT_TYPES);
   }
 
   /** Refused until measured: 7.40 does not advertise the catalogue. */
+  override listProcessTypes<E extends IAdtError>(
+    _options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['types'], E | IAdtError>>;
+  override listProcessTypes(
+    _options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['types'], IAdtError>>;
   override async listProcessTypes<E extends IAdtError = IAdtError>(
     _options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['types'], E>> {
-    return legacyUnmeasuredRefusal<T['types'], E>(
+  ): Promise<IAdtResponse<T['types'], E | IAdtError>> {
+    return legacyUnmeasuredRefusal<T['types']>(
       'listProcessTypes',
       PROCESS_TYPES,
     );

@@ -10,6 +10,7 @@ import type {
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
+  IAnalyse,
   IMemorySnapshots,
   IMemorySnapshotsListOptions,
   IResultStrategy,
@@ -122,9 +123,16 @@ export class MemorySnapshots<
     return this.results[key];
   }
 
+  list<E extends IAdtError>(
+    options: IMemorySnapshotsListOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['list'], E | IAdtError>>;
+  list(
+    options?: IMemorySnapshotsListOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['list'], IAdtError>>;
   async list<E extends IAdtError = IAdtError>(
     options?: IMemorySnapshotsListOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['list'], E>> {
+  ): Promise<IAdtResponse<T['list'], E | IAdtError>> {
     return answering(
       () =>
         listSnapshots(this.connection, options?.user, options?.originalUser),
@@ -133,10 +141,18 @@ export class MemorySnapshots<
     );
   }
 
+  getById<E extends IAdtError>(
+    snapshotId: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['snapshot'], E | IAdtError>>;
+  getById(
+    snapshotId: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['snapshot'], IAdtError>>;
   async getById<E extends IAdtError = IAdtError>(
     snapshotId: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['snapshot'], E>> {
+  ): Promise<IAdtResponse<T['snapshot'], E | IAdtError>> {
     return answering(
       () => getSnapshot(this.connection, snapshotId),
       this.reading('snapshot'),
@@ -144,10 +160,18 @@ export class MemorySnapshots<
     );
   }
 
+  getOverview<E extends IAdtError>(
+    snapshotId: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['overview'], E | IAdtError>>;
+  getOverview(
+    snapshotId: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['overview'], IAdtError>>;
   async getOverview<E extends IAdtError = IAdtError>(
     snapshotId: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['overview'], E>> {
+  ): Promise<IAdtResponse<T['overview'], E | IAdtError>> {
     return answering(
       () => getSnapshotOverview(this.connection, snapshotId),
       this.reading('overview'),
@@ -155,10 +179,19 @@ export class MemorySnapshots<
     );
   }
 
+  getRankingList<E extends IAdtError>(
+    snapshotId: string,
+    options: ISnapshotRankingListOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['rankingList'], E | IAdtError>>;
+  getRankingList(
+    snapshotId: string,
+    options: ISnapshotRankingListOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['rankingList'], IAdtError>>;
   async getRankingList<E extends IAdtError = IAdtError>(
     snapshotId: string,
     options: ISnapshotRankingListOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['rankingList'], E>> {
+  ): Promise<IAdtResponse<T['rankingList'], E | IAdtError>> {
     return answering(
       () => getSnapshotRankingList(this.connection, snapshotId, options),
       this.reading('rankingList'),
@@ -166,11 +199,22 @@ export class MemorySnapshots<
     );
   }
 
+  getChildren<E extends IAdtError>(
+    snapshotId: string,
+    parentKey: string,
+    options: ISnapshotChildrenOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['children'], E | IAdtError>>;
+  getChildren(
+    snapshotId: string,
+    parentKey: string,
+    options: ISnapshotChildrenOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['children'], IAdtError>>;
   async getChildren<E extends IAdtError = IAdtError>(
     snapshotId: string,
     parentKey: string,
     options: ISnapshotChildrenOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['children'], E>> {
+  ): Promise<IAdtResponse<T['children'], E | IAdtError>> {
     return answering(
       () =>
         getSnapshotChildren(this.connection, snapshotId, parentKey, options),
@@ -179,11 +223,22 @@ export class MemorySnapshots<
     );
   }
 
+  getReferences<E extends IAdtError>(
+    snapshotId: string,
+    objectKey: string,
+    options: ISnapshotReferencesOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['references'], E | IAdtError>>;
+  getReferences(
+    snapshotId: string,
+    objectKey: string,
+    options: ISnapshotReferencesOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['references'], IAdtError>>;
   async getReferences<E extends IAdtError = IAdtError>(
     snapshotId: string,
     objectKey: string,
     options: ISnapshotReferencesOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['references'], E>> {
+  ): Promise<IAdtResponse<T['references'], E | IAdtError>> {
     return answering(
       () =>
         getSnapshotReferences(this.connection, snapshotId, objectKey, options),
@@ -192,11 +247,21 @@ export class MemorySnapshots<
     );
   }
 
+  getDeltaOverview<E extends IAdtError>(
+    fromId: string,
+    toId: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['overview'], E | IAdtError>>;
+  getDeltaOverview(
+    fromId: string,
+    toId: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['overview'], IAdtError>>;
   async getDeltaOverview<E extends IAdtError = IAdtError>(
     fromId: string,
     toId: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['overview'], E>> {
+  ): Promise<IAdtResponse<T['overview'], E | IAdtError>> {
     return answering(
       () => getSnapshotDeltaOverview(this.connection, fromId, toId),
       this.reading('overview'),
@@ -204,11 +269,22 @@ export class MemorySnapshots<
     );
   }
 
+  getDeltaRankingList<E extends IAdtError>(
+    fromId: string,
+    toId: string,
+    options: ISnapshotRankingListOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['rankingList'], E | IAdtError>>;
+  getDeltaRankingList(
+    fromId: string,
+    toId: string,
+    options: ISnapshotRankingListOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['rankingList'], IAdtError>>;
   async getDeltaRankingList<E extends IAdtError = IAdtError>(
     fromId: string,
     toId: string,
     options: ISnapshotRankingListOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['rankingList'], E>> {
+  ): Promise<IAdtResponse<T['rankingList'], E | IAdtError>> {
     return answering(
       () => getSnapshotDeltaRankingList(this.connection, fromId, toId, options),
       this.reading('rankingList'),
@@ -216,12 +292,25 @@ export class MemorySnapshots<
     );
   }
 
+  getDeltaChildren<E extends IAdtError>(
+    fromId: string,
+    toId: string,
+    parentKey: string,
+    options: ISnapshotChildrenOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['children'], E | IAdtError>>;
+  getDeltaChildren(
+    fromId: string,
+    toId: string,
+    parentKey: string,
+    options: ISnapshotChildrenOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['children'], IAdtError>>;
   async getDeltaChildren<E extends IAdtError = IAdtError>(
     fromId: string,
     toId: string,
     parentKey: string,
     options: ISnapshotChildrenOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['children'], E>> {
+  ): Promise<IAdtResponse<T['children'], E | IAdtError>> {
     return answering(
       () =>
         getSnapshotDeltaChildren(
@@ -236,12 +325,25 @@ export class MemorySnapshots<
     );
   }
 
+  getDeltaReferences<E extends IAdtError>(
+    fromId: string,
+    toId: string,
+    objectKey: string,
+    options: ISnapshotReferencesOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['references'], E | IAdtError>>;
+  getDeltaReferences(
+    fromId: string,
+    toId: string,
+    objectKey: string,
+    options: ISnapshotReferencesOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['references'], IAdtError>>;
   async getDeltaReferences<E extends IAdtError = IAdtError>(
     fromId: string,
     toId: string,
     objectKey: string,
     options: ISnapshotReferencesOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['references'], E>> {
+  ): Promise<IAdtResponse<T['references'], E | IAdtError>> {
     return answering(
       () =>
         getSnapshotDeltaReferences(

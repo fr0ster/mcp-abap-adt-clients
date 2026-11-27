@@ -17,7 +17,7 @@ import type {
 import * as ts from 'typescript';
 import type { AdtClient } from '../../clients/AdtClient';
 import type { AdtUtils } from '../../core/shared/AdtUtils';
-import { HANDLERS } from './capabilities/manifest';
+import { HANDLERS, type HandlerEntry } from './capabilities/manifest';
 
 /**
  * The members that take `options.headers`: the 32 of interfaces-adt 19.0.0,
@@ -194,7 +194,7 @@ export function objectRows(
     'activate',
     'checkState',
   ];
-  for (const [name, entry] of Object.entries(HANDLERS)) {
+  for (const [name, entry] of Object.entries<HandlerEntry>(HANDLERS)) {
     const config = entry.config as Record<string, unknown>;
     const build = (connection: IAbapConnection) =>
       (entry.factory as (c: AdtClient) => object)(client(connection));
@@ -221,6 +221,7 @@ export function objectRows(
                 headers,
                 source: String(config.source ?? '" guard'),
                 lockHandle: 'GUARD-LOCK',
+                ...(member === 'update' ? entry.updateOptions : undefined),
               });
             default:
               return fn(config, { headers });

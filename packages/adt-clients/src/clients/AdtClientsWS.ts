@@ -12,6 +12,16 @@ export interface IAdtClientsWSRequestOptions {
   timeoutMs?: number;
 }
 
+/**
+ * A request's options with the reader that types its answer: it runs on the
+ * answer's payload before the promise settles, and what it returns is the
+ * answer. A reader that throws rejects that request alone, with its error.
+ */
+export interface IAdtClientsWSReadOptions<TResponse>
+  extends IAdtClientsWSRequestOptions {
+  read: (payload: unknown) => TResponse;
+}
+
 export interface IAdtClientsWSOptions {
   /**
    * A deadline for every request, in milliseconds — the caller's choice.
@@ -91,15 +101,32 @@ export class AdtClientsWS {
     this.eventHandlers.push(handler);
   }
 
-  async request<TPayload = unknown, TResponse = unknown>(
+  /**
+   * A request answered by what `options.read` makes of its payload. First, so
+   * options carrying a reader — a literal or a value declared before — pick it.
+   */
+  request<TPayload, TResponse>(
+    operation: string,
+    payload: TPayload | undefined,
+    options: IAdtClientsWSReadOptions<TResponse>,
+  ): Promise<TResponse>;
+  /** A request answered by its payload as it came, `unknown`. */
+  request<TPayload = unknown>(
     operation: string,
     payload?: TPayload,
     options?: IAdtClientsWSRequestOptions,
-  ): Promise<TResponse> {
+  ): Promise<unknown>;
+  async request<TPayload>(
+    operation: string,
+    payload?: TPayload,
+    options?: IAdtClientsWSRequestOptions | IAdtClientsWSReadOptions<unknown>,
+  ): Promise<unknown> {
     const correlationId = options?.correlationId ?? randomUUID();
     const timeoutMs = options?.timeoutMs ?? this.requestTimeoutMs;
+    const read =
+      options !== undefined && 'read' in options ? options.read : undefined;
 
-    return new Promise<TResponse>((resolve, reject) => {
+    return new Promise<unknown>((resolve, reject) => {
       // One waiting request per id: a second one would replace the first in
       // the pending map and leave it unsettled for good, so it is refused
       // before anything is sent; the first stays as it is.
@@ -123,7 +150,18 @@ export class AdtClientsWS {
       // still holds it, never a later request that reused the id after this
       // one was settled (by a closed connection, say).
       const entry: PendingRequest = {
-        resolve: (value: unknown) => resolve(value as TResponse),
+        resolve: (value: unknown) => {
+          if (read === undefined) {
+            resolve(value);
+            return;
+          }
+          // The reader's throw rejects this request alone, as it is.
+          try {
+            resolve(read(value));
+          } catch (error) {
+            reject(error);
+          }
+        },
         reject,
         timeout: undefined,
       };

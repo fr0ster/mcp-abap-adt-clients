@@ -17,18 +17,46 @@ import {
   type IAdtAnsweredObject,
 } from '@mcp-abap-adt/interfaces-adt';
 
-/** Every code of every table. */
-const CODES: ReadonlySet<string> = new Set(
-  [ADT_TYPES_ONPREM, ADT_TYPES_CLOUD, ADT_TYPES_BASIS_740].flatMap((table) =>
-    Object.values(table).flatMap((entry) => Object.keys(entry.codes)),
-  ),
-);
+type Entry = { readonly codes: object };
 
-function isAdtTypeCode(text: string): text is AdtTypeCode {
-  return CODES.has(text);
+/** The codes one table names, each typed as the code it is. */
+type CodesOfTable<T extends { readonly [A in keyof T]: Entry }> = {
+  [A in keyof T]: Extract<keyof T[A]['codes'], string>;
+}[keyof T];
+
+/**
+ * The keys of one entry's codes. `for … in` over a generic object yields its
+ * keys as `Extract<keyof C, string>`, so no code is retyped by hand.
+ */
+function keysOf<C extends object>(codes: C): Extract<keyof C, string>[] {
+  const keys: Extract<keyof C, string>[] = [];
+  for (const code in codes) keys.push(code);
+  return keys;
 }
+
+/** Every code of one table, typed by the table. */
+function codesIn<T extends { readonly [A in keyof T]: Entry }>(
+  table: T,
+): CodesOfTable<T>[] {
+  const codes: CodesOfTable<T>[] = [];
+  for (const api in table) codes.push(...keysOf(table[api].codes));
+  return codes;
+}
+
+/** Every code of every table, looked up by its text. */
+const CODES: ReadonlyMap<string, AdtTypeCode> = (() => {
+  const codes = new Map<string, AdtTypeCode>();
+  for (const code of [
+    ...codesIn(ADT_TYPES_ONPREM),
+    ...codesIn(ADT_TYPES_CLOUD),
+    ...codesIn(ADT_TYPES_BASIS_740),
+  ])
+    codes.set(code, code);
+  return codes;
+})();
 
 /** The code ADT sent, as the tables know it or as it came. */
 export function answeredObject(text: string): IAdtAnsweredObject {
-  return isAdtTypeCode(text) ? { type: text } : { unknownType: text };
+  const type = CODES.get(text);
+  return type !== undefined ? { type } : { unknownType: text };
 }

@@ -1,6 +1,7 @@
 /**
  * The legacy forms keep 46.1.0's request and answer exactly (owner's ruling):
- * `link`, `pull` and `checkExternalRepo` with `remoteUser`/`remotePassword`,
+ * `pull` with `remoteUser`/`remotePassword` (the old form of `link` and
+ * `checkExternalRepo` is refused since #304, C4),
  * `listRepos`, `unlink` and `getErrorLog`. Each request below is the one
  * 46.1.0 sent, recorded before 46.2.0 changed anything; none carries the new
  * forms' `noLog`, `noResend` or `stateless`, and each answer is the document
@@ -21,41 +22,6 @@ const NS = 'xmlns:abapgitrepo="http://www.sap.com/adt/abapgit/repositories"';
 const XML = '<?xml version="1.0" encoding="UTF-8"?>';
 
 describe('the deprecated abapGit forms, as 46.1.0 sent and answered them', () => {
-  it('link with remoteUser/remotePassword', async () => {
-    const connection = new ScriptedConnection(() => ok('<linked/>'));
-
-    const answer = await gitClient(connection).link(
-      {
-        package: 'ZPKG',
-        url: 'https://git.example.invalid/team/repo.git',
-        remoteUser: 'old-user',
-        remotePassword: 'old-password',
-        transportRequest: 'DEVK900001',
-      },
-      { headers: HEADERS },
-    );
-
-    expect(connection.sent).toEqual([
-      {
-        method: 'POST',
-        url: '/sap/bc/adt/abapgit/repos',
-        timeout: 0,
-        headers: PAIR,
-        data:
-          `${XML}<abapgitrepo:repository ${NS}>` +
-          '<abapgitrepo:package>ZPKG</abapgitrepo:package>' +
-          '<abapgitrepo:url>https://git.example.invalid/team/repo.git</abapgitrepo:url>' +
-          '<abapgitrepo:branchName>refs/heads/master</abapgitrepo:branchName>' +
-          '<abapgitrepo:remoteUser>old-user</abapgitrepo:remoteUser>' +
-          '<abapgitrepo:remotePassword>old-password</abapgitrepo:remotePassword>' +
-          '<abapgitrepo:transportRequest>DEVK900001</abapgitrepo:transportRequest>' +
-          '</abapgitrepo:repository>',
-      },
-    ]);
-    // `linked`'s shipped default is the document as it arrived.
-    expect(answer.ok && answer.getResult()).toEqual({ value: '<linked/>' });
-  });
-
   it('pull with remoteUser/remotePassword, to its pull link', async () => {
     const connection = new ScriptedConnection(() => ok('<pulled/>'));
 
@@ -88,33 +54,21 @@ describe('the deprecated abapGit forms, as 46.1.0 sent and answered them', () =>
     expect(answer.ok && answer.getResult()).toEqual({ value: '<pulled/>' });
   });
 
-  it('checkExternalRepo with remoteUser/remotePassword', async () => {
-    const connection = new ScriptedConnection(() => ok('<info/>'));
-
-    const answer = await gitClient(connection).checkExternalRepo(
-      {
-        url: 'https://git.example.invalid/team/repo.git',
-        remoteUser: 'old-user',
-        remotePassword: 'old-password',
-      },
-      { headers: HEADERS },
-    );
-
-    expect(connection.sent).toEqual([
-      {
-        method: 'POST',
-        url: '/sap/bc/adt/abapgit/externalrepoinfo',
-        timeout: 0,
-        headers: PAIR,
-        data:
-          `${XML}<abapgitexternalrepo:externalRepoInfoRequest xmlns:abapgitexternalrepo="http://www.sap.com/adt/abapgit/externalRepo">` +
-          '<abapgitexternalrepo:url>https://git.example.invalid/team/repo.git</abapgitexternalrepo:url>' +
-          '<abapgitexternalrepo:remoteUser>old-user</abapgitexternalrepo:remoteUser>' +
-          '<abapgitexternalrepo:remotePassword>old-password</abapgitexternalrepo:remotePassword>' +
-          '</abapgitexternalrepo:externalRepoInfoRequest>',
-      },
-    ]);
-    expect(answer.ok && answer.getResult()).toEqual({ value: '<info/>' });
+  it('refuses the old form of link and checkExternalRepo (C4 of #304)', () => {
+    // Compiled, never called: each old-form call is refused by the types.
+    const _refused = (connection: ScriptedConnection) => {
+      // @ts-expect-error -- remoteUser/remotePassword are the old form, gone
+      void gitClient(connection).link(
+        { package: 'ZPKG', url: 'u', remoteUser: 'u', remotePassword: 'p' },
+        { headers: HEADERS },
+      );
+      // @ts-expect-error -- remoteUser/remotePassword are the old form, gone
+      void gitClient(connection).checkExternalRepo(
+        { url: 'u', remoteUser: 'u', remotePassword: 'p' },
+        { headers: HEADERS },
+      );
+    };
+    expect(typeof _refused).toBe('function');
   });
 
   it('listRepos', async () => {

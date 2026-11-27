@@ -15,8 +15,8 @@ import {
   type AdtActivationCode,
   type AdtMetadataReadCode,
   type AdtSourceReadCode,
-  isMetadataReadCode,
-  isSourceReadCode,
+  METADATA_READ_CODE,
+  SOURCE_READ_CODE,
 } from '../../core/shared/codeSets';
 import { codeHas } from '../../endpoints/codes';
 
@@ -46,18 +46,20 @@ export function isSourceTypeCode(code: AdtTypeCode): code is AdtSourceTypeCode {
 
 /** `value` as a code `readObjectSource` reads; throws for any other. */
 export function sourceReadCode(value: string): AdtSourceReadCode {
-  if (!isSourceReadCode(value)) {
+  const code = SOURCE_READ_CODE.get(value);
+  if (code === undefined) {
     throw new Error(`readObjectSource reads no '${value}'`);
   }
-  return value;
+  return code;
 }
 
 /** `value` as a code `readObjectMetadata` reads; throws for any other. */
 export function metadataReadCode(value: string): AdtMetadataReadCode {
-  if (!isMetadataReadCode(value)) {
+  const code = METADATA_READ_CODE.get(value);
+  if (code === undefined) {
     throw new Error(`readObjectMetadata reads no '${value}'`);
   }
-  return value;
+  return code;
 }
 
 /** A code a modern group activation activates with no parent to name. */

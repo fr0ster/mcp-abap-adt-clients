@@ -42,13 +42,13 @@ import {
 } from './legacyLive';
 
 /** A handler a cycle creates, locks, deletes and validates through. */
-export interface LegacyCycleHandler<C>
+export interface LegacyCycleHandler<C extends object>
   extends LegacyDeletable<C>,
-    Pick<IAdtValidatable<C, unknown>, 'validate'> {}
+    Pick<IAdtValidatable<C, unknown, never>, 'validate'> {}
 
 /** What a cycle names: its label, its name and how to reach it. */
 export interface CycleObjectSpec<
-  C,
+  C extends object,
   H extends LegacyCycleHandler<C> = LegacyCycleHandler<C>,
 > {
   readonly caseName: string;
@@ -81,7 +81,7 @@ function messageOf(error: unknown): string {
  * cycle that stops between `lock` and `unlock` is cleaned with that handle.
  */
 export class CycleObject<
-  C,
+  C extends object,
   H extends LegacyCycleHandler<C> = LegacyCycleHandler<C>,
 > {
   private created = false;
@@ -291,7 +291,7 @@ export class CycleObject<
 }
 
 /** One object of a cycle (see {@link CycleObject}). */
-export function cycleObject<C, H extends LegacyCycleHandler<C>>(
+export function cycleObject<C extends object, H extends LegacyCycleHandler<C>>(
   spec: CycleObjectSpec<C, H>,
 ): CycleObject<C, H> {
   return new CycleObject(spec);
@@ -305,7 +305,7 @@ export function cycleObject<C, H extends LegacyCycleHandler<C>>(
  */
 export async function runCycle(
   caseName: string,
-  cleanupOrder: readonly Pick<CycleObject<unknown>, 'cleanup'>[],
+  cleanupOrder: readonly Pick<CycleObject<object>, 'cleanup'>[],
   body: () => Promise<void>,
 ): Promise<void> {
   let failed: { error: unknown } | undefined;

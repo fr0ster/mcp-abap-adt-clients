@@ -44,6 +44,7 @@ import {
   expectResult,
 } from '../../../../../../adt-clients/src/__tests__/helpers/contract';
 import { judged } from '../../../../../../adt-clients/src/__tests__/helpers/judged';
+import { writeMessage } from '../../../../../../adt-clients/src/__tests__/helpers/messageWrite';
 import {
   cycleObject,
   expectRefusedUnsent,
@@ -222,10 +223,15 @@ describeLegacyRfc(
 
           mark = at();
           expectResult(
-            await messages().create(message(FIRST_TEXT), {
-              headers: integrationHeadersOf(messages(), 'create'),
-              analyse: analyseException,
-            }),
+            // The caller's recipe (C7 of #304): one request per member.
+            await writeMessage(
+              client.getMessageClass(),
+              messages(),
+              message(FIRST_TEXT),
+              {
+                headers: integrationHeadersOf(messages(), 'update'),
+              },
+            ),
             'create message 001',
           );
           // B4 r2-m5-msg-create.
@@ -239,10 +245,14 @@ describeLegacyRfc(
 
           mark = at();
           expectResult(
-            await messages().update(message(SECOND_TEXT), {
-              headers: integrationHeadersOf(messages(), 'update'),
-              analyse: analyseException,
-            }),
+            await writeMessage(
+              client.getMessageClass(),
+              messages(),
+              message(SECOND_TEXT),
+              {
+                headers: integrationHeadersOf(messages(), 'update'),
+              },
+            ),
             'update message 001',
           );
           // B4 r2-m7-msg-update.
@@ -256,10 +266,14 @@ describeLegacyRfc(
 
           mark = at();
           expectResult(
-            await messages().delete(message(), {
-              headers: integrationHeadersOf(messages(), 'delete'),
-              analyse: analyseException,
-            }),
+            await writeMessage(
+              client.getMessageClass(),
+              messages(),
+              { ...message(), removeMessage: true },
+              {
+                headers: integrationHeadersOf(messages(), 'update'),
+              },
+            ),
             'delete message 001',
           );
           // B4 r2-m9-msg-delete.

@@ -2,6 +2,7 @@ import type {
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
+  IAnalyse,
   IResultStrategy,
   ISt05Trace,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -54,9 +55,15 @@ export class St05Trace<
     this.results = options.results;
   }
 
+  getState<E extends IAdtError>(
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['state'], E | IAdtError>>;
+  getState(
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['state'], IAdtError>>;
   async getState<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['state'], E>> {
+  ): Promise<IAdtResponse<T['state'], E | IAdtError>> {
     return answering(
       () => getSt05TraceState(this.connection),
       this.results.state,
@@ -64,9 +71,15 @@ export class St05Trace<
     );
   }
 
+  getDirectory<E extends IAdtError>(
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['directory'], E | IAdtError>>;
+  getDirectory(
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['directory'], IAdtError>>;
   async getDirectory<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['directory'], E>> {
+  ): Promise<IAdtResponse<T['directory'], E | IAdtError>> {
     return answering(
       () => getSt05TraceDirectory(this.connection),
       this.results.directory,

@@ -62,14 +62,14 @@ const serviceBinding = client.getServiceBinding();
 type U = unknown;
 
 type LifecycleAtoms = IAdtCreatable<U, U> &
-  IAdtReadable<U, U> &
-  IAdtMetadataReadable<U, U> &
-  IAdtUpdatable<U, U> &
-  IAdtDeletable<U, U, U> &
-  IAdtValidatable<U, U> &
-  IAdtCheckable<U, U> &
-  IAdtActivatable<U, U> &
-  IAdtLockable<U>;
+  IAdtReadable<U, U, never> &
+  IAdtMetadataReadable<U, U, never> &
+  IAdtUpdatable<U, U, never> &
+  IAdtDeletable<U, U, never, U> &
+  IAdtValidatable<U, U, never> &
+  IAdtCheckable<U, U, never> &
+  IAdtActivatable<U, U, never> &
+  IAdtLockable<U, never>;
 
 type UtilsAtoms = IAdtInformationSystem<U, U, U, U, U> &
   IAdtRepositoryStructure<U, U> &
@@ -81,7 +81,7 @@ type UtilsAtoms = IAdtInformationSystem<U, U, U, U, U> &
   IAdtObjectProperties<U>;
 
 type FeatureToggleAtoms = LifecycleAtoms &
-  IAdtMetadataUpdatable<U, U> &
+  IAdtMetadataUpdatable<U, U, never> &
   IFeatureToggleObject<{
     switched: U;
     runtimeState: U;
@@ -90,8 +90,8 @@ type FeatureToggleAtoms = LifecycleAtoms &
   }>;
 
 type ServiceBindingAtoms = LifecycleAtoms &
-  IAdtMetadataUpdatable<U, U> &
-  IAdtTransportAware<U, U> &
+  IAdtMetadataUpdatable<U, U, never> &
+  IAdtTransportAware<U, U, never> &
   IAdtServiceBindingTypes<U> &
   IAdtServiceGroupReadable<U>;
 

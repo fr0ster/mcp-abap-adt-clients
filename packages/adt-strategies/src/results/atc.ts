@@ -26,7 +26,10 @@
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
+import type { AdtHeaderMap } from '../headers';
+import { at, field, isElement } from '../parsed';
 import { rawOf } from '../result';
+import { withoutTrailingSlashes } from '../scan';
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -42,7 +45,10 @@ type Node = Record<string, unknown>;
 function parseXml(body: unknown): Node | null {
   if (typeof body !== 'string' || body.trim() === '') return null;
   try {
-    return parser.parse(body) as Node;
+    const parsed: unknown = parser.parse(body);
+    // Not an element (a parser's text for a body with no root) carries none
+    // of what is read here, as `null` does.
+    return isElement(parsed) ? parsed : null;
   } catch {
     // A body that is not XML is a body that carries none of what is looked for
     // here, and reads as such — the caller's analyse sees the same answer.
@@ -53,9 +59,8 @@ function parseXml(body: unknown): Node | null {
 /** Elements that appear once are objects and many times are arrays. */
 function asArray(value: unknown): Node[] {
   if (value === undefined || value === null) return [];
-  return (Array.isArray(value) ? value : [value]).filter(
-    (v): v is Node => typeof v === 'object' && v !== null,
-  );
+  const list: readonly unknown[] = Array.isArray(value) ? value : [value];
+  return list.filter(isElement);
 }
 
 function text(value: unknown): string | undefined {
@@ -64,7 +69,7 @@ function text(value: unknown): string | undefined {
 
 /** The last path segment of a URI, ignoring trailing slashes. */
 function lastSegment(uri: string): string | undefined {
-  return uri.replace(/\/+$/, '').split('/').pop() || undefined;
+  return withoutTrailingSlashes(uri).split('/').pop() || undefined;
 }
 
 /** What the run resource says about a run in progress or done. */
@@ -130,7 +135,7 @@ export interface IAtcWaitingRun {
 }
 
 function headerOf(answer: IAdtWireResponse, name: string): string | undefined {
-  const headers = answer.headers as Record<string, unknown> | undefined;
+  const headers: AdtHeaderMap | undefined = answer.headers;
   if (!headers) return undefined;
   const key = Object.keys(headers).find(
     (k) => k.toLowerCase() === name.toLowerCase(),
@@ -146,8 +151,12 @@ function headerOf(answer: IAdtWireResponse, name: string): string | undefined {
  * by its `name` rather than by position.
  */
 export const atcSystemCheckVariant: IResultStrategy<string> = (answer) => {
-  const root = parseXml(answer.data)?.customizing as Node | undefined;
-  const properties = (root?.properties as Node | undefined)?.property;
+  const properties = at(
+    parseXml(answer.data),
+    'customizing',
+    'properties',
+    'property',
+  );
   const match = asArray(properties).find(
     (p) => text(p['@_name']) === 'systemCheckVariant',
   );
@@ -176,12 +185,12 @@ export const atcStartedRun: IResultStrategy<IAtcStartedRun> = (answer) => {
  * reaching for the first description in the document.
  */
 export const atcWaitingRun: IResultStrategy<IAtcWaitingRun> = (answer) => {
-  const run = parseXml(answer.data)?.worklistRun as Node | undefined;
-  const infos = asArray((run?.infos as Node | undefined)?.info);
+  const run = field(parseXml(answer.data), 'worklistRun');
+  const infos = asArray(at(run, 'infos', 'info'));
   const stats = infos.find((i) => text(i.type) === 'FINDING_STATS');
   return {
     waited: true,
-    worklistId: text(run?.worklistId),
+    worklistId: text(field(run, 'worklistId')),
     findingStats: text(stats?.description) ?? '',
   };
 };
@@ -194,8 +203,8 @@ export const atcWaitingRun: IResultStrategy<IAtcWaitingRun> = (answer) => {
  * captured.
  */
 export const atcRunStatus: IResultStrategy<IAtcRunStatus> = (answer) => {
-  const run = parseXml(answer.data)?.run as Node | undefined;
-  const links = asArray((run?.result as Node | undefined)?.link);
+  const run = field(parseXml(answer.data), 'run');
+  const links = asArray(at(run, 'result', 'link'));
   // `rel` is a full URL whose last segment names the relation. Matched on that
   // segment rather than on the whole URL: the relation is what is meant.
   const idOf = (relation: string) => {
@@ -207,7 +216,7 @@ export const atcRunStatus: IResultStrategy<IAtcRunStatus> = (answer) => {
     const href = text(link?.['@_href']);
     return href ? lastSegment(href) : undefined;
   };
-  const status = text(run?.['@_status']) ?? '';
+  const status = text(field(run, '@_status')) ?? '';
   return {
     status,
     // Exact and case-normalised. A substring test would accept `unfinished`

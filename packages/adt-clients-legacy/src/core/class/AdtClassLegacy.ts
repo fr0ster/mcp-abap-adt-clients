@@ -20,11 +20,15 @@ import {
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
 import type {
+  AdtObjectIdentity,
+  AdtRequiredUpdateOptions,
   IAdtError,
   IAdtHeaders,
+  IAdtLockedWrite,
   IAdtOperationOptions,
   IAdtResponse,
   IAdtUpdateOptions,
+  IAnalyse,
   IClassConfig,
 } from '@mcp-abap-adt/interfaces-adt';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
@@ -50,11 +54,21 @@ export class AdtClassLegacy<
    * A delete with `corrNr` in a transportable package was not measured.
    * `/sap/bc/adt/deletion/*` does not exist there.
    */
+  override delete<E extends IAdtError>(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>>;
+  override delete(
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletion'], IAdtError>>;
   override async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IClassConfig>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletion'], E>> {
-    const name = config.className as string;
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
+    const name = config.className;
 
     const objectUrl = `${CLASS.uri(name)}`;
     return answering(
@@ -76,12 +90,24 @@ export class AdtClassLegacy<
    * `POST /sap/bc/adt/deletion/check` answers `404` (spec §5). `delete` with
    * the object's lock handle is the delete.
    */
+  override checkDeletion<E extends IAdtError>(
+    this: this & AdtPerformedBy<'class', 'deletionCheck'>,
+    _config: AdtObjectIdentity<IClassConfig, 'className'>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  override checkDeletion(
+    this: this & AdtPerformedBy<'class', 'deletionCheck'>,
+    _config: AdtObjectIdentity<IClassConfig, 'className'>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   override async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'class', 'deletionCheck'>,
-    _config: Partial<IClassConfig>,
+    _config: AdtObjectIdentity<IClassConfig, 'className'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
-    return noDeletionCheck<T['deletionCheck'], E>();
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
+    return noDeletionCheck<T['deletionCheck']>();
   }
 
   /**
@@ -89,12 +115,28 @@ export class AdtClassLegacy<
    * `updateMetadata` for the class, and no run there has sent the PUT of its
    * metadata document.
    */
+  override updateMetadata<E extends IAdtError>(
+    this: this & AdtPerformedBy<'class', 'updateMetadata'>,
+    _config: AdtObjectIdentity<IClassConfig, 'className'>,
+    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>>;
+  override updateMetadata(
+    this: this & AdtPerformedBy<'class', 'updateMetadata'>,
+    _config: AdtObjectIdentity<IClassConfig, 'className'>,
+    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], IAdtError>>;
   override async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'class', 'updateMetadata'>,
-    _config: Partial<IClassConfig>,
-    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
-    return legacyNotMeasuredRefusal<T['metadataUpdated'], E>(
+    _config: AdtObjectIdentity<IClassConfig, 'className'>,
+    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
+    return legacyNotMeasuredRefusal<T['metadataUpdated']>(
       'updateMetadata',
       'PUT /sap/bc/adt/oo/classes/{name}',
     );
@@ -104,13 +146,23 @@ export class AdtClassLegacy<
    * Refused without a request: measured on 7.40 SP04, `GET <object URI>/transport`
    * answers `404` for every type (record B4-cycles-20261026-2019).
    */
+  override readTransport<E extends IAdtError>(
+    this: this & AdtPerformedBy<'class', 'transport'>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    _options: ({ withLongPolling?: boolean } & IAdtOperationOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>>;
+  override readTransport(
+    this: this & AdtPerformedBy<'class', 'transport'>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
+    _options?: { withLongPolling?: boolean } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['transport'], IAdtError>>;
   override async readTransport<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'class', 'transport'>,
-    config: Partial<IClassConfig>,
+    config: AdtObjectIdentity<IClassConfig, 'className'>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['transport'], E>> {
-    return noTransportResource<T['transport'], E>(
-      CLASS.uri(config.className as string),
-    );
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
+    return noTransportResource<T['transport']>(CLASS.uri(config.className));
   }
 }

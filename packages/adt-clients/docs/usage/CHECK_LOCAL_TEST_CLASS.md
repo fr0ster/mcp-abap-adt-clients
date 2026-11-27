@@ -53,9 +53,11 @@ const answer = await client.getLocalTestClass().check(
 if (answer.ok) {
   console.log(answer.getResult().value);   // the check-run report document
 } else {
-  for (const m of answer.getError().messages) {
-    console.log(`[${m.type}] ${m.text}`);
-  }
+  // `analyseCheck`'s failure, or the library's own when no answer came back
+  // (48.0.0: the answer is the union of the two).
+  const failure = answer.getError();
+  if ('messages' in failure)
+    for (const m of failure.messages) console.log(`[${m.type}] ${m.text}`);
 }
 ```
 

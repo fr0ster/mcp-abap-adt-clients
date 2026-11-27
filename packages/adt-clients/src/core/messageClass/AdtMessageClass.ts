@@ -10,7 +10,9 @@
  */
 
 import type {
+  AdtObjectIdentity,
   AdtReadVersion,
+  AdtRequiredUpdateOptions,
   AdtVariant,
   IAdtAnalyseOptions,
   IAdtCreatable,
@@ -19,6 +21,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
   IAdtOperationOptions,
@@ -26,6 +29,7 @@ import type {
   IAdtSystemContext,
   IAdtUpdateOptions,
   IAdtValidatable,
+  IAnalyse,
   IMessageClassResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -64,11 +68,21 @@ export class AdtMessageClass<
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IMessageClassConfig, T['created']>,
-    IAdtMetadataReadable<IMessageClassConfig, T['metadata']>,
-    IAdtMetadataUpdatable<Partial<IMessageClassConfig>, T['metadataUpdated']>,
-    IAdtDeletable<IMessageClassConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IMessageClassConfig, T['validation']>,
-    IAdtLockable<IMessageClassConfig>
+    IAdtMetadataReadable<IMessageClassConfig, T['metadata'], 'name'>,
+    IAdtMetadataUpdatable<
+      Partial<IMessageClassConfig>,
+      T['metadataUpdated'],
+      'name',
+      'source'
+    >,
+    IAdtDeletable<
+      IMessageClassConfig,
+      T['deletion'],
+      'name',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<IMessageClassConfig, T['validation'], 'name'>,
+    IAdtLockable<IMessageClassConfig, 'name'>
 {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -111,8 +125,8 @@ export class AdtMessageClass<
    * from nothing and the server answers — which is a reading a strategy can
    * take, where a sentence composed here would not be.
    */
-  private name(config: Partial<IMessageClassConfig>): string {
-    return config.name as string;
+  private name(config: AdtObjectIdentity<IMessageClassConfig, 'name'>): string {
+    return config.name;
   }
 
   /**
@@ -121,10 +135,18 @@ export class AdtMessageClass<
    * POST with the params in the query string and an empty body — that is what
    * Eclipse sends, and what the other types' validation endpoints take.
    */
+  validate<E extends IAdtError>(
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>>;
+  validate(
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['validation'], IAdtError>>;
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IMessageClassConfig>,
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['validation'], E>> {
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -147,13 +169,29 @@ export class AdtMessageClass<
   }
 
   /** Create the message class shell. No activation — message classes have none. */
+  create<E extends IAdtError>(
+    config: Omit<IMessageClassConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>>;
+  create(
+    config: Omit<IMessageClassConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['created'], IAdtError>>;
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IMessageClassConfig, 'source'> & {
       source?: never;
       packageName: string;
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<T['created'], E>> {
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // The type requires a package; this refuses an empty one, which the type
@@ -178,7 +216,7 @@ export class AdtMessageClass<
       () =>
         createMessageClass(connection, options.headers, {
           name,
-          description: config.description as string,
+          description: config.description,
           package_name: config.packageName,
           // config → global systemContext; none invented: without one SAP
           // takes the logon language.
@@ -198,13 +236,27 @@ export class AdtMessageClass<
   }
 
   /** The same document `read` fetches — there is no metadata resource. */
+  readMetadata<E extends IAdtError>(
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
+    options: ({
+      withLongPolling?: boolean;
+      version?: AdtReadVersion;
+    } & IAdtOperationOptions<E>) & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>>;
+  readMetadata(
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
+    options?: {
+      withLongPolling?: boolean;
+      version?: AdtReadVersion;
+    } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['metadata'], IAdtError>>;
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IMessageClassConfig>,
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
     options?: {
       withLongPolling?: boolean;
       version?: AdtReadVersion;
     } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['metadata'], E>> {
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -229,11 +281,27 @@ export class AdtMessageClass<
    * `config.description` into it — a second request, and a document this
    * library composed in place of the caller's.
    */
+  updateMetadata<E extends IAdtError>(
+    this: this & AdtPerformedBy<'messageClass', 'updateMetadata'>,
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>>;
+  updateMetadata(
+    this: this & AdtPerformedBy<'messageClass', 'updateMetadata'>,
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], IAdtError>>;
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'messageClass', 'updateMetadata'>,
-    config: Partial<IMessageClassConfig>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -246,7 +314,7 @@ export class AdtMessageClass<
           options.headers,
           options.ifMatch,
           name,
-          options?.source as string,
+          options?.source,
           options?.lockHandle,
           config.transportRequest,
         ),
@@ -272,11 +340,23 @@ export class AdtMessageClass<
    * a consumer that wants the check runs this first and decides what a refusal
    * means.
    */
+  checkDeletion<E extends IAdtError>(
+    this: this & AdtPerformedBy<'messageClass', 'deletionCheck'>,
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  checkDeletion(
+    this: this & AdtPerformedBy<'messageClass', 'deletionCheck'>,
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'messageClass', 'deletionCheck'>,
-    config: Partial<IMessageClassConfig>,
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -289,10 +369,20 @@ export class AdtMessageClass<
     );
   }
 
+  delete<E extends IAdtError>(
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>>;
+  delete(
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletion'], IAdtError>>;
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IMessageClassConfig>,
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletion'], E>> {
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -316,10 +406,18 @@ export class AdtMessageClass<
    * carrying no handle reads as `''`; whether that is a refusal is the
    * caller's `analyse` to say.
    */
+  lock<E extends IAdtError>(
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  lock(
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IMessageClassConfig>,
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
     const name = this.name(config);
     const answer = await answering(
       () =>
@@ -336,11 +434,21 @@ export class AdtMessageClass<
   }
 
   /** Unlock the message class. */
+  unlock<E extends IAdtError>(
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
+    lockHandle: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<void, E | IAdtError>>;
+  unlock(
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
+    lockHandle: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<void, IAdtError>>;
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IMessageClassConfig>,
+    config: AdtObjectIdentity<IMessageClassConfig, 'name'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<void, E>> {
+  ): Promise<IAdtResponse<void, E | IAdtError>> {
     const name = this.name(config);
 
     return answering(

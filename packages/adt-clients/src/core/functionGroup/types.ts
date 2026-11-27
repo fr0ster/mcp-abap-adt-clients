@@ -123,5 +123,5 @@ export interface IDeleteFunctionGroupParams {
 export interface IUpdateFunctionGroupParams {
   function_group_name: string;
   transport_request?: string;
-  lock_handle?: string;
+  lock_handle: string;
 }

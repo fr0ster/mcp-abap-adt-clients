@@ -13,7 +13,7 @@
  */
 
 import type {
-  IAdtUpdatable,
+  IAdtLockFreeUpdatable,
   IServiceBindingPublicationConfig,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -45,9 +45,11 @@ const logger = { info: () => {} } as unknown as ILogger;
  * this config back to `Partial` on the way out, and every assertion below was
  * true of the implementation and false of the contract.
  */
-type BindingPublication = IAdtUpdatable<
+// A publication takes no lock (C7 of #304): the lock-free atom.
+type BindingPublication = IAdtLockFreeUpdatable<
   IServiceBindingPublicationConfig,
-  string
+  string,
+  never
 >;
 
 /**

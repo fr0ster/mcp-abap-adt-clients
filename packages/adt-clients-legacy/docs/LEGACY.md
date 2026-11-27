@@ -65,7 +65,7 @@ Measured on 7.40 SP04 through the library over `legacy-http`:
 new AdtClientLegacy(connection)          // the consumer declares the system; RFC
   ├── Served types: *Legacy handlers (direct DELETE under the caller's lock, caller's headers)
   ├── Members 7.40 does not serve, or does not advertise and nobody measured: a refusal, no request
-  ├── Types 7.40 lacks: the getter does not compile (ADT_TYPES_BASIS_740 has no such API); called anyway, absentOnLegacy — every member answers a refusal, no request
+  ├── Types 7.40 lacks: the getter does not compile (ADT_TYPES_BASIS_740 has no such API); called anyway, a *AbsentLegacy subclass of the modern handler — every public operation answers a refusal, no request
   └── Content types: AdtContentTypesBase (versionless headers)
 
 new AdtExecutorLegacy(connection)
@@ -157,7 +157,7 @@ try {
 | `getFunctionInclude().delete` | **refused**: it went through `/sap/bc/adt/deletion/*`, which 7.40 does not serve. A direct `DELETE ?lockHandle=` on a function include is **not measured** and is not implemented on inference: refused until measured. A function include is removed with its function group (B3-fugr-v1 a2-9) |
 | `getUtils().deleteObjectsGroup` | **refused** — `/deletion/*` |
 | `getPackage().delete`, `getRequest().delete` | refused |
-| `getMessageClassMessage().delete` | **sends**: read, two locks, the `PUT` of the class, two unlocks — no `/deletion/*` (B4 r2-m9) |
+| a message of a message class | since 0.12.0 (adt-clients 48, C7) the caller's `update` with `removeMessage: true` under the locks it took (`lockMessage`, `lockClassForMessage`, then `unlockMessages`): one `PUT` of the class, no `/deletion/*` — measured 2026-11-27 (`MessageClassCycle.test.ts`, the #333 live run). Before, `getMessageClassMessage().delete` ran the chain itself (read, two locks, the `PUT`, two unlocks; B4 r2-m9, historical) |
 | `getLocalTestClass/Types/Definitions/Macros().delete` | kept: an `update` with empty source; the write is the include `PUT`, measured for the test-class include (`B3-cycle-20261023-1544` s3-update) |
 
 ### No deletion check
@@ -181,7 +181,7 @@ try {
 | Function include (`getFunctionInclude()`, `AdtFunctionIncludeLegacy`) | `create` with the v1 pair (below), `lock`, `update`, `unlock` (`B3-fugr-v1-20261023-1632` a2-5), `activate` (a2-6), `read` (`B2-reads-20261023-1749` s5-finc-read; of an include the run wrote, `T6-20261027` FunctionIncludeCycle: `200`), `readMetadata` (`GET <include>` `200`, `T6-20261027`), `check` (`T6-20261027`), `validate` (a `GET` of its group `200`, the include itself `404` while absent, `T6-20261027`) | `updateMetadata`, `getVersions`, `getVersionSource` | `delete`, `checkDeletion` |
 | Include (`getInclude()`, `AdtIncludeLegacy`) | `create` — the unversioned pair, `200` (B4 n1-create-alt; the v2 pair `400`, n1-create), `lock`, `update`, `unlock` (n2), `activate` (n3), `read` (n4), `readMetadata` (n5), `validate` — free `200`, existing `400 InvalidProgramName` (r3-incl-validate, n6-validate), `delete` — one `DELETE ?lockHandle=` (n8-rawDELETE) | enhancement readers | `checkDeletion`, `updateMetadata` (refused until measured), `readMainPrograms` (refused until measured) |
 | Message class (`getMessageClass()`, `AdtMessageClassLegacy`) | `create` — `application/xml`, `201` (B4 r2-m1), `lock`/`unlock` (r2-m2), `readMetadata` — an absent class reads `200`, empty (r2-m0), a present one `200` (r2-m3), `validate` — free `200`, existing `400 InvalidMcName` (r3-msag-validate, r2-m4-validate), `delete` — one `DELETE ?lockHandle=` (r2-m12-rawDELETE) | — | `updateMetadata` (the `PUT` answered `400 ExceptionInvalidData`, r2-m2-updateMetadata), `checkDeletion` |
-| Message class message (`getMessageClassMessage()`) | `read` — the whole class document, the message present in it (`B2-reads-20261023-1749` s6-msg-read), `create`, `update`, `delete` (B4 r2-m5 … r2-m10: read, two locks, the `PUT`, two unlocks) | `readMetadata` | — |
+| Message class message (`getMessageClassMessage()`) | `read` — the whole class document, the message present in it (`B2-reads-20261023-1749` s6-msg-read); since 0.12.0 the four members `lockMessage`, `lockClassForMessage`, `update` (upsert, or `removeMessage: true`), `unlockMessages`, one request each, composed by the caller (`MessageClassCycle.test.ts`, 2026-11-27, #333 live run). Historical, adt-clients 47 and earlier: `create`, `update`, `delete` each ran read, two locks, the `PUT`, two unlocks (B4 r2-m5 … r2-m10) — the same requests the four members now send | `readMetadata` | — |
 | Package (`getPackage()`, `AdtPackageLegacy`) | — | — | every member — [Packages](#packages) |
 | Transport request (`getRequest()`, `AdtRequestLegacy`) | `list`, `readMetadata` | — | every other member — [Transports](#transports) |
 
@@ -212,9 +212,9 @@ await client.getFunctionInclude().create(config, {
 });
 ```
 
-### Types 7.40 does not serve, or does not advertise: `absentOnLegacy`
+### Types 7.40 does not serve, or does not advertise: the `*AbsentLegacy` handlers
 
-`ADT_TYPES_BASIS_740` has no such API, so since 0.2.0 the getter does not compile on `AdtClientLegacy`. Called from outside the type system, it still hands out a handler, and every member of that handler answers the refusal without a request.
+`ADT_TYPES_BASIS_740` has no such API, so since 0.2.0 the getter does not compile on `AdtClientLegacy`. Called from outside the type system, it still hands out a handler, and every public operation of that handler answers the refusal without a request. Since 0.12.0 (C5 of #304) the handler is a subclass of the modern one (`clients/absentHandlers.ts`: `AdtDomainAbsentLegacy` extends `AdtDomain`, and so on), constructed with the options the modern factory gives; it overrides every public operation, and keeps the modern private helpers, which only those operations reach. Before, `absentOnLegacy` built a plain object of refusing functions.
 
 | Object Type | Getter | Endpoint | Evidence (RFC) |
 |-------------|--------|----------|------------------|

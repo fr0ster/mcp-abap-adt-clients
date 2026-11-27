@@ -29,6 +29,28 @@ import type {
   TestClientFactory,
 } from '../../../../adt-clients/src/__tests__/helpers/sessionConfig';
 import { AdtClientLegacy } from '../../clients/AdtClientLegacy';
+import {
+  AdtAccessControlAbsentLegacy,
+  AdtAppendStructureAbsentLegacy,
+  AdtAuthorizationFieldAbsentLegacy,
+  AdtBehaviorDefinitionAbsentLegacy,
+  AdtBehaviorImplementationAbsentLegacy,
+  AdtDataElementAbsentLegacy,
+  AdtDdicTableTypeAbsentLegacy,
+  AdtDomainAbsentLegacy,
+  AdtEnhancementAbsentLegacy,
+  AdtFeatureToggleAbsentLegacy,
+  AdtMetadataExtensionAbsentLegacy,
+  AdtScalarFunctionAbsentLegacy,
+  AdtScalarFunctionImplementationAbsentLegacy,
+  AdtServiceBindingAbsentLegacy,
+  AdtServiceDefinitionAbsentLegacy,
+  AdtStructureAbsentLegacy,
+  AdtTableAbsentLegacy,
+  AdtTableSettingsAbsentLegacy,
+  AdtTextElementsAbsentLegacy,
+  AdtTransformationAbsentLegacy,
+} from '../../clients/absentHandlers';
 import { AdtClassLegacy } from '../../core/class/AdtClassLegacy';
 import { AdtLocalDefinitionsLegacy } from '../../core/class/AdtLocalDefinitionsLegacy';
 import { AdtLocalMacrosLegacy } from '../../core/class/AdtLocalMacrosLegacy';
@@ -240,76 +262,50 @@ export const REFUSED_WITHOUT_REQUEST: [IHandlerClass, string[]][] = [
 ];
 
 /**
- * The types `AdtClientLegacy` hands out through `absentOnLegacy`: a plain
- * object whose every member answers a refusal without a request. Each name is
+ * The types `AdtClientLegacy` hands out as `*AbsentLegacy` handlers
+ * (`clients/absentHandlers.ts`, since 0.12.0), whose every public member
+ * answers a refusal without a request. Each name is
  * the handler's `objectType` and its factory's suffix (`getDomain`, …).
  */
-const ABSENT_ON_LEGACY = [
-  'Domain',
-  'DataElement',
-  'Structure',
-  'Table',
-  'TableType',
-  'AccessControl',
-  'ServiceDefinition',
-  'ServiceBinding',
-  'BehaviorDefinition',
-  'BehaviorImplementation',
-  'MetadataExtension',
-  'Enhancement',
-  'AuthorizationField',
-  'FeatureToggle',
-  'Transformation',
-  'ScalarFunction',
-  'ScalarFunctionImplementation',
-  'AppendStructure',
-  'TableSettings',
-  'TextElements',
-];
-
-/** A connection that refuses every request: the reference handlers send none. */
-const NO_CONNECTION = {
-  makeAdtRequest: () => {
-    throw new Error('a legacy refusal handler sent a request');
-  },
-} as unknown as IAbapConnection;
-
 /**
- * Whether `handler` is a handler `absentOnLegacy` made: its `objectType` is
- * one of {@link ABSENT_ON_LEGACY}, and it matches the handler the legacy
- * client's own factory hands out for that type — the same keys, and the
- * member the same refusal (`absentOnLegacy` builds each member from one
- * source, so a member with any other body is not a refusal).
+ * The absent types' handlers (C5 of #304): every operation each declares
+ * refuses without a request. Registered by identity, as every other legacy
+ * refusal is.
  */
-function isAbsentOnLegacy(handler: object, member: string): boolean {
-  if (Object.getPrototypeOf(handler) !== Object.prototype) return false;
-  const objectType = (handler as { objectType?: unknown }).objectType;
-  if (typeof objectType !== 'string' || !ABSENT_ON_LEGACY.includes(objectType))
-    return false;
-  const client = new AdtClientLegacy(NO_CONNECTION) as unknown as Record<
-    string,
-    (() => Record<string, unknown>) | undefined
-  >;
-  const reference = client[`get${objectType}`]?.call(client);
-  if (!reference || Object.getPrototypeOf(reference) !== Object.prototype)
-    return false;
-  const own = (handler as Record<string, unknown>)[member];
-  const expected = reference[member];
-  return (
-    Object.hasOwn(handler, member) &&
-    typeof own === 'function' &&
-    typeof expected === 'function' &&
-    // Catches an accidental handler, not deliberate evasion: a function with a forged toString() copying the refusal's body still passes.
-    own.toString() === expected.toString() &&
-    Object.keys(handler).sort().join() === Object.keys(reference).sort().join()
-  );
-}
+const ABSENT_HANDLERS = [
+  AdtAccessControlAbsentLegacy,
+  AdtAppendStructureAbsentLegacy,
+  AdtAuthorizationFieldAbsentLegacy,
+  AdtBehaviorDefinitionAbsentLegacy,
+  AdtBehaviorImplementationAbsentLegacy,
+  AdtDataElementAbsentLegacy,
+  AdtDdicTableTypeAbsentLegacy,
+  AdtDomainAbsentLegacy,
+  AdtEnhancementAbsentLegacy,
+  AdtFeatureToggleAbsentLegacy,
+  AdtMetadataExtensionAbsentLegacy,
+  AdtScalarFunctionAbsentLegacy,
+  AdtScalarFunctionImplementationAbsentLegacy,
+  AdtServiceBindingAbsentLegacy,
+  AdtServiceDefinitionAbsentLegacy,
+  AdtStructureAbsentLegacy,
+  AdtTableAbsentLegacy,
+  AdtTableSettingsAbsentLegacy,
+  AdtTextElementsAbsentLegacy,
+  AdtTransformationAbsentLegacy,
+] as const;
 
 for (const [handlerClass, pairs] of LEGACY_HEADER_PAIRS)
   registerHeaderPairs(handlerClass, pairs);
 for (const [handlerClass, members] of REFUSED_WITHOUT_REQUEST)
   registerRefusedMembers(handlerClass, members);
-registerRefusingHandler(isAbsentOnLegacy);
+for (const handlerClass of ABSENT_HANDLERS)
+  registerRefusedMembers(
+    handlerClass,
+    Object.getOwnPropertyNames(handlerClass.prototype).filter(
+      (name) => name !== 'constructor',
+    ),
+  );
 
 /**
  * Whether test-config.yaml marks the system as legacy (SAP_BASIS 7.40):

@@ -24,12 +24,16 @@ import {
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
 import type {
+  AdtObjectIdentity,
+  AdtRequiredUpdateOptions,
   IAdtAnalyseOptions,
   IAdtError,
   IAdtHeaders,
+  IAdtLockedWrite,
   IAdtOperationOptions,
   IAdtResponse,
   IAdtUpdateOptions,
+  IAnalyse,
   IDdlConfig,
 } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
@@ -56,11 +60,21 @@ export class AdtDdlLegacy<
    * A delete with `corrNr` in a transportable package was not measured.
    * `/sap/bc/adt/deletion/*` does not exist there.
    */
+  override delete<E extends IAdtError>(
+    config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>>;
+  override delete(
+    config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletion'], IAdtError>>;
   override async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IDdlConfig>,
+    config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletion'], E>> {
-    const name = config.ddlName as string;
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
+    const name = config.ddlName;
 
     const objectUrl = `${DDL_SOURCE.uri(name)}`;
     return answering(
@@ -78,17 +92,27 @@ export class AdtDdlLegacy<
   }
 
   /** Refused without a request: the endpoint is absent on 7.40 SP04. */
+  override checkCdsTestDoubles<E extends IAdtError>(
+    this: this & AdtPerformedBy<'ddl', 'checkCdsTestDoubles'>,
+    _cdsViewName: string,
+    _options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['testDoubles'], E | IAdtError>>;
+  override checkCdsTestDoubles(
+    this: this & AdtPerformedBy<'ddl', 'checkCdsTestDoubles'>,
+    _cdsViewName: string,
+    _options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['testDoubles'], IAdtError>>;
   override async checkCdsTestDoubles<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'ddl', 'checkCdsTestDoubles'>,
     _cdsViewName: string,
     _options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['testDoubles'], E>> {
-    return failed<T['testDoubles'], E>({
+  ): Promise<IAdtResponse<T['testDoubles'], E | IAdtError>> {
+    return failed<T['testDoubles']>({
       origin: 'refusal',
       code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
       message:
         'The CDS test-doubles check needs BASIS 7.50 or later; this system has no such endpoint.',
-    } as E);
+    });
   }
 
   /**
@@ -96,12 +120,24 @@ export class AdtDdlLegacy<
    * `POST /sap/bc/adt/deletion/check` answers `404` (spec §5). `delete` with
    * the object's lock handle is the delete.
    */
+  override checkDeletion<E extends IAdtError>(
+    this: this & AdtPerformedBy<'ddl', 'deletionCheck'>,
+    _config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  override checkDeletion(
+    this: this & AdtPerformedBy<'ddl', 'deletionCheck'>,
+    _config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   override async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'ddl', 'deletionCheck'>,
-    _config: Partial<IDdlConfig>,
+    _config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
-    return noDeletionCheck<T['deletionCheck'], E>();
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
+    return noDeletionCheck<T['deletionCheck']>();
   }
 
   /**
@@ -109,12 +145,28 @@ export class AdtDdlLegacy<
    * `updateMetadata` for the DDL source, and no run there has sent the PUT of its
    * metadata document.
    */
+  override updateMetadata<E extends IAdtError>(
+    this: this & AdtPerformedBy<'ddl', 'updateMetadata'>,
+    _config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
+    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>>;
+  override updateMetadata(
+    this: this & AdtPerformedBy<'ddl', 'updateMetadata'>,
+    _config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
+    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], IAdtError>>;
   override async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'ddl', 'updateMetadata'>,
-    _config: Partial<IDdlConfig>,
-    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
-    return legacyNotMeasuredRefusal<T['metadataUpdated'], E>(
+    _config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
+    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
+    return legacyNotMeasuredRefusal<T['metadataUpdated']>(
       'updateMetadata',
       'PUT /sap/bc/adt/ddic/ddl/sources/{name}',
     );
@@ -124,28 +176,48 @@ export class AdtDdlLegacy<
    * Refused without a request: measured on 7.40 SP04, `GET <object URI>/transport`
    * answers `404` for every type (record B4-cycles-20261026-2019).
    */
+  override readTransport<E extends IAdtError>(
+    this: this & AdtPerformedBy<'ddl', 'transport'>,
+    config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
+    _options: ({ withLongPolling?: boolean } & IAdtOperationOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>>;
+  override readTransport(
+    this: this & AdtPerformedBy<'ddl', 'transport'>,
+    config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
+    _options?: { withLongPolling?: boolean } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['transport'], IAdtError>>;
   override async readTransport<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'ddl', 'transport'>,
-    config: Partial<IDdlConfig>,
+    config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
     _options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['transport'], E>> {
-    return noTransportResource<T['transport'], E>(
-      DDL_SOURCE.uri(config.ddlName as string),
-    );
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
+    return noTransportResource<T['transport']>(DDL_SOURCE.uri(config.ddlName));
   }
 
   /**
    * Refused without a request: measured on 7.40 SP04, `GET <DDL URI>/versions`
    * answers `404` (record B4-cycles-20261026-2019).
    */
+  override getVersions<E extends IAdtError>(
+    this: this & AdtPerformedBy<'ddl', 'versions'>,
+    config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
+    _options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>>;
+  override getVersions(
+    this: this & AdtPerformedBy<'ddl', 'versions'>,
+    config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
+    _options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versions'], IAdtError>>;
   override async getVersions<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'ddl', 'versions'>,
-    config: Partial<IDdlConfig>,
+    config: AdtObjectIdentity<IDdlConfig, 'ddlName'>,
     _options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versions'], E>> {
-    return legacyMeasuredRefusal<T['versions'], E>(
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>> {
+    return legacyMeasuredRefusal<T['versions']>(
       'getVersions',
-      `GET ${versionsUri(DDL_SOURCE.uri(config.ddlName as string))} answers 404.`,
+      `GET ${versionsUri(DDL_SOURCE.uri(config.ddlName))} answers 404.`,
     );
   }
 
@@ -153,12 +225,22 @@ export class AdtDdlLegacy<
    * Refused without a request: the version list it takes its `contentUri`
    * from answers `404` on 7.40 SP04 (record B4-cycles-20261026-2019).
    */
+  override getVersionSource<E extends IAdtError>(
+    this: this & AdtPerformedBy<'ddl', 'versions'>,
+    _contentUri: string,
+    _options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versionSource'], E | IAdtError>>;
+  override getVersionSource(
+    this: this & AdtPerformedBy<'ddl', 'versions'>,
+    _contentUri: string,
+    _options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versionSource'], IAdtError>>;
   override async getVersionSource<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'ddl', 'versions'>,
     _contentUri: string,
     _options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versionSource'], E>> {
-    return legacyMeasuredRefusal<T['versionSource'], E>(
+  ): Promise<IAdtResponse<T['versionSource'], E | IAdtError>> {
+    return legacyMeasuredRefusal<T['versionSource']>(
       'getVersionSource',
       'the DDL version list (GET <DDL URI>/versions) answers 404, so there is no version to read.',
     );

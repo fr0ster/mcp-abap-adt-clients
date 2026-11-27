@@ -333,6 +333,20 @@ describe('the requests of the new members', () => {
   );
 });
 
+/**
+ * One of the two pulls, each called on its own: a union of two overload sets
+ * has no call signature (D3 of #304).
+ */
+function pull(
+  client: ReturnType<typeof gitClient>,
+  member: 'pullRepo' | 'pullRepoInDialog',
+  args: Parameters<ReturnType<typeof gitClient>['pullRepoInDialog']>[0],
+) {
+  return member === 'pullRepo'
+    ? client.pullRepo(args, { headers: HEADERS })
+    : client.pullRepoInDialog(args, { headers: HEADERS });
+}
+
 describe('the selection R6 answers, fed back to a pull', () => {
   it.each(['pullRepo', 'pullRepoInDialog'] as const)(
     '%s writes the pull.req.v1 document with exactly its entries',
@@ -345,10 +359,11 @@ describe('the selection R6 answers, fed back to a pull', () => {
       const selection = modified.getResult().value.facts;
       const connection = new ScriptedConnection();
 
-      await gitClient(connection)[member](
-        { key: '000001', branchName: 'refs/heads/main', selection },
-        { headers: HEADERS },
-      );
+      await pull(gitClient(connection), member, {
+        key: '000001',
+        branchName: 'refs/heads/main',
+        selection,
+      });
 
       const data = String(connection.sent[0]?.data);
       // `ABAPGIT_ST_REPO_SELECTIVE_PULL` L5, L42, L55 and
@@ -388,10 +403,10 @@ describe('the answers of the new members', () => {
     '%s: a 202 is a success with its status, after one request',
     async (_name, member) => {
       const connection = new ScriptedConnection(() => ok('', 202));
-      const answer = await gitClient(connection)[member](
-        { key: '000001', branchName: 'refs/heads/main' },
-        { headers: HEADERS },
-      );
+      const answer = await pull(gitClient(connection), member, {
+        key: '000001',
+        branchName: 'refs/heads/main',
+      });
       expect(connection.sent).toHaveLength(1);
       expect(answer.ok && answer.getResult().value.status).toBe(202);
     },

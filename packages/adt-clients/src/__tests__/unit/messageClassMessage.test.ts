@@ -2,7 +2,6 @@ import type {
   IAbapConnection,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { AdtClient } from '../../clients/AdtClient';
 import { AdtMessageClassMessage } from '../../core/messageClass/AdtMessageClassMessage';
 import { messageDocuments } from '../../core/messageClass/types';
 import { parseMessageClass } from '../../core/messageClass/xml';
@@ -46,17 +45,30 @@ function recorder(classXml = CLASS_XML) {
   return { conn, calls };
 }
 
+/** The update's options: the class document and both handles (C7 of #304). */
+function under(m: AdtMessageClassMessage, classDocument = CLASS_XML) {
+  return {
+    headers: headersOf(m, 'update'),
+    classDocument,
+    classLockHandle: 'CH',
+    messageLockHandle: 'MH',
+  };
+}
+
+function handler(classXml = CLASS_XML) {
+  const { conn, calls } = recorder(classXml);
+  const m = new AdtMessageClassMessage(conn, {
+    logger: noopLogger,
+    results: messageDocuments,
+  });
+  return { m, calls };
+}
+
 describe('AdtMessageClassMessage', () => {
-  it('reads the class document the message lives in, and refuses when it is absent', async () => {
-    const { conn } = recorder();
-    const m = new AdtMessageClassMessage(conn, {
-      logger: noopLogger,
-      results: messageDocuments,
-    });
+  it('reads the class document the message lives in', async () => {
+    const { m } = handler();
     // There is no resource for one message: it is read through its class's
-    // document, so that document is what comes back. Whether the message is in
-    // it is the shipped `analyse`'s question — the read below succeeds only
-    // because 001 is there.
+    // document, so that document is what comes back.
     const document = expectResult(
       await m.read({ className: 'ZT', msgno: '001' }),
       'read message 001',
@@ -66,43 +78,20 @@ describe('AdtMessageClassMessage', () => {
     );
   });
 
-  it('update does LOCK_MSG + class LOCK + PUT(full class, lockhandle) + UNLOCK + UNLOCK_ALL', async () => {
-    const { conn, calls } = recorder();
-    const m = new AdtMessageClassMessage(conn, {
-      logger: noopLogger,
-      results: messageDocuments,
-    });
-    await m.update(
-      { className: 'ZT', msgno: '001', msgtext: 'NEW' },
-      { headers: headersOf(m, 'update') },
-    );
-    const urls = calls.map((c) => `${c.method} ${c.url}`);
-    expect(urls.some((u) => u.includes('/messages/001?_action=LOCK_MSG'))).toBe(
-      true,
-    );
-    expect(
-      urls.some(
-        (u) =>
-          u.includes('?_action=LOCK') &&
-          u.includes('msgNo=001') &&
-          u.includes('onSave=X'),
-      ),
-    ).toBe(true);
-    const put = calls.find((c) => c.method === 'PUT');
+  it('update is one PUT of the full class, under both handles', async () => {
+    const { m, calls } = handler();
+    await m.update({ className: 'ZT', msgno: '001', msgtext: 'NEW' }, under(m));
+    expect(calls).toHaveLength(1);
+    const [put] = calls;
+    expect(put.method).toBe('PUT');
+    expect(put.url).toContain('lockHandle=CH');
     expect(String(put.data)).toContain('mc:msgtext="NEW"');
     expect(String(put.data)).toContain('mc:lockhandle="MH"');
-    expect(urls.some((u) => u.includes('?_action=UNLOCK'))).toBe(true);
-    expect(
-      urls.some((u) => u.includes('/messages/001?_action=UNLOCK_ALL')),
-    ).toBe(true);
+    expect(String(put.data)).toContain('mc:msgno="002"');
   });
 
   it('appends &corrNr= on the class PUT when transportRequest is set', async () => {
-    const { conn, calls } = recorder();
-    const m = new AdtMessageClassMessage(conn, {
-      logger: noopLogger,
-      results: messageDocuments,
-    });
+    const { m, calls } = handler();
     await m.update(
       {
         className: 'ZT',
@@ -110,85 +99,45 @@ describe('AdtMessageClassMessage', () => {
         msgtext: 'NEW',
         transportRequest: 'DEVK900001',
       },
-      { headers: headersOf(m, 'update') },
+      under(m),
     );
-    const put = calls.find((c) => c.method === 'PUT');
-    expect(put.url).toContain('lockHandle=');
-    expect(put.url).toContain('&corrNr=DEVK900001');
+    expect(calls[0].url).toContain('&corrNr=DEVK900001');
   });
 
-  it('delete appends &corrNr= on the class PUT when transportRequest is set', async () => {
-    const { conn, calls } = recorder();
-    const m = new AdtMessageClassMessage(conn, {
-      logger: noopLogger,
-      results: messageDocuments,
-    });
-    await m.delete(
+  it('a removal appends &corrNr= too', async () => {
+    const { m, calls } = handler();
+    await m.update(
       {
         className: 'ZT',
         msgno: '001',
         transportRequest: 'DEVK900001',
+        removeMessage: true,
       },
-      { headers: headersOf(m, 'delete') },
+      under(m),
     );
-    const put = calls.find((c) => c.method === 'PUT');
-    expect(put.url).toContain('lockHandle=');
-    expect(put.url).toContain('&corrNr=DEVK900001');
+    expect(calls[0].url).toContain('&corrNr=DEVK900001');
   });
 
-  it('delete: <mc:deletedmessages> for target + lockhandle; kept messages in <mc:messages>; correct lock chain; no HTTP DELETE', async () => {
-    const { conn, calls } = recorder();
-    const m = new AdtMessageClassMessage(conn, {
-      logger: noopLogger,
-      results: messageDocuments,
-    });
-    await m.delete(
-      { className: 'ZT', msgno: '001' },
-      { headers: headersOf(m, 'delete') },
+  it('a removal puts the message in <mc:deletedmessages> with its handle, keeps the others, and sends no DELETE', async () => {
+    const { m, calls } = handler();
+    await m.update(
+      { className: 'ZT', msgno: '001', removeMessage: true },
+      under(m),
     );
-
-    const urls = calls.map((c) => `${c.method} ${c.url}`);
-    // Lock chain mirrors create/update: LOCK_MSG + class LOCK (msgNo + onSave) + UNLOCK + UNLOCK_ALL
-    expect(urls.some((u) => u.includes('/messages/001?_action=LOCK_MSG'))).toBe(
-      true,
-    );
-    expect(
-      urls.some(
-        (u) =>
-          u.includes('?_action=LOCK') &&
-          u.includes('msgNo=001') &&
-          u.includes('onSave=X'),
-      ),
-    ).toBe(true);
-    expect(urls.some((u) => u.includes('?_action=UNLOCK'))).toBe(true);
-    expect(
-      urls.some((u) => u.includes('/messages/001?_action=UNLOCK_ALL')),
-    ).toBe(true);
-
-    // PUT body: 001 in <mc:deletedmessages> with its message lock handle
-    const put = calls.find((c) => c.method === 'PUT');
-    const body = String(put.data);
+    expect(calls).toHaveLength(1);
+    const body = String(calls[0].data);
     expect(body).toMatch(/<mc:deletedmessages[^>]*mc:msgno="001"/);
     expect(body).toMatch(/<mc:deletedmessages[^>]*mc:lockhandle="MH"/);
-
-    // 002 stays as a regular <mc:messages> entry (not deleted)
     expect(body).toMatch(/<mc:messages[^>]*mc:msgno="002"/);
     expect(body).not.toMatch(/<mc:deletedmessages[^>]*mc:msgno="002"/);
-
-    // No HTTP-level DELETE — message-level DELETE /messages/{no} returns 423 and is never used
     expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
   });
 
   it('carries no method for what a single message cannot do', () => {
-    // These threw ADT_UNSUPPORTED_OPERATION until they were deleted. A message
-    // is created, read, changed and removed through its class's XML; it is not
-    // validated, activated, checked, locked or versioned in its own right.
-    const { conn } = recorder();
-    const m = new AdtMessageClassMessage(conn, {
-      logger: noopLogger,
-      results: messageDocuments,
-    });
+    const { m } = handler();
     for (const name of [
+      'create',
+      'delete',
       'validate',
       'activate',
       'check',
@@ -202,12 +151,8 @@ describe('AdtMessageClassMessage', () => {
     }
   });
 
-  it('upsert with selfExplanatory+description: PUT body emits mc:selfexplainatory and adtcore:description', async () => {
-    const { conn, calls } = recorder();
-    const m = new AdtMessageClassMessage(conn, {
-      logger: noopLogger,
-      results: messageDocuments,
-    });
+  it('an upsert with selfExplanatory and description writes both', async () => {
+    const { m, calls } = handler();
     await m.update(
       {
         className: 'ZT',
@@ -216,42 +161,28 @@ describe('AdtMessageClassMessage', () => {
         selfExplanatory: true,
         description: 'X',
       },
-      { headers: headersOf(m, 'update') },
+      under(m),
     );
-    const put = calls.find((c) => c.method === 'PUT');
-    const body = String(put.data);
+    const body = String(calls[0].data);
     expect(body).toContain('mc:selfexplainatory="true"');
     expect(body).toContain('adtcore:description="X"');
   });
 
-  it('existing selfExplanatory+description round-trip when not overridden in update', async () => {
-    // CLASS_XML_WITH_FLAGS has 001 with selfexplainatory="true" and description="D1"
-    const { conn, calls } = recorder(CLASS_XML_WITH_FLAGS);
-    const m = new AdtMessageClassMessage(conn, {
-      logger: noopLogger,
-      results: messageDocuments,
-    });
-    // Update only msgtext — selfExplanatory and description not specified
+  it('keeps an existing selfExplanatory and description it is not told to change', async () => {
+    const { m, calls } = handler(CLASS_XML_WITH_FLAGS);
     await m.update(
       { className: 'ZT', msgno: '001', msgtext: 'UPDATED' },
-      { headers: headersOf(m, 'update') },
+      under(m, CLASS_XML_WITH_FLAGS),
     );
-    const put = calls.find((c) => c.method === 'PUT');
-    const body = String(put.data);
+    const body = String(calls[0].data);
     expect(body).toContain('mc:msgtext="UPDATED"');
-    // Existing values preserved via rawAttrs round-trip
     expect(body).toContain('mc:selfexplainatory="true"');
     expect(body).toContain('adtcore:description="D1"');
   });
 
-  it('create new message with selfExplanatory+description: PUT body emits both fields', async () => {
-    const { conn, calls } = recorder();
-    const m = new AdtMessageClassMessage(conn, {
-      logger: noopLogger,
-      results: messageDocuments,
-    });
-    // 003 does not exist in CLASS_XML — it will be pushed as a new message
-    await m.create(
+  it('adds a new message with its fields', async () => {
+    const { m, calls } = handler();
+    await m.update(
       {
         className: 'ZT',
         msgno: '003',
@@ -259,61 +190,49 @@ describe('AdtMessageClassMessage', () => {
         selfExplanatory: false,
         description: 'New message desc',
       },
-      { headers: headersOf(m, 'create') },
+      under(m),
     );
-    const put = calls.find((c) => c.method === 'PUT');
-    const body = String(put.data);
+    const body = String(calls[0].data);
     expect(body).toContain('mc:msgno="003"');
     expect(body).toContain('mc:selfexplainatory="false"');
     expect(body).toContain('adtcore:description="New message desc"');
   });
 });
 
-describe('the message contract', () => {
-  it('declares delete: getMessageClassMessage() answers a handler a consumer deletes through, no cast', async () => {
-    const { conn, calls } = recorder();
-    const messages = new AdtClient(conn, noopLogger).getMessageClassMessage();
-    expectResult(
-      await messages.delete(
-        { className: 'ZT', msgno: '001' },
-        { headers: headersOf(messages, 'delete') },
-      ),
-      'delete message 001',
+describe('the lock members carry the caller deadline (#333 review)', () => {
+  const address = { className: 'ZT', msgno: '001' };
+  it.each(['lockMessage', 'lockClassForMessage', 'unlockMessages'] as const)(
+    '%s sends options.timeout on its request, and 0 (no deadline) without it',
+    async (member) => {
+      const timed = handler();
+      await timed.m[member](address, { timeout: 1234 });
+      expect(timed.calls.map((c) => c.timeout)).toEqual([1234]);
+      const untimed = handler();
+      await untimed.m[member](address);
+      expect(untimed.calls.map((c) => c.timeout)).toEqual([0]);
+    },
+  );
+});
+
+describe('a removal is read by the deleted strategy (#333 review)', () => {
+  it('answers deleted for a removal and written for an upsert', async () => {
+    // The old `delete` read the PUT with `written` and cast it to the deleted
+    // type (oldMessageChain.json, "remove none": "W"); the value is now
+    // `deleted`'s.
+    const { conn } = recorder();
+    const m = new AdtMessageClassMessage(conn, {
+      logger: noopLogger,
+      results: { ...messageDocuments, written: () => 'W', deleted: () => 'D' },
+    });
+    const removed = await m.update(
+      { className: 'ZT', msgno: '001', removeMessage: true },
+      under(m),
     );
-    expect(calls.some((c) => c.method === 'PUT')).toBe(true);
-  });
-  describe('the class read behind a write names its version', () => {
-    // A write edits the working area, so the read it builds the PUT from asks
-    // for that version explicitly (40.0.0: every read sends the version given).
-    const CLASS_URL = '/sap/bc/adt/messageclass/zt?version=workingArea';
-    const writes = {
-      create: (m: AdtMessageClassMessage) =>
-        m.create(
-          { className: 'ZT', msgno: '003', msgtext: 'N' },
-          { headers: headersOf(m, 'create') },
-        ),
-      update: (m: AdtMessageClassMessage) =>
-        m.update(
-          { className: 'ZT', msgno: '001', msgtext: 'NEW' },
-          { headers: headersOf(m, 'update') },
-        ),
-      delete: (m: AdtMessageClassMessage) =>
-        m.delete(
-          { className: 'ZT', msgno: '001' },
-          { headers: headersOf(m, 'delete') },
-        ),
-    };
-    for (const [name, write] of Object.entries(writes)) {
-      it(`${name} reads the class with version=workingArea`, async () => {
-        const { conn, calls } = recorder();
-        const m = new AdtMessageClassMessage(conn, {
-          logger: noopLogger,
-          results: messageDocuments,
-        });
-        await write(m);
-        const gets = calls.filter((c) => c.method === 'GET');
-        expect(gets.map((c) => c.url)).toEqual([CLASS_URL]);
-      });
-    }
+    const written = await m.update(
+      { className: 'ZT', msgno: '001', msgtext: 'x' },
+      under(m),
+    );
+    expect(removed.ok && removed.getResult().value).toBe('D');
+    expect(written.ok && written.getResult().value).toBe('W');
   });
 });

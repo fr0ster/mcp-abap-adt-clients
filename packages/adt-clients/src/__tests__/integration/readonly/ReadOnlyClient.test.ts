@@ -136,8 +136,8 @@ describe('AdtClient read operations', () => {
     // at once. The shape below is what those handlers actually offer: either
     // member, and the reader below asks for the one that is there.
     getAdtObject: () =>
-      | (Partial<IAdtReadable<any, unknown>> &
-          Partial<IAdtMetadataReadable<any, unknown>>)
+      | (Partial<IAdtReadable<any, unknown, never>> &
+          Partial<IAdtMetadataReadable<any, unknown, never>>)
       | undefined,
     handlerName?: string,
     testCaseName?: string,

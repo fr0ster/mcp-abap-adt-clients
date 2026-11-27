@@ -36,6 +36,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { isUnansweredCredentialRefusal } from './adtResponse';
+import { requestTraceOf } from './ownValue';
 
 /** Enough to say which call, and nothing more. Matches `IAdtError.request`. */
 export interface IAdtRequestTrace {
@@ -54,7 +55,8 @@ export interface IAdtRequestTrace {
 export function requestOf(
   answer?: IAdtWireResponse,
 ): IAdtRequestTrace | undefined {
-  const carried = answer?.request as IAdtRequestTrace | undefined;
+  // Only its string method and url (the owner's decision D4 of #304).
+  const carried = requestTraceOf(answer?.request);
   if (!carried || (!carried.url && !carried.method)) return undefined;
   return { method: carried.method, url: carried.url };
 }

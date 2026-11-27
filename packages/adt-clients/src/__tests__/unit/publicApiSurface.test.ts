@@ -66,6 +66,7 @@ const RUNTIME_EXPORTS = [
   'AbapDebugger',
   'abapDebuggerDocuments',
   'abapGitDocuments',
+  'abapGitFactsDefaults',
   'AbapUnitTestRunner',
   'abapUnitTestRunnerDocuments',
   'ACCESS_CONTROL',

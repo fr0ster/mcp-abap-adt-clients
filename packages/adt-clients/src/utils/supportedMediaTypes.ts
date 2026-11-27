@@ -11,6 +11,7 @@
  */
 
 import type { HttpError } from '@mcp-abap-adt/interfaces-network';
+import { propertyOf } from './ownValue';
 
 /**
  * The text SAP's 406 puts before the types it accepts.
@@ -42,7 +43,7 @@ const LIST_ENDS = ['<', '"', '\n'];
 
 /** The body of a refusal as text. */
 function bodyText(error: unknown): string {
-  const data = (error as HttpError)?.response?.data;
+  const data = propertyOf(propertyOf(error, 'response'), 'data');
   return typeof data === 'string' ? data : data ? JSON.stringify(data) : '';
 }
 
@@ -71,7 +72,7 @@ export function extractSupportedAccept(error: unknown): string[] {
 }
 
 export function extractSupportedContentType(error: unknown): string[] {
-  if ((error as HttpError)?.response?.status !== 415) {
+  if (propertyOf(propertyOf(error, 'response'), 'status') !== 415) {
     return [];
   }
   return listedAfter(bodyText(error), SUPPORTED_MEDIA_TYPES);

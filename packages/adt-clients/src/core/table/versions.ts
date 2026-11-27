@@ -1,3 +1,4 @@
+import type { AdtObjectIdentity } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -16,10 +17,10 @@ const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
  */
 export async function getTableVersions(
   connection: IAbapConnection,
-  config: Partial<ITableConfig>,
+  config: AdtObjectIdentity<ITableConfig, 'tableName'>,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
-    url: `${versionsUri(sourceUri(TABLE.uri(config.tableName as string)))}`,
+    url: `${versionsUri(sourceUri(TABLE.uri(config.tableName)))}`,
     method: 'GET',
     timeout: 0,
     headers: { Accept: ACCEPT_VERSION_FEED },

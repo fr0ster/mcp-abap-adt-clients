@@ -8,7 +8,9 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
+  AdtObjectIdentity,
   AdtReadVersion,
+  AdtRequiredUpdateOptions,
   IAdtActivatable,
   IAdtActivationOptions,
   IAdtAnalyseOptions,
@@ -19,6 +21,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
@@ -29,6 +32,7 @@ import type {
   IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
+  IAnalyse,
   IAppendStructureResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -77,16 +81,47 @@ export class AdtAppendStructure<
   >,
 > implements
     IAdtCreatable<IAppendStructureConfig, T['created']>,
-    IAdtReadable<IAppendStructureConfig, T['source']>,
-    IAdtMetadataReadable<IAppendStructureConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IAppendStructureConfig>, T['updated']>,
-    IAdtDeletable<IAppendStructureConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IAppendStructureConfig, T['validation']>,
-    IAdtCheckable<IAppendStructureConfig, T['check']>,
-    IAdtActivatable<IAppendStructureConfig, T['activation']>,
-    IAdtLockable<IAppendStructureConfig>,
-    IAdtTransportAware<IAppendStructureConfig, T['transport']>,
-    IAdtVersionable<IAppendStructureConfig, T['versions'], T['versionSource']>
+    IAdtReadable<IAppendStructureConfig, T['source'], 'appendStructureName'>,
+    IAdtMetadataReadable<
+      IAppendStructureConfig,
+      T['metadata'],
+      'appendStructureName'
+    >,
+    IAdtUpdatable<
+      Partial<IAppendStructureConfig>,
+      T['updated'],
+      'appendStructureName',
+      'source'
+    >,
+    IAdtDeletable<
+      IAppendStructureConfig,
+      T['deletion'],
+      'appendStructureName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<
+      IAppendStructureConfig,
+      T['validation'],
+      'appendStructureName'
+    >,
+    IAdtCheckable<IAppendStructureConfig, T['check'], 'appendStructureName'>,
+    IAdtActivatable<
+      IAppendStructureConfig,
+      T['activation'],
+      'appendStructureName'
+    >,
+    IAdtLockable<IAppendStructureConfig, 'appendStructureName'>,
+    IAdtTransportAware<
+      IAppendStructureConfig,
+      T['transport'],
+      'appendStructureName'
+    >,
+    IAdtVersionable<
+      IAppendStructureConfig,
+      T['versions'],
+      T['versionSource'],
+      'appendStructureName'
+    >
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
@@ -124,15 +159,25 @@ export class AdtAppendStructure<
    * from nothing and the server answers — which is a reading a strategy can
    * take, where a sentence composed here would not be.
    */
-  private name(config: Partial<IAppendStructureConfig>): string {
-    return config.appendStructureName as string;
+  private name(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+  ): string {
+    return config.appendStructureName;
   }
 
   /** Validate the name, where the system offers the resource. */
+  validate<E extends IAdtError>(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>>;
+  validate(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['validation'], IAdtError>>;
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['validation'], E>> {
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -146,13 +191,29 @@ export class AdtAppendStructure<
   }
 
   /** Create the append structure. Metadata only — the fields come via update. */
+  create<E extends IAdtError>(
+    config: Omit<IAppendStructureConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>>;
+  create(
+    config: Omit<IAppendStructureConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['created'], IAdtError>>;
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IAppendStructureConfig, 'source'> & {
       source?: never;
       packageName: string;
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<T['created'], E>> {
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // The type requires a package; this refuses an empty one, which the type
@@ -176,10 +237,10 @@ export class AdtAppendStructure<
       () =>
         createAppendStructure(connection, options.headers, {
           append_structure_name: name,
-          base_object: config.baseObject as string,
+          base_object: config.baseObject,
           package_name: config.packageName,
           transport_request: config.transportRequest,
-          description: config.description as string,
+          description: config.description,
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,
           masterLanguage: createLanguage(
@@ -193,11 +254,21 @@ export class AdtAppendStructure<
   }
 
   /** Read the DDL source. */
+  read<E extends IAdtError>(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    version: AdtReadVersion | undefined,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>>;
+  read(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    version?: AdtReadVersion,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['source'], IAdtError>>;
   async read<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['source'], E>> {
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -220,10 +291,18 @@ export class AdtAppendStructure<
   }
 
   /** Read the metadata document. */
+  readMetadata<E extends IAdtError>(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>>;
+  readMetadata(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['metadata'], IAdtError>>;
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['metadata'], E>> {
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -244,10 +323,20 @@ export class AdtAppendStructure<
   }
 
   /** The transport request the object belongs to. */
+  readTransport<E extends IAdtError>(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    options: ({ withLongPolling?: boolean } & IAdtOperationOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>>;
+  readTransport(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['transport'], IAdtError>>;
   async readTransport<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['transport'], E>> {
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -281,10 +370,24 @@ export class AdtAppendStructure<
    * what the object holds, change what you mean to change, and pass the result:
    * anything left out is gone, because nothing is read here to keep it.
    */
+  update<E extends IAdtError>(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>>;
+  update(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['updated'], IAdtError>>;
   async update<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['updated'], E>> {
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -304,10 +407,10 @@ export class AdtAppendStructure<
           options.ifMatch,
           {
             append_structure_name: name,
-            source_code: source as string,
+            source_code: source,
             transport_request: config.transportRequest,
           },
-          options?.lockHandle as string,
+          options?.lockHandle,
         ),
       this.results.updated,
       options?.analyse,
@@ -321,10 +424,20 @@ export class AdtAppendStructure<
    * it: a consumer that wants the check runs this first and decides what a
    * refusal means.
    */
+  checkDeletion<E extends IAdtError>(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  checkDeletion(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   async checkDeletion<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -345,10 +458,20 @@ export class AdtAppendStructure<
    *
    * The deletion check is read, not merely performed — see AdtProgram.delete.
    */
+  delete<E extends IAdtError>(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>>;
+  delete(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletion'], IAdtError>>;
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletion'], E>> {
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -365,10 +488,20 @@ export class AdtAppendStructure<
   }
 
   /** Activate the append structure. */
+  activate<E extends IAdtError>(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>>;
+  activate(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['activation'], IAdtError>>;
   async activate<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
-  ): Promise<IAdtResponse<T['activation'], E>> {
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -389,11 +522,23 @@ export class AdtAppendStructure<
   }
 
   /** Check the append structure. */
+  check<E extends IAdtError>(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>>;
+  check(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['check'], IAdtError>>;
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['check'], E>> {
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -413,10 +558,18 @@ export class AdtAppendStructure<
    * carrying no handle reads as `''`; whether that is a refusal is the
    * caller's `analyse` to say.
    */
+  lock<E extends IAdtError>(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  lock(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
     const name = this.name(config);
     const answer = await answering(
       () =>
@@ -433,11 +586,21 @@ export class AdtAppendStructure<
   }
 
   /** Unlock the object. */
+  unlock<E extends IAdtError>(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    lockHandle: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<void, E | IAdtError>>;
+  unlock(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    lockHandle: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<void, IAdtError>>;
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<void, E>> {
+  ): Promise<IAdtResponse<void, E | IAdtError>> {
     const name = this.name(config);
     return answering(
       async () => {
@@ -456,10 +619,18 @@ export class AdtAppendStructure<
   }
 
   /** Version history of the object's source. */
+  getVersions<E extends IAdtError>(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>>;
+  getVersions(
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versions'], IAdtError>>;
   async getVersions<E extends IAdtError = IAdtError>(
-    config: Partial<IAppendStructureConfig>,
+    config: AdtObjectIdentity<IAppendStructureConfig, 'appendStructureName'>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versions'], E>> {
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>> {
     return answering(
       () => getAppendStructureVersions(this.connection, config),
       this.results.versions,
@@ -468,10 +639,18 @@ export class AdtAppendStructure<
   }
 
   /** Source of one version, by the `contentUri` its entry carried. */
+  getVersionSource<E extends IAdtError>(
+    contentUri: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versionSource'], E | IAdtError>>;
+  getVersionSource(
+    contentUri: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versionSource'], IAdtError>>;
   async getVersionSource<E extends IAdtError = IAdtError>(
     contentUri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versionSource'], E>> {
+  ): Promise<IAdtResponse<T['versionSource'], E | IAdtError>> {
     return answering(
       () => getAppendStructureVersionSource(this.connection, contentUri),
       this.results.versionSource,

@@ -664,6 +664,7 @@ define structure ${structureName} {
                     analyse: analyseException,
                     headers: integrationHeadersOf(structureHandler, 'update'),
                     lockHandle: structureLockHandle,
+                    source: structureDdlCode,
                   },
                 ),
                 'update structure',

@@ -115,6 +115,12 @@ export interface HandlerEntry {
   capabilities: readonly Atom[];
   /** Why this set, when the set is not the full one. */
   why?: string;
+  /**
+   * What the entry's `update` takes beyond `source` and `lockHandle`, for a
+   * write whose options name more than those two (a message: the class
+   * document it is written into and both handles, C7 of #304).
+   */
+  updateOptions?: Readonly<Record<string, unknown>>;
 }
 
 /**
@@ -1365,12 +1371,16 @@ export const HANDLERS = {
     subject: '/sap/bc/adt/messageclass/ZGUARD_MSG',
     config: { className: 'ZGUARD_MSG', msgno: '001', msgtext: 'guard' },
     requests: {
-      create: '/sap/bc/adt/messageclass/zguard_msg',
       read: '/sap/bc/adt/messageclass/zguard_msg',
-      update: '/sap/bc/adt/messageclass/zguard_msg',
     },
-    capabilities: ['creatable', 'readable', 'updatable'],
-    why: 'A message is created, read, changed and removed through its class’s XML, and is nothing else in its own right.',
+    capabilities: ['readable'],
+    updateOptions: {
+      classDocument:
+        '<?xml version="1.0"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZGUARD_MSG" adtcore:type="MSAG/N"><adtcore:packageRef adtcore:name="$TMP"/><mc:messages mc:msgno="001" mc:msgtext="guard"/></mc:messageClass>',
+      classLockHandle: 'GUARD-LOCK',
+      messageLockHandle: 'GUARD-MESSAGE-LOCK',
+    },
+    why: 'A message is read through its class’s XML and written by a PUT of it, under its own locks (C7 of #304: lockMessage, lockClassForMessage, update, unlockMessages), and is nothing else in its own right.',
   },
   transport: {
     factory: (c: AdtClient) => c.getRequest(),

@@ -4,6 +4,9 @@ import {
   AdtObjectErrorCodes,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
+import { type AdtHeaderMap, firstOf } from '../headers';
+import { field, propertyOf } from '../parsed';
+import { aunitRunUriHasRunId, runIdAfter } from '../scan';
 import {
   type AdtActivationFacts,
   type AdtActivationRefusal,
@@ -97,15 +100,12 @@ function sessionLostOn(
 function requestOf(
   answer: IAdtWireResponse | undefined,
 ): { method?: string; url?: string } | undefined {
-  const carried = (answer as { request?: { method?: unknown; url?: unknown } })
-    ?.request;
-  const config = (answer as { config?: { method?: unknown; url?: unknown } })
-    ?.config;
-
-  for (const source of [carried, config]) {
-    const method =
-      typeof source?.method === 'string' ? source.method : undefined;
-    const url = typeof source?.url === 'string' ? source.url : undefined;
+  // Both are `unknown` in the contract: whatever the transport put there.
+  for (const source of [answer?.request, answer?.config]) {
+    const sourceMethod = propertyOf(source, 'method');
+    const sourceUrl = propertyOf(source, 'url');
+    const method = typeof sourceMethod === 'string' ? sourceMethod : undefined;
+    const url = typeof sourceUrl === 'string' ? sourceUrl : undefined;
     if (method || url) return { method, url };
   }
   return undefined;
@@ -221,10 +221,7 @@ function analyser(
   return (verdict, answer, context) => {
     if (verdict !== ADT_NO_FAILURE)
       return enrich(verdict, answer, context?.activation);
-    const refusal = read(
-      (answer as { data?: unknown } | undefined)?.data,
-      context?.activation,
-    );
+    const refusal = read(answer?.data, context?.activation);
     return refusal ? asFailure(refusal, answer) : ADT_NO_FAILURE;
   };
 }
@@ -344,10 +341,10 @@ function headerOf(
   answer: IAdtWireResponse | undefined,
   name: string,
 ): string | undefined {
-  const headers = (answer?.headers ?? {}) as Record<string, unknown>;
+  const headers: AdtHeaderMap = answer?.headers ?? {};
   const key = Object.keys(headers).find((k) => k.toLowerCase() === name);
   const value = key ? headers[key] : undefined;
-  const first = Array.isArray(value) ? value[0] : value;
+  const first = Array.isArray(value) ? firstOf(value) : value;
   return typeof first === 'string' ? first : undefined;
 }
 
@@ -446,16 +443,18 @@ export const analyseUnitTestStart: IAnalyse<IAdtMessageFailure> = (
   answer,
 ) => {
   if (verdict !== ADT_NO_FAILURE) return enrich(verdict, answer);
-  const headers = (answer?.headers ?? {}) as Record<string, unknown>;
+  const headers: AdtHeaderMap = answer?.headers ?? {};
   const header = [
     headers.location,
     headers['content-location'],
     headers['sap-adt-location'],
   ]
-    .map((v) => (Array.isArray(v) ? v[0] : v))
-    .find((v) => typeof v === 'string' && /\/runs\/[^/]+/.test(v));
+    .map((v) => (Array.isArray(v) ? firstOf(v) : v))
+    .find(
+      (v) => typeof v === 'string' && runIdAfter(v, '/runs/') !== undefined,
+    );
   const body = typeof answer?.data === 'string' ? answer.data : '';
-  const inBody = /<aunit:run[^>]*uri="[^"]*\/runs\/[^/"]+/.test(body);
+  const inBody = aunitRunUriHasRunId(body);
   if (header || inBody) return ADT_NO_FAILURE;
   const message = 'Failed to start unit test run: run ID not returned';
   return {

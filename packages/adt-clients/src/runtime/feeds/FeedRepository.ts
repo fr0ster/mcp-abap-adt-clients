@@ -10,6 +10,7 @@ import type {
   IAdtAnalyseOptions,
   IAdtError,
   IAdtResponse,
+  IAnalyse,
   IFeedQueryOptions,
   IFeedRepository,
   IResultStrategy,
@@ -99,9 +100,15 @@ export class FeedRepository<
   }
 
   /** The feeds this system offers. */
+  list<E extends IAdtError>(
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['feeds'], E | IAdtError>>;
+  list(
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['feeds'], IAdtError>>;
   async list<E extends IAdtError = IAdtError>(
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['feeds'], E>> {
+  ): Promise<IAdtResponse<T['feeds'], E | IAdtError>> {
     return answering(
       () => getFeeds(this.connection),
       this.results.feeds,
@@ -117,10 +124,18 @@ export class FeedRepository<
    * "Parameter category could not be found." Everything that called this before
    * `@mcp-abap-adt/interfaces@26.0.0` fixed the contract was getting that 400.
    */
+  variants<E extends IAdtError>(
+    category: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['variants'], E | IAdtError>>;
+  variants(
+    category: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['variants'], IAdtError>>;
   async variants<E extends IAdtError = IAdtError>(
     category: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['variants'], E>> {
+  ): Promise<IAdtResponse<T['variants'], E | IAdtError>> {
     // The compiler rejects a missing category; JavaScript callers reach here
     // anyway, so it says so rather than sending a request the server answers
     // with 400.
@@ -138,16 +153,30 @@ export class FeedRepository<
   }
 
   /** The runtime dumps feed. */
+  dumps<E extends IAdtError>(
+    options: IFeedQueryOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['entries'], E | IAdtError>>;
+  dumps(
+    options?: IFeedQueryOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['entries'], IAdtError>>;
   async dumps<E extends IAdtError = IAdtError>(
     options?: IFeedQueryOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['entries'], E>> {
+  ): Promise<IAdtResponse<T['entries'], E | IAdtError>> {
     return this.byUrl(FEED_URLS.dumps, options);
   }
 
   /** The system-messages feed. */
+  systemMessages<E extends IAdtError>(
+    options: IFeedQueryOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['systemMessages'], E | IAdtError>>;
+  systemMessages(
+    options?: IFeedQueryOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['systemMessages'], IAdtError>>;
   async systemMessages<E extends IAdtError = IAdtError>(
     options?: IFeedQueryOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['systemMessages'], E>> {
+  ): Promise<IAdtResponse<T['systemMessages'], E | IAdtError>> {
     return answering(
       () => fetchFeed(this.connection, FEED_URLS.systemMessages, options),
       this.results.systemMessages,
@@ -161,9 +190,16 @@ export class FeedRepository<
    * Filtered by `username`, not `user`: this feed names the parameter
    * differently from the others.
    */
+  gatewayErrors<E extends IAdtError>(
+    options: IFeedQueryOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['gatewayErrors'], E | IAdtError>>;
+  gatewayErrors(
+    options?: IFeedQueryOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['gatewayErrors'], IAdtError>>;
   async gatewayErrors<E extends IAdtError = IAdtError>(
     options?: IFeedQueryOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['gatewayErrors'], E>> {
+  ): Promise<IAdtResponse<T['gatewayErrors'], E | IAdtError>> {
     return answering(
       () =>
         fetchFeed(
@@ -183,10 +219,18 @@ export class FeedRepository<
    * negotiates (`/IWBEP/CL_ERROR_LOG_VIEWER->get`, onprem l. 89-93, cloud
    * l. 93-97); it was asked for as an Atom feed until 47.0.0.
    */
+  gatewayErrorDetail<E extends IAdtError>(
+    feedUrl: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['gatewayErrorDetail'], E | IAdtError>>;
+  gatewayErrorDetail(
+    feedUrl: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['gatewayErrorDetail'], IAdtError>>;
   async gatewayErrorDetail<E extends IAdtError = IAdtError>(
     feedUrl: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['gatewayErrorDetail'], E>> {
+  ): Promise<IAdtResponse<T['gatewayErrorDetail'], E | IAdtError>> {
     return answering(
       () =>
         this.connection.makeAdtRequest({
@@ -206,10 +250,19 @@ export class FeedRepository<
    * Not part of `IFeedRepository`: a caller who has a feed's URL from `list()`
    * can read it without this package naming that feed.
    */
+  byUrl<E extends IAdtError>(
+    feedUrl: string,
+    options: IFeedQueryOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['entries'], E | IAdtError>>;
+  byUrl(
+    feedUrl: string,
+    options?: IFeedQueryOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['entries'], IAdtError>>;
   async byUrl<E extends IAdtError = IAdtError>(
     feedUrl: string,
     options?: IFeedQueryOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['entries'], E>> {
+  ): Promise<IAdtResponse<T['entries'], E | IAdtError>> {
     return answering(
       () => fetchFeed(this.connection, feedUrl, options),
       this.results.entries,

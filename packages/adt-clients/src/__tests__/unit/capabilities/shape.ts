@@ -30,6 +30,8 @@ import type {
   IAdtEnhancementHost,
   IAdtIncludeEnhancementHost,
   IAdtLockable,
+  IAdtLockFreeMetadataUpdatable,
+  IAdtLockFreeUpdatable,
   IAdtMainProgramsReadable,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
@@ -76,36 +78,63 @@ type Contract<H extends keyof typeof HANDLERS> = ReturnType<
  */
 type Offers<T, A> = T extends A ? true : false;
 
+/**
+ * Does `T` offer one form of a write atom? Since #304 a write names the
+ * options it requires (`source`) and whether it takes a lock (C7), so the
+ * atom has these forms; any one of them is the method offered.
+ */
+type OffersWrite<T, Forms> = true extends (
+  Forms extends unknown
+    ? T extends Forms
+      ? true
+      : false
+    : never
+)
+  ? true
+  : false;
+
 type OffersAtom<T, A extends string> = A extends 'enhancementHost'
-  ? Offers<T, IAdtEnhancementHost<any, any, any>>
+  ? Offers<T, IAdtEnhancementHost<any, any, any, never>>
   : A extends 'includeEnhancementHost'
-    ? Offers<T, IAdtIncludeEnhancementHost<any, any, any>>
+    ? Offers<T, IAdtIncludeEnhancementHost<any, any, any, never>>
     : A extends 'mainProgramsReadable'
-      ? Offers<T, IAdtMainProgramsReadable<any, any>>
+      ? Offers<T, IAdtMainProgramsReadable<any, any, never>>
       : A extends 'creatable'
         ? Offers<T, IAdtCreatable<any, any>>
         : A extends 'readable'
-          ? Offers<T, IAdtReadable<any, any>>
+          ? Offers<T, IAdtReadable<any, any, never>>
           : A extends 'metadataReadable'
-            ? Offers<T, IAdtMetadataReadable<any, any>>
+            ? Offers<T, IAdtMetadataReadable<any, any, never>>
             : A extends 'updatable'
-              ? Offers<T, IAdtUpdatable<any, any>>
+              ? OffersWrite<
+                  T,
+                  | IAdtUpdatable<any, any, never>
+                  | IAdtUpdatable<any, any, never, 'source'>
+                  | IAdtLockFreeUpdatable<any, any, never>
+                  | IAdtLockFreeUpdatable<any, any, never, 'source'>
+                >
               : A extends 'metadataUpdatable'
-                ? Offers<T, IAdtMetadataUpdatable<any, any>>
+                ? OffersWrite<
+                    T,
+                    | IAdtMetadataUpdatable<any, any, never>
+                    | IAdtMetadataUpdatable<any, any, never, 'source'>
+                    | IAdtLockFreeMetadataUpdatable<any, any, never>
+                    | IAdtLockFreeMetadataUpdatable<any, any, never, 'source'>
+                  >
                 : A extends 'deletable'
-                  ? Offers<T, IAdtDeletable<any, any>>
+                  ? Offers<T, IAdtDeletable<any, any, never>>
                   : A extends 'validatable'
-                    ? Offers<T, IAdtValidatable<any, any>>
+                    ? Offers<T, IAdtValidatable<any, any, never>>
                     : A extends 'checkable'
-                      ? Offers<T, IAdtCheckable<any, any>>
+                      ? Offers<T, IAdtCheckable<any, any, never>>
                       : A extends 'activatable'
-                        ? Offers<T, IAdtActivatable<any, any>>
+                        ? Offers<T, IAdtActivatable<any, any, never>>
                         : A extends 'lockable'
-                          ? Offers<T, IAdtLockable<any>>
+                          ? Offers<T, IAdtLockable<any, never>>
                           : A extends 'versionable'
-                            ? Offers<T, IAdtVersionable<any, any, any>>
+                            ? Offers<T, IAdtVersionable<any, any, any, never>>
                             : A extends 'transportAware'
-                              ? Offers<T, IAdtTransportAware<any, any>>
+                              ? Offers<T, IAdtTransportAware<any, any, never>>
                               : // An atom this chain does not know resolves to
                                 // `never`, and `never extends true` is vacuously true
                                 // — so it would drop out of the product and be checked
@@ -186,12 +215,23 @@ export type Offenders = {
 // `read` (the parent class's document; a message has no resource of its own).
 // The deleted composition left the atom out, so the type hid it. The class's
 // members are not changed by #216, so the disagreement is recorded here.
+//
+// The four after it since D3 of #304, when every member became an overload
+// pair: against the `any` configs of this check, the pair of a member with a
+// contract of its own also satisfies the general atom's pair. Their own
+// contracts are `IAdtTextElementsReadable` / `IAdtTextElementsUpdatable`,
+// `IAdtTableSettingsUpdatable` and `IAdtMessageClassMessageUpdatable`, each
+// checked by its handler's own tests.
 export type KnownDisagreements =
   | 'include.enhancementHost — offered but not claimed'
   | 'class.includeEnhancementHost — offered but not claimed'
   | 'program.includeEnhancementHost — offered but not claimed'
   | 'functionGroup.includeEnhancementHost — offered but not claimed'
-  | 'messageClassMessage.metadataReadable — offered but not claimed';
+  | 'messageClassMessage.metadataReadable — offered but not claimed'
+  | 'textElements.readable — offered but not claimed'
+  | 'textElements.updatable — offered but not claimed'
+  | 'tableSettings.metadataUpdatable — offered but not claimed'
+  | 'messageClassMessage.updatable — offered but not claimed';
 
 /**
  * The assertion.

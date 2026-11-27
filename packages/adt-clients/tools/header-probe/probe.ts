@@ -27,6 +27,7 @@ import {
   withLock,
 } from './ledger';
 import { deletesUnderLock, temporaryClient } from './members';
+import { type IMessageHandlers, upsertMessage } from './messageRecipe';
 import {
   type IObjectSpec,
   type IProbeable,
@@ -108,9 +109,8 @@ export class Probe {
   /** The rows that work on the object of `spec` (a class's includes, a message class's messages) skipped with it. */
   private skipDependents(spec: IObjectSpec, why: string): void {
     if (spec.type === 'messageClass')
-      for (const member of ['create', 'update', 'delete'])
-        if (this.wanted('messageClassMessage', member))
-          this.skip('messageClassMessage', member, why);
+      if (this.wanted('messageClassMessage', 'update'))
+        this.skip('messageClassMessage', 'update', why);
     if (spec.type === 'class')
       for (const local of LOCAL_INCLUDES)
         for (const member of ['update', 'delete', 'check'])
@@ -831,75 +831,49 @@ export class Probe {
     }
   }
 
-  /** A message class's messages: each write is the member's own chain. */
+  /**
+   * A message class's message: its one write, `update`, is the PUT of the
+   * class document under the message's locks (C7 of #304), run through the
+   * caller's recipe ({@link upsertMessage}); the pair goes out on the PUT.
+   * The message is upserted, so the known probe makes it; it goes with the
+   * class's delete.
+   */
   async messages(className: string): Promise<void> {
     const handler = 'getMessageClassMessage()';
-    const handle = (client: IProbeClient): IProbeable =>
-      client.getMessageClassMessage() as unknown as IProbeable;
-    const msgno: Record<ProbeKind, string> = {
-      known: '001',
-      badAccept: '002',
-      badContentType: '003',
+    const handlers = (client: IProbeClient): IMessageHandlers => ({
+      messageClass:
+        client.getMessageClass() as unknown as IMessageHandlers['messageClass'],
+      message:
+        client.getMessageClassMessage() as unknown as IMessageHandlers['message'],
+    });
+    const address = { className, msgno: '001' };
+    const state: ICall = (client, analyse) =>
+      handlers(client).message.read(address, undefined, { analyse });
+    const present = (capture: ICapture): IObjectState => {
+      const base = readState(capture.wire);
+      if (base.exists !== true) return base;
+      const body = String(capture.wire?.data ?? '');
+      return { ...base, exists: body.includes('msgno="001"') };
     };
-    const config = (number: string) => ({
-      className,
-      msgno: number,
-      msgtext: `Header probe ${number}`,
-      transportRequest: this.context.transportRequest,
-    });
-    const state =
-      (number: string): ICall =>
-      (client, analyse) =>
-        handle(client).read?.(config(number), undefined, { analyse }) ??
-        Promise.resolve();
-    const present =
-      (number: string) =>
-      (capture: ICapture): IObjectState => {
-        const base = readState(capture.wire);
-        if (base.exists !== true) return base;
-        const body = String(capture.wire?.data ?? '');
-        return { ...base, exists: body.includes(`msgno="${number}"`) };
-      };
-    const chain =
-      'a chain: read, two locks, the write, two unlocks, each next request depending on the answer before';
-    await this.operation({
-      objectType: 'messageClassMessage',
-      handler,
-      member: 'create',
-      sequential: chain,
-      call: (kind, headers) => (client, analyse) =>
-        handle(client).create?.(config(msgno[kind]), { headers, analyse }) ??
-        Promise.resolve(),
-      state: (kind) => state(msgno[kind]),
-      readState: (capture, kind) => present(msgno[kind])(capture),
-    });
     await this.operation({
       objectType: 'messageClassMessage',
       handler,
       member: 'update',
-      sequential: chain,
-      call: (_kind, headers) => (client, analyse) =>
-        handle(client).update?.(
-          { ...config('001'), msgtext: 'Header probe updated' },
+      sequential:
+        'a recipe: read the class, two locks, the write, two unlocks, each next request depending on the answer before',
+      call: (kind, headers) => (client, analyse) =>
+        upsertMessage(
+          handlers(client),
           {
-            headers,
-            analyse,
+            ...address,
+            msgtext: `Header probe ${kind}`,
+            transportRequest: this.context.transportRequest,
           },
-        ) ?? Promise.resolve(),
-      state: () => state('001'),
-      readState: present('001'),
-    });
-    await this.operation({
-      objectType: 'messageClassMessage',
-      handler,
-      member: 'delete',
-      sequential: chain,
-      kinds: ['badAccept', 'badContentType', 'known'],
-      call: (_kind, headers) => (client, analyse) =>
-        handle(client).delete?.(config('001'), { headers, analyse }) ??
-        Promise.resolve(),
-      state: () => state('001'),
-      readState: present('001'),
+          headers,
+          analyse,
+        ),
+      state: () => state,
+      readState: present,
     });
   }
 

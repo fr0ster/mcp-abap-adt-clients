@@ -25,6 +25,7 @@ import type {
   IAdtError,
   IAdtResponse,
   IAdtRunnable,
+  IAnalyse,
   IClassUnitTestDefinition,
   IClassUnitTestRunOptions,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -97,11 +98,22 @@ export class ClassTestRunner<
    * answered the id, and pass `analyseUnitTestStart` to have an id-less answer
    * read as a failure.
    */
+  run<E extends IAdtError>(
+    this: this & AdtPerformedBy<'class', 'unitTestRun'>,
+    target: IClassTestRunTarget,
+    options: IClassUnitTestRunOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>>;
+  run(
+    this: this & AdtPerformedBy<'class', 'unitTestRun'>,
+    target: IClassTestRunTarget,
+    options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['run'], IAdtError>>;
   async run<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'class', 'unitTestRun'>,
     target: IClassTestRunTarget,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['run'], E>> {
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>> {
     if (typeof target === 'string') {
       return this.startByObject(target, 'CLAS', options);
     }
@@ -132,11 +144,22 @@ export class ClassTestRunner<
    * `context` are not sent; scope, risk levels and durations are, with the
    * same defaults.
    */
+  runSync<E extends IAdtError>(
+    this: this & AdtPerformedBy<'class', 'unitTestRunSync'>,
+    target: IClassTestRunTarget,
+    options: IClassUnitTestRunOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['result'], E | IAdtError>>;
+  runSync(
+    this: this & AdtPerformedBy<'class', 'unitTestRunSync'>,
+    target: IClassTestRunTarget,
+    options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['result'], IAdtError>>;
   async runSync<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'class', 'unitTestRunSync'>,
     target: IClassTestRunTarget,
     options?: IClassUnitTestRunOptions & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['result'], E>> {
+  ): Promise<IAdtResponse<T['result'], E | IAdtError>> {
     const { analyse, ...runOptions } = options ?? {};
     return answering(
       () =>

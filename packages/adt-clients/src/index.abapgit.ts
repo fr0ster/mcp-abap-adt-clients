@@ -15,6 +15,8 @@ export {
   type AbapGitValues,
   type AbapGitValuesOf,
   abapGitDocuments,
+  abapGitFactsDefaults,
+  type FactsReaders,
   type FactsValue,
   type IAbapGitFactsOf,
   type IAbapGitFactsResults,

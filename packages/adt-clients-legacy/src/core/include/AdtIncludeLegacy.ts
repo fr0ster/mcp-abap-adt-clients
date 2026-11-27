@@ -22,11 +22,15 @@ import {
   withCallTimeout,
 } from '@mcp-abap-adt/adt-clients';
 import type {
+  AdtObjectIdentity,
+  AdtRequiredUpdateOptions,
   IAdtError,
   IAdtHeaders,
+  IAdtLockedWrite,
   IAdtOperationOptions,
   IAdtResponse,
   IAdtUpdateOptions,
+  IAnalyse,
   IIncludeConfig,
   IIncludeResults,
   IResultStrategy,
@@ -41,12 +45,24 @@ export class AdtIncludeLegacy<
   T extends IncludeValues = ResultValuesOf<typeof includeDocuments>,
 > extends AdtInclude<T, 'basis740'> {
   /** Refused without a request: 7.40 has no `/sap/bc/adt/deletion/check` (§5). */
+  override checkDeletion<E extends IAdtError>(
+    this: this & AdtPerformedBy<'include', 'deletionCheck'>,
+    _config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  override checkDeletion(
+    this: this & AdtPerformedBy<'include', 'deletionCheck'>,
+    _config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    _options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   override async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'include', 'deletionCheck'>,
-    _config: Partial<IIncludeConfig>,
+    _config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
     _options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
-    return noDeletionCheck<T['deletionCheck'], E>();
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
+    return noDeletionCheck<T['deletionCheck']>();
   }
 
   /**
@@ -54,12 +70,28 @@ export class AdtIncludeLegacy<
    * `updateMetadata` for the include, and no run there has sent the PUT of its
    * metadata document.
    */
+  override updateMetadata<E extends IAdtError>(
+    this: this & AdtPerformedBy<'include', 'updateMetadata'>,
+    _config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>>;
+  override updateMetadata(
+    this: this & AdtPerformedBy<'include', 'updateMetadata'>,
+    _config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], IAdtError>>;
   override async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'include', 'updateMetadata'>,
-    _config: Partial<IIncludeConfig>,
-    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
-    return legacyNotMeasuredRefusal<T['metadataUpdated'], E>(
+    _config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    _options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
+    return legacyNotMeasuredRefusal<T['metadataUpdated']>(
       'updateMetadata',
       'PUT /sap/bc/adt/programs/includes/{name}',
     );
@@ -70,12 +102,22 @@ export class AdtIncludeLegacy<
    * `mainPrograms` for the include, and no run there has sent the GET of its
    * main programs.
    */
+  override readMainPrograms<E extends IAdtError>(
+    this: this & AdtPerformedBy<'include', 'mainPrograms'>,
+    _config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    _options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['mainPrograms'], E | IAdtError>>;
+  override readMainPrograms(
+    this: this & AdtPerformedBy<'include', 'mainPrograms'>,
+    _config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    _options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['mainPrograms'], IAdtError>>;
   override async readMainPrograms<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'include', 'mainPrograms'>,
-    _config: Partial<IIncludeConfig>,
+    _config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
     _options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['mainPrograms'], E>> {
-    return legacyNotMeasuredRefusal<T['mainPrograms'], E>(
+  ): Promise<IAdtResponse<T['mainPrograms'], E | IAdtError>> {
+    return legacyNotMeasuredRefusal<T['mainPrograms']>(
       'readMainPrograms',
       'GET /sap/bc/adt/programs/includes/{name}/mainprograms',
     );
@@ -90,11 +132,21 @@ export class AdtIncludeLegacy<
    * this member does not lock. Measured on 7.40 SP04: `200`, and a read of the
    * include afterwards answers `404`.
    */
+  override delete<E extends IAdtError>(
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>>;
+  override delete(
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletion'], IAdtError>>;
   override async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IIncludeConfig>,
+    config: AdtObjectIdentity<IIncludeConfig, 'includeName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletion'], E>> {
-    const objectUrl = PROGRAM_INCLUDE.uri(config.includeName as string);
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
+    const objectUrl = PROGRAM_INCLUDE.uri(config.includeName);
     return answering(
       () =>
         deleteObjectDirect(

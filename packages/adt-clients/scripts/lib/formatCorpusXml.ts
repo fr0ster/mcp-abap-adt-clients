@@ -119,8 +119,10 @@ export function formatCorpusXml(text: string): string {
       const emptyOrLeaf =
         previous !== undefined &&
         ((previous.kind === 'tag' && isOpening(previous.value)) ||
-          (previous.kind === 'text' && isBlank(previous.value) &&
-            all[i - 2]?.kind === 'tag' && isOpening((all[i - 2] as Token).value)));
+          (previous.kind === 'text' &&
+            isBlank(previous.value) &&
+            all[i - 2]?.kind === 'tag' &&
+            isOpening((all[i - 2] as Token).value)));
       if (!kept && !emptyOrLeaf) newline();
       out += token.value;
       continue;

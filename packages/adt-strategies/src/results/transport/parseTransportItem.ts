@@ -13,7 +13,6 @@
  */
 
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
-import { rawOf } from '../../result';
 import {
   type ITmElement,
   tmAttributeIn,
@@ -215,4 +214,6 @@ export function readTransportItem(
 export const transportItem =
   (number: string): IResultStrategy<ITransportItem> =>
   (answer) =>
-    readTransportItem(rawOf(answer), number);
+    // The body as it came: a document that is no string is refused, as its
+    // JSON or '' was before.
+    readTransportItem(answer.data, number);

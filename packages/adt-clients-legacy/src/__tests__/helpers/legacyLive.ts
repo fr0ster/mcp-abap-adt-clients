@@ -166,20 +166,20 @@ export function stepOf(request: RecordedRequest): string {
  * A handler whose object is locked and unlocked. Built from the contract, so
  * every member keeps its `analyse` option.
  */
-export type LegacyLockable<C> = IAdtLockable<C>;
+export type LegacyLockable<C extends object> = IAdtLockable<C, never>;
 
 /** A handler deleted as 7.40 SP04 deletes: lock, delete with the handle, unlock. */
-export interface LegacyDeletable<C>
+export interface LegacyDeletable<C extends object>
   extends LegacyLockable<C>,
-    IAdtMetadataReadable<C, unknown>,
-    Pick<IAdtDeletable<C, unknown>, 'delete'> {}
+    IAdtMetadataReadable<C, unknown, never>,
+    Pick<IAdtDeletable<C, unknown, never>, 'delete'> {}
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
 /** Why the unlock did not release the lock, or `undefined` when it did. */
-async function unlockProblem<C>(
+async function unlockProblem<C extends object>(
   handler: LegacyLockable<C>,
   config: C,
   lockHandle: string,
@@ -204,7 +204,7 @@ async function unlockProblem<C>(
  * when that was a failure), attached to `body`'s error when `body` threw —
  * never in place of it.
  */
-export async function withLock<C, T>(
+export async function withLock<C extends object, T>(
   handler: LegacyLockable<C>,
   config: C,
   label: string,
@@ -243,7 +243,7 @@ export async function withLock<C, T>(
 }
 
 /** Lock, `delete` with the handle, unlock (checked, see {@link withLock}). */
-export async function deleteLocked<C>(
+export async function deleteLocked<C extends object>(
   handler: LegacyDeletable<C>,
   config: C,
   label: string,

@@ -29,7 +29,7 @@ function transportOf(entry: unknown): {
   description?: string;
 } {
   const raw = field(entry, 'atom:link') ?? field(entry, 'link');
-  const links = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  const links: readonly unknown[] = Array.isArray(raw) ? raw : raw ? [raw] : [];
   const link = links.find((l: unknown) => field(l, '@_rel') === TRANSPORT_REL);
   if (!link) return {};
   return {

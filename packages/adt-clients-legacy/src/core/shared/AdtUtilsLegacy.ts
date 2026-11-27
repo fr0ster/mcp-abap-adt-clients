@@ -1,4 +1,4 @@
-import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
+import type { AdtReadVersion, IAnalyse } from '@mcp-abap-adt/interfaces-adt';
 /**
  * AdtUtilsLegacy - Utility operations for legacy SAP systems (7.40 SP04)
  *
@@ -62,6 +62,7 @@ import {
   type IAdtGroupReference,
   PACKAGE,
   type ParentedArguments,
+  type ParentedArgumentsBefore,
   type ResultValuesOf,
   STRUCTURE,
   TABLE,
@@ -164,13 +165,10 @@ function refusedFor(
  * absent from discovery, not measured, so its refusal says that; the other
  * families answered `404`.
  */
-function refuseRead<T, E extends IAdtError>(
-  operation: string,
-  endpoint: string,
-): IAdtResponse<T, E> {
+function refuseRead<T>(operation: string, endpoint: string): IAdtResponse<T> {
   return endpoint === TABLE_TYPE.collection
-    ? legacyUnmeasuredRefusal<T, E>(operation, endpoint)
-    : legacyRefusal<T, E>(operation, endpoint);
+    ? legacyUnmeasuredRefusal<T>(operation, endpoint)
+    : legacyRefusal<T>(operation, endpoint);
 }
 
 function unsupportedError(operation: string, endpoint: string): string {
@@ -194,11 +192,8 @@ const CODES_740: ReadonlySet<string> = new Set(
  * A code 7.40's table does not list, from a caller outside the type system:
  * refused, as every legacy refusal is, and nothing is sent.
  */
-function refuseCode<T, E extends IAdtError>(
-  operation: string,
-  code: string,
-): IAdtResponse<T, E> {
-  return legacyRefusal<T, E>(
+function refuseCode<T>(operation: string, code: string): IAdtResponse<T> {
+  return legacyRefusal<T>(
     `${operation}(${code})`,
     `${code} in ADT_TYPES_BASIS_740`,
     'Nothing is sent.',
@@ -214,12 +209,24 @@ export class AdtUtilsLegacy<
    * synchronous `POST /sap/bc/adt/activation` — `activateObjects`, inherited
    * unchanged. One endpoint, one member: this one is `/activation/runs`'s.
    */
+  override activateObjectsGroup<E extends IAdtError>(
+    _objects: IAdtCodedReference<AdtActivationCode<'basis740'>>[],
+    _preauditRequested: boolean | undefined,
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>>;
+  override activateObjectsGroup(
+    _objects: IAdtCodedReference<AdtActivationCode<'basis740'>>[],
+    _preauditRequested: boolean | undefined,
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['activation'], IAdtError>>;
   override async activateObjectsGroup<E extends IAdtError = IAdtError>(
     _objects: IAdtCodedReference<AdtActivationCode<'basis740'>>[],
     _preauditRequested: boolean = false,
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['activation'], E>> {
-    return legacyRefusal<T['activation'], E>(
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>> {
+    return legacyRefusal<T['activation']>(
       'activateObjectsGroup',
       ACTIVATION_RUNS,
       GROUP_ACTIVATION_ON_740,
@@ -244,34 +251,70 @@ export class AdtUtilsLegacy<
    * No request is made, so there is no answer for the caller's `analyse` to
    * read; the option is accepted for the contract's shape.
    */
+  override getTableColumns<E extends IAdtError>(
+    _tableName: string,
+    _options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['columns'], E | IAdtError>>;
+  override getTableColumns(
+    _tableName: string,
+    _options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['columns'], IAdtError>>;
   override async getTableColumns<E extends IAdtError = IAdtError>(
     _tableName: string,
     _options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['columns'], E>> {
+  ): Promise<IAdtResponse<T['columns'], E | IAdtError>> {
     return this.refuse(
       'Table columns',
       '/sap/bc/adt/datapreview/ddic/{name}/metadata',
     );
   }
 
+  override getTableContents<E extends IAdtError>(
+    _params: IGetTableContentsParams,
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['contents'], E | IAdtError>>;
+  override getTableContents(
+    _params: IGetTableContentsParams,
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['contents'], IAdtError>>;
   override async getTableContents<E extends IAdtError = IAdtError>(
     _params: IGetTableContentsParams,
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['contents'], E>> {
+  ): Promise<IAdtResponse<T['contents'], E | IAdtError>> {
     return this.refuse('Table contents', '/sap/bc/adt/datapreview/ddic');
   }
 
+  override getSqlQuery<E extends IAdtError>(
+    _params: IGetSqlQueryParams,
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['query'], E | IAdtError>>;
+  override getSqlQuery(
+    _params: IGetSqlQueryParams,
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['query'], IAdtError>>;
   override async getSqlQuery<E extends IAdtError = IAdtError>(
     _params: IGetSqlQueryParams,
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['query'], E>> {
+  ): Promise<IAdtResponse<T['query'], E | IAdtError>> {
     return this.refuse('SQL query', '/sap/bc/adt/datapreview/freestyle');
   }
 
+  override getObjectProperties<E extends IAdtError>(
+    _objectUri: string,
+    _options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['objectProperties'], E | IAdtError>>;
+  override getObjectProperties(
+    _objectUri: string,
+    _options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['objectProperties'], IAdtError>>;
   override async getObjectProperties<E extends IAdtError = IAdtError>(
     _objectUri: string,
     _options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['objectProperties'], E>> {
+  ): Promise<IAdtResponse<T['objectProperties'], E | IAdtError>> {
     return this.refuse(
       'Object properties',
       '/sap/bc/adt/repository/informationsystem/objectproperties/values',
@@ -283,10 +326,20 @@ export class AdtUtilsLegacy<
    * (adt-clients' `corpus/adt/discovery/`, basis-740), and 7.40 has no
    * structure type to read it for (`TABL/DS` is not in its table).
    */
+  override getStructureElementInfo<E extends IAdtError>(
+    _structureName: string,
+    _options: ({ accept?: string } & IAdtAnalyseOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  override getStructureElementInfo(
+    _structureName: string,
+    _options?: { accept?: string } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   override async getStructureElementInfo<E extends IAdtError = IAdtError>(
     _structureName: string,
     _options?: { accept?: string } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
     return this.refuse(
       'Structure element info',
       '/sap/bc/adt/ddic/elementinfo',
@@ -297,12 +350,22 @@ export class AdtUtilsLegacy<
    * Refused without a request: the 7.40 discovery lists no service definition
    * element info, and 7.40 has no service definitions.
    */
+  override getServiceDefinitionElementInfo<E extends IAdtError>(
+    _serviceDefinitionName: string,
+    _options: ({ accept?: string } & IAdtAnalyseOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  override getServiceDefinitionElementInfo(
+    _serviceDefinitionName: string,
+    _options?: { accept?: string } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   override async getServiceDefinitionElementInfo<
     E extends IAdtError = IAdtError,
   >(
     _serviceDefinitionName: string,
     _options?: { accept?: string } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
     return this.refuse(
       'Service definition element info',
       '/sap/bc/adt/ddic/srvd/elementinfo',
@@ -313,11 +376,21 @@ export class AdtUtilsLegacy<
    * Refused without a request: 7.40 has no deletion API —
    * `POST /sap/bc/adt/deletion/check` answers `404` (spec §5, §10.2).
    */
+  override checkDeletionGroup<E extends IAdtError>(
+    _objects: IAdtCodedReference<AdtDeletionCheckCode<'basis740'>>[],
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  override checkDeletionGroup(
+    _objects: IAdtCodedReference<AdtDeletionCheckCode<'basis740'>>[],
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   override async checkDeletionGroup<E extends IAdtError = IAdtError>(
     _objects: IAdtCodedReference<AdtDeletionCheckCode<'basis740'>>[],
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
-    return noDeletionCheck<T['deletionCheck'], E>('checkDeletionGroup');
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
+    return noDeletionCheck<T['deletionCheck']>('checkDeletionGroup');
   }
 
   /**
@@ -325,12 +398,24 @@ export class AdtUtilsLegacy<
    * `/sap/bc/adt/deletion/check` then `/deletion/delete`, which 7.40 does not
    * serve (spec §4.3, §10.2).
    */
+  override deleteObjectsGroup<E extends IAdtError>(
+    _objects: IAdtCodedReference<AdtDeletionCode<'basis740'>>[],
+    _transportRequest: string | undefined,
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>>;
+  override deleteObjectsGroup(
+    _objects: IAdtCodedReference<AdtDeletionCode<'basis740'>>[],
+    _transportRequest: string | undefined,
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletion'], IAdtError>>;
   override async deleteObjectsGroup<E extends IAdtError = IAdtError>(
     _objects: IAdtCodedReference<AdtDeletionCode<'basis740'>>[],
     _transportRequest: string | undefined,
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['deletion'], E>> {
-    return noDeletionApi<T['deletion'], E>(
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
+    return noDeletionApi<T['deletion']>(
       'deleteObjectsGroup',
       "Delete each object through its handler's delete() with the object's lock handle, from lock().",
     );
@@ -341,11 +426,21 @@ export class AdtUtilsLegacy<
    * 7.40 SP04 (spec §10.2). Refused before the type is read, so an unknown
    * type is not thrown here: the member itself is not offered.
    */
+  override getWhereUsed<E extends IAdtError>(
+    _params: IGetWhereUsedParams<AdtWhereUsedCode<'basis740'>>,
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['whereUsed'], E | IAdtError>>;
+  override getWhereUsed(
+    _params: IGetWhereUsedParams<AdtWhereUsedCode<'basis740'>>,
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['whereUsed'], IAdtError>>;
   override async getWhereUsed<E extends IAdtError = IAdtError>(
     _params: IGetWhereUsedParams<AdtWhereUsedCode<'basis740'>>,
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['whereUsed'], E>> {
-    return legacyRefusal<T['whereUsed'], E>(
+  ): Promise<IAdtResponse<T['whereUsed'], E | IAdtError>> {
+    return legacyRefusal<T['whereUsed']>(
       'getWhereUsed',
       WHERE_USED,
       WHERE_USED_ON_740,
@@ -353,11 +448,21 @@ export class AdtUtilsLegacy<
   }
 
   /** Refused without a request, like {@link getWhereUsed} (spec §10.2). */
+  override getWhereUsedScope<E extends IAdtError>(
+    _params: IGetWhereUsedScopeParams<AdtWhereUsedCode<'basis740'>>,
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['whereUsedScope'], E | IAdtError>>;
+  override getWhereUsedScope(
+    _params: IGetWhereUsedScopeParams<AdtWhereUsedCode<'basis740'>>,
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['whereUsedScope'], IAdtError>>;
   override async getWhereUsedScope<E extends IAdtError = IAdtError>(
     _params: IGetWhereUsedScopeParams<AdtWhereUsedCode<'basis740'>>,
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['whereUsedScope'], E>> {
-    return legacyRefusal<T['whereUsedScope'], E>(
+  ): Promise<IAdtResponse<T['whereUsedScope'], E | IAdtError>> {
+    return legacyRefusal<T['whereUsedScope']>(
       'getWhereUsedScope',
       WHERE_USED_SCOPE,
       WHERE_USED_ON_740,
@@ -369,11 +474,21 @@ export class AdtUtilsLegacy<
    * RFC on 7.40 SP04 (spec §10.2). A package's contents are served by
    * `fetchNodeStructure` with `DEVC/K`, measured on 7.40.
    */
+  override getVirtualFoldersContents<E extends IAdtError>(
+    _params: IGetVirtualFoldersContentsParams,
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['folders'], E | IAdtError>>;
+  override getVirtualFoldersContents(
+    _params: IGetVirtualFoldersContentsParams,
+    _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['folders'], IAdtError>>;
   override async getVirtualFoldersContents<E extends IAdtError = IAdtError>(
     _params: IGetVirtualFoldersContentsParams,
     _options: { headers: IAdtHeaders } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['folders'], E>> {
-    return legacyRefusal<T['folders'], E>(
+  ): Promise<IAdtResponse<T['folders'], E | IAdtError>> {
+    return legacyRefusal<T['folders']>(
       'getVirtualFoldersContents',
       VIRTUAL_FOLDERS,
       "A package's contents: fetchNodeStructure with the package and type DEVC/K.",
@@ -384,13 +499,25 @@ export class AdtUtilsLegacy<
    * Refused without a request: `objecttypes` answered `404` over RFC on 7.40
    * SP04 (spec §10.2).
    */
+  override getAllTypes<E extends IAdtError>(
+    _maxItemCount: number | undefined,
+    _name: string | undefined,
+    _data: string | undefined,
+    _options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['types'], E | IAdtError>>;
+  override getAllTypes(
+    _maxItemCount?: number,
+    _name?: string,
+    _data?: string,
+    _options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['types'], IAdtError>>;
   override async getAllTypes<E extends IAdtError = IAdtError>(
     _maxItemCount?: number,
     _name?: string,
     _data?: string,
     _options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['types'], E>> {
-    return legacyRefusal<T['types'], E>(
+  ): Promise<IAdtResponse<T['types'], E | IAdtError>> {
+    return legacyRefusal<T['types']>(
       'getAllTypes',
       OBJECT_TYPES,
       OBJECT_TYPES_ON_740,
@@ -401,13 +528,25 @@ export class AdtUtilsLegacy<
    * Refused without a request: a legacy group activation is synchronous and
    * yields no run id, and `/activation/runs` is not advertised (spec §10.2).
    */
+  override getActivationRun<E extends IAdtError>(
+    _runId: string,
+    _options: ({
+      withLongPolling?: boolean | undefined;
+    } & IAdtAnalyseOptions<E>) & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>>;
+  override getActivationRun(
+    _runId: string,
+    _options?: {
+      withLongPolling?: boolean | undefined;
+    } & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['run'], IAdtError>>;
   override async getActivationRun<E extends IAdtError = IAdtError>(
     _runId: string,
     _options?: {
       withLongPolling?: boolean | undefined;
     } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['run'], E>> {
-    return legacyRefusal<T['run'], E>(
+  ): Promise<IAdtResponse<T['run'], E | IAdtError>> {
+    return legacyRefusal<T['run']>(
       'getActivationRun',
       ACTIVATION_RUNS,
       NO_RUN_ID,
@@ -415,11 +554,19 @@ export class AdtUtilsLegacy<
   }
 
   /** Refused without a request, like {@link getActivationRun} (spec §10.2). */
+  override getActivationResults<E extends IAdtError>(
+    _runId: string,
+    _options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['results'], E | IAdtError>>;
+  override getActivationResults(
+    _runId: string,
+    _options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['results'], IAdtError>>;
   override async getActivationResults<E extends IAdtError = IAdtError>(
     _runId: string,
     _options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['results'], E>> {
-    return legacyRefusal<T['results'], E>(
+  ): Promise<IAdtResponse<T['results'], E | IAdtError>> {
+    return legacyRefusal<T['results']>(
       'getActivationResults',
       ACTIVATION_RESULTS,
       NO_RUN_ID,
@@ -432,6 +579,22 @@ export class AdtUtilsLegacy<
    * thrown (spec §10.2). Every other type goes to the base as it is, so an
    * unknown one is still the caller's mistake and thrown.
    */
+  override readObjectMetadata<
+    C extends AdtMetadataReadCodeOf<'basis740'>,
+    E extends IAdtError,
+  >(
+    objectType: C,
+    objectName: string,
+    ...rest: ParentedArgumentsBefore<
+      C,
+      [options: IReadOptions & IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> }]
+    >
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>>;
+  override readObjectMetadata<C extends AdtMetadataReadCodeOf<'basis740'>>(
+    objectType: C,
+    objectName: string,
+    ...rest: ParentedArguments<C, [options?: IReadOptions & IAdtAnalyseOptions]>
+  ): Promise<IAdtResponse<T['metadata']>>;
   override async readObjectMetadata<
     C extends AdtMetadataReadCodeOf<'basis740'>,
     E extends IAdtError = IAdtError,
@@ -442,15 +605,15 @@ export class AdtUtilsLegacy<
       C,
       [options?: IReadOptions & IAdtAnalyseOptions<E>]
     >
-  ): Promise<IAdtResponse<T['metadata'], E>> {
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>> {
     const endpoint = refusedFor(METADATA_REFUSED, objectType);
     if (endpoint)
-      return refuseRead<T['metadata'], E>(
+      return refuseRead<T['metadata']>(
         `readObjectMetadata(${objectType})`,
         endpoint,
       );
     if (!CODES_740.has(objectType))
-      return refuseCode<T['metadata'], E>('readObjectMetadata', objectType);
+      return refuseCode<T['metadata']>('readObjectMetadata', objectType);
     return super.readObjectMetadata(objectType, objectName, ...rest);
   }
 
@@ -459,6 +622,29 @@ export class AdtUtilsLegacy<
    * endpoint (spec §10.2); any other code 7.40's table lacks with the
    * generic refusal; a 7.40 code goes to the base as it is.
    */
+  override readObjectSource<
+    C extends AdtSourceReadCodeOf<'basis740'>,
+    E extends IAdtError,
+  >(
+    objectType: C,
+    objectName: string,
+    ...rest: ParentedArgumentsBefore<
+      C,
+      [
+        version: AdtReadVersion | undefined,
+        options: IReadOptions &
+          IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+      ]
+    >
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>>;
+  override readObjectSource<C extends AdtSourceReadCodeOf<'basis740'>>(
+    objectType: C,
+    objectName: string,
+    ...rest: ParentedArguments<
+      C,
+      [version?: AdtReadVersion, options?: IReadOptions & IAdtAnalyseOptions]
+    >
+  ): Promise<IAdtResponse<T['source']>>;
   override async readObjectSource<
     C extends AdtSourceReadCodeOf<'basis740'>,
     E extends IAdtError = IAdtError,
@@ -469,15 +655,15 @@ export class AdtUtilsLegacy<
       C,
       [version?: AdtReadVersion, options?: IReadOptions & IAdtAnalyseOptions<E>]
     >
-  ): Promise<IAdtResponse<T['source'], E>> {
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>> {
     const endpoint = refusedFor(SOURCE_REFUSED, objectType);
     if (endpoint)
-      return refuseRead<T['source'], E>(
+      return refuseRead<T['source']>(
         `readObjectSource(${objectType})`,
         endpoint,
       );
     if (!CODES_740.has(objectType))
-      return refuseCode<T['source'], E>('readObjectSource', objectType);
+      return refuseCode<T['source']>('readObjectSource', objectType);
     return super.readObjectSource(objectType, objectName, ...rest);
   }
 
@@ -487,15 +673,23 @@ export class AdtUtilsLegacy<
    * an alias (`STRU`) or an unknown name with no hits, silently, which the
    * caller could not tell from an empty search.
    */
+  override search<E extends IAdtError>(
+    criteria: IAdtSearchObjectsParamsOf<'basis740'>,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['search'], E | IAdtError>>;
+  override search(
+    criteria: IAdtSearchObjectsParamsOf<'basis740'>,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['search'], IAdtError>>;
   override async search<E extends IAdtError = IAdtError>(
     criteria: IAdtSearchObjectsParamsOf<'basis740'>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['search'], E>> {
+  ): Promise<IAdtResponse<T['search'], E | IAdtError>> {
     if (
       criteria.objectType !== undefined &&
       !Object.hasOwn(ADT_SEARCH_TYPES_BASIS_740, criteria.objectType)
     )
-      return legacyRefusal<T['search'], E>(
+      return legacyRefusal<T['search']>(
         `search(${criteria.objectType})`,
         `${criteria.objectType} in ADT_SEARCH_TYPES_BASIS_740`,
         'Nothing is sent.',
@@ -507,41 +701,57 @@ export class AdtUtilsLegacy<
    * A node structure of a code 7.40's table lacks is refused without a
    * request — but a package's, measured served on 7.40 (`AdtStructureCode`).
    */
+  override fetchNodeStructure<E extends IAdtError>(
+    parentType: AdtStructureCode<'basis740'>,
+    parentName: string,
+    options: { headers: IAdtHeaders } & IGetNodeContentsOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['node'], E | IAdtError>>;
+  override fetchNodeStructure(
+    parentType: AdtStructureCode<'basis740'>,
+    parentName: string,
+    options: { headers: IAdtHeaders } & IGetNodeContentsOptions &
+      IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['node'], IAdtError>>;
   override async fetchNodeStructure<E extends IAdtError = IAdtError>(
     parentType: AdtStructureCode<'basis740'>,
     parentName: string,
     options: { headers: IAdtHeaders } & IGetNodeContentsOptions &
       IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['node'], E>> {
+  ): Promise<IAdtResponse<T['node'], E | IAdtError>> {
     if (!CODES_740.has(parentType) && parentType !== 'DEVC/K')
-      return refuseCode<T['node'], E>('fetchNodeStructure', parentType);
+      return refuseCode<T['node']>('fetchNodeStructure', parentType);
     return super.fetchNodeStructure(parentType, parentName, options);
   }
 
   /** An object structure of a code 7.40's table lacks is refused without a request. */
+  override getObjectStructure<E extends IAdtError>(
+    objectType: AdtStructureCode<'basis740'>,
+    objectName: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['objectStructure'], E | IAdtError>>;
+  override getObjectStructure(
+    objectType: AdtStructureCode<'basis740'>,
+    objectName: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['objectStructure'], IAdtError>>;
   override async getObjectStructure<E extends IAdtError = IAdtError>(
     objectType: AdtStructureCode<'basis740'>,
     objectName: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['objectStructure'], E>> {
+  ): Promise<IAdtResponse<T['objectStructure'], E | IAdtError>> {
     if (!CODES_740.has(objectType) && objectType !== 'DEVC/K')
-      return refuseCode<T['objectStructure'], E>(
-        'getObjectStructure',
-        objectType,
-      );
+      return refuseCode<T['objectStructure']>('getObjectStructure', objectType);
     return super.getObjectStructure(objectType, objectName, options);
   }
 
-  private refuse<T, E extends IAdtError>(
-    operation: string,
-    endpoint: string,
-  ): IAdtResponse<T, E> {
+  private refuse<T>(operation: string, endpoint: string): IAdtResponse<T> {
     // The library's own verdict, so `E` is its default `IAdtError` here — the
     // same cast `answering` makes when no strategy supplied one.
-    return failed<T, E>({
+    return failed<T>({
       origin: 'refusal',
       code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
       message: unsupportedError(operation, endpoint),
-    } as E);
+    });
   }
 }

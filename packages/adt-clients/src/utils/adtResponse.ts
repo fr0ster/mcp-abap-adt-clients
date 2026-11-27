@@ -49,6 +49,13 @@ import {
   RFC_RCS,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtSAPError } from './adtErrors';
+import {
+  asString,
+  isWireResponse,
+  ownValue,
+  propertyOf,
+  requestTraceOf,
+} from './ownValue';
 
 /**
  * An answer that succeeded, carrying the value a result strategy made.
@@ -107,12 +114,6 @@ interface ICredentialRefusal {
   readonly answered?: IWithResponse;
 }
 
-function ownValue(holder: unknown, key: string): unknown {
-  if (holder === null || typeof holder !== 'object') return undefined;
-  const descriptor = Object.getOwnPropertyDescriptor(holder, key);
-  return descriptor && 'value' in descriptor ? descriptor.value : undefined;
-}
-
 function credentialRefusal(error: unknown): ICredentialRefusal | undefined {
   if (ownValue(error, 'response') !== undefined) return undefined;
   const refusal = ownValue(error, 'refusal');
@@ -131,10 +132,12 @@ function credentialRefusal(error: unknown): ICredentialRefusal | undefined {
   const cause = ownValue(error, 'cause');
   const response = ownValue(cause, 'response');
   if (ownValue(response, 'status') !== 401) return {};
+  // The status was read as 401, so the shape is a wire answer's.
+  if (!isWireResponse(response)) return {};
   return {
     answered: {
-      response: response as IAdtWireResponse,
-      request: ownValue(cause, 'request') as IWithResponse['request'],
+      response,
+      request: requestTraceOf(ownValue(cause, 'request')),
     },
   };
 }
@@ -282,6 +285,21 @@ export function markOf(
 }
 
 /**
+ * The verdict on a refusal a connection resolved instead of rejecting: what
+ * {@link recogniseFailure} made of `{ message, response }`, read from the typed
+ * answer instead of through `unknown` — a connection failure naming the
+ * status, with the answer when its status is an integer.
+ */
+function resolvedRefusal(wire: IAdtWireResponse): IAdtError {
+  return {
+    origin: 'connection',
+    message: `Request failed with status code ${wire.status}`,
+    response: Number.isInteger(wire.status) ? wire : undefined,
+    request: undefined,
+  };
+}
+
+/**
  * The default error strategy: what this library recognises as a failure.
  *
  * Origin is not decoration — the two have different remedies, and a caller
@@ -319,7 +337,8 @@ export function recogniseFailure(error: unknown): IAdtError {
   if (answered) {
     return {
       origin: 'connection',
-      message: (error as IWithResponse).message ?? 'The credential was refused',
+      message:
+        asString(propertyOf(error, 'message')) ?? 'The credential was refused',
       response: answered.response,
       request: answered.request,
     };
@@ -327,7 +346,15 @@ export function recogniseFailure(error: unknown): IAdtError {
 
   // Everything else reached us from below the ADT conversation: a status the
   // transport refused, a socket that would not open, a session that is gone.
-  const carried = error as IWithResponse;
+  // Each field of the thrown value only with the shape its field has (the
+  // owner's decision D4 of #304).
+  const carriedMessage = asString(propertyOf(error, 'message'));
+  const carriedResponse = propertyOf(error, 'response');
+  const carried = {
+    message: carriedMessage,
+    response: isWireResponse(carriedResponse) ? carriedResponse : undefined,
+    request: requestTraceOf(propertyOf(error, 'request')),
+  };
   // The network code, by code alone, so a caller can say "no connection"
   // without reading the message. Absent unless it is a listed one.
   const connectionCause = connectionCauseOf(error);
@@ -420,11 +447,21 @@ export const nothingIsARefusal: IAnalyse<IAdtError> = () => ADT_NO_FAILURE;
  * wrong system entirely. A document this library cannot read is its own failure
  * and surfaces as itself.
  */
+export function answering<T, E extends IAdtError>(
+  run: () => Promise<IAdtWireResponse>,
+  read: IResultStrategy<T>,
+  analyse: IAnalyse<E>,
+): Promise<IAdtResponse<T, E | IAdtError>>;
+export function answering<T>(
+  run: () => Promise<IAdtWireResponse>,
+  read: IResultStrategy<T>,
+  analyse?: IAnalyse,
+): Promise<IAdtResponse<T>>;
 export async function answering<T, E extends IAdtError = IAdtError>(
   run: () => Promise<IAdtWireResponse>,
   read: IResultStrategy<T>,
   analyse?: IAnalyse<E>,
-): Promise<IAdtResponse<T, E>> {
+): Promise<IAdtResponse<T, E | IAdtError>> {
   return answeringExchange(
     async () => ({ answer: await run() }),
     read,
@@ -455,11 +492,21 @@ export interface IAdtExchange {
  * and a failed read (`failure`) is the verdict it starts from. Every other
  * row of {@link answering}'s table holds as it is.
  */
+export function answeringExchange<T, E extends IAdtError>(
+  run: () => Promise<IAdtExchange>,
+  read: IResultStrategy<T>,
+  analyse: IAnalyse<E>,
+): Promise<IAdtResponse<T, E | IAdtError>>;
+export function answeringExchange<T>(
+  run: () => Promise<IAdtExchange>,
+  read: IResultStrategy<T>,
+  analyse?: IAnalyse,
+): Promise<IAdtResponse<T>>;
 export async function answeringExchange<T, E extends IAdtError = IAdtError>(
   run: () => Promise<IAdtExchange>,
   read: IResultStrategy<T>,
   analyse?: IAnalyse<E>,
-): Promise<IAdtResponse<T, E>> {
+): Promise<IAdtResponse<T, E | IAdtError>> {
   let wire: IAdtWireResponse | undefined;
   let verdict: IAdtError | AdtNoFailure = ADT_NO_FAILURE;
   let context: IAdtAnalyseContext | undefined;
@@ -479,10 +526,7 @@ export async function answeringExchange<T, E extends IAdtError = IAdtError>(
       // A refusal a connection resolved instead of rejecting — outside the
       // connection contract, which rejects on SAP's refusal — is still SAP's
       // refusal: the default verdict is the one it would have had thrown.
-      verdict = recogniseFailure({
-        message: `Request failed with status code ${wire.status}`,
-        response: wire,
-      });
+      verdict = resolvedRefusal(wire);
     }
   } catch (error: unknown) {
     // The provider refused before SAP said anything: no answer exists to come
@@ -490,15 +534,14 @@ export async function answeringExchange<T, E extends IAdtError = IAdtError>(
     // thrown as it came — the same object, before any strategy sees it.
     if (isUnansweredCredentialRefusal(error)) throw error;
     verdict = recogniseFailure(error);
-    wire = (error as IWithResponse)?.response;
+    const thrown = propertyOf(error, 'response');
+    wire = isWireResponse(thrown) ? thrown : undefined;
     lost = sessionLostOf(error) ?? wire?.sessionLost;
   }
 
-  // Two casts below, and one reason for both: `E` is only ever given a value by
-  // the `analyse` argument. Where the code falls back to the library's own
-  // verdict — no strategy was supplied, or nothing came back for one to read —
-  // `E` is its default `IAdtError`, which is what that verdict already is. The
-  // compiler cannot see that from inside the body; a caller never sees either.
+  // The failure is `analyse`'s own `E`, or the library's `IAdtError` where it
+  // falls back to its own verdict — no strategy was supplied, or nothing came
+  // back for one to read (C3 of #304): the answer is typed `E | IAdtError`.
   if (analyse) {
     // The facts only where a member read some: every other member calls
     // `analyse` with the two arguments it always had.
@@ -507,10 +550,10 @@ export async function answeringExchange<T, E extends IAdtError = IAdtError>(
         ? analyse(verdict, wire)
         : analyse(verdict, wire, context);
     if (overruled !== ADT_NO_FAILURE) {
-      return failed<T, E>(overruled);
+      return failed<T, E | IAdtError>(overruled);
     }
   } else if (verdict !== ADT_NO_FAILURE) {
-    return failed<T, E>(verdict as E);
+    return failed<T, E | IAdtError>(verdict);
   }
 
   if (!wire) {
@@ -518,18 +561,18 @@ export async function answeringExchange<T, E extends IAdtError = IAdtError>(
     // caller: a success built from no answer would be a lie the type cannot
     // catch, so the original verdict stands. A strategy that adds fields has
     // none to add about a request that never arrived.
-    return failed<T, E>(
-      (verdict === ADT_NO_FAILURE
+    return failed<T, E | IAdtError>(
+      verdict === ADT_NO_FAILURE
         ? {
             origin: 'connection',
             message: 'The request did not complete, and carried no answer',
           }
-        : verdict) as E,
+        : verdict,
     );
   }
 
   // Outside any catch, on purpose. The reading's own exception is the reading's.
-  return succeeded<T, E>(read(wire), lost);
+  return succeeded<T, E | IAdtError>(read(wire), lost);
 }
 
 /**

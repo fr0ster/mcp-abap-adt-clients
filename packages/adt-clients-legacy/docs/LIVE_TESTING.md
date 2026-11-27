@@ -151,7 +151,7 @@ would.
 | File | `legacy_740` case | Checks |
 |---|---|---|
 | `LegacyDelete.test.ts` | `legacy_deletes` | class, program, interface, function group, function module, DDL source: lock → delete with the handle → unlock → the read answers `404`; a delete without a handle answers `400` for the first four. Creates and deletes only its own objects |
-| `LegacyRefusals.test.ts` | `legacy_refusals_send_nothing` | every refused member — `checkDeletion`, the `absentOnLegacy` handlers, the rest — answers the refusal and sends nothing; `readObjectMetadata`/`readObjectSource` for a program and a class answer `200` |
+| `LegacyRefusals.test.ts` | `legacy_refusals_send_nothing` | every refused member — `checkDeletion`, the absent types' `*AbsentLegacy` handlers, the rest — answers the refusal and sends nothing; `readObjectMetadata`/`readObjectSource` for a program and a class answer `200` |
 | `LegacyUnitTests.test.ts` | `legacy_unit_runners` | class, program, function group `run`/`runSync` and function module `runSync` send one testruns POST with `<options>` and answer the fixtures' methods |
 | `LegacyFunctionInclude.test.ts` | `legacy_function_include` | a function include created with the v1 pair, written under its lock, activated (its group is created and deleted by the test) |
 | `LegacyTransports.test.ts` | `legacy_transports` | `list` and `readMetadata` send one GET to `/sap/bc/cts/transportrequests` and answer the user's list |

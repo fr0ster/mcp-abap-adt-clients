@@ -19,12 +19,12 @@ export async function updateFeatureToggle(
   headers: IAdtHeaders,
   ifMatch: string | undefined,
   params: ICreateFeatureToggleParams,
-  lockHandle?: string,
+  lockHandle: string,
   _logger?: ILogger,
 ): Promise<IAdtWireResponse> {
   const xml = buildFeatureToggleXml(params);
-  const query: Record<string, string> = {};
-  if (lockHandle) query.lockHandle = lockHandle;
+  // The handle is required, and sent as given (C7 of #304).
+  const query: Record<string, string> = { lockHandle };
   if (params.transport_request) query.corrNr = params.transport_request;
   return connection.makeAdtRequest({
     method: 'PUT',

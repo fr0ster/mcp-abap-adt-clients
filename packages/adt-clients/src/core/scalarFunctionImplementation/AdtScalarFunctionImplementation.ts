@@ -13,7 +13,9 @@
  * at construction makes of that endpoint's answer.
  */
 import type {
+  AdtObjectIdentity,
   AdtReadVersion,
+  AdtRequiredUpdateOptions,
   IAdtActivatable,
   IAdtActivationOptions,
   IAdtAnalyseOptions,
@@ -24,6 +26,7 @@ import type {
   IAdtError,
   IAdtHeaders,
   IAdtLockable,
+  IAdtLockedWrite,
   IAdtMetadataReadable,
   IAdtOperationOptions,
   IAdtReadable,
@@ -34,6 +37,7 @@ import type {
   IAdtUpdateOptions,
   IAdtValidatable,
   IAdtVersionable,
+  IAnalyse,
   IScalarFunctionImplementationResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -86,23 +90,54 @@ export class AdtScalarFunctionImplementation<
   >,
 > implements
     IAdtCreatable<IScalarFunctionImplementationConfig, T['created']>,
-    IAdtReadable<IScalarFunctionImplementationConfig, T['source']>,
-    IAdtMetadataReadable<IScalarFunctionImplementationConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IScalarFunctionImplementationConfig>, T['updated']>,
+    IAdtReadable<
+      IScalarFunctionImplementationConfig,
+      T['source'],
+      'implementationName'
+    >,
+    IAdtMetadataReadable<
+      IScalarFunctionImplementationConfig,
+      T['metadata'],
+      'implementationName'
+    >,
+    IAdtUpdatable<
+      Partial<IScalarFunctionImplementationConfig>,
+      T['updated'],
+      'implementationName',
+      'source'
+    >,
     IAdtDeletable<
       IScalarFunctionImplementationConfig,
       T['deletion'],
+      'implementationName',
       T['deletionCheck']
     >,
-    IAdtValidatable<IScalarFunctionImplementationConfig, T['validation']>,
-    IAdtCheckable<IScalarFunctionImplementationConfig, T['check']>,
-    IAdtActivatable<IScalarFunctionImplementationConfig, T['activation']>,
-    IAdtLockable<IScalarFunctionImplementationConfig>,
-    IAdtTransportAware<IScalarFunctionImplementationConfig, T['transport']>,
+    IAdtValidatable<
+      IScalarFunctionImplementationConfig,
+      T['validation'],
+      'implementationName'
+    >,
+    IAdtCheckable<
+      IScalarFunctionImplementationConfig,
+      T['check'],
+      'implementationName'
+    >,
+    IAdtActivatable<
+      IScalarFunctionImplementationConfig,
+      T['activation'],
+      'implementationName'
+    >,
+    IAdtLockable<IScalarFunctionImplementationConfig, 'implementationName'>,
+    IAdtTransportAware<
+      IScalarFunctionImplementationConfig,
+      T['transport'],
+      'implementationName'
+    >,
     IAdtVersionable<
       IScalarFunctionImplementationConfig,
       T['versions'],
-      T['versionSource']
+      T['versionSource'],
+      'implementationName'
     >
 {
   protected readonly connection: IAbapConnection;
@@ -141,15 +176,37 @@ export class AdtScalarFunctionImplementation<
    * from nothing and the server answers — which is a reading a strategy can
    * take, where a sentence composed here would not be.
    */
-  private name(config: Partial<IScalarFunctionImplementationConfig>): string {
-    return config.implementationName as string;
+  private name(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+  ): string {
+    return config.implementationName;
   }
 
   /** Validate the name before creating the object. */
+  validate<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>>;
+  validate(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['validation'], IAdtError>>;
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionImplementationConfig>,
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['validation'], E>> {
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -168,13 +225,29 @@ export class AdtScalarFunctionImplementation<
   }
 
   /** Create the object. */
+  create<E extends IAdtError>(
+    config: Omit<IScalarFunctionImplementationConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>>;
+  create(
+    config: Omit<IScalarFunctionImplementationConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['created'], IAdtError>>;
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IScalarFunctionImplementationConfig, 'source'> & {
       source?: never;
       packageName: string;
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<T['created'], E>> {
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // The type requires a package; this refuses an empty one, which the type
@@ -197,11 +270,11 @@ export class AdtScalarFunctionImplementation<
       () =>
         createScalarFunctionImplementation(connection, options.headers, {
           implementation_name: name,
-          scalar_function_name: config.scalarFunctionName as string,
+          scalar_function_name: config.scalarFunctionName,
           engine_value: config.engineValue,
           package_name: config.packageName,
           transport_request: config.transportRequest,
-          description: config.description as string,
+          description: config.description,
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,
           masterLanguage: createLanguage(
@@ -215,11 +288,30 @@ export class AdtScalarFunctionImplementation<
   }
 
   /** Read the object. */
+  read<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    version: AdtReadVersion | undefined,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>>;
+  read(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    version?: AdtReadVersion,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['source'], IAdtError>>;
   async read<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionImplementationConfig>,
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['source'], E>> {
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -243,10 +335,27 @@ export class AdtScalarFunctionImplementation<
   }
 
   /** Read the object's metadata document. */
+  readMetadata<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>>;
+  readMetadata(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['metadata'], IAdtError>>;
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionImplementationConfig>,
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['metadata'], E>> {
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -267,10 +376,29 @@ export class AdtScalarFunctionImplementation<
   }
 
   /** The transport request the object belongs to. */
+  readTransport<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    options: ({ withLongPolling?: boolean } & IAdtOperationOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>>;
+  readTransport(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['transport'], IAdtError>>;
   async readTransport<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionImplementationConfig>,
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['transport'], E>> {
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -293,18 +421,41 @@ export class AdtScalarFunctionImplementation<
   /**
    * Write the object.
    *
-   * With `options.lockHandle` the caller holds the lock and owns the chain, so
-   * this is one request. Without it, this locks, checks, writes and unlocks —
-   * and the unlock happens on every path out.
+   * One request: the write, under the lock the caller holds
+   * (`options.lockHandle`, required). The lock, the check and the unlock are
+   * the caller's own calls of `lock`, `check` and `unlock`.
    *
    * **The whole content, every time.** This is a replace, never a merge. Read
    * what the object holds, change what you mean to change, and pass the result:
    * anything left out is gone, because nothing is read here to keep it.
    */
+  update<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>>;
+  update(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['updated'], IAdtError>>;
   async update<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionImplementationConfig>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['updated'], E>> {
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -324,7 +475,7 @@ export class AdtScalarFunctionImplementation<
           options.ifMatch,
           {
             implementation_name: name,
-            source_code: source as string,
+            source_code: source,
             transport_request: config.transportRequest,
           },
           options?.lockHandle,
@@ -344,10 +495,33 @@ export class AdtScalarFunctionImplementation<
    * what the object holds, change what you mean to change, and pass the result:
    * anything left out is gone, because nothing is read here to keep it.
    */
+  updateMetadata<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>>;
+  updateMetadata(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], IAdtError>>;
   async updateMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionImplementationConfig>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -362,7 +536,7 @@ export class AdtScalarFunctionImplementation<
           options.ifMatch,
           {
             implementation_name: name,
-            source_code: source as string,
+            source_code: source,
             transport_request: config.transportRequest,
           },
           options?.lockHandle,
@@ -379,10 +553,29 @@ export class AdtScalarFunctionImplementation<
    * it: a consumer that wants the check runs this first and decides what a
    * refusal means.
    */
+  checkDeletion<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  checkDeletion(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   async checkDeletion<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionImplementationConfig>,
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -407,10 +600,29 @@ export class AdtScalarFunctionImplementation<
    * shipped reading of that answer; a caller who wants another passes their own
    * `analyse`.
    */
+  delete<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>>;
+  delete(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletion'], IAdtError>>;
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionImplementationConfig>,
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletion'], E>> {
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -427,10 +639,29 @@ export class AdtScalarFunctionImplementation<
   }
 
   /** Activate the object. Needs no stateful session. */
+  activate<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>>;
+  activate(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['activation'], IAdtError>>;
   async activate<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionImplementationConfig>,
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
-  ): Promise<IAdtResponse<T['activation'], E>> {
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -451,11 +682,32 @@ export class AdtScalarFunctionImplementation<
   }
 
   /** Check the object. */
+  check<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>>;
+  check(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['check'], IAdtError>>;
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionImplementationConfig>,
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['check'], E>> {
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -481,10 +733,27 @@ export class AdtScalarFunctionImplementation<
    * carrying no handle reads as `''`; whether that is a refusal is the
    * caller's `analyse` to say.
    */
+  lock<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  lock(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionImplementationConfig>,
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
     const name = this.name(config);
     const answer = await answering(
       () =>
@@ -501,11 +770,30 @@ export class AdtScalarFunctionImplementation<
   }
 
   /** Unlock the object. */
+  unlock<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    lockHandle: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<void, E | IAdtError>>;
+  unlock(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    lockHandle: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<void, IAdtError>>;
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionImplementationConfig>,
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<void, E>> {
+  ): Promise<IAdtResponse<void, E | IAdtError>> {
     const name = this.name(config);
     return answering(
       async () => {
@@ -528,10 +816,27 @@ export class AdtScalarFunctionImplementation<
   }
 
   /** Version history of the object's source. */
+  getVersions<E extends IAdtError>(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>>;
+  getVersions(
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versions'], IAdtError>>;
   async getVersions<E extends IAdtError = IAdtError>(
-    config: Partial<IScalarFunctionImplementationConfig>,
+    config: AdtObjectIdentity<
+      IScalarFunctionImplementationConfig,
+      'implementationName'
+    >,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versions'], E>> {
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>> {
     return answering(
       () => getScalarFunctionImplementationVersions(this.connection, config),
       this.results.versions,
@@ -540,10 +845,18 @@ export class AdtScalarFunctionImplementation<
   }
 
   /** Source of one version, by the `contentUri` its entry carried. */
+  getVersionSource<E extends IAdtError>(
+    contentUri: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versionSource'], E | IAdtError>>;
+  getVersionSource(
+    contentUri: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versionSource'], IAdtError>>;
   async getVersionSource<E extends IAdtError = IAdtError>(
     contentUri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versionSource'], E>> {
+  ): Promise<IAdtResponse<T['versionSource'], E | IAdtError>> {
     return answering(
       () =>
         getScalarFunctionImplementationVersionSource(

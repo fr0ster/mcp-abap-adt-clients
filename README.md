@@ -8,11 +8,11 @@ The repository of three packages, each with its README and CHANGELOG in its dire
   the default result and failure strategies, derived from recorded ADT answers;
 - [`packages/adt-clients-legacy`](packages/adt-clients-legacy/README.md) —
   `@mcp-abap-adt/adt-clients-legacy`, the clients for legacy systems (SAP_BASIS 7.40,
-  measured on 7.40 SP04, over RFC only). It depends on `@mcp-abap-adt/adt-clients`
-  `^38.0.0`; `adt-clients` holds no legacy code, and the consumer declares the system type by
+  measured on 7.40 SP04, over RFC only). It takes `@mcp-abap-adt/adt-clients`
+  as a peer, `^48.0.0`; `adt-clients` holds no legacy code, and the consumer declares the system type by
   constructing `AdtClientLegacy` from it.
 
-All three are typed by the ADT type tables of `@mcp-abap-adt/interfaces-adt` (`^26.0.0`), one per
+All three are typed by the ADT type tables of `@mcp-abap-adt/interfaces-adt` (`^33.0.0`), one per
 release variant: on premise, ABAP cloud and SAP_BASIS 7.40.
 
 This root is private and holds only the tools that build, check and publish the packages.

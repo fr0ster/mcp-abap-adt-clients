@@ -11,7 +11,11 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtAbapGitClient } from '../../../../clients/AdtAbapGitClient';
-import { abapGitDocuments } from '../../../../clients/abapGit/types';
+import {
+  abapGitDocuments,
+  abapGitFactsDefaults,
+} from '../../../../clients/abapGit/types';
+import type { ResultValuesOf } from '../../../../utils/resultStrategy';
 
 /** What the connection does with a request: answer it, or throw. */
 export type Script = (request: IAbapRequestOptions) => IAdtWireResponse;
@@ -73,10 +77,13 @@ export function gitClient(
   connection: IAbapConnection,
   logger?: ILogger,
 ): AdtAbapGitClient {
-  return new AdtAbapGitClient(connection, {
-    results: abapGitDocuments,
-    ...(logger === undefined ? {} : { logger }),
-  });
+  return new AdtAbapGitClient<ResultValuesOf<typeof abapGitDocuments>>(
+    connection,
+    {
+      results: { ...abapGitFactsDefaults, ...abapGitDocuments },
+      ...(logger === undefined ? {} : { logger }),
+    },
+  );
 }
 
 /** Values a credential could take; none may reach anything but the request. */

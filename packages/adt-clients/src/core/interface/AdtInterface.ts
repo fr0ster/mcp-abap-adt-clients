@@ -1,4 +1,9 @@
-import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  AdtReadVersion,
+  AdtRequiredUpdateOptions,
+  IAdtLockedWrite,
+  IAnalyse,
+} from '@mcp-abap-adt/interfaces-adt';
 /**
  * AdtInterface - CRUD for `INTF/OI` interfaces.
  *
@@ -14,6 +19,7 @@ import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
  */
 
 import type {
+  AdtObjectIdentity,
   AdtVariant,
   IAdtActivatable,
   IAdtActivationOptions,
@@ -84,17 +90,37 @@ export class AdtInterface<
   V extends AdtVariant = AdtModernVariant,
 > implements
     IAdtCreatable<IInterfaceConfig, T['created']>,
-    IAdtReadable<IInterfaceConfig, T['source']>,
-    IAdtMetadataReadable<IInterfaceConfig, T['metadata']>,
-    IAdtUpdatable<Partial<IInterfaceConfig>, T['updated']>,
-    IAdtMetadataUpdatable<Partial<IInterfaceConfig>, T['metadataUpdated']>,
-    IAdtDeletable<IInterfaceConfig, T['deletion'], T['deletionCheck']>,
-    IAdtValidatable<IInterfaceConfig, T['validation']>,
-    IAdtCheckable<IInterfaceConfig, T['check']>,
-    IAdtActivatable<IInterfaceConfig, T['activation']>,
-    IAdtLockable<IInterfaceConfig>,
-    IAdtTransportAware<IInterfaceConfig, T['transport']>,
-    IAdtVersionable<IInterfaceConfig, T['versions'], T['versionSource']>
+    IAdtReadable<IInterfaceConfig, T['source'], 'interfaceName'>,
+    IAdtMetadataReadable<IInterfaceConfig, T['metadata'], 'interfaceName'>,
+    IAdtUpdatable<
+      Partial<IInterfaceConfig>,
+      T['updated'],
+      'interfaceName',
+      'source'
+    >,
+    IAdtMetadataUpdatable<
+      Partial<IInterfaceConfig>,
+      T['metadataUpdated'],
+      'interfaceName',
+      'source'
+    >,
+    IAdtDeletable<
+      IInterfaceConfig,
+      T['deletion'],
+      'interfaceName',
+      T['deletionCheck']
+    >,
+    IAdtValidatable<IInterfaceConfig, T['validation'], 'interfaceName'>,
+    IAdtCheckable<IInterfaceConfig, T['check'], 'interfaceName'>,
+    IAdtActivatable<IInterfaceConfig, T['activation'], 'interfaceName'>,
+    IAdtLockable<IInterfaceConfig, 'interfaceName'>,
+    IAdtTransportAware<IInterfaceConfig, T['transport'], 'interfaceName'>,
+    IAdtVersionable<
+      IInterfaceConfig,
+      T['versions'],
+      T['versionSource'],
+      'interfaceName'
+    >
 {
   /**
    * The release variant this serves, as a type only — never set. The
@@ -132,10 +158,18 @@ export class AdtInterface<
   }
 
   /** Validate an interface name before creating it. */
+  validate<E extends IAdtError>(
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options: IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>>;
+  validate(
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options?: IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['validation'], IAdtError>>;
   async validate<E extends IAdtError = IAdtError>(
-    config: Partial<IInterfaceConfig>,
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
     options?: IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['validation'], E>> {
+  ): Promise<IAdtResponse<T['validation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -143,7 +177,7 @@ export class AdtInterface<
       () =>
         validateInterfaceName(
           connection,
-          config.interfaceName as string,
+          config.interfaceName,
           config.packageName ?? '',
           config.description,
         ),
@@ -153,13 +187,35 @@ export class AdtInterface<
   }
 
   /** Create the interface. */
+  create<E extends IAdtError>(
+    config: Omit<IInterfaceConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+      // Read by the request builder, so required (#304, D4).
+      description: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>>;
+  create(
+    config: Omit<IInterfaceConfig, 'source'> & {
+      source?: never;
+      packageName: string;
+      // Read by the request builder, so required (#304, D4).
+      description: string;
+    },
+    options: { headers: IAdtHeaders } & IAdtCreateOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['created'], IAdtError>>;
   async create<E extends IAdtError = IAdtError>(
     config: Omit<IInterfaceConfig, 'source'> & {
       source?: never;
       packageName: string;
+      // Read by the request builder, so required (#304, D4).
+      description: string;
     },
     options: { headers: IAdtHeaders } & IAdtCreateOptions<E>,
-  ): Promise<IAdtResponse<T['created'], E>> {
+  ): Promise<IAdtResponse<T['created'], E | IAdtError>> {
     // **The one guard this package keeps, and only on a create.**
     //
     // The type requires a package; this refuses an empty one, which the type
@@ -177,7 +233,7 @@ export class AdtInterface<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    const name = config.interfaceName as string;
+    const name = config.interfaceName;
     return answering(
       () =>
         createInterface(
@@ -187,7 +243,7 @@ export class AdtInterface<
             interfaceName: name,
             packageName: config.packageName,
             transportRequest: config.transportRequest,
-            description: config.description as string,
+            description: config.description,
             masterSystem: this.systemContext.masterSystem,
             responsible: this.systemContext.responsible,
             masterLanguage: createLanguage(
@@ -203,11 +259,21 @@ export class AdtInterface<
   }
 
   /** Read the interface's source. */
+  read<E extends IAdtError>(
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    version: AdtReadVersion | undefined,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>>;
+  read(
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    version?: AdtReadVersion,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['source'], IAdtError>>;
   async read<E extends IAdtError = IAdtError>(
-    config: Partial<IInterfaceConfig>,
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
     version?: AdtReadVersion,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['source'], E>> {
+  ): Promise<IAdtResponse<T['source'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -215,32 +281,30 @@ export class AdtInterface<
     // an empty body, and whether that *is* absence is the caller's reading.
     return answering(
       () =>
-        getInterfaceSource(
-          connection,
-          config.interfaceName as string,
-          version,
-          options,
-        ),
+        getInterfaceSource(connection, config.interfaceName, version, options),
       this.results.source,
       options?.analyse,
     );
   }
 
   /** Read the interface's metadata. */
+  readMetadata<E extends IAdtError>(
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options: IReadOptions & IAdtOperationOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>>;
+  readMetadata(
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options?: IReadOptions & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['metadata'], IAdtError>>;
   async readMetadata<E extends IAdtError = IAdtError>(
-    config: Partial<IInterfaceConfig>,
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
     options?: IReadOptions & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['metadata'], E>> {
+  ): Promise<IAdtResponse<T['metadata'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
     return answering(
-      () =>
-        getInterfaceMetadata(
-          connection,
-          config.interfaceName as string,
-          options,
-        ),
+      () => getInterfaceMetadata(connection, config.interfaceName, options),
       this.results.metadata,
       options?.analyse,
     );
@@ -249,22 +313,36 @@ export class AdtInterface<
   /**
    * Write the interface's source.
    *
-   * With `options.lockHandle` the caller holds the lock and owns the chain, so
-   * this is one request. Without it, this locks, checks, writes and unlocks —
-   * and the unlock happens on every path out.
+   * One request: the write, under the lock the caller holds
+   * (`options.lockHandle`, required). The lock, the check and the unlock are
+   * the caller's own calls of `lock`, `check` and `unlock`.
    *
    * **The whole content, every time.** This is a replace, never a merge. Read
    * what the object holds, change what you mean to change, and pass the result:
    * anything left out is gone, because nothing is read here to keep it.
    */
+  update<E extends IAdtError>(
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>>;
+  update(
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['updated'], IAdtError>>;
   async update<E extends IAdtError = IAdtError>(
-    config: Partial<IInterfaceConfig>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['updated'], E>> {
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['updated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    const name = config.interfaceName as string;
+    const name = config.interfaceName;
     // The source is the caller's, through `options.source`. This used to
     // fall back to `config.source` — two channels for one value, where the
     // contract documents one. `config.source` is `check`'s alone now: a
@@ -279,8 +357,8 @@ export class AdtInterface<
           options.headers,
           options.ifMatch,
           name,
-          source as string,
-          options?.lockHandle as string,
+          source,
+          options?.lockHandle,
           config.transportRequest,
         ),
       this.results.updated,
@@ -298,11 +376,27 @@ export class AdtInterface<
    * and pass the result: anything left out is gone, because nothing is read
    * here to keep it.
    */
+  updateMetadata<E extends IAdtError>(
+    this: this & AdtPerformedBy<'interface', 'updateMetadata'>,
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>>;
+  updateMetadata(
+    this: this & AdtPerformedBy<'interface', 'updateMetadata'>,
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<IAdtError> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], IAdtError>>;
   async updateMetadata<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'interface', 'updateMetadata'>,
-    config: Partial<IInterfaceConfig>,
-    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E>,
-  ): Promise<IAdtResponse<T['metadataUpdated'], E>> {
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options: { headers: IAdtHeaders } & IAdtUpdateOptions<E> &
+      IAdtLockedWrite &
+      AdtRequiredUpdateOptions<'source'>,
+  ): Promise<IAdtResponse<T['metadataUpdated'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -312,8 +406,8 @@ export class AdtInterface<
           connection,
           options.headers,
           options.ifMatch,
-          INTERFACE.uri(config.interfaceName as string),
-          options?.source as string,
+          INTERFACE.uri(config.interfaceName),
+          options?.source,
           options?.lockHandle,
           config.transportRequest,
         ),
@@ -329,15 +423,27 @@ export class AdtInterface<
    * it: a consumer that wants the check runs this first and decides what a
    * refusal means.
    */
+  checkDeletion<E extends IAdtError>(
+    this: this & AdtPerformedBy<'interface', 'deletionCheck'>,
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>>;
+  checkDeletion(
+    this: this & AdtPerformedBy<'interface', 'deletionCheck'>,
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletionCheck'], IAdtError>>;
   async checkDeletion<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'interface', 'deletionCheck'>,
-    config: Partial<IInterfaceConfig>,
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletionCheck'], E>> {
+  ): Promise<IAdtResponse<T['deletionCheck'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    const name = config.interfaceName as string;
+    const name = config.interfaceName;
     return answering(
       () =>
         checkDeletion(connection, options.headers, {
@@ -354,14 +460,24 @@ export class AdtInterface<
    *
    * The deletion check is read, not merely performed — see AdtProgram.delete.
    */
+  delete<E extends IAdtError>(
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>>;
+  delete(
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['deletion'], IAdtError>>;
   async delete<E extends IAdtError = IAdtError>(
-    config: Partial<IInterfaceConfig>,
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['deletion'], E>> {
+  ): Promise<IAdtResponse<T['deletion'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    const name = config.interfaceName as string;
+    const name = config.interfaceName;
     return answering(
       () =>
         deleteInterface(connection, options.headers, {
@@ -374,10 +490,20 @@ export class AdtInterface<
   }
 
   /** Activate the interface. Needs no stateful session. */
+  activate<E extends IAdtError>(
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>>;
+  activate(
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options: { headers: IAdtHeaders } & IAdtActivationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['activation'], IAdtError>>;
   async activate<E extends IAdtError = IAdtError>(
-    config: Partial<IInterfaceConfig>,
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
     options: { headers: IAdtHeaders } & IAdtActivationOptions<E>,
-  ): Promise<IAdtResponse<T['activation'], E>> {
+  ): Promise<IAdtResponse<T['activation'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -387,7 +513,7 @@ export class AdtInterface<
         activateInterface(
           sent,
           options.headers,
-          config.interfaceName as string,
+          config.interfaceName,
           options.preauditRequested ?? true,
         ),
       this.results.activation,
@@ -396,11 +522,23 @@ export class AdtInterface<
   }
 
   /** Check the interface. */
+  check<E extends IAdtError>(
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<E> & {
+        analyse: IAnalyse<E>;
+      },
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>>;
+  check(
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    status: string | undefined,
+    options: { headers: IAdtHeaders } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['check'], IAdtError>>;
   async check<E extends IAdtError = IAdtError>(
-    config: Partial<IInterfaceConfig>,
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
     status: string | undefined,
     options: { headers: IAdtHeaders } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['check'], E>> {
+  ): Promise<IAdtResponse<T['check'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -412,7 +550,7 @@ export class AdtInterface<
         checkInterface(
           connection,
           options.headers,
-          config.interfaceName as string,
+          config.interfaceName,
           version,
           config.source,
           this.contentTypes?.sourceArtifactContentType(),
@@ -423,11 +561,23 @@ export class AdtInterface<
   }
 
   /** The transport request the interface belongs to. */
+  readTransport<E extends IAdtError>(
+    this: this & AdtPerformedBy<'interface', 'transport'>,
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options: ({ withLongPolling?: boolean } & IAdtOperationOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>>;
+  readTransport(
+    this: this & AdtPerformedBy<'interface', 'transport'>,
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options?: { withLongPolling?: boolean } & IAdtOperationOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['transport'], IAdtError>>;
   async readTransport<E extends IAdtError = IAdtError>(
     this: this & AdtPerformedBy<'interface', 'transport'>,
-    config: Partial<IInterfaceConfig>,
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
     options?: { withLongPolling?: boolean } & IAdtOperationOptions<E>,
-  ): Promise<IAdtResponse<T['transport'], E>> {
+  ): Promise<IAdtResponse<T['transport'], E | IAdtError>> {
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
@@ -435,7 +585,7 @@ export class AdtInterface<
       () =>
         getInterfaceTransport(
           connection,
-          config.interfaceName as string,
+          config.interfaceName,
           options?.withLongPolling !== undefined
             ? { withLongPolling: options.withLongPolling }
             : undefined,
@@ -450,11 +600,19 @@ export class AdtInterface<
    * carrying no handle reads as `''`; whether that is a refusal is the
    * caller's `analyse` to say.
    */
+  lock<E extends IAdtError>(
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  lock(
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
   async lock<E extends IAdtError = IAdtError>(
-    config: Partial<IInterfaceConfig>,
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E>> {
-    const name = config.interfaceName as string;
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
+    const name = config.interfaceName;
     const answer = await answering(
       () =>
         inStatefulSession(this.connection, () =>
@@ -470,12 +628,22 @@ export class AdtInterface<
   }
 
   /** Unlock the interface. */
+  unlock<E extends IAdtError>(
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    lockHandle: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<void, E | IAdtError>>;
+  unlock(
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    lockHandle: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<void, IAdtError>>;
   async unlock<E extends IAdtError = IAdtError>(
-    config: Partial<IInterfaceConfig>,
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
     lockHandle: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<void, E>> {
-    const name = config.interfaceName as string;
+  ): Promise<IAdtResponse<void, E | IAdtError>> {
+    const name = config.interfaceName;
 
     return answering(
       async () => {
@@ -492,10 +660,18 @@ export class AdtInterface<
   }
 
   /** Version history of the interface's source. */
+  getVersions<E extends IAdtError>(
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>>;
+  getVersions(
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versions'], IAdtError>>;
   async getVersions<E extends IAdtError = IAdtError>(
-    config: Partial<IInterfaceConfig>,
+    config: AdtObjectIdentity<IInterfaceConfig, 'interfaceName'>,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versions'], E>> {
+  ): Promise<IAdtResponse<T['versions'], E | IAdtError>> {
     return answering(
       () => getInterfaceVersions(this.connection, config),
       this.results.versions,
@@ -504,10 +680,18 @@ export class AdtInterface<
   }
 
   /** Source of one version, by the `contentUri` its entry carried. */
+  getVersionSource<E extends IAdtError>(
+    contentUri: string,
+    options: IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['versionSource'], E | IAdtError>>;
+  getVersionSource(
+    contentUri: string,
+    options?: IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['versionSource'], IAdtError>>;
   async getVersionSource<E extends IAdtError = IAdtError>(
     contentUri: string,
     options?: IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<T['versionSource'], E>> {
+  ): Promise<IAdtResponse<T['versionSource'], E | IAdtError>> {
     return answering(
       () => getInterfaceVersionSource(this.connection, contentUri),
       this.results.versionSource,

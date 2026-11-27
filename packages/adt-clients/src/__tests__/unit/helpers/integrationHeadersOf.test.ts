@@ -4,7 +4,10 @@ import { join, sep } from 'node:path';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtAbapGitClient } from '../../../clients/AdtAbapGitClient';
 import { AdtClient } from '../../../clients/AdtClient';
-import { abapGitDocuments } from '../../../clients/abapGit/types';
+import {
+  abapGitDocuments,
+  abapGitFactsDefaults,
+} from '../../../clients/abapGit/types';
 import { ClassExecutor } from '../../../executors/class/ClassExecutor';
 import { ProgramExecutor } from '../../../executors/program/ProgramExecutor';
 import {
@@ -19,6 +22,7 @@ import {
   AmdpDebugger,
   amdpDebuggerDocuments,
 } from '../../../runtime/debugger/AmdpDebugger';
+import type { ResultValuesOf } from '../../../utils/resultStrategy';
 import {
   headersOf,
   integrationHeadersOf,
@@ -137,7 +141,10 @@ function everyHeaderMember(conn: IAbapConnection): {
   const standalone: [string, unknown][] = [
     [
       'AdtAbapGitClient',
-      new AdtAbapGitClient(conn, { logger, results: abapGitDocuments }),
+      new AdtAbapGitClient<ResultValuesOf<typeof abapGitDocuments>>(conn, {
+        logger,
+        results: { ...abapGitFactsDefaults, ...abapGitDocuments },
+      }),
     ],
     [
       'AbapDebugger',

@@ -117,6 +117,7 @@ async function main(): Promise<void> {
         { className: NAME },
         {
           headers: headersOf(cls, 'update'),
+          lockHandle: 'H',
           source: [
             `CLASS ${NAME.toLowerCase()} DEFINITION PUBLIC FINAL CREATE PUBLIC.`,
             '  PUBLIC SECTION.',

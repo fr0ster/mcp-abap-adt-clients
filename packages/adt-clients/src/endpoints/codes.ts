@@ -118,9 +118,18 @@ export type AdtAddressableCode =
   | AdtGroupOnlyCode;
 
 /** Whether `code` is a group-only code — a value from outside the types included. */
-export function isGroupOnlyCode(code: string): code is AdtGroupOnlyCode {
+export function isGroupOnlyCode(code: string): boolean {
   return Object.hasOwn(GROUP_ONLY_ADDRESS, code);
 }
+
+/**
+ * The address builder of a group-only code, by its text: a typed lookup, so
+ * a caller learns the builder without a predicate narrowing the code.
+ */
+export const GROUP_ONLY_ADDRESS_OF: ReadonlyMap<
+  string,
+  (name: string) => string
+> = new Map(Object.entries(GROUP_ONLY_ADDRESS));
 
 /** The parent's API entry in the table that names the child. */
 export function parentEntry(

@@ -255,7 +255,8 @@ export function parsedDocument(answer: IAdtWireResponse): unknown {
   if (typeof body !== 'string') return undefined;
   try {
     if (XMLValidator.validate(body) !== true) return undefined;
-    return documentParser.parse(body);
+    const parsed: unknown = documentParser.parse(body);
+    return parsed;
   } catch {
     return undefined;
   }

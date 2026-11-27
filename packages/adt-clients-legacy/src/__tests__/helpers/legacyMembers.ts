@@ -5,7 +5,7 @@
  *
  * `legacyMemberInventory.test.ts` walks every getter of `AdtClientLegacy` and
  * `AdtExecutorLegacy`, collects the members of what each returns through its
- * whole prototype chain (the own keys of an `absentOnLegacy` object included),
+ * whole prototype chain (an absent type's `*AbsentLegacy` class included),
  * and requires each one in exactly one of {@link LEGACY_REFUSED} and
  * {@link LEGACY_SENDS}, unless {@link NON_PUBLIC} lists it as a member the
  * TypeScript source declares `private` or `protected`.
@@ -317,6 +317,9 @@ const unlockOf = (uri: string) =>
 const activation = () => post(ACTIVATION, { method: 'activate' });
 const checkRun = () => post(CHECKRUNS, { reporters: 'abapCheckRun' });
 const writeWith = (uri: string) => put(uri, { lockHandle: LOCK });
+/** The class document a message's `update` is written into (C7 of #304). */
+const MESSAGE_CLASS_DOCUMENT =
+  '<?xml version="1.0"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZGUARD_MSG" adtcore:type="MSAG/N"><adtcore:packageRef adtcore:name="$TMP"/><mc:messages mc:msgno="001" mc:msgtext="guard"/></mc:messageClass>';
 /** §4.2: the consumer's lock handle on one DELETE of the object. */
 const deleteWith = (uri: string) =>
   request('DELETE', uri, { lockHandle: LOCK });
@@ -348,7 +351,7 @@ function rowsFor(getter: string) {
   };
 }
 
-/** Every member of a handler absentOnLegacy builds, or one Task 6 makes so. */
+/** Every member of an absent type's `*AbsentLegacy` handler, or one Task 6 makes so. */
 function absent(getter: string, members: readonly string[]): Rows<RefusedRow> {
   const { refused } = rowsFor(getter);
   return Object.fromEntries(members.map((m) => refused(m, '§10.1')));
@@ -499,7 +502,7 @@ const INCLUDE_URI = PROGRAM_INCLUDE.uri('ZGUARD_INC');
 const DDL_URI = DDL_SOURCE.uri('ZGUARD_DDL');
 const MSAG_URI = MESSAGE_CLASS.uri('ZGUARD_MSG');
 
-/** The handlers absentOnLegacy builds today (§10.1), by their public members. */
+/** The absent types' `*AbsentLegacy` handlers (§10.1), by their public members. */
 const ABSENT = {
   getAccessControl: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
   getAppendStructure: [...SOURCE_OBJECT_MEMBERS],
@@ -1187,14 +1190,30 @@ export const LEGACY_SENDS: Record<string, Rows<SendsRow>> = {
   getMessageClassMessage: Object.fromEntries([
     msg.sends('read', '§10.3 measured', [get(MSAG_URI)]),
     msg.sends('readMetadata', '§10.3 kept', [get(MSAG_URI)]),
-    ...(['create', 'update', 'delete'] as const).map((member) =>
-      msg.sends(member, '§10.3 kept, §4.3', [
-        get(MSAG_URI),
-        post(`${MSAG_URI}/messages/001`, { _action: 'LOCK_MSG' }),
-        post(MSAG_URI, { _action: 'LOCK', msgNo: '001' }),
-        writeWith(MSAG_URI),
-        unlockOf(MSAG_URI),
-        post(`${MSAG_URI}/messages/001`, { _action: 'UNLOCK_ALL' }),
+    // One member, one request (C7 of #304): the old create, update and
+    // delete chain is the caller's recipe over these four and the class's
+    // own read, lock and unlock.
+    msg.sends('lockMessage', '§10.3 kept, C7 of #304', [
+      post(`${MSAG_URI}/messages/001`, { _action: 'LOCK_MSG' }),
+    ]),
+    msg.sends('lockClassForMessage', '§10.3 kept, C7 of #304', [
+      post(MSAG_URI, { _action: 'LOCK', msgNo: '001' }),
+    ]),
+    msg.sends('unlockMessages', '§10.3 kept, C7 of #304', [
+      post(`${MSAG_URI}/messages/001`, { _action: 'UNLOCK_ALL' }),
+    ]),
+    msg.sends(
+      'update',
+      '§10.3 kept, §4.3, C7 of #304',
+      [writeWith(MSAG_URI)],
+      calling('update', (headers) => [
+        CONFIGS.getMessageClassMessage,
+        {
+          ...headers('update'),
+          classDocument: MESSAGE_CLASS_DOCUMENT,
+          classLockHandle: LOCK,
+          messageLockHandle: LOCK,
+        },
       ]),
     ),
   ]),
@@ -1446,7 +1465,7 @@ export const NON_PUBLIC: Record<string, { file: string; className: string }> = {
     ]),
   ),
   ...Object.fromEntries(
-    ['names', 'writeClass'].map((member) => [
+    ['names'].map((member) => [
       `getMessageClassMessage.${member}`,
       {
         file: '../adt-clients/src/core/messageClass/AdtMessageClassMessage.ts',

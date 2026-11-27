@@ -10,7 +10,8 @@ import type {
 import type { HttpError } from '@mcp-abap-adt/interfaces-network';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { ENHANCEMENT } from '../../endpoints/objects';
-import { safeStringify } from '../../utils/internalUtils';
+import { responseDataHead, safeStringify } from '../../utils/internalUtils';
+import { propertyOf } from '../../utils/ownValue';
 import { updateRequestHeaders } from '../../utils/requestHeaders';
 import {
   type EnhancementType,
@@ -53,7 +54,7 @@ export async function update(
 
   const baseUri = getEnhancementUri(
     args.enhancement_type,
-    args.enhancement_name as string,
+    args.enhancement_name,
   );
 
   // Build URL with parameters
@@ -88,22 +89,20 @@ export async function update(
     });
     return response;
   } catch (error: unknown) {
-    const e = error as HttpError;
-    if (e.response && debugEnabled) {
+    const response = propertyOf(error, 'response');
+    if (response && debugEnabled) {
       logger?.error?.(
-        `[ERROR] Update enhancement failed - Status: ${e.response.status}`,
+        `[ERROR] Update enhancement failed - Status: ${propertyOf(response, 'status')}`,
       );
       logger?.error?.(
-        `[ERROR] Update enhancement failed - StatusText: ${e.response.statusText}`,
+        `[ERROR] Update enhancement failed - StatusText: ${propertyOf(response, 'statusText')}`,
       );
       logger?.error?.(
-        `[ERROR] Update enhancement failed - Response headers: ${JSON.stringify(e.response.headers, null, 2)}`,
+        `[ERROR] Update enhancement failed - Response headers: ${JSON.stringify(propertyOf(response, 'headers'), null, 2)}`,
       );
       logger?.error?.(
         `[ERROR] Update enhancement failed - Response data (first 1000 chars):`,
-        typeof e.response.data === 'string'
-          ? e.response.data.substring(0, 1000)
-          : safeStringify(e.response.data).substring(0, 1000),
+        responseDataHead(propertyOf(response, 'data')),
       );
     }
     throw error;
@@ -125,7 +124,7 @@ export async function updateEnhancement(
   connection: IAbapConnection,
   headers: IAdtHeaders,
   ifMatch: string | undefined,
-  enhancementType: EnhancementType,
+  enhancementType: EnhancementType | undefined,
   enhancementName: string,
   sourceCode: string,
   lockHandle: string | undefined,
@@ -152,7 +151,7 @@ export async function updateEnhancementMetadata(
   connection: IAbapConnection,
   headers: IAdtHeaders,
   ifMatch: string | undefined,
-  type: EnhancementType,
+  type: EnhancementType | undefined,
   name: string,
   source: string,
   lockHandle: string | undefined,

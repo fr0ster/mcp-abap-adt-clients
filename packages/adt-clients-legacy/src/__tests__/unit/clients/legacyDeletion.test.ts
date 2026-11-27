@@ -77,7 +77,6 @@ const STILL_SENDS: [getter: string, member: string][] = [
   ['getLocalTypes', 'delete'],
   ['getLocalDefinitions', 'delete'],
   ['getLocalMacros', 'delete'],
-  ['getMessageClassMessage', 'delete'],
 ];
 
 function handlerOf(

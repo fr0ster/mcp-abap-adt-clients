@@ -108,7 +108,8 @@ const withClass = gateAll(
 describe('Shared - what check answers', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let className: string | undefined;
+  // '' until configured: a case runs only with a class name (D1 of #304).
+  let className = '';
 
   beforeAll(async () => {
     try {
@@ -119,7 +120,7 @@ describe('Shared - what check answers', () => {
       );
       client = resolved;
 
-      className = configuredClassName();
+      className = configuredClassName() ?? '';
     } catch (error) {
       skipUnlessConfigured(error, testsLogger);
     }

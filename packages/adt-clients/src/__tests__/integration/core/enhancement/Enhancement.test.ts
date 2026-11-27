@@ -235,7 +235,8 @@ describe('Enhancement family and host reads (using AdtClient)', () => {
       const common = {
         packageName: spot.packageName,
         transportRequest: spot.transportRequest,
-        description: spot.description,
+        // A create reads the description (#304, D4): the case's, or none.
+        description: spot.description ?? '',
       };
       const intfConfig = { ...common, interfaceName };
       const classConfig = { ...common, className };

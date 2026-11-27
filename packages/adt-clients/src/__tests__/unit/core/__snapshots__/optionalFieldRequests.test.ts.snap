@@ -1,0 +1,1343 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`a member sends the same request with an optional field given or absent getAppendStructure().create 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="d" adtcore:name="ZAPP" adtcore:type="TABL/DS">
+  <adtcore:adtTemplate>
+    <adtcore:adtProperty adtcore:key="base_structure">ZTAB</adtcore:adtProperty>
+  </adtcore:adtTemplate>
+  <adtcore:packageRef adtcore:name="P"/>
+</blue:blueSource>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/ddic/structures",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without baseObject": {
+    "failed": "Missing required parameters: append_structure_name, base_object, package_name",
+    "sent": [],
+    "thrown": undefined,
+  },
+  "without description": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="ZAPP" adtcore:name="ZAPP" adtcore:type="TABL/DS">
+  <adtcore:adtTemplate>
+    <adtcore:adtProperty adtcore:key="base_structure">ZTAB</adtcore:adtProperty>
+  </adtcore:adtTemplate>
+  <adtcore:packageRef adtcore:name="P"/>
+</blue:blueSource>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/ddic/structures",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getBehaviorDefinition().create 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="d" adtcore:name="ZBDEF" adtcore:type="BDEF/BDO">
+    <adtcore:adtTemplate>
+        <adtcore:adtProperty adtcore:key="implementation_type">Managed</adtcore:adtProperty>
+    </adtcore:adtTemplate>
+    <adtcore:packageRef adtcore:name="P"/>
+</blue:blueSource>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/bo/behaviordefinitions",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without description": {
+    "failed": "Cannot read properties of undefined (reading 'length')",
+    "sent": [],
+    "thrown": undefined,
+  },
+  "without implementationType": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="d" adtcore:name="ZBDEF" adtcore:type="BDEF/BDO">
+    <adtcore:adtTemplate>
+        <adtcore:adtProperty adtcore:key="implementation_type">undefined</adtcore:adtProperty>
+    </adtcore:adtTemplate>
+    <adtcore:packageRef adtcore:name="P"/>
+</blue:blueSource>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/bo/behaviordefinitions",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getDomain().create 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?><doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="d" adtcore:name="ZDOM" adtcore:type="DOMA/DD">
+  <adtcore:packageRef adtcore:name="P"/>
+</doma:domain>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/ddic/domains",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without description": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?><doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="ZDOM" adtcore:name="ZDOM" adtcore:type="DOMA/DD">
+  <adtcore:packageRef adtcore:name="P"/>
+</doma:domain>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/ddic/domains",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getEnhancement().activate 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?>
+<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/enhancements/enhoxhh/ze" adtcore:name="ZE"/>
+</adtcore:objectReferences>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without enhancementType": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?>
+<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/enhancements/undefined/ze" adtcore:name="ZE"/>
+</adtcore:objectReferences>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getEnhancement().check 1`] = `
+{
+  "given": {
+    "failed": "Cannot read properties of undefined (reading 'headers')",
+    "sent": [],
+    "thrown": undefined,
+  },
+  "without enhancementType": {
+    "failed": "Cannot read properties of undefined (reading 'headers')",
+    "sent": [],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getEnhancement().checkDeletion 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?>
+<del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
+  <del:object adtcore:uri="/sap/bc/adt/enhancements/enhoxhh/ze"/>
+</del:checkRequest>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/deletion/check",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without enhancementType": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?>
+<del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
+  <del:object adtcore:uri="/sap/bc/adt/enhancements/undefined/ze"/>
+</del:checkRequest>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/deletion/check",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getEnhancement().create 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?>
+<enho:enhancement xmlns:enho="http://www.sap.com/adt/enhancements/enho" xmlns:adtcore="http://www.sap.com/adt/core" xmlns:enhcore="http://www.sap.com/abapsource/enhancementscore"
+ adtcore:description="d"
+ adtcore:name="ZE"
+ adtcore:type="ENHO/XHH">
+ <adtcore:packageRef adtcore:name="P"/>
+ <enho:contentCommon enho:toolType="HOOK_IMPL" enho:adjustmentStatus="" enho:upgradeFlag="false"/><enho:contentSpecific><enho:hookTechnology enho:nextId="2"><enho:enhancedObject adtcore:uri="" adtcore:type="" adtcore:name=""/><enho:hookImplementation enho:id="1" enho:spotname="" enho:programname="" enho:overwrite="" enho:method="" enho:enhmode="" enho:full_name="" enho:full_description=""/></enho:hookTechnology></enho:contentSpecific>
+</enho:enhancement>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/enhancements/enhoxhh",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without enhancementType": {
+    "failed": "value is not iterable",
+    "sent": [],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getEnhancement().delete 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?>
+<del:deletionRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
+  <del:object adtcore:uri="/sap/bc/adt/enhancements/enhoxhh/ze">
+    <del:transportNumber/>
+  </del:object>
+</del:deletionRequest>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/deletion/delete",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without enhancementType": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?>
+<del:deletionRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
+  <del:object adtcore:uri="/sap/bc/adt/enhancements/undefined/ze">
+    <del:transportNumber/>
+  </del:object>
+</del:deletionRequest>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/deletion/delete",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getEnhancement().getVersions 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": undefined,
+        "headers": {
+          "Accept": "application/atom+xml;type=feed",
+        },
+        "method": "GET",
+        "params": undefined,
+        "url": "/sap/bc/adt/enhancements/enhoxhh/ze/source/main/versions",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without enhancementType": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": undefined,
+        "headers": {
+          "Accept": "application/atom+xml;type=feed",
+        },
+        "method": "GET",
+        "params": undefined,
+        "url": "/sap/bc/adt/enhancements/undefined/ze/source/main/versions",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getEnhancement().lock 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": null,
+        "headers": {
+          "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/enhancements/enhoxhh/ze?_action=LOCK&accessMode=MODIFY",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without enhancementType": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": null,
+        "headers": {
+          "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/enhancements/undefined/ze?_action=LOCK&accessMode=MODIFY",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getEnhancement().read 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": undefined,
+        "headers": {
+          "Accept": "text/plain",
+        },
+        "method": "GET",
+        "params": undefined,
+        "url": "/sap/bc/adt/enhancements/enhoxhh/ze/source/main?version=%5Bobject+Object%5D",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without enhancementType": {
+    "failed": "Enhancement type 'undefined' does not support source code operations. Only 'enhoxhh' supports source code.",
+    "sent": [],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getEnhancement().readMetadata 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": undefined,
+        "headers": {
+          "Accept": "application/vnd.sap.adt.enh.enhoxhh.v3+xml",
+        },
+        "method": "GET",
+        "params": undefined,
+        "url": "/sap/bc/adt/enhancements/enhoxhh/ze",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without enhancementType": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": undefined,
+        "headers": {
+          "Accept": undefined,
+        },
+        "method": "GET",
+        "params": undefined,
+        "url": "/sap/bc/adt/enhancements/undefined/ze",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getEnhancement().readTransport 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": undefined,
+        "headers": {
+          "Accept": "application/vnd.sap.adt.transportorganizer.v1+xml",
+        },
+        "method": "GET",
+        "params": undefined,
+        "url": "/sap/bc/adt/enhancements/enhoxhh/ze/transport",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without enhancementType": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": undefined,
+        "headers": {
+          "Accept": "application/vnd.sap.adt.transportorganizer.v1+xml",
+        },
+        "method": "GET",
+        "params": undefined,
+        "url": "/sap/bc/adt/enhancements/undefined/ze/transport",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getEnhancement().unlock 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": null,
+        "headers": undefined,
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/enhancements/enhoxhh/ze?_action=UNLOCK&lockHandle=%5Bobject%20Object%5D",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without enhancementType": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": null,
+        "headers": undefined,
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/enhancements/undefined/ze?_action=UNLOCK&lockHandle=%5Bobject%20Object%5D",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getEnhancement().update 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": undefined,
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "PUT",
+        "params": undefined,
+        "url": "/sap/bc/adt/enhancements/enhoxhh/ze/source/main?lockHandle=L",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without enhancementType": {
+    "failed": "Enhancement type 'undefined' does not support source code update. Only 'enhoxhh' supports source code.",
+    "sent": [],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getEnhancement().updateMetadata 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": undefined,
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "PUT",
+        "params": undefined,
+        "url": "/sap/bc/adt/enhancements/enhoxhh/ze?lockHandle=L",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without enhancementType": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": undefined,
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "PUT",
+        "params": undefined,
+        "url": "/sap/bc/adt/enhancements/undefined/ze?lockHandle=L",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getEnhancement().validate 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": undefined,
+        "headers": {
+          "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.validation.objectname",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/enhancements/enhoxhh/validation?objname=ZE&objtype=ENHO%2FXHH&packagename=P&description=d",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without enhancementType": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": undefined,
+        "headers": {
+          "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.validation.objectname",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/enhancements/undefined/validation?objname=ZE&objtype=undefined&packagename=P&description=d",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getFeatureToggle().update 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "{"rollout":{"strategy":"x"}}",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "PUT",
+        "params": {
+          "lockHandle": "L",
+        },
+        "url": "/sap/bc/adt/sfw/featuretoggles/zft/source/main",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without source": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": undefined,
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "PUT",
+        "params": {
+          "lockHandle": "L",
+        },
+        "url": "/sap/bc/adt/sfw/featuretoggles/zft/source/main",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getFeatureToggle().updateMetadata 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" xmlns:abapsource="http://www.sap.com/adt/abapsource" adtcore:name="ZFT" adtcore:type="FTG2/FT" adtcore:description="d"><adtcore:packageRef adtcore:name="P"/></blue:blueSource>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "PUT",
+        "params": {
+          "lockHandle": "L",
+        },
+        "url": "/sap/bc/adt/sfw/featuretoggles/zft",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without description": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" xmlns:abapsource="http://www.sap.com/adt/abapsource" adtcore:name="ZFT" adtcore:type="FTG2/FT" adtcore:description=""><adtcore:packageRef adtcore:name="P"/></blue:blueSource>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "PUT",
+        "params": {
+          "lockHandle": "L",
+        },
+        "url": "/sap/bc/adt/sfw/featuretoggles/zft",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without packageName": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" xmlns:abapsource="http://www.sap.com/adt/abapsource" adtcore:name="ZFT" adtcore:type="FTG2/FT" adtcore:description="d"></blue:blueSource>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "PUT",
+        "params": {
+          "lockHandle": "L",
+        },
+        "url": "/sap/bc/adt/sfw/featuretoggles/zft",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getFunctionGroup().create 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?>
+<group:abapFunctionGroup xmlns:group="http://www.sap.com/adt/functions/groups" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="d" adtcore:name="ZFG" adtcore:type="FUGR/F">
+  <adtcore:packageRef adtcore:name="P"/>
+</group:abapFunctionGroup>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/functions/groups",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without description": {
+    "failed": "Cannot read properties of undefined (reading 'length')",
+    "sent": [],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getFunctionInclude().updateMetadata 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?>
+<finclude:abapFunctionGroupInclude xmlns:finclude="http://www.sap.com/adt/functions/fincludes" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZINC" adtcore:type="FUGR/I" adtcore:description="d">
+  <adtcore:containerRef adtcore:uri="/sap/bc/adt/functions/groups/zfg" adtcore:type="FUGR/F" adtcore:name="ZFG"/>
+</finclude:abapFunctionGroupInclude>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "PUT",
+        "params": undefined,
+        "url": "/sap/bc/adt/functions/groups/zfg/includes/zinc?lockHandle=L",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without description": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?>
+<finclude:abapFunctionGroupInclude xmlns:finclude="http://www.sap.com/adt/functions/fincludes" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZINC" adtcore:type="FUGR/I" adtcore:description="ZINC">
+  <adtcore:containerRef adtcore:uri="/sap/bc/adt/functions/groups/zfg" adtcore:type="FUGR/F" adtcore:name="ZFG"/>
+</finclude:abapFunctionGroupInclude>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "PUT",
+        "params": undefined,
+        "url": "/sap/bc/adt/functions/groups/zfg/includes/zinc?lockHandle=L",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getFunctionModule().create 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?>
+<fmodule:abapFunctionModule xmlns:fmodule="http://www.sap.com/adt/functions/fmodules" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="d" adtcore:name="ZFM" adtcore:type="FUGR/FF">
+  <adtcore:containerRef adtcore:name="ZFG" adtcore:type="FUGR/F" adtcore:uri="/sap/bc/adt/functions/groups/zfg"/>
+</fmodule:abapFunctionModule>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/functions/groups/zfg/fmodules",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without description": {
+    "failed": "Cannot read properties of undefined (reading 'length')",
+    "sent": [],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getInterface().create 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?><intf:abapInterface xmlns:intf="http://www.sap.com/adt/oo/interfaces" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="d" adtcore:name="ZIF" adtcore:type="INTF/OI">
+
+
+
+  <adtcore:packageRef adtcore:name="P"/>
+
+
+
+</intf:abapInterface>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/oo/interfaces",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without description": {
+    "failed": "Cannot read properties of undefined (reading 'length')",
+    "sent": [],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getMessageClass().create 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZMC" adtcore:description="d" adtcore:type="MSAG/N"><adtcore:packageRef adtcore:name="P"/></mc:messageClass>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/messageclass",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without description": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZMC" adtcore:type="MSAG/N"><adtcore:packageRef adtcore:name="P"/></mc:messageClass>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/messageclass",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getMetadataExtension().create 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?><ddlxsources:ddlxSource xmlns:ddlxsources="http://www.sap.com/adt/ddic/ddlxsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="d" adtcore:name="ZMDE" adtcore:type="DDLX/EX">
+    <adtcore:packageRef adtcore:name="P"/>
+
+</ddlxsources:ddlxSource>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/ddic/ddlx/sources",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without description": {
+    "failed": "Cannot read properties of undefined (reading 'length')",
+    "sent": [],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getPackage().create 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?>
+<pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="d" adtcore:name="ZPKG" adtcore:type="DEVC/K" adtcore:version="active">
+  <adtcore:packageRef adtcore:name="ZPKG"/>
+  <pak:attributes pak:isEncapsulated="false" pak:packageType="development" pak:recordChanges="false"/>
+  <pak:superPackage adtcore:name="ZSUP"/>
+  <pak:applicationComponent/>
+  <pak:transport>
+    <pak:softwareComponent pak:name="LOCAL"/>
+    <pak:transportLayer/>
+  </pak:transport>
+  <pak:translation/>
+  <pak:useAccesses/>
+  <pak:packageInterfaces/>
+  <pak:subPackages/>
+</pak:package>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/packages",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without superPackage": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?>
+<pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="d" adtcore:name="ZPKG" adtcore:type="DEVC/K" adtcore:version="active">
+  <adtcore:packageRef adtcore:name="ZPKG"/>
+  <pak:attributes pak:isEncapsulated="false" pak:packageType="development" pak:recordChanges="false"/>
+  <pak:superPackage/>
+  <pak:applicationComponent/>
+  <pak:transport>
+    <pak:softwareComponent pak:name="LOCAL"/>
+    <pak:transportLayer/>
+  </pak:transport>
+  <pak:translation/>
+  <pak:useAccesses/>
+  <pak:packageInterfaces/>
+  <pak:subPackages/>
+</pak:package>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/packages",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getPackage().create with and without a master system 1`] = `
+{
+  "absent": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?>
+<pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="d" adtcore:name="ZPKG" adtcore:type="DEVC/K" adtcore:version="active">
+  <adtcore:packageRef adtcore:name="ZPKG"/>
+  <pak:attributes pak:isEncapsulated="false" pak:packageType="development" pak:recordChanges="false"/>
+  <pak:superPackage adtcore:name="ZSUP"/>
+  <pak:applicationComponent/>
+  <pak:transport>
+    <pak:softwareComponent pak:name="LOCAL"/>
+    <pak:transportLayer/>
+  </pak:transport>
+  <pak:translation/>
+  <pak:useAccesses/>
+  <pak:packageInterfaces/>
+  <pak:subPackages/>
+</pak:package>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/packages",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?>
+<pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="d" adtcore:name="ZPKG" adtcore:type="DEVC/K" adtcore:version="active" adtcore:masterSystem="SYS">
+  <adtcore:packageRef adtcore:name="ZPKG"/>
+  <pak:attributes pak:isEncapsulated="false" pak:packageType="development" pak:recordChanges="false"/>
+  <pak:superPackage adtcore:name="ZSUP"/>
+  <pak:applicationComponent/>
+  <pak:transport>
+    <pak:softwareComponent pak:name="LOCAL"/>
+    <pak:transportLayer/>
+  </pak:transport>
+  <pak:translation/>
+  <pak:useAccesses/>
+  <pak:packageInterfaces/>
+  <pak:subPackages/>
+</pak:package>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/packages",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getPackage().updateMetadata 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": undefined,
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "PUT",
+        "params": undefined,
+        "url": "/sap/bc/adt/packages/zpkg?lockHandle=L",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without superPackage": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": undefined,
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "PUT",
+        "params": undefined,
+        "url": "/sap/bc/adt/packages/zpkg?lockHandle=L",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getPackage().validate 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": undefined,
+        "headers": {
+          "Accept": "application/vnd.sap.as+xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/packages/validation?objname=ZPKG&packagename=ZSUP&description=d&packagetype=development&checkmode=basic",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without superPackage": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": undefined,
+        "headers": {
+          "Accept": "application/vnd.sap.as+xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/packages/validation?objname=ZPKG&description=d&packagetype=development&checkmode=basic",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getRequest().create 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="ASCII"?>
+<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:useraction="newrequest">
+  <tm:request tm:desc="d" tm:type="K" tm:target="LOCAL" tm:cts_project="">
+    <tm:task tm:owner="OWNER"/>
+  </tm:request>
+</tm:root>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/cts/transportrequests",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without owner": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="ASCII"?>
+<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:useraction="newrequest">
+  <tm:request tm:desc="d" tm:type="K" tm:target="LOCAL" tm:cts_project="">
+    <tm:task tm:owner=""/>
+  </tm:request>
+</tm:root>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/cts/transportrequests",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getScalarFunction().create 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="d" adtcore:name="ZSF" adtcore:type="DSFD/SCF">
+  <adtcore:packageRef adtcore:name="P"/>
+</blue:blueSource>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/ddic/dsfd/sources",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without description": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="ZSF" adtcore:name="ZSF" adtcore:type="DSFD/SCF">
+  <adtcore:packageRef adtcore:name="P"/>
+</blue:blueSource>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/ddic/dsfd/sources",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getScalarFunctionImplementation().create 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="d" adtcore:name="ZSFI" adtcore:type="DSFI/SFI">
+  <adtcore:packageRef adtcore:name="P"/>
+  <blue:additionalCreationProperties>
+    <adtcore:content adtcore:encoding="base64" adtcore:type="application/vnd.sap.adt.serverdriven.content.v1+json">eyJzY2FsYXJGdW5jdGlvbk5hbWUiOiJaU0YiLCJlbmdpbmVWYWx1ZSI6InNxbEVuZ2luZSJ9</adtcore:content>
+  </blue:additionalCreationProperties>
+</blue:blueSource>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/ddic/dsfi",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without description": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="ZSFI" adtcore:name="ZSFI" adtcore:type="DSFI/SFI">
+  <adtcore:packageRef adtcore:name="P"/>
+  <blue:additionalCreationProperties>
+    <adtcore:content adtcore:encoding="base64" adtcore:type="application/vnd.sap.adt.serverdriven.content.v1+json">eyJzY2FsYXJGdW5jdGlvbk5hbWUiOiJaU0YiLCJlbmdpbmVWYWx1ZSI6InNxbEVuZ2luZSJ9</adtcore:content>
+  </blue:additionalCreationProperties>
+</blue:blueSource>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/ddic/dsfi",
+      },
+    ],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getServiceBinding().create 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?><srvb:serviceBinding xmlns:srvb="http://www.sap.com/adt/ddic/ServiceBindings" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="d" adtcore:name="ZSB" adtcore:type="SRVB/SVB">
+  <adtcore:packageRef adtcore:name="P"/>
+  <srvb:services srvb:name="ZS">
+    <srvb:content srvb:version="0001">
+      <srvb:serviceDefinition adtcore:name="ZSD"/>
+    </srvb:content>
+  </srvb:services>
+  <srvb:binding srvb:category="0" srvb:type="ODATA" srvb:version="V4">
+    <srvb:implementation adtcore:name=""/>
+  </srvb:binding>
+</srvb:serviceBinding>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/businessservices/bindings",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without bindingVariant": {
+    "failed": "Cannot destructure property 'bindingType' of '(0 , types_1.resolveBindingVariant)(...)' as it is undefined.",
+    "sent": [],
+    "thrown": undefined,
+  },
+  "without description": {
+    "failed": "Cannot read properties of undefined (reading 'length')",
+    "sent": [],
+    "thrown": undefined,
+  },
+  "without serviceDefinitionName": {
+    "failed": "Cannot read properties of undefined (reading 'toUpperCase')",
+    "sent": [],
+    "thrown": undefined,
+  },
+  "without serviceName": {
+    "failed": "Cannot read properties of undefined (reading 'toUpperCase')",
+    "sent": [],
+    "thrown": undefined,
+  },
+  "without serviceVersion": {
+    "failed": "value is not iterable",
+    "sent": [],
+    "thrown": undefined,
+  },
+}
+`;
+
+exports[`a member sends the same request with an optional field given or absent getStructure().create 1`] = `
+{
+  "given": {
+    "failed": undefined,
+    "sent": [
+      {
+        "data": "<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="d" adtcore:name="ZST" adtcore:type="TABL/DS">
+  <adtcore:packageRef adtcore:name="P"/>
+</blue:blueSource>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml",
+        },
+        "method": "POST",
+        "params": undefined,
+        "url": "/sap/bc/adt/ddic/structures",
+      },
+    ],
+    "thrown": undefined,
+  },
+  "without description": {
+    "failed": "Cannot read properties of undefined (reading 'length')",
+    "sent": [],
+    "thrown": undefined,
+  },
+}
+`;

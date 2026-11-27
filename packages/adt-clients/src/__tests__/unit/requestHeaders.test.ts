@@ -20,7 +20,10 @@ import { AdtBatchConnection } from '../../batch';
 import { AdtAbapGitClient } from '../../clients/AdtAbapGitClient';
 import { AdtClient } from '../../clients/AdtClient';
 import { AdtExecutor } from '../../clients/AdtExecutor';
-import { abapGitDocuments } from '../../clients/abapGit/types';
+import {
+  abapGitDocuments,
+  abapGitFactsDefaults,
+} from '../../clients/abapGit/types';
 import { AdtUtils } from '../../core/shared/AdtUtils';
 import { utilDocuments } from '../../core/shared/utilResultSet';
 import { AdtTextElements } from '../../core/textElements/AdtTextElements';
@@ -35,6 +38,7 @@ import {
   AmdpDebugger,
   amdpDebuggerDocuments,
 } from '../../runtime/debugger/AmdpDebugger';
+import type { ResultValuesOf } from '../../utils/resultStrategy';
 import { createLibraryLogger } from '../helpers/testLogger';
 import {
   expectCarriesItsPair,
@@ -69,9 +73,9 @@ function SCAN(): ReturnType<typeof scanImplementations> {
 
 function otherRows(): Row[] {
   const git = (connection: IAbapConnection) =>
-    new AdtAbapGitClient(connection, {
+    new AdtAbapGitClient<ResultValuesOf<typeof abapGitDocuments>>(connection, {
       logger: createLibraryLogger(),
-      results: abapGitDocuments,
+      results: { ...abapGitFactsDefaults, ...abapGitDocuments },
     });
   const abap = (connection: IAbapConnection) =>
     new AbapDebugger(connection, { results: abapDebuggerDocuments });

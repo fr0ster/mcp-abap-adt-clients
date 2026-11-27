@@ -54,7 +54,7 @@ legacy_740:
         ddl_name: "ZLG7_DEL_DDL"
     - name: "legacy_refusals_send_nothing"
       enabled: false
-      description: "checkDeletion, the absentOnLegacy handlers and the other refused members answer the refusal and send no request (asserted on the wire recorder); readObjectMetadata/readObjectSource for a program and a class answer 200"
+      description: "checkDeletion, the absent types' handlers and the other refused members answer the refusal and send no request (asserted on the wire recorder); readObjectMetadata/readObjectSource for a program and a class answer 200"
       params:
         # The refused members are called with placeholders; nothing is sent.
         class_name: "ZCL_LG7_FX_UNIT"             # the fixture (legacy:setup), read for the 200 cases

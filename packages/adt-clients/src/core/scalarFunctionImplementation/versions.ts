@@ -1,3 +1,4 @@
+import type { AdtObjectIdentity } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -21,12 +22,13 @@ const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
  */
 export async function getScalarFunctionImplementationVersions(
   connection: IAbapConnection,
-  config: Partial<IScalarFunctionImplementationConfig>,
+  config: AdtObjectIdentity<
+    IScalarFunctionImplementationConfig,
+    'implementationName'
+  >,
 ): Promise<IAdtWireResponse> {
   const url = versionsUri(
-    sourceUri(
-      SCALAR_FUNCTION_IMPLEMENTATION.uri(config.implementationName as string),
-    ),
+    sourceUri(SCALAR_FUNCTION_IMPLEMENTATION.uri(config.implementationName)),
   );
   return connection.makeAdtRequest({
     url,
