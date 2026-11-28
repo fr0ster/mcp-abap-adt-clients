@@ -36,12 +36,10 @@
  *   const current = read.getResult().value;
  *   // No ETag, no write: the PUT is guarded with If-Match.
  *   if (!current.etag) return;
- *   const patched = patchTableSettings(current, { sizeCategory: '1' });
+ *   const patched = patchTableSettings(current, { sizeCategory: '1' }, 'onprem');
  *   if (!patched.ok) return; // patched.reason, patched.message
- *   // On premise the read carries no isWritableByAMDP (Code).
- *   const { isWritableByAMDP: _cloudOnly, ...onPremise } = patched.settings;
  *   const put = await settings.updateMetadata(
- *     { tableName, description: patched.description, settings: onPremise },
+ *     { tableName, description: patched.description, settings: patched.settings },
  *     { headers, lockHandle, ifMatch: current.etag },
  *   );
  *   written = put.ok;

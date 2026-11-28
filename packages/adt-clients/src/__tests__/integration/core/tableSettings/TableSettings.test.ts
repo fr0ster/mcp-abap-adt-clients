@@ -334,16 +334,25 @@ describe("A table's technical settings (AdtTableSettings)", () => {
               );
             }
             // A cloud read without isWritableByAMDP would reset it on the
-            // write (measured 2026-11-19): the caller refuses it.
-            if (
-              isCloudSystem &&
-              current.settings.isWritableByAMDP === undefined
-            ) {
+            // write (measured 2026-11-19): the caller refuses it. The patch is
+            // typed by the declared system kind.
+            const amdp = current.settings.isWritableByAMDP;
+            if (isCloudSystem && amdp === undefined) {
               throw new Error(
                 `the cloud settings read of ${tableName} answered no ts:isWritableByAMDP`,
               );
             }
-            const patched = patchTableSettings(current, changes);
+            const patched =
+              isCloudSystem && amdp !== undefined
+                ? patchTableSettings(
+                    {
+                      description: current.description,
+                      settings: { ...current.settings, isWritableByAMDP: amdp },
+                    },
+                    changes,
+                    'cloud',
+                  )
+                : patchTableSettings(current, { sizeCategory: '2' }, 'onprem');
             if (!patched.ok) {
               throw new Error(
                 `the patch of ${tableName} was refused: ${patched.message}`,

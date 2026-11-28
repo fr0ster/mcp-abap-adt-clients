@@ -91,23 +91,23 @@ export const cloudPatchFlag = patchTableSettings(
   { isWritableByAMDP: false },
   'cloud',
 );
+// @ts-expect-error a cloud patch takes a cloud read: the flag must be there
 export const cloudFromGenericRead = patchTableSettings(
-  // @ts-expect-error a cloud patch takes a cloud read: the flag must be there
   onPremiseRead,
   { sizeCategory: '1' },
   'cloud',
 );
 // @ts-expect-error a patch names at least one setting
 export const emptyPatch = patchTableSettings(onPremiseRead, {}, 'onprem');
+// @ts-expect-error a buffering change names at least one field
 export const emptyBuffering = patchTableSettings(
   onPremiseRead,
-  // @ts-expect-error a buffering change names at least one field
   { buffering: {} },
   'onprem',
 );
+// @ts-expect-error on premise a change does not name isWritableByAMDP
 export const onPremiseFlag = patchTableSettings(
   onPremiseRead,
-  // @ts-expect-error on premise a change does not name isWritableByAMDP
   { isWritableByAMDP: true },
   'onprem',
 );

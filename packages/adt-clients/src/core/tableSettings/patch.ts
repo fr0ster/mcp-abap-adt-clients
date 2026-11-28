@@ -9,7 +9,7 @@
  * // read through adt-strategies' `tableSettings` (`cloudTableSettings` on the cloud)
  * const current = read.getResult().value;
  * if (!current.etag) return; // no ETag, no write: the PUT is guarded
- * const patched = patchTableSettings(current, { sizeCategory: '1' });
+ * const patched = patchTableSettings(current, { sizeCategory: '1' }, 'onprem');
  * if (patched.ok)
  *   await settings.updateMetadata(
  *     { tableName, description: patched.description, settings: patched.settings },
@@ -47,6 +47,7 @@
  */
 
 import type {
+  AdtModernVariant,
   ITableSettingsChanges,
   ITableSettingsChangesOf,
   ITableSettingsRead,
@@ -75,24 +76,31 @@ export type TableSettingsPatch<S> =
       readonly message: string;
     };
 
-/** The settings read on the cloud, with `changes` overlaid. */
+/**
+ * The settings read on the cloud (`cloudTableSettings`: the flag is there),
+ * with `changes` overlaid: `isWritableByAMDP` as read unless named.
+ */
 export function patchTableSettings(
   read: ITableSettingsPatchRead<ITableSettingsReadOf<'cloud'>>,
   changes: ITableSettingsChangesOf<'cloud'>,
+  variant: 'cloud',
 ): TableSettingsPatch<ITableSettingsReadOf<'cloud'>>;
 /**
- * The settings any read answered (`tableSettings`), with `changes` overlaid.
- * On premise the read carries no `isWritableByAMDP` (Code: the transformation
- * does not define it), and neither does the patch; a write of the on-premise
- * client takes the settings without it.
+ * The settings read on premise (`tableSettings`), with `changes` overlaid —
+ * no `isWritableByAMDP` in the change (the type refuses it) or in the answer,
+ * which is the on-premise write's settings as it is. An on-premise read never
+ * carries the flag (Code: the transformation does not define it); one that
+ * did would not reach the write.
  */
 export function patchTableSettings(
   read: ITableSettingsPatchRead<ITableSettingsRead>,
-  changes: ITableSettingsChanges,
-): TableSettingsPatch<ITableSettingsRead>;
+  changes: ITableSettingsChangesOf<'onprem'>,
+  variant: 'onprem',
+): TableSettingsPatch<ITableSettingsReadOf<'onprem'>>;
 export function patchTableSettings(
   read: ITableSettingsPatchRead<ITableSettingsRead>,
   changes: ITableSettingsChanges,
+  variant: AdtModernVariant,
 ): TableSettingsPatch<ITableSettingsRead> {
   const settings = read.settings;
   const buffering = changes.buffering;
@@ -108,8 +116,12 @@ export function patchTableSettings(
       message: `areaKeyFields ${areaKeyFields} is kept by SAP only with buffering type G; the resulting type is '${type}'`,
     };
   }
+  // The declared variant decides the flag, never the read: on premise the
+  // write carries none.
   const isWritableByAMDP =
-    changes.isWritableByAMDP ?? settings.isWritableByAMDP;
+    variant === 'cloud'
+      ? (changes.isWritableByAMDP ?? settings.isWritableByAMDP)
+      : undefined;
   return {
     ok: true,
     description: read.description,
