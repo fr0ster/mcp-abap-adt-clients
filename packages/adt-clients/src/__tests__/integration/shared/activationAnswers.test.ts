@@ -6,12 +6,13 @@
  * - discovery lists `/sap/bc/adt/activation/runs`;
  * - a class written inactive: the default activation (`preauditRequested=true`)
  *   activates it; activating it again with `false` answers the silent
- *   checklist, the member reads the inactive list exactly once, and the
- *   answer is nothing to activate;
+ *   checklist, the member sends that POST alone, the caller reads the
+ *   inactive list exactly once (49.0.0), and the answer is nothing to
+ *   activate;
  * - a function group whose main program was changed, its reference alone:
  *   `true` answers `ioc:inactiveObjects`, not activated, the group in
- *   `stillInactive`; `false` answers the silent checklist, the list is read
- *   once, still not activated; the second step — `activateObjects` with the
+ *   `stillInactive`; `false` answers the silent checklist, the caller reads
+ *   the list once, still not activated; the second step — `activateObjects` with the
  *   group and its main program, `false` — activates both.
  *
  * Each test creates its own object and deletes it, also when a step failed.
@@ -29,13 +30,19 @@ import {
   analyseException,
   utilDiscoveryCollections,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import {
+  ADT_NO_FAILURE,
+  type IAdtResponse,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { utilDocuments } from '../../../core/shared/utilResultSet';
+import { buildObjectUri } from '../../../utils/activationUtils';
+import { wireItself } from '../../../utils/resultStrategy';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { activationJudged } from '../../helpers/activationJudged';
 import { integrationHeadersOf } from '../../helpers/adtHeaders';
 import {
   configuredCase,
@@ -119,6 +126,12 @@ describe('Activation answers (fr0ster/mcp-abap-adt#351)', () => {
   /** The requests since `mark`, each as `METHOD url`. */
   const sentSince = (mark: number): string[] =>
     recorder.requests.slice(mark).map((r) => `${r.method} ${r.url}`);
+
+  /** The inactive list as it came, for the caller's judgement. */
+  const inactiveList = () =>
+    client
+      .getUtils({ ...utilDocuments, inactive: wireItself })
+      .getInactiveObjects();
 
   /** Whether the inactive list names `uri`. */
   const listed = async (uri: string): Promise<boolean> => {
@@ -213,19 +226,25 @@ describe('Activation answers (fr0ster/mcp-abap-adt#351)', () => {
         expect(sentSince(mark)).toEqual([`POST ${ACTIVATION}true`]);
         expect(await listed(uri)).toBe(false);
 
+        // Again with preauditRequested=false: the silent checklist. The
+        // member sends the activation alone; the caller reads the list once
+        // (49.0.0, the recipe in helpers/activationJudged.ts).
         mark = recorder.requests.length;
-        expectResult(
-          await cls.activate(
-            { className },
-            {
-              headers: integrationHeadersOf(cls, 'activate'),
-              preauditRequested: false,
-              analyse: judged(analyseActivation),
-            },
-          ),
-          're-activate with preauditRequested=false',
+        const again = await activationJudged(
+          (analyse) =>
+            cls.activate(
+              { className },
+              {
+                headers: integrationHeadersOf(cls, 'activate'),
+                preauditRequested: false,
+                analyse,
+              },
+            ),
+          inactiveList,
+          [buildObjectUri(className, 'CLAS/OC')],
         );
-        // The silent checklist, and the one read the member makes after it.
+        expect(again.verdict).toBe(ADT_NO_FAILURE);
+        expect(again.listRead).toBe(true);
         expect(sentSince(mark)).toEqual([`POST ${ACTIVATION}false`, INACTIVE]);
       } catch (error) {
         cleanup.record('test', error);
@@ -321,23 +340,26 @@ describe('Activation answers (fr0ster/mcp-abap-adt#351)', () => {
         expect(stillInactiveUris(notActivated)).toContain(uri);
         expect(await listed(uri)).toBe(true);
 
-        // The same reference, preauditRequested=false: the silent checklist.
+        // The same reference, preauditRequested=false: the silent checklist;
+        // the caller reads the list once and judges by it.
         mark = recorder.requests.length;
-        const silent = expectFailure(
-          await utils.activateObjects(
-            [{ type: 'FUGR/F', name: group }],
-            false,
-            {
+        const judgedSilent = await activationJudged(
+          (analyse) =>
+            utils.activateObjects([{ type: 'FUGR/F', name: group }], false, {
               headers: integrationHeadersOf(utils, 'activateObjects'),
-              analyse: judged(analyseActivation),
-            },
-          ),
-          'the group alone, preauditRequested=false',
+              analyse,
+            }),
+          inactiveList,
+          [buildObjectUri(group, 'FUGR/F')],
         );
         expect(sentSince(mark)).toEqual([`POST ${ACTIVATION}false`, INACTIVE]);
+        if (judgedSilent.verdict === ADT_NO_FAILURE) {
+          throw new Error('the group alone, false: expected not activated');
+        }
+        const silent = judgedSilent.verdict;
         expect(silent.message).toContain('the inactive list still names');
         expect(stillInactiveUris(silent)).toEqual(
-          expect.arrayContaining([uri, `${uri}/source/main`]),
+          expect.arrayContaining([uri]),
         );
 
         // The second step: the group and its main program, false. The main

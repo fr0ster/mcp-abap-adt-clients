@@ -17,6 +17,7 @@ const {
 } = require('@mcp-abap-adt/adt-strategies');
 // Every expected-success call is judged, the exception document first.
 const { judged } = require('./judged');
+const { ADT_NO_FAILURE } = require('@mcp-abap-adt/interfaces-adt');
 const { failureOf, whatFailureSays } = require('./contract');
 const {
   loadTestConfigFrom,
@@ -1917,16 +1918,41 @@ async function activateSharedFunctionGroup(
   transportRequest,
   logger,
 ) {
-  const answer = await client.getFunctionGroup().activate(
-    { functionGroupName: name, transportRequest },
-    {
-      headers: integrationHeadersOf(client.getFunctionGroup(), 'activate'),
-      analyse: judged(analyseActivation),
-    },
+  // The activation, and — when its checklist leaves the outcome to the
+  // inactive list (a re-activation with nothing to do answers the silent
+  // checklist) — the caller's read of the list (adt-clients 49.0.0: the
+  // member sends the activation alone; `activationJudged`, the recipe).
+  const { activationJudged } = require('./activationJudged');
+  const { buildObjectUri } = require('../../utils/activationUtils');
+  const { wireItself } = require('../../utils/resultStrategy');
+  const {
+    utilDocuments: wiredUtils,
+  } = require('../../core/shared/utilResultSet');
+  const group = client.getFunctionGroup();
+  const groupUri = buildObjectUri(name, 'FUGR/F');
+  const judgedAnswer = await activationJudged(
+    (analyse) =>
+      group.activate(
+        { functionGroupName: name, transportRequest },
+        {
+          headers: integrationHeadersOf(group, 'activate'),
+          analyse,
+        },
+      ),
+    () =>
+      client
+        .getUtils({ ...wiredUtils, inactive: wireItself })
+        .getInactiveObjects(),
+    [groupUri, `${groupUri}/source/main`],
   );
-  if (!answer.ok) {
+  // An `exc:exception` inside a 200 is no checklist: read it first, as
+  // `judged` does.
+  const exception = analyseException(ADT_NO_FAILURE, judgedAnswer.answer);
+  const verdict =
+    exception !== ADT_NO_FAILURE ? exception : judgedAnswer.verdict;
+  if (verdict !== ADT_NO_FAILURE) {
     throw new Error(
-      `Shared function group ${name} could not be activated: ${whatFailureSays(answer.getError())}`,
+      `Shared function group ${name} could not be activated: ${whatFailureSays(verdict)}`,
     );
   }
 
