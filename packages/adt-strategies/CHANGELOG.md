@@ -14,6 +14,24 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [Unreleased]
+
+The readings of the support reads (fr0ster/mcp-abap-adt#404).
+
+### Added
+
+- **`docuPage`** (`readDocuPage`, `IDocuPage`, `DocuLink`, `IDocuTopicLink`,
+  `IDocuOtherLink`): a keyword documentation page's title, text, every `a`
+  element with an `href` (topic links with `object`, `version`, `language`)
+  and its version choices. A tokenizer of plain code, no regex and no DOM; an
+  input with no `html` element reads as `undefined`. Held to the recorded
+  pages' links element by element.
+- **`jsonDocument`** and **`bluesMetadata`** (`IBluesMetadata`, `IBluesLink`):
+  a definition's JSON source and its `blue:blueSource` object document, every
+  field optional, `undefined` for a body that is not one.
+- **`utilDiscoveryTemplates`**: each discovery collection with the parameter
+  names its templates declare.
+
 ## [0.29.0] - 2026-11-27
 
 The source rules of fr0ster/mcp-abap-adt-clients#304: this package's `src`

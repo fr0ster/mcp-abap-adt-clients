@@ -24,6 +24,38 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+The support reads (fr0ster/mcp-abap-adt#404): the definitions of application
+log objects, application job catalogs and templates, and the ABAP keyword
+documentation. On `@mcp-abap-adt/interfaces-adt` ^34.0.0.
+
+### Added
+
+- **`AdtClient.getApplicationJobCatalog()` and `getApplicationJobTemplate()`**
+  (`ApplicationJobCatalog`, `ApplicationJobTemplate`, `applicationJobDocuments`):
+  `getObject` (`application/vnd.sap.adt.blues.v2+xml`) and `getSource`
+  (`application/json`), one `GET` each, `version` and `accept` as given. Measured
+  `200` on ABAP cloud and on premise, an absent name `404` (2026-11-28).
+- **`AdtClient.getApplicationLog()`**, gated by the type tables, answering the
+  handler `AdtRuntimeClient.getApplicationLog()` answers.
+- **`AdtRuntimeClient.getKeywordDocumentation()`** (`KeywordDocumentation`,
+  `keywordDocumentationDocuments`): `query`, `topic` and `position`, one `GET`
+  each on `/sap/bc/adt/docu/abap/langu`, `language`, `version` and `format`
+  sent only when given, as given, `''` included. See ERRATA for the no-hit
+  `200`, the topic form missing from discovery and the `500` of an unknown
+  `version`.
+- **The address records** `APPLICATION_LOG`, `APPLICATION_JOB_CATALOG`,
+  `APPLICATION_JOB_TEMPLATE` and `KEYWORD_DOCUMENTATION`, exported.
+- **`accept`** on both application log reads.
+
+### Fixed
+
+- **A namespaced application log object name** was written into the path raw,
+  as several segments; it is now one segment through `seg()` (lowercased,
+  percent-encoded), as every other object's. Measured `200` on premise for the
+  `%2f` names (2026-11-28).
+
 ## [48.0.0] - 2026-11-27
 
 fr0ster/mcp-abap-adt-clients#304: this package's `src` holds no cast but

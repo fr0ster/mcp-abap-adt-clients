@@ -4,6 +4,15 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [Unreleased]
+
+### Added
+
+- **`getApplicationLog()`, `getApplicationJobCatalog()` and
+  `getApplicationJobTemplate()`** on `AdtClientLegacy` answer handlers whose
+  every operation refuses with no request: the recorded 7.40 SP04 discovery
+  lists none of their collections and its typestructure none of their codes.
+
 ## [0.12.0] - 2026-11-27
 
 Released with `@mcp-abap-adt/adt-clients` 48.0.0 (fr0ster/mcp-abap-adt-clients#304),
