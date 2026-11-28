@@ -185,11 +185,11 @@ B5. **Proof that it is load-bearing:** put the list read back into one member an
   (adt-strategies `tableSettings` / `cloudTableSettings`, decision 15), and
   those readings are already strict: every setting or a throw naming the one
   missing, and on the cloud `isWritableByAMDP` or a throw.
-- The runtime top-level check `namesASetting`, pending the owner's ruling
-  (see "Open points"): `ITableSettingsChangesOf<V>` (`AtLeastOne`) already
-  refuses an empty change set at compile time.
-  **The question to answer: inside adt-clients, does `changes` ever come from
-  outside the type system?** No. `changes` reaches the library only as the
+- The runtime top-level check `namesASetting`. **Decided by the owner:
+  removed.** `ITableSettingsChangesOf<V>` (`AtLeastOne`) already refuses an
+  empty change set at compile time, and the MCP layer keeps the refusal for
+  tool input. Inside adt-clients, does `changes` ever come from outside the
+  type system? No. `changes` reaches the library only as the
   typed argument of `patchMetadata` today and of `patchTableSettings` after the
   split. adt-clients builds no change set from a document, a network answer,
   a file, the environment or user input, and it parses no tool argument. A
@@ -199,9 +199,7 @@ B5. **Proof that it is load-bearing:** put the list read back into one member an
   "names no setting" refusal and tests it. Under the owner's rule (a runtime
   check only for values from outside the type system) the check therefore
   leaves the library. Its test, `tableSettings.test.ts`, "names no setting",
-  moves to H3. If the owner rules to keep it, it goes into
-  `patchTableSettings` as an `ok: false` refusal `names-no-setting`, with its
-  own test, and the rest of the plan does not change.
+  moves to H3.
 
 ### Added
 
@@ -371,7 +369,7 @@ G4. **`docs/usage/MIGRATION-49.md`**, the migration note:
     - the `variant` constructor option of `AdtTableSettings` is gone.
     - the runtime validation that moved: the library no longer refuses, at
       run time, a read with no ETag, an incomplete settings document, a cloud
-      read without `isWritableByAMDP` or (pending the ruling) a change set that
+      read without `isWritableByAMDP` or a change set that
       names no setting. The caller checks each before `updateMetadata`, as the
       recipe shows. `updateMetadata` still throws on an empty lock handle.
       `patchTableSettings` still refuses an `areaKeyFields` change whose type
@@ -473,7 +471,7 @@ H3. **The settings recipe** in `handleUpdateTableSettings.ts`
     - a cloud read without `isWritableByAMDP`: `cloudTableSettings` throws, and
       the variant comes from `adtClientOf`, never from the answer;
     - a change set that names no setting: refused from the tool's input
-      (`writeOrRefuse`), whatever the owner rules for the library;
+      (`writeOrRefuse`); the library no longer checks it at run time;
     - an `areaKeyFields` change whose resulting buffering type is not `G`:
       `patchTableSettings`' `ok: false`, answered as a refusal.
 H4. Live: the table settings tools and the activation tools on onprem and
@@ -498,7 +496,3 @@ H4. Live: the table settings tools and the activation tools on onprem and
 - The removal of the `variant: 'cloud'` constructor option. Strict cloud
   strategy selection stays (`cloudTableSettings`, chosen by the declared
   variant).
-- The `namesASetting` runtime check: removal under "static types first"
-  (`changes` never comes from outside the type system inside adt-clients; see
-  Part C, "Removed"), or kept in `patchTableSettings` as a refusal. The review
-  asked to keep it; the owner decides.
