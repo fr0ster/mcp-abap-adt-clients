@@ -2703,11 +2703,13 @@ navigation_target:
         object_name: "LSEWORKINGAREAFAC"
     - name: "navigate_outline_elements_onprem"
       enabled: true
-      description: "Navigate a delivered function group include's elements"
+      description: "Navigate a delivered function group include's elements (forms, modules, local classes, types, local methods)"
       available_in: ["onprem"]
       params:
+        # The same delivered ADT function group include as on the cloud: its
+        # group has local classes with methods (a local method's two links).
         object_type: "PROG/I"
-        object_name: "LSVIMF01"
+        object_name: "LSEWORKINGAREAFAC"
 
 # Node Structure (fetchNodeStructure)
 node_structure:
