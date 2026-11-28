@@ -567,6 +567,13 @@ describe('Shared - getWhereUsed', () => {
       for (const ref of result.references) {
         expect(ref.kind).toBe(ref.type === 'DEVC/K' ? 'package' : 'object');
       }
+      // The answer for this object lists its package (on premise and on the
+      // cloud, 2026-11-28): the reading must hand that node back.
+      expect(
+        result.references.some(
+          (ref) => ref.kind === 'package' && ref.type === 'DEVC/K',
+        ),
+      ).toBe(true);
 
       testsLogger.info?.('✅ Test complete: parsed results received');
     },
