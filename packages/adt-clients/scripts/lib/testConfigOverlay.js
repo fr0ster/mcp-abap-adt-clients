@@ -239,6 +239,13 @@ const ALLOWED_OVERLAY_KEYS = Object.freeze(
     [`${IF_MATCH}[if_match_structure].params.package_name`, {}],
     [`${IF_MATCH}[if_match_domain].enabled`, { type: 'boolean' }],
     [`${IF_MATCH}[if_match_domain].params.package_name`, {}],
+    // The type group cycle's package and transport: a transportable package
+    // and its request make the create, the write and the delete carry corrNr.
+    ['type_groups.test_cases[adt_type_group].params.package_name', {}],
+    [
+      'type_groups.test_cases[adt_type_group].params.transport_request',
+      { empty: true },
+    ],
     // Standard objects the enhancement hosts expect, if the system lacks them.
     [`${ENHANCEMENT}[program_host].params.program_name`, {}],
     [`${ENHANCEMENT}[function_group_host].params.function_group_name`, {}],
