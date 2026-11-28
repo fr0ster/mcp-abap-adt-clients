@@ -13,6 +13,7 @@ in [the changelog](../../CHANGELOG.md).
 - [A settings change is three calls](#a-settings-change-is-three-calls)
 - [The settings handler takes no `variant`](#the-settings-handler-takes-no-variant)
 - [What the library no longer checks at run time](#what-the-library-no-longer-checks-at-run-time)
+- [A utilities result set names the outline and the navigation](#a-utilities-result-set-names-the-outline-and-the-navigation)
 
 ## An activation sends the activation alone
 
@@ -212,3 +213,25 @@ without `ts:isWritableByAMDP`, a change set that names no setting, and an
   `patchTableSettings` answers `{ ok: false, reason:
   'area-key-fields-need-type-g' }`;
 - an empty `lockHandle`: `updateMetadata` still throws before the PUT.
+
+## A utilities result set names the outline and the navigation
+
+### What changed
+
+`getObjectOutline` and the new `getNavigationTarget` read their answers through
+the result set's `objectOutline` and `navigationTarget` slots (interfaces-adt
+34.0.0). `getUtils(results)` and `new AdtUtils(connection, { results })` take an
+`AdtUtilResults`: `IUtilResults` with both slots required. `utilDocuments` names
+both (`rawDocument`).
+
+### What fails
+
+A result set written out slot by slot, without spreading `utilDocuments`, no
+longer compiles as `getUtils`' argument: it lacks `objectOutline` and
+`navigationTarget`.
+
+### Remedy
+
+Add both slots (`rawDocument` for the document as it came, or adt-strategies'
+`objectOutline` / `navigationTarget`), or spread `utilDocuments`:
+`getUtils({ ...utilDocuments, search: utilSearchHits })`.

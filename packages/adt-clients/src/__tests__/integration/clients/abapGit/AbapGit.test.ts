@@ -90,7 +90,7 @@ import {
   releasing,
 } from '../../../helpers/contract';
 import { judged } from '../../../helpers/judged';
-import { presenceOf, removeLeftover } from '../../../helpers/objectPresence';
+import { removeLeftover } from '../../../helpers/objectPresence';
 import {
   getConfig,
   getTargetSystem,
@@ -1346,12 +1346,13 @@ describeLive(
 
     memberCase(
       'unlink',
-      'unlink, then the interface, package and branches go (cloud: after every job is terminal)',
+      'unlink takes the repository off the list; the cleanup removes the interface, package and branches (cloud: after every job is terminal)',
       async () => {
         if (uncorrelated)
           throw new Error(
             `a cloud job could not be correlated: nothing is cleaned up, the next run works the ledger (${fixturesOf(ledger.find(RUN))})`,
           );
+        const key = requireKey();
         await cleanUpEntry(
           ledger,
           RUN,
@@ -1360,16 +1361,9 @@ describeLive(
         );
         cleanedUp = true;
         expect(ledger.find(RUN)).toBeUndefined();
-        const pkg = client.getPackage();
-        const presence = presenceOf(
-          await pkg.readMetadata(
-            { packageName: PACKAGE },
-            { analyse: loaded().strategies.analyseException },
-          ),
-          `package ${PACKAGE}`,
-        );
-        if (presence.present === 'unknown') throw new Error(presence.reason);
-        expect(presence.present).toBe(false);
+        // What unlink does: R1 lists the run's repository no more. The
+        // package's deletion is the ledger's step and has its own tests.
+        expect(await repoRow(key)).toBeUndefined();
         expect(await github.branchExists(BRANCH)).toBe(false);
         expect(await github.branchExists(SECOND_BRANCH)).toBe(false);
       },

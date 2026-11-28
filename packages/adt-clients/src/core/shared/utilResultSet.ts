@@ -27,8 +27,8 @@
  * for.
  */
 
-import type { IUtilResults } from '@mcp-abap-adt/interfaces-adt';
 import { rawDocument } from '../../utils/resultStrategy';
+import type { AdtUtilResults } from './AdtUtils';
 
 /**
  * The shipped default.
@@ -58,4 +58,6 @@ export const utilDocuments = {
   metadata: rawDocument,
   include: rawDocument,
   objectProperties: rawDocument,
-} satisfies IUtilResults;
+  objectOutline: rawDocument,
+  navigationTarget: rawDocument,
+} satisfies AdtUtilResults;

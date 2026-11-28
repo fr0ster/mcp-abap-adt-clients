@@ -1,0 +1,255 @@
+/**
+ * Integration test for AdtUtils.getNavigationTarget: where an outline's name
+ * fragment leads, against a real system, read only.
+ *
+ * The case names an object SAP delivers (`navigation_target` in the test
+ * config). Its outline (getObjectOutline) names each form, module, local
+ * class, type and local method by a fragment `#type=…;name=…`; the test
+ * navigates the first element of each kind it carries, one request each, and
+ * then all of them in one `/communication/batch` envelope.
+ *
+ * Measured (2026-11-28): every fragment answers `200` with an
+ * `adtcore:objectReference` whose uri is the element's include and
+ * `#start=line,column` in an include of the same object (not always the include
+ * the link names); a function group's local method's definition link is
+ * refused on both systems (`400`, EU/061), a program's answers a start on
+ * premise.
+ *
+ * Enable debug logs: DEBUG_ADT_TESTS=true npm test -- integration/shared/navigationTarget
+ */
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import {
+  analyseException,
+  type IOutlineElement,
+  readObjectOutline,
+} from '@mcp-abap-adt/adt-strategies';
+import type { AdtReadVersion } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  ISessionLifecycleAware,
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import * as dotenv from 'dotenv';
+import { AdtBatchConnection } from '../../../batch/AdtBatchConnection';
+import { AdtUtils } from '../../../core/shared/AdtUtils';
+import type { AdtOutlineCode } from '../../../core/shared/objectStructure';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
+import { configuredCase, gate } from '../../helpers/caseGate';
+import {
+  createTestConnection,
+  releaseTestConnection,
+  skipUnlessConfigured,
+} from '../../helpers/sessionConfig';
+import { createTestsLogger } from '../../helpers/testLogger';
+import { logTestStep } from '../../helpers/testProgressLogger';
+
+const envPath =
+  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
+
+const testsLogger: ILogger = createTestsLogger();
+
+const OUTLINE_ACCEPT = 'application/vnd.sap.adt.objectstructure.v2+xml';
+const VERSION: AdtReadVersion = 'active';
+
+/** The kinds navigated, by the suffix of their `adtcore:type`. */
+const KINDS = ['PU', 'PM', 'PL', 'PT', 'PLM'] as const;
+type Kind = (typeof KINDS)[number];
+
+interface INavigated {
+  kind: Kind;
+  /** The element's whole `adtcore:type` (`FUGR/PLM`, `PROG/PLM`, …). */
+  type: string;
+  rel: string;
+  href: string;
+}
+
+function kindOf(element: IOutlineElement): Kind | undefined {
+  const type = element.type ?? element.unknownType ?? '';
+  const suffix = type.slice(type.indexOf('/') + 1);
+  return KINDS.find((kind) => kind === suffix);
+}
+
+function flatten(element: IOutlineElement): IOutlineElement[] {
+  return [element, ...element.children.flatMap(flatten)];
+}
+
+/** The link of `rel` of the first element of each kind that has one. */
+function firstLinks(root: IOutlineElement, rel: string): INavigated[] {
+  const found: INavigated[] = [];
+  for (const element of flatten(root)) {
+    const kind = kindOf(element);
+    if (kind === undefined || found.some((item) => item.kind === kind))
+      continue;
+    const link = element.links.find((item) => item.rel === rel);
+    if (link?.fragment?.startsWith('type=')) {
+      found.push({
+        kind,
+        type: element.type ?? element.unknownType ?? '',
+        rel,
+        href: link.href,
+      });
+    }
+  }
+  return found;
+}
+
+/** `<include>#start=l,c` of an objectReference answer, or undefined. */
+function referenceOf(document: string): string | undefined {
+  const marker = 'adtcore:uri="';
+  const at = document.indexOf(marker);
+  if (at < 0) return undefined;
+  const start = at + marker.length;
+  return document.slice(start, document.indexOf('"', start));
+}
+
+function includeOf(uri: string): string {
+  const hash = uri.indexOf('#');
+  return hash < 0 ? uri : uri.slice(0, hash);
+}
+
+/**
+ * The object a source belongs to: the address before `/includes/` or
+ * `/source/` — a function group's includes share it. SAP may answer an
+ * element's start in another include of the same object than the one its
+ * link names (measured on premise: a local method's implementation link into
+ * the class-definition include answers the implementation include).
+ */
+function objectOf(uri: string): string {
+  const include = includeOf(uri);
+  for (const marker of ['/includes/', '/source/']) {
+    const at = include.indexOf(marker);
+    if (at >= 0) return include.slice(0, at);
+  }
+  return include;
+}
+
+describe('Shared - getNavigationTarget', () => {
+  let connection: (IAbapConnection & ISessionLifecycleAware) | undefined;
+  let utils: AdtUtils | undefined;
+
+  beforeAll(async () => {
+    try {
+      connection = await createTestConnection(testsLogger);
+      utils = new AdtUtils(connection, {
+        logger: testsLogger,
+        results: utilDocuments,
+      });
+    } catch (error) {
+      skipUnlessConfigured(error, testsLogger);
+    }
+  });
+
+  afterAll(async () => {
+    if (connection) await releaseTestConnection(connection);
+  });
+
+  for (const caseName of [
+    'navigate_outline_elements_cloud',
+    'navigate_outline_elements_onprem',
+    'navigate_program_elements_onprem',
+  ]) {
+    gate('navigation_target', caseName)(
+      `${caseName}: each element's fragment leads to its start, alone and in one envelope`,
+      async () => {
+        if (!connection || !utils) throw new Error('no connection');
+        const testCase = configuredCase('navigation_target', caseName);
+        const objectType: AdtOutlineCode = testCase.params.object_type;
+        const objectName: string = testCase.params.object_name;
+
+        logTestStep(
+          `getObjectOutline(${objectType}, ${objectName})`,
+          testsLogger,
+        );
+        const outline = await utils.getObjectOutline(objectType, objectName, {
+          version: VERSION,
+          accept: OUTLINE_ACCEPT,
+          analyse: analyseException,
+        });
+        if (!outline.ok) throw new Error(outline.getError().message);
+        const root = readObjectOutline(outline.getResult().value).root;
+        if (root === undefined) throw new Error('the answer is no outline');
+
+        const definitions = firstLinks(root, 'definitionIdentifier');
+        const implementations = firstLinks(root, 'implementationIdentifier');
+        const kinds = definitions.map((item) => item.kind);
+        testsLogger.info?.(`kinds found: ${kinds.join(', ')}`);
+        expect(kinds).toContain('PU');
+
+        // Each element's start, one request each: the same include, a start.
+        const alone = definitions
+          .filter((item) => item.kind !== 'PLM')
+          .concat(implementations.filter((item) => item.kind === 'PLM'));
+        const answers: string[] = [];
+        for (const item of alone) {
+          logTestStep(`navigate ${item.kind} ${item.rel}`, testsLogger);
+          const answer = await utils.getNavigationTarget(item.href, {
+            analyse: analyseException,
+          });
+          if (!answer.ok) throw new Error(answer.getError().message);
+          const reference = referenceOf(answer.getResult().value);
+          expect(reference).toContain('#start=');
+          expect(objectOf(reference ?? '')).toBe(objectOf(item.href));
+          answers.push(answer.getResult().value);
+        }
+
+        // A local method's definition link, as each system answers it.
+        const definition = definitions.find((item) => item.kind === 'PLM');
+        const implementation = implementations.find(
+          (item) => item.kind === 'PLM',
+        );
+        if (definition && implementation) {
+          const answer = await utils.getNavigationTarget(definition.href, {
+            analyse: analyseException,
+          });
+          // As measured (2026-11-28): a function group's local method
+          // (`FUGR/PLM`) answers 400 on both systems; a program's
+          // (`PROG/PLM`, on premise only) answers a start.
+          testsLogger.info?.(
+            `definition link ${definition.type} ${definition.href} -> ${answer.ok ? referenceOf(answer.getResult().value) : answer.getError().response?.status}`,
+          );
+          if (definition.type.startsWith('FUGR/')) {
+            expect(answer.ok).toBe(false);
+            expect(answer.ok ? 0 : answer.getError().response?.status).toBe(
+              400,
+            );
+          } else {
+            if (!answer.ok) throw new Error(answer.getError().message);
+            const reference = referenceOf(answer.getResult().value);
+            expect(reference).toContain('#start=');
+            expect(objectOf(reference ?? '')).toBe(objectOf(definition.href));
+          }
+        } else {
+          testsLogger.info?.(
+            'no local method in this outline: its links not navigated',
+          );
+        }
+
+        // The same navigations in one envelope: each part as alone.
+        const batch = new AdtBatchConnection(connection, {
+          endpoint: 'communication',
+          logger: testsLogger,
+        });
+        const batched = new AdtUtils(batch, {
+          logger: testsLogger,
+          results: utilDocuments,
+        });
+        const pending = alone.map((item) =>
+          batched.getNavigationTarget(item.href, { analyse: analyseException }),
+        );
+        await batch.execute();
+        const parts = await Promise.all(pending);
+        expect(
+          parts.map((part) =>
+            part.ok ? referenceOf(part.getResult().value) : 'refused',
+          ),
+        ).toEqual(answers.map(referenceOf));
+      },
+      120000,
+    );
+  }
+});

@@ -47,6 +47,7 @@ import {
   type AdtTableSettings,
   type AdtTextElements,
   type AdtTransformation,
+  type AdtUtilResults,
   type AppendStructureValues,
   type ApplicationJobCatalog,
   type ApplicationJobTemplate,
@@ -582,11 +583,11 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
    * be told about a refusal differently.
    */
   override getUtils(): AdtUtilsLegacy<ResultValuesOf<typeof utilDocuments>>;
-  override getUtils<R extends IUtilResults>(
+  override getUtils<R extends AdtUtilResults>(
     results: R,
   ): AdtUtilsLegacy<ResultValuesOf<R>>;
   override getUtils(
-    results: IUtilResults = utilDocuments,
+    results: AdtUtilResults = utilDocuments,
   ): AdtUtilsLegacy<UtilValues> {
     this.assertConnected();
     return new AdtUtilsLegacy<UtilValues>(this.connection, {

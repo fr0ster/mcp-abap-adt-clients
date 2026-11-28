@@ -186,6 +186,69 @@ it: `transportObjectEntryList` answers `{ entries, incompleteEntries? }`,
 and `transportItem`'s task item has `incompleteEntries`, the field the
 entry lacks absent; a request's per-task `objectCount` counts it.
 
+## A source position's end stops before the closing period
+
+**Symptom.** An outline's block of a class or an interface,
+`<include>#start=l,c;end=l,c`, cut by its columns, ends `ENDMETHOD` or
+`ENDCLASS` without the `.` that closes the statement; a declaration's block
+ends before its `.` too.
+
+**What actually happened.** `end` is exclusive and SAP places it at the end of
+the last keyword or name, not after the period. Measured on ABAP cloud
+(2026-11-28): every `implementationBlock` of the methods and local methods of
+two delivered classes, 332 blocks in `source/main`, `implementations` and
+`testclasses`, ends this way.
+
+**Rule.** Take a block as whole lines, from its start line to its end line, when
+the statement's period belongs to it; the columns alone leave it out.
+
+## A function group include's outline answers the whole group
+
+**Symptom.** `GET /sap/bc/adt/programs/includes/<include>/objectstructure` for an
+include of a function group answers an outline rooted at the function group
+(`FUGR/F`), with every module, form, local class and its methods, dialog
+module and declaration of the group, each linked into the include it lives in.
+The group's own outline (`/functions/groups/<group>/objectstructure`) lists
+only its function modules and includes.
+
+**What actually happened.** Measured on ABAP cloud (2026-11-28) on a delivered
+function group: its outline listed 29 modules and 12 includes; one include's
+outline listed the same 29 modules, 62 forms, 10 local classes with 45
+methods, 3 dialog modules and the group's data and types.
+
+**Rule.** For a function group's elements, read the outline of one of its
+includes, named by the group's own outline.
+
+## A local method's definition link: refused in a function group, answered in a program
+
+**Symptom.** An outline names a program's or a function group's local method
+(`PROG/PLM`, `FUGR/PLM`) by a fragment whose name is the class name padded to
+30 characters and the method name. Navigating its `definitionIdentifier`
+(`POST /sap/bc/adt/navigation/target`) answers differently by system.
+
+**What actually happened.** Measured 2026-11-28:
+
+- a function group's local method (`FUGR/PLM`, the include outline of a
+  delivered group): the `definitionIdentifier` is refused, `400`
+  `uriMappingError`, EU/061 "Object … not found", on ABAP cloud and on premise
+  alike; the `implementationIdentifier` answers `200` at the `METHOD`
+  statement, in the implementation include, which is not always the include
+  the link names;
+- a program's local method (`PROG/PLM`, a program of one include, on premise):
+  the two links are the same href and both answer `200` at the same start, the
+  `METHOD` statement.
+
+**Rule.** Navigate a local method by its `implementationIdentifier`; its
+declaration is part of its local class's definition. Take the include from the
+answer, never from the link, and never take the link's rel as proof of which
+statement a start is.
+
+## `HEAD` on a source is refused
+
+**Symptom.** `HEAD <object uri>/source/main` answers `400`, on premise and on
+ABAP cloud (measured 2026-11-28); a source's size cannot be had without its
+`GET`, which carries `etag` and `last-modified` on the cloud.
+
 ## A node SAP cannot load is answered as a tree line
 
 **Symptom.** `POST /sap/bc/adt/repository/nodestructure` for a node answers

@@ -184,6 +184,11 @@ export {
   readDocuPage,
 } from './results/keywordDocumentation';
 export {
+  type INavigationTarget,
+  navigationTarget,
+  readNavigationTarget,
+} from './results/navigation';
+export {
   type IObjectOutline,
   type IOutlineElement,
   type IOutlineLink,

@@ -37,7 +37,10 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 > caller reads it (`getInactiveObjects`) and hands it to `analyseActivation`;
 > `answeringActivation` is gone. `getTableSettings().patchMetadata` is gone:
 > a settings change is `readMetadata`, the pure `patchTableSettings` and
-> `updateMetadata` with the read's ETag. See
+> `updateMetadata` with the read's ETag. A utilities result set is an
+> `AdtUtilResults`: it names the `objectOutline` and `navigationTarget` slots,
+> which `getObjectOutline` and the new `getNavigationTarget` read through (a set
+> spreading `utilDocuments` has both). See
 > [`docs/usage/MIGRATION-49.md`](docs/usage/MIGRATION-49.md).
 >
 > **On a cloud client, 46.1.0** (on `interfaces-adt` ^30.1.0) requires
@@ -2200,7 +2203,7 @@ See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-a
 One document per breaking release, each written for a consumer on the contract
 before it:
 
-- **[48.x → 49.0.0](docs/usage/MIGRATION-49.md)** (unreleased) — one member, one endpoint, one request: an activation member sends the activation alone, and the inactive list after a checklist that does not state its outcome is the caller's to read and hand to `analyseActivation` (`readUnstatedActivation`, adt-strategies 0.30.0); `answeringActivation` is gone; `getTableSettings().patchMetadata` and the handler's `variant` constructor option are gone — a settings change is `readMetadata`, the pure `patchTableSettings` and `updateMetadata` with the read's ETag.
+- **[48.x → 49.0.0](docs/usage/MIGRATION-49.md)** (unreleased) — one member, one endpoint, one request: an activation member sends the activation alone, and the inactive list after a checklist that does not state its outcome is the caller's to read and hand to `analyseActivation` (`readUnstatedActivation`, adt-strategies 0.30.0); `answeringActivation` is gone; `getTableSettings().patchMetadata` and the handler's `variant` constructor option are gone — a settings change is `readMetadata`, the pure `patchTableSettings` and `updateMetadata` with the read's ETag; `getUtils(results)` takes an `AdtUtilResults`, which names the `objectOutline` and `navigationTarget` slots (spread `utilDocuments`, or add both).
 - **[44.x → 45.0.0](docs/usage/MIGRATION-45.md)** — interfaces-adt 27: a full `IUtilResults` names `objectActivation`; `getUtils().activateObjects` posts a group activation to `/activation` (the caller picks it or `activateObjectsGroup` from discovery); every single-object activation takes `options.preauditRequested` (absent, `true`); after a silent checklist the member reads the inactive list once and hands it to `analyse`; the low-level activation functions take `preauditRequested`. With adt-strategies 0.22.0, `analyseActivation` reads an activation that activated nothing as a failure, with `stillInactive`.
 - **[43.x → 44.0.0](docs/usage/MIGRATION-44.md)** — `@mcp-abap-adt/interfaces-adt-connection` 4: `getBaseUrl()` answers `Promise<string | undefined>` (`undefined` over RFC), `AdtBatchConnection` hands it on and `isCloudEnvironment` asks `systeminformation` without a URL; adt-strategies 0.21.0 and adt-clients-legacy 0.8.0 declare the same range. The test configuration states `environment.connection_type` (required, `"http"` or `"rfc"`); over RFC it states `SAP_ASHOST` + `SAP_SYSNR` (or the message-server keys), `SAP_CLIENT` and `SAP_LANGUAGE`, and no `SAP_URL`.
 - **[42.x → 43.0.0](docs/usage/MIGRATION-43.md)** — a create invents no language: given one, it writes `adtcore:language` / `adtcore:masterLanguage` and sends `sap-language`, one value, from the config else the system context; given none, neither (no `EN` default); `AdtFunctionModule.validate` requires `description`; class create takes no `abstract` and program create no program type (SAP ignores both on create); a run id of `.` or `..` is refused before anything is sent.
