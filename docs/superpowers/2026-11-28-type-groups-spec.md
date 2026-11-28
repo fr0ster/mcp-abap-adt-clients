@@ -3,14 +3,90 @@
 This spec answers to `2026-11-28-type-groups-goal.md`. Where the two disagree, the goal wins
 and this spec changes.
 
-## 1. The contract package: `@mcp-abap-adt/interfaces-adt` (a minor)
+## 1. Measurement establishes the rows
+
+The table rows are written from measurements, and nothing is published before those
+measurements are taken. The integration suite (section 5.3) verifies the public API afterwards,
+against rows that are already fixed. It is not how a row gets filled.
+
+### 1.1 How it is measured
+
+There is one measurement script per system, sent through the connector and not through the
+library's members. That keeps a member's variant gate from deciding what is asked:
+
+- **Cloud:** run on the trial.
+- **On premise:** the on-premise twin, run through the tunnel.
+
+What the script does:
+- It uses only a `Z` type group of its own in the system's configured test package (on premise
+  `$TMP`, or the package and transport given), and deletes it at the end, also after a
+  failure.
+- It addresses the object by the name exactly as given.
+- It stops at once on any 401.
+- It sends, in order:
+  1. validation, with and without `packagename`, for a free name, a taken one, one that is too
+     long, and with `objtype=typedg`;
+  2. create, with `sap-language` and an optional `corrNr`;
+  3. the metadata and source reads with `?version=inactive`, and a source read with
+     `withLongPolling=true`;
+  4. lock, a source write carrying `If-Match` from the read's etag and an optional `corrNr`,
+     then unlock;
+  5. activation;
+  6. the reads with `?version=active`, the version list, and one entry's version source;
+  7. lock, `DELETE ?lockHandle` with an optional `corrNr`, unlock, and a final read.
+- Every exchange is recorded whole.
+
+### 1.2 How an answer decides
+
+Each operation's answer gets the goal's three-way classification:
+
+- **Served.** The operation's own handler answered: a success, or a refusal of this object or
+  these arguments, such as `400 InvalidTypeGroupName`. The operation is in the row.
+- **Not offered.** The resource framework has no handler for the request: `404` "No suitable
+  resource found", or `405 ExceptionMethodNotSupported`. The operation is out of the row.
+- **Decides nothing.** An authorization refusal, or any answer that is neither of the above.
+  The operation stays unmeasured. It is not in the cloud row (goal, availability step 4); on
+  premise, discovery and then typestructure decide.
+
+### 1.3 What the measurements show
+
+Cloud: the trial, measured. On premise: S/4HANA 2025, measured by the tracking issue's
+recordings and the read-only probe. The on-premise twin of 1.1 still has to run for the rows
+marked "twin".
+
+| Operation | On premise | ABAP Cloud (trial) |
+|---|---|---|
+| validate | served: valid 200, empty body; taken or too long 400 `InvalidTypeGroupName` | served: valid 200, empty body, with and without `packagename`; taken (`SLIS`) 400 `InvalidTypeGroupName` "already exists"; 7 characters 400 `InvalidTypeGroupName` (E2/129, "maximum of five characters"); `objtype=typedg` 400 |
+| create | served: 200, empty body | **decides nothing:** 403 `ExceptionResourceNoAuthorization`, EU/519, `S_DEVELOP`, in the trial's test package |
+| readMetadata | served: 200 v3 and v2 | served: 200 v3 and v2, and `?version=active` |
+| read / source | served: 200 `text/plain` | served: 200, and `?version=active`, and `withLongPolling=true` (answered at once) |
+| update (source write) | served: 200 (`If-Match`, `corrNr`: twin) | not measured: no object of its own (create decides nothing) |
+| lock / unlock | served: 200 / 200 | not measured: no object of its own |
+| activate | served: `chkl:messages`, `activationExecuted="true"` | not measured: no object of its own |
+| versions: list | served: 200 atom feed | served: 200 atom feed |
+| versions: version source | twin | served: 200 `text/plain` |
+| delete | served: 200, then the read answers 404 | not measured: no object of its own |
+| name in the path as given (upper case) | twin | served: `GET …/typegroups/ABAP` and `…/ABAP/source/main` 200 |
+
+The cloud row is therefore: `validate`, `readMetadata`, `read`, `source`, `versions`.
+
+- Create and every write stay out of the cloud row, because none can be measured there: the
+  create answer is an authorization refusal, and without an object of its own no write runs.
+- Discovery's empty `app:accept` for the collection agrees, though by the goal's rule it is not
+  what decides.
+
+The on-premise row is every operation of the goal, once the twin confirms the rows marked
+"twin". If an operation the twin measures is not served, it leaves the on-premise row before
+anything is published.
+
+## 2. The contract package: `@mcp-abap-adt/interfaces-adt` (a minor)
 
 Types and constants only, as the package holds no logic.
 
-### 1.1 API name and config
+### 2.1 API name, config, results
 
 - `AdtApiName` gains `'typeGroup'`.
-- `ITypeGroupConfig` (new file `adt/IAdtTypeGroup.d.ts` in the source tree):
+- `ITypeGroupConfig`:
 
   ```ts
   export interface ITypeGroupConfig {
@@ -23,22 +99,24 @@ Types and constants only, as the package holds no logic.
   }
   ```
 
-  The fields match those of `ITransformationConfig`, without `transformationType`. A type group
-  has no subtype: the measured create body carries `adtcore:type="TYPE/DG"` and nothing that
-  selects a kind.
+  The fields match those of `ITransformationConfig`, without its `transformationType`:
+  - The measured create body carries `adtcore:type="TYPE/DG"`, and nothing in it selects a
+    kind.
+  - Whether type groups have subtypes is unverified. This task sends only `TYPE/DG`.
 
-- `ITypeGroupResults`, one `IResultStrategy<unknown>` per slot the members answer:
-  - `validation`, `created`, `metadata`, `source`, `updated`, `activation`, `deletion`,
-    `versions`, `versionSource`.
-  - It has no `check`, `metadataUpdated`, `transport` or `deletionCheck` slot: those operations
-    are out of this task.
+- `ITypeGroupResults`, one `IResultStrategy<unknown>` per slot the members answer: `validation`,
+  `created`, `metadata`, `source`, `updated`, `activation`, `deletion`, `versions`,
+  `versionSource`.
+  - Lock and unlock have no slot, as for every lockable type: their answers are the atom's
+    `string` and `void` (section 3.2).
+  - There are no slots for operations outside the goal.
 
-### 1.2 The new atom `IAdtLockedDeletable`
+### 2.2 The new atom `IAdtLockedDeletable`
 
 `IAdtDeletable` does not fit, for two reasons:
 - it pairs `delete` with `checkDeletion`, and the deletion check is out of this task;
-- its `delete` takes no lock handle, while the type group's delete is the measured
-  `DELETE …/{name}?lockHandle=…` under the caller's lock.
+- its `delete` takes no lock handle, while the measured delete is `DELETE …/{name}?lockHandle=…`
+  under the caller's lock.
 
 So a new atom, beside `IAdtDeletable`:
 
@@ -55,13 +133,10 @@ export interface IAdtLockedDeletable<TConfig, TDeleted, TRequired extends keyof 
 }
 ```
 
-The handle is required by type, as every locked write's is (`IAdtLockedWrite`). No other
-type's atoms change.
+`delete` keeps `IAdtDeletable`'s own name and overload shape, adds `IAdtLockedWrite`, and drops
+`checkDeletion`. No other atom changes.
 
-### 1.3 The table rows
-
-The rows go into `ADT_TYPES_ONPREM` and `ADT_TYPES_CLOUD`, in the DDIC group beside
-`tableType`:
+### 2.3 The rows, written from section 1.3
 
 ```ts
 typeGroup: {
@@ -79,60 +154,42 @@ typeGroup: {
 },
 ```
 
-- **On premise** (`s4-2025`), operations: `validate`, `create`, `readMetadata`, `read`,
-  `source`, `update`, `lock`, `unlock`, `activate`, `versions`, `delete`.
-  - All of them are measured except the version source (`versions` names both halves). The live
-    suite measures it before the release (section 4.3).
-  - If it is not served there, `versions` leaves the row.
-- **ABAP Cloud** (`abap-cloud`), operations: exactly those the trial measures served before the
-  release, by the goal's availability rule.
-  - Measured served today: `readMetadata`, `read`, `source`, and the version list.
-  - The rest are measured in the live cloud suite: `validate`, `create`, `lock`, `unlock`,
-    `update`, `activate`, `delete`, and the version source.
-  - A measurement outranks discovery's empty `app:accept`.
-  - The cloud row is written in the last step before the release, from the trial's results.
-- `nameMaxLength` 5 is typestructure's `OBJNAME_MAXLENGTH` on both releases. `read` and
-  `source` name the source read, as on every other source object's row.
+- **`ADT_TYPES_ONPREM` (`s4-2025`):** `validate`, `create`, `readMetadata`, `read`, `source`,
+  `update`, `lock`, `unlock`, `activate`, `versions`, `delete`. Any of these the twin finds not
+  served is removed first.
+- **`ADT_TYPES_CLOUD` (`abap-cloud`):** `validate`, `readMetadata`, `read`, `source`, `versions`.
+- `nameMaxLength` 5 is typestructure's `OBJNAME_MAXLENGTH` on both releases, and the trial's
+  E2/129 says the same.
+- The code `TYPE/DG` enters the tables' code types (`typeCodeScan.ts`).
 
-The type code `TYPE/DG` enters the tables' code types, so a literal `'TYPE/DG'` in adt-clients
-compiles (`typeCodeScan.ts`).
+## 3. adt-clients (a minor)
 
-## 2. adt-clients (a minor)
+### 3.1 Files
 
-### 2.1 Files
-
-- `src/core/typeGroup/`, laid out like `transformation/`:
-  - the module files: `AdtTypeGroup.ts`, `types.ts`, `validation.ts`, `create.ts`, `read.ts`,
-    `update.ts`, `lock.ts`, `unlock.ts`, `activation.ts`, `versions.ts`, `delete.ts`,
-    `index.ts`;
-  - no `check.ts`.
-- `src/endpoints/objects.ts`: a `TYPE_GROUP` record in the registry:
+- `src/core/typeGroup/`, laid out like `transformation/`: `AdtTypeGroup.ts`, `types.ts`,
+  `validation.ts`, `create.ts`, `read.ts`, `update.ts`, `lock.ts`, `unlock.ts`,
+  `activation.ts`, `versions.ts`, `delete.ts`, `index.ts`.
+- `src/endpoints/objects.ts`: a `TYPE_GROUP` record. Its `uri` encodes the name exactly as
+  given, with `encodeURIComponent` and no case change. It does not use `seg`, which lower-cases:
+  the goal's "names as given" wins over what the siblings do.
 
   ```ts
   export const TYPE_GROUP = {
     collection: '/sap/bc/adt/ddic/typegroups',
     validation: '/sap/bc/adt/ddic/typegroups/validation',
-    uri: (name: string) => `/sap/bc/adt/ddic/typegroups/${seg(name)}`,
+    uri: (name: string) => `/sap/bc/adt/ddic/typegroups/${encodeURIComponent(name)}`,
   };
   ```
 
-  `seg` lower-cases and encodes, as the record's siblings do. The measured requests address the
-  object in lower case.
 - `src/constants/contentTypes.ts`: `ACCEPT_TYPE_GROUP =
   'application/vnd.sap.adt.ddic.typegroups.v3+xml'`.
-- `src/core/typeGroup/types.ts`:
+- `types.ts`:
   - `typeGroupDocuments`, `rawDocument` in every slot, `satisfies ITypeGroupResults`;
-  - the snake_case `ICreateTypeGroupParams`, `IUpdateTypeGroupParams` and
-    `IDeleteTypeGroupParams`.
-- `AdtClient.getTypeGroup()`: two overloads, gated `this: this & AdtServedBy<'typeGroup'>`, as
-  `getTransformation()` is.
-- `src/index.ts` exports:
-  - `AdtTypeGroup`, `TypeGroupValues` and `typeGroupDocuments`;
-  - `ITypeGroupConfig` / `ITypeGroupResults` stay in the contract package, not re-exported.
+  - the snake_case create, update and delete params.
+- `AdtClient.getTypeGroup()`: two overloads, gated `this: this & AdtServedBy<'typeGroup'>`.
+- `src/index.ts`: `AdtTypeGroup`, `TypeGroupValues` and `typeGroupDocuments`.
 
-### 2.2 `AdtTypeGroup<T, V>` and its members
-
-The class declaration:
+### 3.2 `AdtTypeGroup<T, V>` and its members
 
 ```ts
 export class AdtTypeGroup<T extends TypeGroupValues = ResultValuesOf<typeof typeGroupDocuments>,
@@ -149,166 +206,189 @@ export class AdtTypeGroup<T extends TypeGroupValues = ResultValuesOf<typeof type
 ```
 
 How the members are built:
-- The constructor and the lock tracker are as in `AdtTransformation`.
-- Every member takes `timeout` through `withCallTimeout` and answers through `answering`.
-  That includes `activate`, which uses `answering` and not `answeringActivation`.
-- Each member that a release may not serve is gated
-  `this: this & AdtPerformedBy<'typeGroup', '<op>'>`. That is every member, since the cloud
-  row starts with reads only.
+- Every member takes `timeout` through `withCallTimeout`.
+- `create`, `update`, `lock`, `unlock`, `activate` and `delete` are gated
+  `this: this & AdtPerformedBy<'typeGroup', '<op>'>`, since the cloud row lacks them.
+- `validate`, the reads and `versions` are served on both variants, so they need no gate.
 
-| Member | Request | Headers sent | Body |
+How each member answers:
+- Every member but `lock` and `unlock` answers through `answering(send, this.results.<slot>,
+  options?.analyse)`. That is one request, and the slot and the caller's `analyse` are applied
+  to it.
+- `activate` uses `answering` too, never `answeringActivation`: one request, and no read after
+  it.
+- `lock` answers through `answering` with `lockHandleOf` as its strategy: the handle, `''` when
+  SAP sent none. It records the handle in the lock registry (`createLockTracker`).
+- `unlock` answers with `nothing`, and releases the handle in the registry.
+
+| Member | Request | Headers sent | Evidence |
 |---|---|---|---|
-| `validate(config, options?)` | `POST /sap/bc/adt/ddic/typegroups/validation?objtype=TYPE%2FDG&objname=<NAME>[&packagename=…][&description=…]` | `Accept: application/vnd.sap.as+xml` (`ACCEPT_VALIDATION`) | none |
-| `create(config, { headers, … })` | `POST /sap/bc/adt/ddic/typegroups[?corrNr=…]` | the caller's pair; `sap-language` when `masterLanguage` is given (`createRequestHeaders`) | `atypgr:abapTypeGroup` (below) |
-| `readMetadata(config, options?)` | `GET /sap/bc/adt/ddic/typegroups/<name>[?version=…][&withLongPolling=true]` | `Accept: options.accept ?? ACCEPT_TYPE_GROUP` | — |
-| `read(config, version?, options?)` | `GET …/<name>/source/main[?version=…][&withLongPolling=true]` | `Accept: options.accept ?? 'text/plain'` (`ACCEPT_SOURCE`) | — |
-| `update(config, { headers, lockHandle, source, ifMatch? })` | `PUT …/<name>/source/main?lockHandle=…[&corrNr=…]` (`writeQuery`) | the caller's pair; `If-Match` when given (`updateRequestHeaders`) | the source as given |
-| `lock(config, options?)` | `POST …/<name>?_action=LOCK&accessMode=MODIFY`, stateful for this request only (`inStatefulSession`) | `Accept: ACCEPT_LOCK` | — |
-| `unlock(config, lockHandle, options?)` | `POST …/<name>?_action=UNLOCK&lockHandle=…`, stateful for this request only | none of its own | — |
-| `activate(config, { headers, preauditRequested? })` | `POST /sap/bc/adt/activation?method=activate&preauditRequested=<true unless false>` (`activateObjectInSession`) | the caller's pair | `adtcore:objectReferences` naming `/sap/bc/adt/ddic/typegroups/<name>` and `<NAME>` |
-| `getVersions(config, options?)` | `GET …/<name>/source/main/versions` | `Accept: application/atom+xml;type=feed` | — |
-| `getVersionSource(contentUri, options?)` | `GET <contentUri>` | `Accept: text/plain` | — |
-| `delete(config, { headers, lockHandle })` | `DELETE …/<name>?lockHandle=…[&corrNr=…]` | the caller's pair (`requestHeaders`) | none |
+| `validate(config, options?)` | `POST …/typegroups/validation?objtype=TYPE%2FDG&objname=<name>[&packagename=<pkg>][&description=<d>]` | `Accept: application/vnd.sap.as+xml` | on premise: issue recordings `40`/`53`–`56`; cloud: trial `validate-*`, `packagename` included |
+| `create(config, { headers, … })` | `POST …/typegroups[?corrNr=<t>]` | the caller's pair; `sap-language` when `masterLanguage` is given | body: issue `62-create` (v3 pair). `sap-language`, `corrNr`: twin |
+| `readMetadata(config, options?)` | `GET …/typegroups/<name>[?version=…][&withLongPolling=true]` | `Accept: options.accept ?? ACCEPT_TYPE_GROUP` | both measured; `version=active` cloud; `version=inactive` and `withLongPolling` on metadata: twin |
+| `read(config, version?, options?)` | `GET …/<name>/source/main[?version=…][&withLongPolling=true]` | `Accept: options.accept ?? 'text/plain'` | both measured; cloud also `version=active` and `withLongPolling` |
+| `update(config, { headers, lockHandle, source, ifMatch? })` | `PUT …/<name>/source/main?lockHandle=<h>[&corrNr=<t>]` | the caller's pair; `If-Match` when given | issue `66-write-source`; `If-Match`, `corrNr`: twin |
+| `lock(config, options?)` | `POST …/<name>?_action=LOCK&accessMode=MODIFY`, stateful for this request only | `Accept: ACCEPT_LOCK` | issue `65-lock`, `71-lock-for-delete` |
+| `unlock(config, lockHandle, options?)` | `POST …/<name>?_action=UNLOCK&lockHandle=<h>`, stateful for this request only | none of its own | issue `67-unlock`, `73-unlock-after-delete` |
+| `activate(config, { headers, preauditRequested? })` | `POST /sap/bc/adt/activation?method=activate&preauditRequested=<true unless false>` | the caller's pair (measured: `Accept: application/xml`, `Content-Type: application/vnd.sap.adt.activation+xml`) | issue `68-activate` |
+| `getVersions(config, options?)` | `GET …/<name>/source/main/versions` | `Accept: application/atom+xml;type=feed` | issue `37-slis-versions`; cloud `05-versions` |
+| `getVersionSource(contentUri, options?)` | `GET <contentUri>` | `Accept: text/plain` | cloud: trial `12-version-source` 200; on premise: twin |
+| `delete(config, { headers, lockHandle })` | `DELETE …/<name>?lockHandle=<h>[&corrNr=<t>]` | the caller's pair | issue `72-delete`; `corrNr`: twin |
 
-The create body is the measured one, built from the config with the module's shared helpers
-(`escapeXmlAttr`, `limitDescription`, `languageAttributes`):
+The activation body is the measured `adtcore:objectReferences`. It names `TYPE_GROUP.uri(name)`
+and the name as given.
+
+The create body is the measured one (issue `62-create`), with every value XML-escaped and
+nothing else changed:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?><atypgr:abapTypeGroup
   xmlns:atypgr="http://www.sap.com/adt/ddic/typegroups" xmlns:adtcore="http://www.sap.com/adt/core"
-  adtcore:description="…" adtcore:language="…" adtcore:masterLanguage="…"
-  adtcore:name="<NAME>" adtcore:type="TYPE/DG">
-  <adtcore:packageRef adtcore:name="<PACKAGE>"/>
+  adtcore:description="<description>" adtcore:language="<language>" adtcore:masterLanguage="<language>"
+  adtcore:name="<name>" adtcore:type="TYPE/DG">
+  <adtcore:packageRef adtcore:name="<package>"/>
 </atypgr:abapTypeGroup>
 ```
 
-Notes on the members:
-- **Names.** `validate` and `create` send the name in upper case, which is what was measured.
-  Addresses go through `TYPE_GROUP.uri`. The name's length is never checked (goal, "does not
-  second-guess SAP").
-- **What answers what.**
-  - `validate`: a valid name answers an empty `200`, which is no failure under the default
-    verdict (`answering`: a 2xx is the value). A refused name answers `400`, which is the
-    failure. No reading is added to adt-strategies.
-  - `create`: answers an empty `200`. `delete`: answers `200`.
-  - `activate`: answers the checklist as it came. `activationExecuted` is the consumer's
-    `analyse`'s to read (adt-strategies' `analyseActivation`).
-- **Not measured for type groups**, each proven by the live suites (section 4.3) before the
-  release: `packagename` on `validate`; `corrNr` on create, write and delete; `If-Match`; and
-  `?version=` on the reads.
-- **Lock bookkeeping.** `lock` records the handle in the client's lock registry, and `unlock`
-  releases it, as every lockable type does (`createLockTracker`).
+- **Names as given.** The name and the package are sent as the caller gave them: no upper- or
+  lower-casing, no trimming. The only change is the encoding the context needs: URL encoding in
+  a path or query, XML escaping in a body. The name's length is never checked.
+- **No description truncation.** The description is sent whole. `limitDescription` is not used,
+  because no measurement and no SAP handler shows a limit for type groups; SAP refuses a value it
+  does not take.
+- **Optional parts are sent only when the caller gives them.**
+  - The language attributes (measured in `62-create`) and `sap-language` are written only when
+    `masterLanguage` is given (`languageAttributes`, `createRequestHeaders`). No value is
+    invented.
+  - `corrNr` is sent only when `transportRequest` is given.
+  - `sap-language` and `corrNr` are unmeasured for type groups. The twin measures them before
+    anything is published, and one it finds refused is removed from the member.
 
-### 2.3 What changes elsewhere in adt-clients
+## 4. adt-strategies
 
-Each of these is additive:
-- The capability manifest (`__tests__/unit/capabilities/manifest.ts`) gains `typeGroup` with
-  its atoms, and gains the new atom `lockedDeletable: ['delete']`.
-- `activatingApis.ts` lists the type group as an activation member that sends one request: the
-  follow-up read is asserted absent for it.
-- `publicApiSurface.test.ts` gains the new exported values.
+No change. Under the default verdict a 2xx is the value and anything else the failure, and that
+reads every measured answer (section 1.3). A consumer's `analyse` judges anything further,
+`activationExecuted` included.
 
-## 3. adt-strategies
+## 5. Tests
 
-No change. The default verdict reads every answer a type group gives (section 2.2).
+### 5.1 Corpus
 
-## 4. Tests
+Everything goes into `corpus/adt/answers/` in the existing JSON + body format, scrubbed by the
+corpus rule:
+- **Scrubbing.** Every field is scrubbed: params, headers, bodies and escaped JSON. Host, SID,
+  client, user, load-balancer and session headers are replaced by the corpus placeholders. The
+  probe object's own name and its package stay.
+- **The recordings that go in:**
+  - the tracking issue's S/4HANA 2025 recordings (cycle, validation, reads);
+  - the read-only probes of both systems;
+  - the trial's measurement run: the validation answers, the create refusal, the version
+    source, the upper-case and `withLongPolling` reads;
+  - the on-premise twin's run, refusals included.
+- **Names.** Case names are `type-group-<step>-s4-2025` and `type-group-<step>-abap-cloud`.
 
-### 4.1 Corpus
+### 5.2 Unit tests (no SAP system), `core/typeGroup/typeGroup.test.ts`
 
-- **Where the recordings go.** The S/4HANA 2025 recordings of the type group cycle, validation
-  and reads (the tracking issue's set), and the trial's read-only answers, go into
-  `corpus/adt/answers/` in the existing JSON + body format.
-- **Names.** Case names use `type-group-<step>-s4-2025` and `type-group-<step>-abap-cloud`.
-- **Scrubbing.** Every field is scrubbed by the corpus rule: params, headers, bodies and escaped
-  JSON. Host, SID, client, user and the load-balancer header are replaced by the corpus
-  placeholders. The object name `ZTG48` and `$TMP` stay, since they name nothing of a system.
-- **Discovery.** The discovery and typestructure corpus already hold both releases' entries; no
-  new capture is needed.
-
-### 4.2 Unit tests (no SAP system)
-
-- **`core/typeGroup/typeGroup.test.ts`.** Each member against a recording connection asserts the
-  table's request exactly:
-  - the URL, the method, every header and the body;
-  - that it sends one request and nothing more, `activate` included;
-  - that no member but `lock` / `unlock` touches the session type.
-- **The answers.** Each member answers the corpus recording through `typeGroupDocuments`
-  unchanged. The validation answers are an empty `200` (no failure) and a `400`
-  `InvalidTypeGroupName` (a failure carrying the response).
+- **The request.** Each member against a recording connection:
+  - sends exactly one request, the table's: URL, method, every header and the body;
+  - takes the name as given: a mixed-case name arrives unchanged in the path, query and body;
+  - sends a long description whole.
+- **`activate`** sends one request, and nothing more after any checklist, including one with
+  `activationExecuted="false"` and no message.
+- **The session.** Only `lock` and `unlock` touch the session type
+  (`capabilities/behaviour.test.ts`).
+- **The answers.** Each member answers its corpus recording through `typeGroupDocuments`
+  unchanged: the validation's empty 200 is no failure, its 400 `InvalidTypeGroupName` is a
+  failure carrying the response, and the cloud create's 403 is a failure.
+- **Strategies are forwarded.**
+  - Each member built with a custom result set answers what that set's slot made of the wire
+    answer.
+  - A caller's `analyse` is called once per member with that wire answer, and its verdict is
+    the result's.
+  - For `activate`, `analyse` gets no `context`: no second request and no verdict of the
+    library's.
+- **`lock` and `unlock`.** `lock` answers the handle from a lock recording and `''` without one;
+  `unlock` answers nothing.
 - **Variant gates (`clients/variantGates.test.ts`).**
-  - `getTypeGroup()` compiles on both variants.
-  - On cloud, every member outside the cloud row does not compile.
-  - Type-level cases go in the existing typecheck fixtures.
-- **Table and endpoint tests.**
-  - `endpoints/typeTables.test.ts` covers the new rows: evidence names a typestructure case of
-    its release, and `nameMaxLength` equals typestructure's `OBJNAME_MAXLENGTH`.
-  - `endpoints/objects.test.ts` covers the new record.
-- **The repository's guard tests** stay green: `noHardcodedObjectAddresses`, `typeCodeScan`,
-  the stateful-session tests in `capabilities/behaviour.test.ts`, `activatingApis`,
-  `publicApiSurface`, and `onlyCorpusStrategiesShip`.
+  - On cloud, `create`, `update`, `lock`, `unlock`, `activate` and `delete` do not compile, and
+    the other members do.
+  - On premise all of them compile.
+- **Tables and records.**
+  - `endpoints/typeTables.test.ts`: the rows' evidence names a typestructure case of its
+    release, and `nameMaxLength` equals its `OBJNAME_MAXLENGTH`.
+  - `endpoints/objects.test.ts`: the record keeps a name's case.
+- **The capability manifest** gains `typeGroup` and the atom `lockedDeletable: ['delete']`.
+  `activatingApis.ts` lists the type group as one-request activation.
+- **The guards stay green:** `publicApiSurface`, `noHardcodedObjectAddresses`, `typeCodeScan` and
+  `onlyCorpusStrategiesShip`.
 
-### 4.3 Integration tests (live)
+### 5.3 Integration tests (live), `integration/core/typeGroup/TypeGroup.test.ts`
 
-`src/__tests__/integration/core/typeGroup/TypeGroup.test.ts`. Its cases come from
-`test-config.yaml.template`:
-- a `type_groups` section, with names of at most 5 characters under the customer mask;
-- `create_type_group`, with package, description and source.
+The suite verifies the public API on the fixed rows. Every operation in a variant's row has a
+case of its own, enabled by that row, and `lock` never runs without its `unlock`.
 
-The overlays carry the system's values. Each case is enabled by the variant's row (what the
-system serves), not by a flag of convenience.
+The test-config template gains a `type_groups` section: names of at most 5 characters under the
+customer mask, and the package, transport, description and source. An overlay gives a system's
+values.
 
-- **On premise, the whole cycle, each step its own assertion:**
-  1. validate a free name, then a taken one (`SLIS`);
+- **On premise**, one case per operation, each asserting its own answer:
+  1. validate a free name, a taken one (`SLIS`), and one that is too long;
   2. create;
-  3. read the metadata and the source;
-  4. lock, write the source, unlock — and prove the lock released (`expectLockReleased`);
-  5. activate, then read the source active;
-  6. list the versions, then read one version's source;
-  7. lock, delete, unlock;
-  8. read again: 404.
-- **On ABAP Cloud, each listed operation in a case of its own:**
-  - validation with names of its own;
-  - the reads, the version list and the version source against an SAP type group (`ABAP`);
-  - lock, write, unlock, activate and delete on a type group the test creates, when create is
-    served.
-  - If create is not served on cloud, a write the row lists gets a case on an object named in
-    the overlay that the test user may change. Without one, that write leaves the cloud row.
-  - Cloud has no `$TMP`: the test package and its transport come from the overlay.
-- **Cleanup.** A suite deletes what it created, also on failure, and a failing case logs SAP's
-  status and message.
+  3. read the metadata and the source, with `version` inactive;
+  4. lock, write the source with `If-Match`, unlock, and prove the lock released
+     (`expectLockReleased`);
+  5. activate;
+  6. read active;
+  7. list the versions, and read one version's source;
+  8. lock, delete, unlock;
+  9. read again: 404.
+- **On ABAP Cloud**, one case per operation in its row:
+  - validation: a free name, a taken one (`SLIS`), one too long;
+  - the metadata and the source of an SAP type group (`ABAP`), with and without
+    `version=active`;
+  - its version list, and one version's source.
+  - The cloud row has no create, lock, unlock, update, activate or delete, so the suite has no
+    case for them. That operations outside the row do not compile is the unit gate test.
+- **Package.** The test package and its transport come from the overlay.
+  - On premise `$TMP` may be used.
+  - On cloud the trial's test package is used, since a create into `$TMP` on the trial is
+    refused. An earlier probe in this project measured that refusal, but no recording of it is
+    in the corpus, so for this spec it is unverified.
+- **Cleanup.** Whatever the suite creates it deletes, also on failure, and a failing case logs
+  SAP's status and message.
 
-The cloud suite runs on the trial before the release; its results write the cloud row
-(section 1.3).
+## 6. Release order
 
-## 5. Release order
+1. **Measure.** The trial run is done (section 1.3). The on-premise twin is run, and its result
+   settles the on-premise row.
+2. **interfaces-adt minor:** `'typeGroup'`, `ITypeGroupConfig`, `ITypeGroupResults`,
+   `IAdtLockedDeletable`, and both rows as section 2.3 fixes them. It is published, and a clean
+   install of it from the registry, outside the repository, is checked.
+3. **adt-clients,** against the published range:
+   - the module, the corpus and the unit tests;
+   - the live suite, run on premise and on the trial against the published rows.
+   - A live failure that shows a row wrong stops the release. The measurement is redone, and the
+     row is corrected before adt-clients is tagged. No patch is planned to finish a row.
+4. **adt-clients minor:**
+   - Before tagging, every `package.json` of the release declares only semver ranges, every
+     range resolves on the registry, and the lockfile holds no link but the workspace siblings.
+   - It is tagged `adt-clients-v<version>` and published, then a clean install from the registry,
+     outside the repository, is checked.
+   - adt-strategies and adt-clients-legacy have no change and no release.
+5. **mcp-abap-adt** takes the published adt-clients and adds its tools in its own change.
 
-1. **interfaces-adt minor:** `'typeGroup'`, `ITypeGroupConfig`, `ITypeGroupResults`,
-   `IAdtLockedDeletable`, and the on-premise row. The cloud row holds the operations measured so
-   far. Published.
-2. **adt-clients**, against the published interfaces-adt range: the module, the unit tests and
-   the live suites, run on premise and on the trial.
-3. **interfaces-adt patch, if the trial measured more or fewer cloud operations** than step 1
-   listed: the cloud row corrected, published. adt-clients then takes that range. Adding a
-   member a closed list forgot is a patch.
-4. **adt-clients minor**, tagged `adt-clients-v<version>`. adt-strategies and
-   adt-clients-legacy are not released (no change).
-5. **mcp-abap-adt** takes the published adt-clients and adds its type group tools in its own
-   change.
+## 7. Documentation
 
-At every step each dependency range resolves on the registry, and the lockfile holds no link
-but the workspace siblings.
-
-## 6. Documentation
-
-- adt-clients `README.md`:
-  - the type group in the object list and the factory list;
-  - its activation, which is one request, unlike the other types.
-- `docs/usage/` lists the members and their requests.
-- `docs/usage/ERRATA.md` gets one entry per measured ambiguity:
-  - validation's `objtype` must be `TYPE/DG`;
-  - a valid name answers an empty `200`;
-  - the metadata read without any Accept answers `400`;
-  - cloud discovery's empty `app:accept`, with the trial's result.
-- `CHANGELOG.md` gets an entry in the minor's section. interfaces-adt's CHANGELOG gets the new
-  name, types, atom and rows.
+- **adt-clients:**
+  - `README.md`: the type group in the object and factory lists, its members per variant, and
+    its activation as one request;
+  - `docs/usage/`: the members and their requests;
+  - `docs/usage/ERRATA.md`, one entry per measured ambiguity: validation's `objtype` must be
+    `TYPE/DG`; a valid name answers an empty 200; the metadata read without any Accept answers
+    400; and the cloud create's 403 next to discovery's empty `app:accept`;
+  - `docs/architecture/` where it lists object types or atoms;
+  - `CHANGELOG.md`.
+- **interfaces-adt:**
+  - `README.md` and its docs where they list API names, atoms or the tables;
+  - `CHANGELOG.md`: the name, the types, the atom and the rows.
+- Each repository's docs are swept for every list of object types the change extends.
