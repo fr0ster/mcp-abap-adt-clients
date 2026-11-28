@@ -997,6 +997,24 @@ const SENT_BEFORE_36: Record<string, IAdtHeaders> = {
     accept: 'application/vnd.sap.adt.transformations+xml',
     contentType: 'application/vnd.sap.adt.transformations+xml; charset=utf-8',
   },
+  // Not in 35.0.0: the type group's pairs, as measured on S/4HANA 2025
+  // (corpus `type-group-cycle-s4-2025`).
+  'AdtTypeGroup.activate': {
+    accept: 'application/xml',
+    contentType: 'application/vnd.sap.adt.activation+xml',
+  },
+  'AdtTypeGroup.create': {
+    accept: 'application/vnd.sap.adt.ddic.typegroups.v3+xml',
+    contentType: 'application/vnd.sap.adt.ddic.typegroups.v3+xml',
+  },
+  'AdtTypeGroup.delete': {
+    accept: 'application/vnd.sap.adt.ddic.typegroups.v3+xml',
+    contentType: 'application/vnd.sap.adt.ddic.typegroups.v3+xml',
+  },
+  'AdtTypeGroup.update': {
+    accept: 'text/plain',
+    contentType: 'text/plain; charset=utf-8',
+  },
   'AdtUtils.activateObjectsGroup': {
     accept: 'application/xml',
     contentType: 'application/xml',
