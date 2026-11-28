@@ -24,8 +24,10 @@ import type {
   IAdtLockable,
   IAdtMetadataReadable,
   IAdtMetadataUpdatable,
+  IAdtNavigationTargetReadable,
   IAdtObjectAccess,
   IAdtObjectActivation,
+  IAdtObjectOutlineReadable,
   IAdtObjectProperties,
   IAdtReadable,
   IAdtRepositoryStructure,
@@ -78,7 +80,9 @@ type UtilsAtoms = IAdtInformationSystem<U, U, U, U, U> &
   IAdtDataPreview<U, U, U> &
   IAdtDiscovery<U> &
   IAdtObjectAccess<U, U, U> &
-  IAdtObjectProperties<U>;
+  IAdtObjectProperties<U> &
+  IAdtObjectOutlineReadable<U> &
+  IAdtNavigationTargetReadable<U>;
 
 type FeatureToggleAtoms = LifecycleAtoms &
   IAdtMetadataUpdatable<U, U, never> &
@@ -98,8 +102,7 @@ type ServiceBindingAtoms = LifecycleAtoms &
 /**
  * The members of `AdtUtils` no atom of interfaces-adt declares:
  * `getTypeStructure`, added for the conformance check of the ADT type tables,
- * which calls it on the class, `getObjectOutline`, an object's outline
- * (`<object uri>/objectstructure`), and the element infos of a structure and
+ * which calls it on the class, and the element infos of a structure and
  * of a service definition (`getStructureElementInfo`,
  * `getServiceDefinitionElementInfo`). Named here, not hidden: until the
  * contract package carries their atoms, a consumer's composed contract cannot
@@ -107,7 +110,6 @@ type ServiceBindingAtoms = LifecycleAtoms &
  */
 type AwaitingItsAtom =
   | 'getTypeStructure'
-  | 'getObjectOutline'
   | 'getStructureElementInfo'
   | 'getServiceDefinitionElementInfo';
 

@@ -319,8 +319,8 @@ request.
 Served: `search`, `fetchNodeStructure`, `getObjectStructure`, `discovery`,
 `getInactiveObjects` (7.40 answers the older `adtcore:objectReferences`
 document), `readObjectMetadata` / `readObjectSource` for the served types,
-`getTypeStructure`, and `getObjectOutline` (sent as on the modern client; not
-measured on 7.40). `getStructureElementInfo` and
+`getTypeStructure`, `getObjectOutline` and `getNavigationTarget` (each sent as
+on the modern client; not measured on 7.40). `getStructureElementInfo` and
 `getServiceDefinitionElementInfo` are refused without a request: the 7.40
 discovery lists no element info for either. The group activation is
 `activateObjects` (inherited: synchronous `POST /activation`);

@@ -22,6 +22,9 @@ activation members no longer read the inactive list (to be released as
 
 ### Added
 
+- **`readNavigationTarget` / `navigationTarget`** — the include a navigation answer leads to and
+  its `start`; a refusal or a reference without a readable start reads as `undefined`
+  (fr0ster/mcp-abap-adt#401).
 - **`readUnstatedActivation(answer)`** and its type `AdtUnstatedActivation`:
   whether a 2xx `chkl:messages` leaves the activation's outcome to the inactive
   list — `silent` (`activationExecuted="false"`, no message) or `unstated` (no

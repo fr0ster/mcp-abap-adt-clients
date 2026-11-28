@@ -301,6 +301,7 @@ So a legacy client lists and reads its user's requests and does nothing else wit
 | `fetchNodeStructure` | measured (`B3-unmeasured-20261023-1631` b1-3; `T6-20261027` t6-nodestructure-root, t6-nodestructure-prog) — `POST /repository/nodestructure`, one level per request: for `DEVC/K` the root node answers the package's subpackages and one `SEU_ADT_OBJECT_TYPE_INFO` per object type with its `NODE_ID`, not the objects; the same request with `node_id` set to the `PROG/P` node answers the package's programs |
 | `getObjectStructure` | measured (`B2-reads-20261023-1749` s10-objstruct) |
 | `getObjectOutline` | not measured on 7.40 — inherited, sent as the modern client sends it (`GET <object uri>/objectstructure`); SAP's answer is the verdict |
+| `getNavigationTarget` | not measured on 7.40 — inherited, sent as the modern client sends it (`POST /sap/bc/adt/navigation/target?uri=…`; 7.40's discovery lists the collection); SAP's answer is the verdict |
 | `discovery` | measured — 125 collections (s10-discovery) |
 | `getInactiveObjects` | measured (s10-inactive); 7.40 answers the older `adtcore:objectReferences` document |
 | `readObjectMetadata`, `readObjectSource` for the served types (program, class, interface, function group and module, DDL source, …) | measured through the handlers, which send the same request (`B2-reads-20261023-1749` s1–s4, s8) |

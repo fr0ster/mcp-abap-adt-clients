@@ -178,7 +178,11 @@ import {
   type ServiceDefinitionValues,
   serviceDefinitionDocuments,
 } from '../core/serviceDefinition';
-import { AdtUtils, type UtilValues } from '../core/shared/AdtUtils';
+import {
+  type AdtUtilResults,
+  AdtUtils,
+  type UtilValues,
+} from '../core/shared/AdtUtils';
 import { type LockFailure, LockRegistry } from '../core/shared/LockRegistry';
 import { utilDocuments } from '../core/shared/utilResultSet';
 import {
@@ -1280,8 +1284,10 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
    * @returns The cross-cutting operations, `AdtUtils`
    */
   getUtils(): AdtUtils<ResultValuesOf<typeof utilDocuments>, V>;
-  getUtils<R extends IUtilResults>(results: R): AdtUtils<ResultValuesOf<R>, V>;
-  getUtils(results: IUtilResults = utilDocuments): AdtUtils<UtilValues, V> {
+  getUtils<R extends AdtUtilResults>(
+    results: R,
+  ): AdtUtils<ResultValuesOf<R>, V>;
+  getUtils(results: AdtUtilResults = utilDocuments): AdtUtils<UtilValues, V> {
     this.assertConnected();
     return new AdtUtils<UtilValues, V>(this.connection, {
       logger: this.logger,

@@ -2388,9 +2388,10 @@ interface each link names a position, `<include>#start=l,c;end=l,c` (lines from
 1, columns from 0, `end` exclusive); a program's links name their target, a
 function group's a source URI. No element carries a signature.
 
-`IUtilResults` of interfaces-adt has no slot for this member, so it answers the
-document as it came, as `getTypeStructure` does; `readObjectOutline` /
-`objectOutline` of `@mcp-abap-adt/adt-strategies` read it into a tree.
+Its answer goes through the result set's `objectOutline` slot (`rawDocument` in
+`utilDocuments`, so the document as it came by default); `objectOutline` of
+`@mcp-abap-adt/adt-strategies` is a reading for the slot, and `readObjectOutline`
+the same over a document.
 
 ```typescript
 import { readObjectOutline } from '@mcp-abap-adt/adt-strategies';
@@ -2399,6 +2400,43 @@ const answer = await client.getUtils().getObjectOutline('CLAS/OC', 'ZCL_X');
 if (answer.ok) {
   const { root } = readObjectOutline(answer.getResult().value);
   root?.children.map((c) => [c.name, c.visibility, c.links[0]?.start]);
+}
+```
+
+### AdtUtils (Navigation target)
+
+`getNavigationTarget(uri, options?)` is one `POST /sap/bc/adt/navigation/target`
+with `uri` as the query value, encoded once, and no body; `options.filter` and
+`options.fullname` (the discovery template's other parameters) are sent only
+when given, `options.accept` replaces the default `application/xml`. Given an
+outline's name fragment — `<include>/source/main#type=PROG%2FPU;name=…`, as
+`getObjectOutline` links a program's or a function group's element — SAP
+answers an `adtcore:objectReference` whose `uri` is `<include>#start=l,c`: the
+line of the element's statement and the column of its name (measured on
+premise and on ABAP cloud, 2026-11-28). The end is not given.
+
+A function group's local method's definition link is refused (`400`,
+`uriMappingError`, EU/061) on ABAP cloud and on premise; a one-include
+program's (on premise) answers a start. The start may lie in
+another include of the same object than the one the link names: on premise a
+function group's local method, linked into its class-definition include,
+answered its start in the implementation include. Independent navigations
+share one
+`AdtBatchConnection('communication')` envelope on both, each part answered as
+alone.
+
+Its answer goes through the result set's `navigationTarget` slot (`rawDocument`
+in `utilDocuments`); `navigationTarget` of `@mcp-abap-adt/adt-strategies` is a
+reading for the slot, and `readNavigationTarget` the same over a document.
+
+```typescript
+import { readNavigationTarget } from '@mcp-abap-adt/adt-strategies';
+
+const answer = await client
+  .getUtils()
+  .getNavigationTarget('/sap/bc/adt/programs/programs/zprog/source/main#type=PROG%2FPU;name=F');
+if (answer.ok) {
+  readNavigationTarget(answer.getResult().value); // { include, start: { line, column } }
 }
 ```
 

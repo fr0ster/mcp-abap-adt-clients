@@ -2707,6 +2707,37 @@ object_structure:
         # object_name: Uses standard_objects.classes if not specified
         # class_name: Optional alias; uses standard_objects.classes if omitted
 
+# Navigation target (getNavigationTarget): read only, on objects SAP delivers.
+# Each case names an object whose outline (getObjectOutline) carries name
+# fragments; the test navigates the first element of each kind it finds.
+navigation_target:
+  test_cases:
+    - name: "navigate_outline_elements_cloud"
+      enabled: true
+      description: "Navigate a delivered function group include's elements (forms, modules, local classes, types, local methods)"
+      available_in: ["cloud"]
+      params:
+        object_type: "PROG/I"
+        object_name: "LSEWORKINGAREAFAC"
+    - name: "navigate_outline_elements_onprem"
+      enabled: true
+      description: "Navigate a delivered function group include's elements (forms, modules, local classes, types, local methods)"
+      available_in: ["onprem"]
+      params:
+        # The same delivered ADT function group include as on the cloud: its
+        # group has local classes with methods (a local method's two links).
+        object_type: "PROG/I"
+        object_name: "LSEWORKINGAREAFAC"
+    - name: "navigate_program_elements_onprem"
+      enabled: true
+      description: "Navigate a one-include program's elements: its local methods' definition links answer a start"
+      available_in: ["onprem"]
+      params:
+        # A program of one include with local classes, present on the on-premise
+        # test system (measured 2026-11-28); not delivered by SAP.
+        object_type: "PROG/P"
+        object_name: "ZABAPGIT_STANDALONE"
+
 # Node Structure (fetchNodeStructure)
 node_structure:
   test_cases:

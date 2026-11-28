@@ -48,6 +48,7 @@ import {
   type AdtTextElements,
   type AdtTransformation,
   type AdtTypeGroup,
+  type AdtUtilResults,
   type AppendStructureValues,
   AUTHORIZATION_FIELD,
   type AuthorizationFieldValues,
@@ -575,11 +576,11 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
    * be told about a refusal differently.
    */
   override getUtils(): AdtUtilsLegacy<ResultValuesOf<typeof utilDocuments>>;
-  override getUtils<R extends IUtilResults>(
+  override getUtils<R extends AdtUtilResults>(
     results: R,
   ): AdtUtilsLegacy<ResultValuesOf<R>>;
   override getUtils(
-    results: IUtilResults = utilDocuments,
+    results: AdtUtilResults = utilDocuments,
   ): AdtUtilsLegacy<UtilValues> {
     this.assertConnected();
     return new AdtUtilsLegacy<UtilValues>(this.connection, {
