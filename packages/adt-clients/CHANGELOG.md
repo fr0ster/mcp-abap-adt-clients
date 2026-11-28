@@ -133,9 +133,10 @@ carries none, and SAP's own bound applies. Measured on the BTP ABAP environment
 ### Fixed
 
 - **A namespaced application log object name** was written into the path raw,
-  as several segments; it is now one segment through `seg()` (lowercased,
-  percent-encoded), as every other object's. Measured `200` on premise for the
-  `%2f` names (2026-11-28).
+  as several segments; it is now one segment, percent-encoded with its case
+  as given (the name goes to SAP exactly as given). Measured `200` on premise for
+  the `%2f` names, and on ABAP cloud at the upper-, mixed- and lowercase
+  addresses alike (2026-11-28).
 
 - **`getSqlQuery` sends `row_number` as given, and no `rowNumber` without
   one.** A missing or `0` bound was sent as 100. Without `rowNumber` SAP answers

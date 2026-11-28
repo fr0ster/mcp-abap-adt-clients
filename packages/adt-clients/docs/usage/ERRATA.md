@@ -529,6 +529,6 @@ source alike; an absent name of 7 characters answered `404`
 `APLO/TYP` an `OBJNAME_MAXLENGTH` of 20; that the length causes the `500` is
 inferred, not verified.
 
-**What the library does.** The name goes to SAP as given, through `seg()`, and
+**What the library does.** The name goes to SAP as given, percent-encoded, case kept, and
 the `500` comes back through `analyse` as SAP sent it; nothing checks the name's
 length.
