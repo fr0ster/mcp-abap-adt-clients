@@ -14,7 +14,7 @@ against rows that are already fixed. It is not how a row gets filled.
 There is one measurement script per system, sent through the connector and not through the
 library's members. That keeps a member's variant gate from deciding what is asked:
 
-- **Cloud:** run on the trial.
+- **Cloud:** run on the cloud test system.
 - **On premise:** the on-premise twin, run through the tunnel.
 
 What the script does:
@@ -50,23 +50,24 @@ Each operation's answer gets the goal's three-way classification:
 
 ### 1.3 What the measurements show
 
-Cloud: the trial, measured. On premise: S/4HANA 2025, measured by the tracking issue's
-recordings and the read-only probe. The on-premise twin of 1.1 still has to run for the rows
-marked "twin".
+Both runs of 1.1 are done: the cloud test system and S/4HANA 2025 on premise (the corpus cases
+`type-group-cycle-*`, `type-group-reads-*`), beside the tracking issue's earlier on-premise
+recordings. Not measured on either system: `corrNr` (both runs used a package without a
+transport) and `withLongPolling` on the metadata read.
 
-| Operation | On premise | ABAP Cloud (trial) |
+| Operation | On premise | ABAP Cloud (test system) |
 |---|---|---|
 | validate | served: valid 200, empty body; taken or too long 400 `InvalidTypeGroupName` | served: valid 200, empty body, with and without `packagename`; taken (`SLIS`) 400 `InvalidTypeGroupName` "already exists"; 7 characters 400 `InvalidTypeGroupName` (E2/129, "maximum of five characters"); `objtype=typedg` 400 |
-| create | served: 200, empty body | **decides nothing:** 403 `ExceptionResourceNoAuthorization`, EU/519, `S_DEVELOP`, in the trial's test package |
+| create | served: 200, empty body | **decides nothing:** 403 `ExceptionResourceNoAuthorization`, EU/519, `S_DEVELOP`, in the cloud test system's test package |
 | readMetadata | served: 200 v3 and v2 | served: 200 v3 and v2, and `?version=active` |
 | read / source | served: 200 `text/plain` | served: 200, and `?version=active`, and `withLongPolling=true` (answered at once) |
-| update (source write) | served: 200 (`If-Match`, `corrNr`: twin) | not measured: no object of its own (create decides nothing) |
+| update (source write) | served: 200, with `If-Match` from the source read's etag (`type-group-cycle-s4-2025--13`) | not measured: no object of its own (create decides nothing) |
 | lock / unlock | served: 200 / 200 | not measured: no object of its own |
 | activate | served: `chkl:messages`, `activationExecuted="true"` | not measured: no object of its own |
 | versions: list | served: 200 atom feed | served: 200 atom feed |
-| versions: version source | twin | served: 200 `text/plain` |
+| versions: version source | served: 200 `text/plain` (`…--19`) | served: 200 `text/plain` |
 | delete | served: 200, then the read answers 404 | not measured: no object of its own |
-| name in the path as given (upper case) | twin | served: `GET …/typegroups/ABAP` and `…/ABAP/source/main` 200 |
+| name in the path as given (upper case) | served: every request of the cycle addressed `ZTG3A` in upper case | served: `GET …/typegroups/ABAP` and `…/ABAP/source/main` 200 |
 
 The cloud row is therefore: `validate`, `readMetadata`, `read`, `source`, `versions`.
 
@@ -75,9 +76,7 @@ The cloud row is therefore: `validate`, `readMetadata`, `read`, `source`, `versi
 - Discovery's empty `app:accept` for the collection agrees, though by the goal's rule it is not
   what decides.
 
-The on-premise row is every operation of the goal, once the twin confirms the rows marked
-"twin". If an operation the twin measures is not served, it leaves the on-premise row before
-anything is published.
+The on-premise row is every operation of the goal: each one measured served.
 
 ## 2. The contract package: `@mcp-abap-adt/interfaces-adt` (a minor)
 
@@ -155,10 +154,9 @@ typeGroup: {
 ```
 
 - **`ADT_TYPES_ONPREM` (`s4-2025`):** `validate`, `create`, `readMetadata`, `read`, `source`,
-  `update`, `lock`, `unlock`, `activate`, `versions`, `delete`. Any of these the twin finds not
-  served is removed first.
+  `update`, `lock`, `unlock`, `activate`, `versions`, `delete`. Each is measured served (section 1.3).
 - **`ADT_TYPES_CLOUD` (`abap-cloud`):** `validate`, `readMetadata`, `read`, `source`, `versions`.
-- `nameMaxLength` 5 is typestructure's `OBJNAME_MAXLENGTH` on both releases, and the trial's
+- `nameMaxLength` 5 is typestructure's `OBJNAME_MAXLENGTH` on both releases, and the cloud test system's
   E2/129 says the same.
 - The code `TYPE/DG` enters the tables' code types (`typeCodeScan.ts`).
 
@@ -223,17 +221,17 @@ How each member answers:
 
 | Member | Request | Headers sent | Evidence |
 |---|---|---|---|
-| `validate(config, options?)` | `POST …/typegroups/validation?objtype=TYPE%2FDG&objname=<name>[&packagename=<pkg>][&description=<d>]` | `Accept: application/vnd.sap.as+xml` | on premise: issue recordings `40`/`53`–`56`; cloud: trial `validate-*`, `packagename` included |
-| `create(config, { headers, … })` | `POST …/typegroups[?corrNr=<t>]` | the caller's pair; `sap-language` when `masterLanguage` is given | body: issue `62-create` (v3 pair). `sap-language`, `corrNr`: twin |
-| `readMetadata(config, options?)` | `GET …/typegroups/<name>[?version=…][&withLongPolling=true]` | `Accept: options.accept ?? ACCEPT_TYPE_GROUP` | both measured; `version=active` cloud; `version=inactive` and `withLongPolling` on metadata: twin |
+| `validate(config, options?)` | `POST …/typegroups/validation?objtype=TYPE%2FDG&objname=<name>[&packagename=<pkg>][&description=<d>]` | `Accept: application/vnd.sap.as+xml` | on premise: issue recordings `40`/`53`–`56`; cloud: `validate-*`, `packagename` included |
+| `create(config, { headers, … })` | `POST …/typegroups[?corrNr=<t>]` | the caller's pair; `sap-language` when `masterLanguage` is given | body: issue `62-create`; `sap-language` with the v3 pair: `type-group-cycle-s4-2025--07`. `corrNr`: unverified |
+| `readMetadata(config, options?)` | `GET …/typegroups/<name>[?version=…][&withLongPolling=true]` | `Accept: options.accept ?? ACCEPT_TYPE_GROUP` | both measured, with `version=inactive` / `active` (`…--09`, `…--16`, cloud `14`); `withLongPolling`: unverified |
 | `read(config, version?, options?)` | `GET …/<name>/source/main[?version=…][&withLongPolling=true]` | `Accept: options.accept ?? 'text/plain'` | both measured; cloud also `version=active` and `withLongPolling` |
-| `update(config, { headers, lockHandle, source, ifMatch? })` | `PUT …/<name>/source/main?lockHandle=<h>[&corrNr=<t>]` | the caller's pair; `If-Match` when given | issue `66-write-source`; `If-Match`, `corrNr`: twin |
+| `update(config, { headers, lockHandle, source, ifMatch? })` | `PUT …/<name>/source/main?lockHandle=<h>[&corrNr=<t>]` | the caller's pair; `If-Match` when given | issue `66-write-source`; `If-Match`: `type-group-cycle-s4-2025--13`; `corrNr`: unverified |
 | `lock(config, options?)` | `POST …/<name>?_action=LOCK&accessMode=MODIFY`, stateful for this request only | `Accept: ACCEPT_LOCK` | issue `65-lock`, `71-lock-for-delete` |
 | `unlock(config, lockHandle, options?)` | `POST …/<name>?_action=UNLOCK&lockHandle=<h>`, stateful for this request only | none of its own | issue `67-unlock`, `73-unlock-after-delete` |
 | `activate(config, { headers, preauditRequested? })` | `POST /sap/bc/adt/activation?method=activate&preauditRequested=<true unless false>` | the caller's pair (measured: `Accept: application/xml`, `Content-Type: application/vnd.sap.adt.activation+xml`) | issue `68-activate` |
 | `getVersions(config, options?)` | `GET …/<name>/source/main/versions` | `Accept: application/atom+xml;type=feed` | issue `37-slis-versions`; cloud `05-versions` |
-| `getVersionSource(contentUri, options?)` | `GET <contentUri>` | `Accept: text/plain` | cloud: trial `12-version-source` 200; on premise: twin |
-| `delete(config, { headers, lockHandle })` | `DELETE …/<name>?lockHandle=<h>[&corrNr=<t>]` | the caller's pair | issue `72-delete`; `corrNr`: twin |
+| `getVersionSource(contentUri, options?)` | `GET <contentUri>` | `Accept: text/plain` | `type-group-cycle-s4-2025--19`; cloud `12-version-source` |
+| `delete(config, { headers, lockHandle })` | `DELETE …/<name>?lockHandle=<h>[&corrNr=<t>]` | the caller's pair | issue `72-delete`, `type-group-cycle-s4-2025--21`; `corrNr`: unverified |
 
 The activation body is the measured `adtcore:objectReferences`. It names `TYPE_GROUP.uri(name)`
 and the name as given.
@@ -261,8 +259,12 @@ nothing else changed:
     `masterLanguage` is given (`languageAttributes`, `createRequestHeaders`). No value is
     invented.
   - `corrNr` is sent only when `transportRequest` is given.
-  - `sap-language` and `corrNr` are unmeasured for type groups. The twin measures them before
-    anything is published, and one it finds refused is removed from the member.
+  - `sap-language` is measured served on premise (`type-group-cycle-s4-2025--07`).
+  - `corrNr` and the metadata read's `withLongPolling` are unverified: no run had a transport,
+    and none sent long polling on the metadata. They are kept, as every source type sends them,
+    and the on-premise live suite proves them before adt-clients is tagged: a case in a
+    transportable package with the overlay's transport, and a metadata read with long polling.
+    One that is refused is removed from the member before the tag.
 
 ## 4. adt-strategies
 
@@ -282,9 +284,9 @@ corpus rule:
 - **The recordings that go in:**
   - the tracking issue's S/4HANA 2025 recordings (cycle, validation, reads);
   - the read-only probes of both systems;
-  - the trial's measurement run: the validation answers, the create refusal, the version
+  - the cloud test system's measurement run: the validation answers, the create refusal, the version
     source, the upper-case and `withLongPolling` reads;
-  - the on-premise twin's run, refusals included.
+  - the on-premise measurement run (`type-group-cycle-s4-2025`), refusals included.
 - **Names.** Case names are `type-group-<step>-s4-2025` and `type-group-<step>-abap-cloud`.
 
 ### 5.2 Unit tests (no SAP system), `core/typeGroup/typeGroup.test.ts`
@@ -341,7 +343,9 @@ values.
   6. read active;
   7. list the versions, and read one version's source;
   8. lock, delete, unlock;
-  9. read again: 404.
+  9. read again: 404;
+  10. in a transportable package with the overlay's transport: create, write and delete carrying
+      `corrNr`, and a metadata read with `withLongPolling=true`.
 - **On ABAP Cloud**, one case per operation in its row:
   - validation: a free name, a taken one (`SLIS`), one too long;
   - the metadata and the source of an SAP type group (`ABAP`), with and without
@@ -351,7 +355,7 @@ values.
     case for them. That operations outside the row do not compile is the unit gate test.
 - **Package.** The test package and its transport come from the overlay.
   - On premise `$TMP` may be used.
-  - On cloud the trial's test package is used, since a create into `$TMP` on the trial is
+  - On cloud the cloud test system's test package is used, since a create into `$TMP` on the cloud test system is
     refused. An earlier probe in this project measured that refusal, but no recording of it is
     in the corpus, so for this spec it is unverified.
 - **Cleanup.** Whatever the suite creates it deletes, also on failure, and a failing case logs
@@ -359,14 +363,13 @@ values.
 
 ## 6. Release order
 
-1. **Measure.** The trial run is done (section 1.3). The on-premise twin is run, and its result
-   settles the on-premise row.
+1. **Measure.** Both runs are done (section 1.3), and they settle both rows.
 2. **interfaces-adt minor:** `'typeGroup'`, `ITypeGroupConfig`, `ITypeGroupResults`,
    `IAdtLockedDeletable`, and both rows as section 2.3 fixes them. It is published, and a clean
    install of it from the registry, outside the repository, is checked.
 3. **adt-clients,** against the published range:
    - the module, the corpus and the unit tests;
-   - the live suite, run on premise and on the trial against the published rows.
+   - the live suite, run on premise and on the cloud test system against the published rows.
    - A live failure that shows a row wrong stops the release. The measurement is redone, and the
      row is corrected before adt-clients is tagged. No patch is planned to finish a row.
 4. **adt-clients minor:**

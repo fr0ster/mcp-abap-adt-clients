@@ -36,7 +36,7 @@ document of its own.
 
 ## Measured
 
-Read-only requests on S/4HANA 2025 (on premise) and on ABAP Cloud (trial), each sent through
+Read-only requests on S/4HANA 2025 (on premise) and on ABAP Cloud (test system), each sent through
 the connector (`scripts/adt-nc.ts`). The on-premise write cycle and the validation answers are
 the tracking issue's table: raw requests on S/4HANA 2025, recordings kept for the corpus.
 
@@ -57,7 +57,7 @@ the tracking issue's table: raw requests on S/4HANA 2025, recordings kept for th
 | `GET …/typegroups/validation` | 405 | 405 |
 | quickSearch, `objectType=TYPE/DG` | found | found (SAP's type groups; none in the customer namespace) |
 | validate, `objtype=TYPE/DG` (raw) | valid name: 200, empty body; taken or too long: 400 `InvalidTypeGroupName`; `objtype` `typedg`, `type` or `TYPEDG`: 400 | served: valid 200 empty, taken or too long 400 `InvalidTypeGroupName`, `typedg` 400 |
-| create (raw) | 200, empty body; the object is inactive, source `TYPE-POOL <name>.` | 403 EU/519 `S_DEVELOP` in the trial's test package: an authorization refusal, so it decides nothing |
+| create (raw) | 200, empty body; the object is inactive, source `TYPE-POOL <name>.` | 403 EU/519 `S_DEVELOP` in the cloud test system's test package: an authorization refusal, so it decides nothing |
 | lock, source write, unlock (raw) | 200 each | not measured |
 | activate (raw) | `chkl:messages`, `activationExecuted="true"` | not measured |
 | delete: lock, `DELETE ?lockHandle`, unlock (raw) | 200, then the read answers 404 | not measured |
@@ -114,11 +114,11 @@ header; that is not verified.
        apply.
   2. Unmeasured, the release's discovery decides: a listed collection with its media types.
   3. Where discovery does not describe the operation, the typestructure capabilities decide.
-  4. Every operation the cloud row lists is measured on the trial before the release. One that
+  4. Every operation the cloud row lists is measured on the cloud test system before the release. One that
      cannot be measured there stays out of the cloud row.
   - The cloud's create is unverified today: its collection is listed with an empty
     `app:accept`, and its typestructure lists CREATE. A live measurement outranks discovery: if
-    the trial measures create served, it is in the cloud row.
+    the cloud test system measures create served, it is in the cloud row.
 - **Every claim about SAP behaviour is measured or read in SAP's handler.** The document or test
   that states it says which, and an unmeasured claim is marked unverified.
 - **The corpus holds the answers.** The scrubbed recordings of both releases go into the corpus
