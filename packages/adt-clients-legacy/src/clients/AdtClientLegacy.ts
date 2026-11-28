@@ -47,6 +47,7 @@ import {
   type AdtTableSettings,
   type AdtTextElements,
   type AdtTransformation,
+  type AdtTypeGroup,
   type AppendStructureValues,
   AUTHORIZATION_FIELD,
   type AuthorizationFieldValues,
@@ -118,12 +119,14 @@ import {
   TRANSFORMATION,
   type TransformationValues,
   type TransportValues,
+  type TypeGroupValues,
   tableDocuments,
   tableSettingsDocuments,
   tableTypeDocuments,
   textElementsDocuments,
   transformationDocuments,
   transportDocuments,
+  typeGroupDocuments,
   type UtilValues,
   utilDocuments,
 } from '@mcp-abap-adt/adt-clients';
@@ -159,6 +162,7 @@ import type {
   ITextElementsResults,
   ITransformationResults,
   ITransportResults,
+  ITypeGroupResults,
   IUtilResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -200,6 +204,7 @@ import {
   AdtTableSettingsAbsentLegacy,
   AdtTextElementsAbsentLegacy,
   AdtTransformationAbsentLegacy,
+  AdtTypeGroupAbsentLegacy,
   type LegacySettingsKind,
 } from './absentHandlers';
 
@@ -913,6 +918,26 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
   ): AdtFeatureToggle<FeatureToggleValues> {
     this.assertConnected();
     return new AdtFeatureToggleAbsentLegacy(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
+      results,
+    });
+  }
+
+  override getTypeGroup(
+    this: this & AdtServedBy<'typeGroup'>,
+  ): AdtTypeGroup<ResultValuesOf<typeof typeGroupDocuments>, 'basis740'>;
+  override getTypeGroup<R extends ITypeGroupResults>(
+    this: this & AdtServedBy<'typeGroup'>,
+    results: R,
+  ): AdtTypeGroup<ResultValuesOf<R>, 'basis740'>;
+  override getTypeGroup(
+    this: this & AdtServedBy<'typeGroup'>,
+    results: ITypeGroupResults = typeGroupDocuments,
+  ): AdtTypeGroup<TypeGroupValues, 'basis740'> {
+    this.assertConnected();
+    return new AdtTypeGroupAbsentLegacy(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       lockRegistry: this.lockRegistry,

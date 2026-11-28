@@ -1479,3 +1479,66 @@ exports[`an absent legacy handler refuses every operation, as before getTransfor
   },
 }
 `;
+
+exports[`an absent legacy handler refuses every operation, as before getTypeGroup: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": "TypeGroup",
+  "refusals": {
+    "activate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TypeGroup is not supported on this SAP system: /sap/bc/adt/ddic/typegroups, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "create": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TypeGroup is not supported on this SAP system: /sap/bc/adt/ddic/typegroups, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "delete": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TypeGroup is not supported on this SAP system: /sap/bc/adt/ddic/typegroups, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "getVersionSource": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TypeGroup is not supported on this SAP system: /sap/bc/adt/ddic/typegroups, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "getVersions": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TypeGroup is not supported on this SAP system: /sap/bc/adt/ddic/typegroups, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "lock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TypeGroup is not supported on this SAP system: /sap/bc/adt/ddic/typegroups, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "read": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TypeGroup is not supported on this SAP system: /sap/bc/adt/ddic/typegroups, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "readMetadata": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TypeGroup is not supported on this SAP system: /sap/bc/adt/ddic/typegroups, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "unlock": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TypeGroup is not supported on this SAP system: /sap/bc/adt/ddic/typegroups, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "update": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TypeGroup is not supported on this SAP system: /sap/bc/adt/ddic/typegroups, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "validate": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "TypeGroup is not supported on this SAP system: /sap/bc/adt/ddic/typegroups, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+  },
+}
+`;

@@ -233,6 +233,12 @@ export const CONFIGS: Record<string, Record<string, unknown>> = {
     msgtext: 'guard',
   },
   getRequest: { transportNumber: 'GUARD_REQUEST', description: 'guard' },
+  getTypeGroup: {
+    typeGroupName: 'ZGRD',
+    source: 'TYPE-POOL zgrd .',
+    packageName: '$TMP',
+    description: 'guard',
+  },
   getTransformation: {
     transformationName: 'ZGUARD_XSLT',
     transformationType: 'XSLT',
@@ -592,6 +598,19 @@ const ABSENT = {
   getStructure: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
   getTable: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
   getTransformation: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
+  getTypeGroup: [
+    'activate',
+    'create',
+    'delete',
+    'getVersionSource',
+    'getVersions',
+    'lock',
+    'read',
+    'readMetadata',
+    'unlock',
+    'update',
+    'validate',
+  ],
   getTableType: [
     'activate',
     'check',
@@ -646,6 +665,7 @@ const CLIENT_GETTERS = [
   'getTableType',
   'getTextElements',
   'getTransformation',
+  'getTypeGroup',
   'getUtils',
 ] as const;
 
@@ -1595,6 +1615,11 @@ export const NON_PUBLIC: Record<string, { file: string; className: string }> = {
           'getTableType',
           '../adt-clients/src/core/tabletype/AdtDdicTableType.ts',
           'AdtDdicTableType',
+        ],
+        [
+          'getTypeGroup',
+          '../adt-clients/src/core/typeGroup/AdtTypeGroup.ts',
+          'AdtTypeGroup',
         ],
       ] as const
     ).map(([getter, file, className]) => [

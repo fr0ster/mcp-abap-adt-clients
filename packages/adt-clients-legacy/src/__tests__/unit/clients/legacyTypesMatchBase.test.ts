@@ -100,6 +100,7 @@ type LegacyClientGetters = AllTrue<
     | 'getFunctionInclude'
     | 'getMessageClass'
     | 'getTransformation'
+    | 'getTypeGroup'
     | 'getScalarFunction'
     | 'getScalarFunctionImplementation'
     | 'getAppendStructure'

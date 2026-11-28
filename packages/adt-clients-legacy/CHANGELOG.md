@@ -9,6 +9,14 @@ one changelog per package.
 For adt-clients 49.0.0 (C7: one member, one endpoint, one request; to be
 released as 0.13.0 on `@mcp-abap-adt/adt-clients` `^49.0.0`).
 
+### Added
+
+- **`AdtTypeGroupAbsentLegacy`** and `getTypeGroup()` on `AdtClientLegacy`
+  (adt-clients #305): 7.40 SP04's discovery lists no type group collection,
+  so the getter does not compile on the legacy client, and called from outside
+  the type system every member is refused with no request (not measured, not
+  advertised).
+
 ### Changed (breaking)
 
 - **`AdtFunctionGroupLegacy.activate` sends the activation alone**, through

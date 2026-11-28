@@ -50,6 +50,7 @@ import {
   AdtTableSettingsAbsentLegacy,
   AdtTextElementsAbsentLegacy,
   AdtTransformationAbsentLegacy,
+  AdtTypeGroupAbsentLegacy,
 } from '../../clients/absentHandlers';
 import { AdtClassLegacy } from '../../core/class/AdtClassLegacy';
 import { AdtLocalDefinitionsLegacy } from '../../core/class/AdtLocalDefinitionsLegacy';
@@ -293,6 +294,7 @@ const ABSENT_HANDLERS = [
   AdtTableSettingsAbsentLegacy,
   AdtTextElementsAbsentLegacy,
   AdtTransformationAbsentLegacy,
+  AdtTypeGroupAbsentLegacy,
 ] as const;
 
 for (const [handlerClass, pairs] of LEGACY_HEADER_PAIRS)

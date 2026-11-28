@@ -363,7 +363,7 @@ types' reads. Member by member: LEGACY.md.
 `getAccessControl()`, `getServiceDefinition()`, `getServiceBinding()`,
 `getBehaviorDefinition()`, `getBehaviorImplementation()`,
 `getMetadataExtension()`, `getAuthorizationField()`, `getFeatureToggle()`,
-`getTableSettings()`: `ADT_TYPES_BASIS_740` has no such API, so the getter does not compile on
+`getTableSettings()`, `getTypeGroup()`: `ADT_TYPES_BASIS_740` has no such API, so the getter does not compile on
 `AdtClientLegacy` (since 0.2.0). Called from outside the type system, it hands
 out a handler and every member of it is **refused**. Since 0.12.0 that handler
 is a subclass of the modern one (`AdtDomainAbsentLegacy` extends `AdtDomain`,
