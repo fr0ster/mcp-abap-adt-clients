@@ -110,3 +110,27 @@ describe('getAllTypes sends maxItemCount as given, and none when none is given',
     );
   });
 });
+
+// `/datapreview/ddic` without `rowNumber` answered 101 records (SAP's 100 and
+// one more), and ignored `0` (BTP ABAP environment, 2026-11-27).
+describe('getTableContents sends max_rows as given, and none when none is given', () => {
+  it('without max_rows the URL carries no rowNumber', async () => {
+    const { utils, sent } = recording();
+    await utils.getTableContents(
+      { table_name: 't', sql_query: 'SELECT * FROM T' },
+      { headers: headersOf(utils, 'getTableContents') },
+    );
+    expect(onlyUrl(sent)).toBe('/sap/bc/adt/datapreview/ddic?ddicEntityName=T');
+  });
+
+  it.each([0, 5])('max_rows %p goes out as given', async (given) => {
+    const { utils, sent } = recording();
+    await utils.getTableContents(
+      { table_name: 't', sql_query: 'SELECT * FROM T', max_rows: given },
+      { headers: headersOf(utils, 'getTableContents') },
+    );
+    expect(onlyUrl(sent)).toBe(
+      `/sap/bc/adt/datapreview/ddic?rowNumber=${given}&ddicEntityName=T`,
+    );
+  });
+});
