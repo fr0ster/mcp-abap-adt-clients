@@ -302,6 +302,7 @@ const HANDLER: {
   scalarFunction: (c) => c.getScalarFunction(),
   scalarFunctionImplementation: (c) => c.getScalarFunctionImplementation(),
   transformation: (c) => c.getTransformation(),
+  typeGroup: (c) => c.getTypeGroup(),
   messageClass: (c) => c.getMessageClass(),
   messageClassMessage: (c) => c.getMessageClassMessage(),
   featureToggle: (c) => c.getFeatureToggle(),

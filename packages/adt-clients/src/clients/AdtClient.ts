@@ -52,6 +52,7 @@ import type {
   ITextElementsResults,
   ITransformationResults,
   ITransportResults,
+  ITypeGroupResults,
   IUtilResults,
 } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -211,6 +212,11 @@ import {
   type TransportValues,
   transportDocuments,
 } from '../core/transport';
+import {
+  AdtTypeGroup,
+  type TypeGroupValues,
+  typeGroupDocuments,
+} from '../core/typeGroup';
 import { withRequestTrace } from '../utils/requestTrace';
 import type { ResultValuesOf } from '../utils/resultStrategy';
 import type { AdtModernVariant, AdtServedBy } from './variant';
@@ -915,6 +921,30 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
   ): AdtTransformation<TransformationValues, V> {
     this.assertConnected();
     return new AdtTransformation<TransformationValues, V>(this.connection, {
+      logger: this.logger,
+      systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
+      results,
+    });
+  }
+
+  /**
+   * Type groups (`TYPE/DG`). On ABAP Cloud only validation, the reads and the
+   * versions are offered; the writes are gated by the variant's row.
+   */
+  getTypeGroup(
+    this: this & AdtServedBy<'typeGroup'>,
+  ): AdtTypeGroup<ResultValuesOf<typeof typeGroupDocuments>, V>;
+  getTypeGroup<R extends ITypeGroupResults>(
+    this: this & AdtServedBy<'typeGroup'>,
+    results: R,
+  ): AdtTypeGroup<ResultValuesOf<R>, V>;
+  getTypeGroup(
+    this: this & AdtServedBy<'typeGroup'>,
+    results: ITypeGroupResults = typeGroupDocuments,
+  ): AdtTypeGroup<TypeGroupValues, V> {
+    this.assertConnected();
+    return new AdtTypeGroup<TypeGroupValues, V>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
       lockRegistry: this.lockRegistry,

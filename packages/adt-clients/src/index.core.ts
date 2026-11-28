@@ -220,6 +220,7 @@ export {
   type TransportValues,
 } from './core/transport';
 export { changeTransportTaskType } from './core/transport/objects';
+export { AdtTypeGroup, type TypeGroupValues } from './core/typeGroup';
 export type {
   AdtAddressableCode,
   AdtGroupOnlyCode,
@@ -253,6 +254,7 @@ export {
   TEXT_ELEMENTS,
   TRANSFORMATION,
   TRANSPORT_REQUEST,
+  TYPE_GROUP,
   versionsUri,
 } from './endpoints/objects';
 export { buildObjectUri } from './utils/activationUtils';

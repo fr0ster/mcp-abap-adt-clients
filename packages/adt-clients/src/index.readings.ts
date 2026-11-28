@@ -66,6 +66,7 @@ export { tableTypeDocuments } from './core/tabletype/types';
 export { textElementsDocuments } from './core/textElements/types';
 export { transformationDocuments } from './core/transformation/types';
 export { transportDocuments } from './core/transport/types';
+export { typeGroupDocuments } from './core/typeGroup/types';
 /**
  * No error strategy ships from here.
  *
