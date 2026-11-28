@@ -2353,8 +2353,9 @@ answers an `adtcore:objectReference` whose `uri` is `<include>#start=l,c`: the
 line of the element's statement and the column of its name (measured on
 premise and on ABAP cloud, 2026-11-28). The end is not given.
 
-A local method's definition link is refused on ABAP cloud (`400`,
-`uriMappingError`, EU/061) and answers a start on premise. The start may lie in
+A function group's local method's definition link is refused (`400`,
+`uriMappingError`, EU/061) on ABAP cloud and on premise; a one-include
+program's (on premise) answers a start. The start may lie in
 another include of the same object than the one the link names: on premise a
 function group's local method, linked into its class-definition include,
 answered its start in the implementation include. Independent navigations

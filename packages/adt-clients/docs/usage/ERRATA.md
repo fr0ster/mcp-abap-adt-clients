@@ -211,20 +211,24 @@ methods, 3 dialog modules and the group's data and types.
 **Rule.** For a function group's elements, read the outline of one of its
 includes, named by the group's own outline.
 
-## A local method's definition link: refused on the cloud, the implementation on premise
+## A local method's definition link: refused in a function group, answered in a program
 
 **Symptom.** An outline names a program's or a function group's local method
 (`PROG/PLM`, `FUGR/PLM`) by a fragment whose name is the class name padded to
 30 characters and the method name. Navigating its `definitionIdentifier`
 (`POST /sap/bc/adt/navigation/target`) answers differently by system.
 
-**What actually happened.** Measured 2026-11-28: on ABAP cloud the
-`definitionIdentifier` is refused, `400` `uriMappingError`, EU/061 "Object …
-not found", and the `implementationIdentifier` answers `200` at the `METHOD`
-statement; on premise, in a program of one include, the two links are the
-same href and both answer the same start, the `METHOD` statement, and in a
-function group the links name different includes and the implementation
-link's start lies in the implementation include, not the one it names.
+**What actually happened.** Measured 2026-11-28:
+
+- a function group's local method (`FUGR/PLM`, the include outline of a
+  delivered group): the `definitionIdentifier` is refused, `400`
+  `uriMappingError`, EU/061 "Object … not found", on ABAP cloud and on premise
+  alike; the `implementationIdentifier` answers `200` at the `METHOD`
+  statement, in the implementation include, which is not always the include
+  the link names;
+- a program's local method (`PROG/PLM`, a program of one include, on premise):
+  the two links are the same href and both answer `200` at the same start, the
+  `METHOD` statement.
 
 **Rule.** Navigate a local method by its `implementationIdentifier`; its
 declaration is part of its local class's definition. Take the include from the
