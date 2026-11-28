@@ -305,6 +305,9 @@ const HANDLER: {
   messageClass: (c) => c.getMessageClass(),
   messageClassMessage: (c) => c.getMessageClassMessage(),
   featureToggle: (c) => c.getFeatureToggle(),
+  applicationLog: (c) => c.getApplicationLog(),
+  applicationJobCatalog: (c) => c.getApplicationJobCatalog(),
+  applicationJobTemplate: (c) => c.getApplicationJobTemplate(),
   authorizationField: (c) => c.getAuthorizationField(),
   enhancement: (c) => c.getEnhancement(),
   localTestClass: (c) => c.getLocalTestClass(),
@@ -422,6 +425,12 @@ const SOURCE_READ: {
     c
       .getFeatureToggle()
       .readSource({ featureToggleName: name }, undefined, JUDGED),
+  // A definition's source is its JSON (`getSource`, `/source/main`).
+  applicationLog: (c, name) => c.getApplicationLog().getSource(name, JUDGED),
+  applicationJobCatalog: (c, name) =>
+    c.getApplicationJobCatalog().getSource(name, JUDGED),
+  applicationJobTemplate: (c, name) =>
+    c.getApplicationJobTemplate().getSource(name, JUDGED),
   // Only a source-code plugin has a source the library reads.
   enhancement: async (c, name, code) =>
     code === 'ENHO/XHH'

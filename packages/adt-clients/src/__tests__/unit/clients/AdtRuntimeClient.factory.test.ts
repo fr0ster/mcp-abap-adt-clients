@@ -17,6 +17,7 @@ import { DdicActivation } from '../../../runtime/ddic/DdicActivation';
 import { RuntimeDumps } from '../../../runtime/dumps/RuntimeDumps';
 import { FeedRepository } from '../../../runtime/feeds/FeedRepository';
 import { GatewayErrorLog } from '../../../runtime/gatewayErrorLog/GatewayErrorLog';
+import { KeywordDocumentation } from '../../../runtime/keywordDocumentation/KeywordDocumentation';
 import { SystemMessages } from '../../../runtime/systemMessages/SystemMessages';
 import { CrossTrace } from '../../../runtime/traces/CrossTraceDomain';
 import {
@@ -60,6 +61,16 @@ describe('AdtRuntimeClient factory pattern', () => {
   it('getApplicationLog() returns an ApplicationLog instance', () => {
     const { client } = createRuntimeClient();
     expect(client.getApplicationLog()).toBeInstanceOf(ApplicationLog);
+  });
+
+  it('getKeywordDocumentation() returns a KeywordDocumentation instance, fresh per call', () => {
+    const { client } = createRuntimeClient();
+    expect(client.getKeywordDocumentation()).toBeInstanceOf(
+      KeywordDocumentation,
+    );
+    expect(client.getKeywordDocumentation()).not.toBe(
+      client.getKeywordDocumentation(),
+    );
   });
 
   it('getAtcLog() returns an AtcLog instance', () => {

@@ -23,7 +23,26 @@ import {
   PARENTED_SEGMENT,
   parentEntry,
 } from '../endpoints/codes';
-import { seg } from '../endpoints/objects';
+import {
+  APPLICATION_JOB_CATALOG,
+  APPLICATION_JOB_TEMPLATE,
+  APPLICATION_LOG,
+  seg,
+} from '../endpoints/objects';
+
+/**
+ * The codes addressed with their name as given, case kept: the record's own
+ * address, not the lowercased one (fr0ster/mcp-abap-adt#404).
+ */
+const AS_GIVEN_ADDRESS_OF: ReadonlyMap<
+  AdtAddressableCode,
+  (name: string) => string
+> = new Map<AdtAddressableCode, (name: string) => string>([
+  ['APLO/TYP', APPLICATION_LOG.uri],
+  ['SAJC', APPLICATION_JOB_CATALOG.uri],
+  ['SAJT', APPLICATION_JOB_TEMPLATE.uri],
+]);
+
 import { requestHeaders } from './requestHeaders';
 
 /** {@link PARENTED_SEGMENT}, read by any code: absent for an unparented one. */
@@ -61,6 +80,8 @@ export function buildObjectUri<C extends AdtAddressableCode>(
 ): string {
   const groupOnly = GROUP_ONLY_ADDRESS_OF.get(type);
   if (groupOnly) return groupOnly(name);
+  const asGiven = AS_GIVEN_ADDRESS_OF.get(type);
+  if (asGiven) return asGiven(name);
   const [first] = codeEntries(type);
   // Only a caller outside the type system reaches this: a code no table names
   // is no `AdtTypeCode`. It is their argument, refused before any request.

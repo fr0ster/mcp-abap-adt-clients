@@ -1,0 +1,24 @@
+{
+  "case": "read-application-log-definition-abap-cloud",
+  "step": 1,
+  "stepTag": "object",
+  "capturedAt": "2026-11-28",
+  "note": "Recorded 2026-11-28 by a GET-only probe (curl, no CSRF, no session), on ABAP cloud (trial); fr0ster/mcp-abap-adt#404. Scrubbed of host, user fields (SAPUSER01), sap-client and the application server name.",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/applicationlog/objects/abi",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/applicationlog/objects/abi",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.blues.v1+xml"
+    }
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.blues.v1+xml; charset=utf-8"
+    },
+    "bodyFile": "read-application-log-definition-abap-cloud--01-object.body.txt"
+  }
+}

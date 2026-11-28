@@ -3,12 +3,14 @@
  */
 
 export { AdtBatchConnection } from '../batch';
+export * from './applicationJob';
 export * from './applicationLog';
 export * from './atc';
 export * from './ddic';
 export * from './dumps';
 export * from './feeds';
 export * from './gatewayErrorLog';
+export * from './keywordDocumentation';
 export * from './systemMessages';
 // AdtRuntimeClient is now in clients/, not runtime/
 export * from './traces/crossTrace';

@@ -1,0 +1,24 @@
+{
+  "case": "refusal-keyword-documentation-version-1-s4-2025",
+  "step": 1,
+  "stepTag": "topic",
+  "capturedAt": "2026-11-28",
+  "note": "Recorded 2026-11-28 by a GET-only probe (curl, no CSRF, no session), on premise (S/4HANA 2025); fr0ster/mcp-abap-adt#404. Scrubbed of host, user fields (SAPUSER01), sap-client and the application server name.",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/docu/abap/langu?format=eclipse&language=EN&version=1&object=ABAPSELECT",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/docu/abap/langu?format=eclipse&language=EN&version=1&object=ABAPSELECT",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.docu.v1+html"
+    }
+  },
+  "response": {
+    "status": 500,
+    "statusText": "Internal Server Error",
+    "headers": {
+      "content-type": "text/html; charset=utf-8"
+    },
+    "bodyFile": "refusal-keyword-documentation-version-1-s4-2025--01-topic.body.txt"
+  }
+}

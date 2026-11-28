@@ -1,0 +1,41 @@
+{
+  "case": "read-keyword-documentation-no-hit-s4-2025",
+  "step": 1,
+  "stepTag": "query",
+  "capturedAt": "2026-11-28",
+  "note": "Recorded 2026-11-28 by a GET-only probe (curl, no CSRF, no session), on premise (S/4HANA 2025); fr0ster/mcp-abap-adt#404. Scrubbed of host, user fields (SAPUSER01), sap-client and the application server name.",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/docu/abap/langu?format=eclipse&language=EN&query=NO_SUCH_KEYWORD_XYZ",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/docu/abap/langu?format=eclipse&language=EN&query=NO_SUCH_KEYWORD_XYZ",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.docu.v1+html"
+    }
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.docu.v1+html; charset=utf-8"
+    },
+    "bodyFile": "read-keyword-documentation-no-hit-s4-2025--01-query.body.txt"
+  },
+  "links": [
+    {
+      "kind": "other",
+      "href": "",
+      "label": "Mail Feedback"
+    },
+    {
+      "kind": "other",
+      "href": "http://sap.example.local:8000/sap/public/bc/abap/docu?sap-language=EN&tree=X&version=X&sap-client=000&object=ABENABAP&style=adt",
+      "label": "Browser Version ADT Style"
+    },
+    {
+      "kind": "other",
+      "href": "http://sap.example.local:8000/sap/public/bc/abap/docu?sap-language=EN&tree=X&version=X&sap-client=000&object=ABENABAP&style=ui5",
+      "label": "Browser Version UI5 Style"
+    }
+  ]
+}

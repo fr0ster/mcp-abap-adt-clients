@@ -274,6 +274,44 @@ export const FEATURE_TOGGLE = {
   toggle: (name: string) => `${FEATURE_TOGGLE.uri(name)}/toggle`,
 } as const;
 
+/**
+ * A name in a definition read's address: percent-encoded, its case as given —
+ * the name goes to SAP exactly as the caller wrote it (measured on ABAP cloud
+ * and on premise, 2026-11-28: the definitions answer 200 at an uppercase,
+ * a mixed-case and a lowercase address alike).
+ */
+function asGiven(name: string): string {
+  return encodeURIComponent(name);
+}
+
+/** An application log object (`APLO/TYP`), read as its definition. */
+export const APPLICATION_LOG = {
+  collection: '/sap/bc/adt/applicationlog/objects',
+  validation: '/sap/bc/adt/applicationlog/objects/validation',
+  uri: (name: string) => `/sap/bc/adt/applicationlog/objects/${asGiven(name)}`,
+} as const;
+
+/** An application job catalog (`SAJC`), read as its definition. */
+export const APPLICATION_JOB_CATALOG = {
+  collection: '/sap/bc/adt/applicationjob/catalogs',
+  uri: (name: string) => `/sap/bc/adt/applicationjob/catalogs/${asGiven(name)}`,
+} as const;
+
+/** An application job template (`SAJT`), read as its definition. */
+export const APPLICATION_JOB_TEMPLATE = {
+  collection: '/sap/bc/adt/applicationjob/templates',
+  uri: (name: string) =>
+    `/sap/bc/adt/applicationjob/templates/${asGiven(name)}`,
+} as const;
+
+/**
+ * The ABAP keyword documentation: one collection, its forms told apart by
+ * their query parameters (`query`, `object`, `uri`), none of them an address.
+ */
+export const KEYWORD_DOCUMENTATION = {
+  collection: '/sap/bc/adt/docu/abap/langu',
+} as const;
+
 export const AUTHORIZATION_FIELD = {
   collection: '/sap/bc/adt/aps/iam/auth',
   validation: '/sap/bc/adt/aps/iam/auth/validation',
@@ -346,6 +384,10 @@ export const RECORDS = {
   TRANSFORMATION,
   MESSAGE_CLASS,
   FEATURE_TOGGLE,
+  APPLICATION_LOG,
+  APPLICATION_JOB_CATALOG,
+  APPLICATION_JOB_TEMPLATE,
+  KEYWORD_DOCUMENTATION,
   AUTHORIZATION_FIELD,
   ENHANCEMENT,
   SCALAR_FUNCTION,

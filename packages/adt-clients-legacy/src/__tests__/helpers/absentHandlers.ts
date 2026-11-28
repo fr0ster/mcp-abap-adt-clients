@@ -1,5 +1,5 @@
 /**
- * The 20 getters a legacy client answers with an absent handler (C5 of
+ * The 23 getters a legacy client answers with an absent handler (C5 of
  * #304), and the modern classes' private helpers: an absent handler keeps
  * them modern (a subclass cannot redeclare them, TS2415), reached only from
  * the operations it overrides, so a test calls only the public operations.
@@ -25,6 +25,9 @@ export const ABSENT_GETTERS = [
   'getScalarFunction',
   'getScalarFunctionImplementation',
   'getAppendStructure',
+  'getApplicationLog',
+  'getApplicationJobCatalog',
+  'getApplicationJobTemplate',
 ] as const;
 
 export const PRIVATE_HELPERS = new Set([

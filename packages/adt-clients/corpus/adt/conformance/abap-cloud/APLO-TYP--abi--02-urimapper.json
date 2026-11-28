@@ -1,0 +1,35 @@
+{
+  "case": "APLO-TYP--abi",
+  "step": 2,
+  "stepTag": "urimapper",
+  "capturedAt": "2026-11-28T12:16:18.015Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/vit/urimapper",
+    "params": {
+      "uri": "/sap/bc/adt/vit/wb/object_type/aplotyp/object_name/ABI"
+    },
+    "effectiveUrl": "/sap/bc/adt/vit/urimapper?uri=%2Fsap%2Fbc%2Fadt%2Fvit%2Fwb%2Fobject_type%2Faplotyp%2Fobject_name%2FABI",
+    "headers": {
+      "Accept": "application/xml"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded by the live conformance check (typeTablesConformance.test.ts); the connection added the authentication and the session, none of which is recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/xml; charset=utf-8",
+      "content-length": "204",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=8328",
+      "sap-server": "true",
+      "sap-perf-fesrec": "13440.000000"
+    },
+    "bodyFile": "APLO-TYP--abi--02-urimapper.body.xml"
+  }
+}

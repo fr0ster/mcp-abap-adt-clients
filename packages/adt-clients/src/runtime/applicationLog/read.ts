@@ -19,6 +19,7 @@ import {
   ACCEPT_APPLICATION_LOG_OBJECT,
   ACCEPT_APPLICATION_LOG_SOURCE,
 } from '../../constants/contentTypes';
+import { APPLICATION_LOG, sourceUri } from '../../endpoints/objects';
 
 // Declared once, in the contract; re-exported so importers here are unchanged.
 export type { IGetApplicationLogObjectOptions } from '@mcp-abap-adt/interfaces-adt';
@@ -36,7 +37,7 @@ export async function getApplicationLogObject(
   objectName: string,
   options?: IGetApplicationLogObjectOptions,
 ): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/applicationlog/objects/${objectName}`;
+  const url = APPLICATION_LOG.uri(objectName);
   const params: Record<string, string | number | boolean> = {};
 
   if (options?.corrNr) params.corrNr = options.corrNr;
@@ -51,7 +52,7 @@ export async function getApplicationLogObject(
     timeout: 0,
     params,
     headers: {
-      Accept: ACCEPT_APPLICATION_LOG_OBJECT,
+      Accept: options?.accept ?? ACCEPT_APPLICATION_LOG_OBJECT,
       'X-sap-adt-relation':
         'http://www.sap.com/wbobj/applicationlogobjects/aplotyp/properties',
     },
@@ -74,7 +75,7 @@ export async function getApplicationLogSource(
   objectName: string,
   options?: IGetApplicationLogSourceOptions,
 ): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/applicationlog/objects/${objectName}/source/main`;
+  const url = sourceUri(APPLICATION_LOG.uri(objectName));
   const params: Record<string, string | number | boolean> = {};
 
   if (options?.corrNr) params.corrNr = options.corrNr;
@@ -87,7 +88,7 @@ export async function getApplicationLogSource(
     timeout: 0,
     params,
     headers: {
-      Accept: ACCEPT_APPLICATION_LOG_SOURCE,
+      Accept: options?.accept ?? ACCEPT_APPLICATION_LOG_SOURCE,
       'X-sap-adt-relation':
         'http://www.sap.com/wbobj/applicationlogobjects/aplotyp/source',
     },
@@ -105,11 +106,9 @@ export async function validateApplicationLogName(
   connection: IAbapConnection,
   objectName: string,
 ): Promise<IAdtWireResponse> {
-  const url = `/sap/bc/adt/applicationlog/objects/validation`;
+  const url = APPLICATION_LOG.validation;
   const params: Record<string, string | number | boolean> = {};
 
-  // Note: According to the template, validation might need objectName as a parameter
-  // Adjust based on actual ADT endpoint behavior
   params.objectName = objectName;
 
   return connection.makeAdtRequest({

@@ -20,6 +20,10 @@ released as 0.13.0 on `@mcp-abap-adt/adt-clients` `^49.0.0`).
 
 ### Added
 
+- **`getApplicationLog()`, `getApplicationJobCatalog()` and
+  `getApplicationJobTemplate()`** on `AdtClientLegacy` answer handlers whose
+  every operation refuses with no request: the recorded 7.40 SP04 discovery
+  lists none of their collections and its typestructure none of their codes.
 - `getNavigationTarget`, inherited from adt-clients' `AdtUtils`, is decided in the member
   inventory and in `docs/LEGACY.md`: not measured on 7.40, sent as the modern client sends it
   (fr0ster/mcp-abap-adt#401).

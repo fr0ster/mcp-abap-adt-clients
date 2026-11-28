@@ -1,0 +1,585 @@
+{
+  "case": "read-keyword-documentation-query-s4-2025",
+  "step": 1,
+  "stepTag": "query",
+  "capturedAt": "2026-11-28",
+  "note": "Recorded 2026-11-28 by a GET-only probe (curl, no CSRF, no session), on premise (S/4HANA 2025); fr0ster/mcp-abap-adt#404. Scrubbed of host, user fields (SAPUSER01), sap-client and the application server name.",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/docu/abap/langu?format=eclipse&language=EN&query=SELECT",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/docu/abap/langu?format=eclipse&language=EN&query=SELECT",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.docu.v1+html"
+    }
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.docu.v1+html; charset=utf-8"
+    },
+    "bodyFile": "read-keyword-documentation-query-s4-2025--01-query.body.txt"
+  },
+  "links": [
+    {
+      "kind": "other",
+      "href": "",
+      "label": "Mail Feedback"
+    },
+    {
+      "kind": "other",
+      "href": "http://sap.example.local:8000/sap/public/bc/abap/docu?sap-language=EN&tree=X&version=X&sap-client=000&object=ABENABAP&style=adt",
+      "label": "Browser Version ADT Style"
+    },
+    {
+      "kind": "other",
+      "href": "http://sap.example.local:8000/sap/public/bc/abap/docu?sap-language=EN&tree=X&version=X&sap-client=000&object=ABENABAP&style=ui5",
+      "label": "Browser Version UI5 Style"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABAPSELECT",
+      "object": "ABAPSELECT",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, ABAP SQL Statement"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABAPWITH",
+      "object": "ABAPWITH",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, WITH"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABAPSELECT-OPTIONS",
+      "object": "ABAPSELECT-OPTIONS",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT-OPTIONS, ABAP Statement"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_CLAUSES",
+      "object": "ABENSELECT_CLAUSES",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, ABAP Statement, clauses"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABAPOPEN_CURSOR",
+      "object": "ABAPOPEN_CURSOR",
+      "version": "X",
+      "language": "EN",
+      "label": "FOR SELECT, OPEN CURSOR"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABAPWITH",
+      "object": "ABAPWITH",
+      "version": "X",
+      "language": "EN",
+      "label": "AS ( SELECT ... ), WITH"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABAPEXEC_CURSOR",
+      "object": "ABAPEXEC_CURSOR",
+      "version": "X",
+      "language": "EN",
+      "label": "OPEN FOR SELECT, EXEC SQL"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABAPINSERT_SOURCE",
+      "object": "ABAPINSERT_SOURCE",
+      "version": "X",
+      "language": "EN",
+      "label": "( SELECT ... ), INSERT FROM"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABAPMODIFY_SOURCE",
+      "object": "ABAPMODIFY_SOURCE",
+      "version": "X",
+      "language": "EN",
+      "label": "( SELECT ... ), MODIFY writable_obj"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENWHERE_LOGEXP_IN",
+      "object": "ABENWHERE_LOGEXP_IN",
+      "version": "X",
+      "language": "EN",
+      "label": "IN ( SELECT ... ), ABAP SQL Condition"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENWHERE_LOGEXP_ALL_ANY_SOME",
+      "object": "ABENWHERE_LOGEXP_ALL_ANY_SOME",
+      "version": "X",
+      "language": "EN",
+      "label": "ANY ( SELECT ... ), ABAP SQL Condition"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENWHERE_LOGEXP_ALL_ANY_SOME",
+      "object": "ABENWHERE_LOGEXP_ALL_ANY_SOME",
+      "version": "X",
+      "language": "EN",
+      "label": "ALL ( SELECT ... ), ABAP SQL Condition"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENWHERE_LOGEXP_ALL_ANY_SOME",
+      "object": "ABENWHERE_LOGEXP_ALL_ANY_SOME",
+      "version": "X",
+      "language": "EN",
+      "label": "SOME ( SELECT ... ), ABAP SQL Condition"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABAPSELECTION-SCREEN_INCLUDE_SELOP",
+      "object": "ABAPSELECTION-SCREEN_INCLUDE_SELOP",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT-OPTIONS, SELECTION-SCREEN INCLUDE"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENWHERE_LOGEXP_IN",
+      "object": "ABENWHERE_LOGEXP_IN",
+      "version": "X",
+      "language": "EN",
+      "label": "NOT IN ( SELECT ... ), ABAP SQL Condition"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENWHERE_LOGEXP_EXISTS",
+      "object": "ABENWHERE_LOGEXP_EXISTS",
+      "version": "X",
+      "language": "EN",
+      "label": "EXISTS ( SELECT ... ), ABAP SQL Condition"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABAPSELECT_OBSOLETE",
+      "object": "ABAPSELECT_OBSOLETE",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT short form, Obsolete ABAP SQL Statement"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABAPCHECK_SELECT-OPTIONS",
+      "object": "ABAPCHECK_SELECT-OPTIONS",
+      "version": "X",
+      "language": "EN",
+      "label": "CHECK SELECT-OPTIONS, Obsolete ABAP Statement"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABAPSELECTION-SCREEN_LDB_VERSION",
+      "object": "ABAPSELECTION-SCREEN_LDB_VERSION",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT-OPTIONS, SELECTION-SCREEN EXCLUDE"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENCDS_F1_DEFINE_GENERIC_ASPECT",
+      "object": "ABENCDS_F1_DEFINE_GENERIC_ASPECT",
+      "version": "X",
+      "language": "EN",
+      "label": "DEFINE ASPECT AS SELECT FROM, CDS DCL Statement"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENCDS_SELECT_STATEMENT_V2",
+      "object": "ABENCDS_SELECT_STATEMENT_V2",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, DEFINE VIEW ENTITY"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENCDS_DCL_ROLE_GRANT_RULE",
+      "object": "ABENCDS_DCL_ROLE_GRANT_RULE",
+      "version": "X",
+      "language": "EN",
+      "label": "GRANT SELECT ON, DEFINE ROLE"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENCDS_SELECT_STATEMENT_V1",
+      "object": "ABENCDS_SELECT_STATEMENT_V1",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, DEFINE VIEW ddic_based"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENCDS_DCL_ROLE_COND_RULE",
+      "object": "ABENCDS_DCL_ROLE_COND_RULE",
+      "version": "X",
+      "language": "EN",
+      "label": "GRANT SELECT ON WHERE, DEFINE ROLE"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENCDS_DCL_ROLE_INHERITED_RULE",
+      "object": "ABENCDS_DCL_ROLE_INHERITED_RULE",
+      "version": "X",
+      "language": "EN",
+      "label": "GRANT SELECT ON INHERIT, DEFINE ROLE"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENCDS_DCL_ROLE_PROJ_RULE",
+      "object": "ABENCDS_DCL_ROLE_PROJ_RULE",
+      "version": "X",
+      "language": "EN",
+      "label": "GRANT SELECT ON, DEFINE ROLE , projection rule"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=DYNPSELECT",
+      "object": "DYNPSELECT",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, obsolete dynpro statement"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=DYNPFIELD_VALUE_SELECT",
+      "object": "DYNPFIELD_VALUE_SELECT",
+      "version": "X",
+      "language": "EN",
+      "label": "FIELD SELECT, obsolete dynpro statement"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENLDB_FREE_SELECTIONS",
+      "object": "ABENLDB_FREE_SELECTIONS",
+      "version": "X",
+      "language": "EN",
+      "label": "logical database, free select, obsolete, ABAP"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENLDB_FREE_SELECTIONS",
+      "object": "ABENLDB_FREE_SELECTIONS",
+      "version": "X",
+      "language": "EN",
+      "label": "logical database, dynamic select, obsolete, ABAP"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENINSERT_FROM_SELECT_ABEXA",
+      "object": "ABENINSERT_FROM_SELECT_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "INSERT, FROM SELECT"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_GROUPING_SETS_ABEXA",
+      "object": "ABENSELECT_GROUPING_SETS_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Grouping Sets"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENJOIN_JOINS_ABEXA",
+      "object": "ABENJOIN_JOINS_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Multiple Joins"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENGROUPING_FUNCTION_ABEXA",
+      "object": "ABENGROUPING_FUNCTION_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Grouping Function"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_INLINE_DECL_ABEXA",
+      "object": "ABENSELECT_INLINE_DECL_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Inline Declarations"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENDYNAMIC_SELECT_ABEXA",
+      "object": "ABENDYNAMIC_SELECT_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Dynamic Query Clauses"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_IND_BITFIELD_ABEXA",
+      "object": "ABENSELECT_IND_BITFIELD_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Byte Field Indicators"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENDYNAMIC_ORDER_BY_ABEXA",
+      "object": "ABENDYNAMIC_ORDER_BY_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Dynamic ORDER BY Clause"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_UNION_ABEXA",
+      "object": "ABENSELECT_UNION_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Union of Multiple Tables"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENDYNAMIC_SQL_ABEXA",
+      "object": "ABENDYNAMIC_SQL_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Dynamic Token Specification"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSQL_EXPR_WITH_GROUP_BY_ABEXA",
+      "object": "ABENSQL_EXPR_WITH_GROUP_BY_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, GROUP BY for SQL Expressions"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENJOINS_ABEXA",
+      "object": "ABENJOINS_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Inner, Outer, and Cross Joins"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_EXCEPT_ABEXA",
+      "object": "ABENSELECT_EXCEPT_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Difference of Multiple Tables"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_UNION_SUM_ABEXA",
+      "object": "ABENSELECT_UNION_SUM_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Union with Aggregate Expression"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_INTERSECT_ABEXA",
+      "object": "ABENSELECT_INTERSECT_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Intersection of Multiple Tables"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_INTO_NEW_WA_ABEXA",
+      "object": "ABENSELECT_INTO_NEW_WA_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Create Structure as Target Area"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENPATH_EXPR_IN_COLSPEC_ABEXA",
+      "object": "ABENPATH_EXPR_IN_COLSPEC_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "Path Expressions, Use in the SELECT List"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_UNION_SUM_GTT_ABEXA",
+      "object": "ABENSELECT_UNION_SUM_GTT_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Union with Global Temporary Table"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENDEMO_UNION_RANGES_ABEXA",
+      "object": "ABENDEMO_UNION_RANGES_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Union for Building a Ranges Table"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_EXCEPT_COLUMNS_ABEXA",
+      "object": "ABENSELECT_EXCEPT_COLUMNS_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Remove Columns from the SELECT List"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_EXCEPT_MIN_ABEXA",
+      "object": "ABENSELECT_EXCEPT_MIN_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Difference with Aggregate Expression"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_INTO_NEW_TABLE_ABEXA",
+      "object": "ABENSELECT_INTO_NEW_TABLE_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Create Internal Table as Target Area"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSQL_EXPR_IN_WHERE_COND_ABEXA",
+      "object": "ABENSQL_EXPR_IN_WHERE_COND_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, SQL Expressions in the WHERE Condition"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_INTERSECT_MAX_ABEXA",
+      "object": "ABENSELECT_INTERSECT_MAX_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Intersection with Aggregate Expression"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_EXCEPT_MIN_GTT_ABEXA",
+      "object": "ABENSELECT_EXCEPT_MIN_GTT_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Difference with Global Temporary Table"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_INTERSECT_MAX_GTT_ABEXA",
+      "object": "ABENSELECT_INTERSECT_MAX_GTT_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Intersection with Global Temporary Table"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_FROM_ITAB_ABEXA",
+      "object": "ABENSELECT_FROM_ITAB_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Internal Table as Data Source of a Query"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_UP_TO_OFFSET_ABEXA",
+      "object": "ABENSELECT_UP_TO_OFFSET_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Restriction of the Rows in the Result Set"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_HIERARCHY_ABEXA",
+      "object": "ABENSELECT_HIERARCHY_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Hierarchy Generator, BULK vs. INCREMENTAL"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_FROM_CLASS_ABEXA",
+      "object": "ABENSELECT_FROM_CLASS_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Class Attribute as Data Source of a Query"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_UNION_CDS_PARA_ABEXA",
+      "object": "ABENSELECT_UNION_CDS_PARA_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Union of CDS View Entity with Input Parameters"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENHIER_ANCS_AGG_ABEXA",
+      "object": "ABENHIER_ANCS_AGG_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Hierarchy Navigator HIERARCHY_ANCESTORS_AGGREGATE"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_FROM_ITAB_MULTI_ABEXA",
+      "object": "ABENSELECT_FROM_ITAB_MULTI_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Multiple Internal Tables as Data Sources of a Query"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENHIER_DESC_AGG_ABEXA",
+      "object": "ABENHIER_DESC_AGG_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Hierarchy Navigator HIERARCHY_DESCENDANTS_AGGREGATE"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_EXCEPT_CDS_PARA_ABEXA",
+      "object": "ABENSELECT_EXCEPT_CDS_PARA_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Difference of CDS View Entity with Input Parameters"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_INTER_CDS_PARA_ABEXA",
+      "object": "ABENSELECT_INTER_CDS_PARA_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Intersection of CDS View Entity with Input Parameters"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENSELECT_FROM_ITAB_HIERA_ABEXA",
+      "object": "ABENSELECT_FROM_ITAB_HIERA_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Internal Table as a Data Source of the Hierarchy Generator"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=ABENHIER_DESC_AGG_WITH_ABEXA",
+      "object": "ABENHIER_DESC_AGG_WITH_ABEXA",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT, Hierarchy Navigator HIERARCHY_DESCENDANTS_AGGREGATE with WITH"
+    }
+  ]
+}

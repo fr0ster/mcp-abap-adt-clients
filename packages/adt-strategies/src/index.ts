@@ -130,6 +130,12 @@ export {
   type IAtcWaitingRun,
 } from './results/atc';
 export {
+  bluesMetadata,
+  type IBluesLink,
+  type IBluesMetadata,
+  jsonDocument,
+} from './results/definitions';
+export {
   type IElementInfoLink,
   type IElementInfoObject,
   type IElementInfoPackage,
@@ -169,6 +175,14 @@ export {
   type ISourceCodeLine,
   type ISystemMessageEntry,
 } from './results/feeds';
+export {
+  type DocuLink,
+  docuPage,
+  type IDocuOtherLink,
+  type IDocuPage,
+  type IDocuTopicLink,
+  readDocuPage,
+} from './results/keywordDocumentation';
 export {
   type INavigationTarget,
   navigationTarget,
@@ -272,6 +286,7 @@ export {
   readSearchHits,
   utilActivationRunId,
   utilDiscoveryCollections,
+  utilDiscoveryTemplates,
   utilInactiveObjects,
   utilNamedItems,
   utilNodeContents,

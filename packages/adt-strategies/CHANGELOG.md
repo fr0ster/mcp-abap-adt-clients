@@ -20,8 +20,21 @@ For adt-clients 49.0.0 (C7: one member, one endpoint, one request), whose
 activation members no longer read the inactive list (to be released as
 0.30.0).
 
+The readings of the support reads (fr0ster/mcp-abap-adt#404).
+
 ### Added
 
+- **`docuPage`** (`readDocuPage`, `IDocuPage`, `DocuLink`, `IDocuTopicLink`,
+  `IDocuOtherLink`): a keyword documentation page's title, text, every `a`
+  element with an `href` (topic links with `object`, `version`, `language`)
+  and its version choices. A tokenizer of plain code, no regex and no DOM; an
+  input with no `html` element reads as `undefined`. Held to the recorded
+  pages' links element by element.
+- **`jsonDocument`** and **`bluesMetadata`** (`IBluesMetadata`, `IBluesLink`):
+  a definition's JSON source and its `blue:blueSource` object document, every
+  field optional, `undefined` for a body that is not one.
+- **`utilDiscoveryTemplates`**: each discovery collection with the parameter
+  names its templates declare.
 - **`readNavigationTarget` / `navigationTarget`** — the include a navigation answer leads to and
   its `start`; a refusal or a reference without a readable start reads as `undefined`
   (fr0ster/mcp-abap-adt#401).

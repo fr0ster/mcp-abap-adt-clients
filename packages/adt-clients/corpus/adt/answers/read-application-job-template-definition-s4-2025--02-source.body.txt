@@ -1,0 +1,32 @@
+{
+  "formatVersion": "1",
+  "header": {
+    "description": "Mass Apply job template",
+    "originalLanguage": "en"
+  },
+  "generalInformation": {
+    "catalogName": "/ACCGO/ACM_BGJOB_MASS_PROCESSING_J"
+  },
+  "parameters": {
+    "singleValueParameters": [
+      {
+        "name": "P_JOBCNT",
+        "value": ""
+      },
+      {
+        "name": "P_JOBNAM",
+        "value": ""
+      }
+    ],
+    "valueRangesParameters": [
+      {
+        "name": "P_ACTTYP",
+        "valueRanges": []
+      },
+      {
+        "name": "S_APLDOC",
+        "valueRanges": []
+      }
+    ]
+  }
+}

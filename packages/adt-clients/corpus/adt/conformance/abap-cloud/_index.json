@@ -677,6 +677,75 @@
         "urimapper": "ENHS-XSB--scmg_record_c--02-urimapper.json",
         "metadata": "ENHS-XSB--scmg_record_c--03-metadata.json"
       }
+    },
+    "APLO/TYP": {
+      "apis": ["applicationLog"],
+      "sample": {
+        "name": "ABI",
+        "parent": null,
+        "origin": "standard"
+      },
+      "files": {
+        "template": "APLO-TYP--abi--01-template.json",
+        "urimapper": "APLO-TYP--abi--02-urimapper.json",
+        "metadata": "APLO-TYP--abi--03-metadata.json"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/applicationlog/objects/abi",
+      "libraryUri": "/sap/bc/adt/applicationlog/objects/ABI",
+      "urimapperMatchesLibrary": false
+    },
+    "SAJC": {
+      "apis": ["applicationJobCatalog"],
+      "sample": {
+        "name": "APS_GSM_METRIC_COLLECTOR",
+        "parent": null,
+        "origin": "standard"
+      },
+      "files": {
+        "template": "SAJC--aps_gsm_metric_collector--01-template.json",
+        "urimapper": "SAJC--aps_gsm_metric_collector--02-urimapper.json",
+        "metadata": "SAJC--aps_gsm_metric_collector--03-metadata.json"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/applicationjob/catalogs/aps_gsm_metric_collector",
+      "libraryUri": "/sap/bc/adt/applicationjob/catalogs/APS_GSM_METRIC_COLLECTOR",
+      "urimapperMatchesLibrary": false
+    },
+    "SAJT": {
+      "apis": ["applicationJobTemplate"],
+      "sample": {
+        "name": "APS_GSM_METRIC_COLLECTION_TEMPLATE",
+        "parent": null,
+        "origin": "standard"
+      },
+      "files": {
+        "template": "SAJT--aps_gsm_metric_collection_template--01-template.json",
+        "urimapper": "SAJT--aps_gsm_metric_collection_template--02-urimapper.json",
+        "metadata": "SAJT--aps_gsm_metric_collection_template--03-metadata.json"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/applicationjob/templates/aps_gsm_metric_collection_template",
+      "libraryUri": "/sap/bc/adt/applicationjob/templates/APS_GSM_METRIC_COLLECTION_TEMPLATE",
+      "urimapperMatchesLibrary": false
     }
   },
   "apisWithoutCodes": {

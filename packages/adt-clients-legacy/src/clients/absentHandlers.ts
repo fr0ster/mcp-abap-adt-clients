@@ -37,7 +37,15 @@ import {
   AdtTableSettings,
   AdtTextElements,
   AdtTransformation,
+  APPLICATION_JOB_CATALOG,
+  APPLICATION_JOB_TEMPLATE,
+  APPLICATION_LOG,
   type AppendStructureValues,
+  ApplicationJobCatalog,
+  ApplicationJobTemplate,
+  type ApplicationJobValues,
+  ApplicationLog,
+  type ApplicationLogValues,
   AUTHORIZATION_FIELD,
   type AuthorizationFieldValues,
   BEHAVIOR_DEFINITION,
@@ -1411,6 +1419,74 @@ export class AdtAppendStructureAbsentLegacy extends AdtAppendStructure<AppendStr
   }
 
   override async getVersionSource(): Promise<IAdtResponse<never>> {
+    return failed(this.#absence());
+  }
+}
+
+/**
+ * ApplicationLog on a legacy system: every operation refuses, nothing is
+ * sent. `/sap/bc/adt/applicationlog/objects` is absent from the recorded 7.40
+ * discovery, and its typestructure lists no `APLO/TYP`.
+ */
+export class ApplicationLogAbsentLegacy extends ApplicationLog<ApplicationLogValues> {
+  /** The refusal every operation answers. */
+  #absence(): IAdtError {
+    return absentRefusal(
+      'ApplicationLog',
+      APPLICATION_LOG.collection,
+      'not-advertised',
+    );
+  }
+
+  override async getObject(): Promise<IAdtResponse<never>> {
+    return failed(this.#absence());
+  }
+
+  override async getSource(): Promise<IAdtResponse<never>> {
+    return failed(this.#absence());
+  }
+
+  override async validateName(): Promise<IAdtResponse<never>> {
+    return failed(this.#absence());
+  }
+}
+
+/** ApplicationJobCatalog on a legacy system: every operation refuses, nothing is sent. */
+export class ApplicationJobCatalogAbsentLegacy extends ApplicationJobCatalog<ApplicationJobValues> {
+  /** The refusal every operation answers. */
+  #absence(): IAdtError {
+    return absentRefusal(
+      'ApplicationJobCatalog',
+      APPLICATION_JOB_CATALOG.collection,
+      'not-advertised',
+    );
+  }
+
+  override async getObject(): Promise<IAdtResponse<never>> {
+    return failed(this.#absence());
+  }
+
+  override async getSource(): Promise<IAdtResponse<never>> {
+    return failed(this.#absence());
+  }
+}
+
+/** ApplicationJobTemplate on a legacy system: every operation refuses, nothing is sent. */
+export class ApplicationJobTemplateAbsentLegacy extends ApplicationJobTemplate<ApplicationJobValues> {
+  /** The refusal every operation answers. */
+  #absence(): IAdtError {
+    return absentRefusal(
+      'ApplicationJobTemplate',
+      APPLICATION_JOB_TEMPLATE.collection,
+      'not-advertised',
+    );
+  }
+
+  override async getObject(): Promise<IAdtResponse<never>> {
+    return failed(this.#absence());
+  }
+
+  override async getSource(): Promise<IAdtResponse<never>> {
     return failed(this.#absence());
   }
 }

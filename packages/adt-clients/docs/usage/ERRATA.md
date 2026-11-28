@@ -469,3 +469,86 @@ library judges none of them: each is an answer the caller reads.
   runtime error answered as an HTML `500` carries none, like the on-premise
   `checkRepo` `SYNTAX_ERROR` above: its only fact is `status`.
 
+
+## A keyword documentation query with no hit answers 200
+
+**Symptom.** `GET /sap/bc/adt/docu/abap/langu?query=<term>` for a term with
+no hit answers `200`, `application/vnd.sap.adt.docu.v1+html`, a page titled
+"Not found | ABAP Keyword Documentation" — not `404`. Measured on ABAP cloud
+and on premise (S/4HANA 2025), 2026-11-28
+(`corpus/adt/answers/read-keyword-documentation-no-hit-<release>--01-query`).
+
+**What actually happened.** The search ran and found nothing; the page says
+so in its title and text.
+
+**What the library does.** `getKeywordDocumentation().query` answers the page
+as a success, as SAP sent it. `docuPage` from `@mcp-abap-adt/adt-strategies`
+reads its title; no reading or strategy here turns it into a failure — a
+caller that wants "no hit" to be one decides it from the title.
+
+## The topic form of the keyword documentation is in no discovery template
+
+**Symptom.** The discovery lists `/sap/bc/adt/docu/abap/langu` with the
+templates `{?format,language,uri,version}` and `{?format,language,query,version}`
+(on 7.40 SP04 the first alone, without `version`). Every topic link the
+documentation's own pages carry uses another form:
+`adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=<v>&style=&object=<topic>`.
+
+**What actually happened.** The topic form answers `200` with the topic's
+page on ABAP cloud and on premise (2026-11-28,
+`read-keyword-documentation-topic-<release>`, `…-topic-link-<release>`), with
+`language` or `sap-language` alike. The page without `version` differs from
+the page with the link's `version` (measured for three topics on each kind),
+so a link is followed only by sending its `version` as it carries it. On ABAP
+cloud the links carry `version=5`, on premise `version=X`.
+
+**What the library does.** `getKeywordDocumentation().topic` sends `object`,
+and `language`, `version`, `format` when given, as given. It checks nothing
+against the discovery.
+
+## An unknown version of the keyword documentation answers an ICF 500
+
+**Symptom.** `version=1` and `version=6` answer `500` with an ICF error page
+("Application Server Error", "Invalid enumeration value"), no ADT exception
+document; `2`, `3`, `4`, `5` and `X` answer `200`. Measured on ABAP cloud and
+on premise, 2026-11-28 (`refusal-keyword-documentation-version-1-<release>`).
+What any value selects is unverified.
+
+**What the library does.** The `500` comes back through the call's `analyse`:
+`analyseException` keeps the library's verdict ("Request failed with status
+code 500") and the answer whole, the page included.
+
+## An application log object name of 21 characters answers an ICF 500
+
+**Symptom.** On ABAP cloud and on premise (2026-11-28), an absent application
+log object name of 21 characters answered `500` with an ICF error page (on
+cloud "Data was lost while copying a value"), for the object document and the
+source alike; an absent name of 7 characters answered `404`
+(`refusal-application-log-name-21-abap-cloud`,
+`refusal-application-log-absent-abap-cloud`). The recorded typestructure gives
+`APLO/TYP` an `OBJNAME_MAXLENGTH` of 20; that the length causes the `500` is
+inferred, not verified.
+
+**What the library does.** The name goes to SAP as given, percent-encoded, case kept, and
+the `500` comes back through `analyse` as SAP sent it; nothing checks the name's
+length.
+
+## The urimapper names a definition by its lowercase address
+
+**Symptom.** `GET /sap/bc/adt/vit/urimapper?uri=/sap/bc/adt/vit/wb/object_type/<type>/object_name/<NAME>`
+for an application log object, a job catalog or a job template answers the
+lowercase address (`/sap/bc/adt/applicationlog/objects/abi`), while the library
+sends the name as the caller gives it, case kept (`…/objects/ABI`). Measured on
+ABAP cloud and on premise, 2026-11-28 (`corpus/adt/conformance/<release>/`,
+`APLO-TYP--abi`, `SAJC--aps_gsm_metric_collector`,
+`SAJT--aps_gsm_metric_collection_template`).
+
+**What actually happened.** Both addresses are served: the metadata read at the
+case-kept address answered `200` on both kinds, and on ABAP cloud the upper-,
+mixed- and lowercase addresses of the object document and the source answered
+`200` alike. The urimapper's lowercase is its own spelling, not a requirement.
+
+**What the library does.** It keeps the name as given and does not rewrite it
+to the urimapper's spelling. The type tables' conformance check lists the
+difference as a recorded divergence of the `address` rule, with this entry as
+its evidence.

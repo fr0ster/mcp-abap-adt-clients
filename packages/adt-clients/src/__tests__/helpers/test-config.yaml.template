@@ -3054,6 +3054,25 @@ runtime_system_messages:
       params:
         max_results: 10
 
+# Application log objects (APLO), job catalogs (SAJC) and job templates (SAJT),
+# read as definitions (AdtClient). Names come from the system's quick search.
+runtime_application_definitions:
+  test_cases:
+    - name: "adt_application_definitions"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Definition reads: object document and source per type, an absent name, an over-long APLO name"
+
+# The ABAP keyword documentation (AdtRuntimeClient.getKeywordDocumentation)
+runtime_keyword_documentation:
+  test_cases:
+    - name: "adt_keyword_documentation"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Query, no-hit query, topic followed from a link, link fidelity, version matrix, 406, position measurement"
+      params:
+        keyword: "SELECT"   # a keyword with hits on every system kind
+
 # Gateway error log - /IWFND/ERROR_LOG (AdtRuntimeClient)
 runtime_gateway_errors:
   test_cases:

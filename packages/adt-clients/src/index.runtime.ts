@@ -5,6 +5,13 @@
 
 export { AdtRuntimeClient } from './clients/AdtRuntimeClient';
 export {
+  ApplicationJobCatalog,
+  ApplicationJobTemplate,
+  type ApplicationJobValues,
+  applicationJobDocuments,
+  type IApplicationJobResults,
+} from './runtime/applicationJob/ApplicationJob';
+export {
   ApplicationLog,
   type ApplicationLogValues,
   applicationLogDocuments,
@@ -72,6 +79,12 @@ export {
   gatewayErrorLogDocuments,
   type IGatewayErrorLogResults,
 } from './runtime/gatewayErrorLog/GatewayErrorLog';
+export {
+  type IKeywordDocumentationResults,
+  KeywordDocumentation,
+  type KeywordDocumentationValues,
+  keywordDocumentationDocuments,
+} from './runtime/keywordDocumentation/KeywordDocumentation';
 export {
   type IMemorySnapshotsResults,
   MemorySnapshots,

@@ -1,0 +1,13 @@
+{
+  "formatVersion": "1",
+  "header": {
+    "description": "Analytic Business Insight",
+    "originalLanguage": "en"
+  },
+  "subobjects": [
+    {
+      "name": "QUICK_ACTION",
+      "description": "Analytic Business Insights - Quick Action"
+    }
+  ]
+}

@@ -31,6 +31,10 @@ of member that still sent two requests are split (to be released as 49.0.0,
 with `@mcp-abap-adt/adt-strategies` 0.30.0 and the interfaces-adt change of
 decision 53). See [MIGRATION-49.md](docs/usage/MIGRATION-49.md).
 
+The support reads (fr0ster/mcp-abap-adt#404): the definitions of application
+log objects, application job catalogs and templates, and the ABAP keyword
+documentation. On `@mcp-abap-adt/interfaces-adt` ^34.0.0.
+
 ### Changed (breaking)
 
 - **Every activation member sends the activation alone.** Each handler's
@@ -72,6 +76,22 @@ decision 53). See [MIGRATION-49.md](docs/usage/MIGRATION-49.md).
 
 ### Added
 
+- **`AdtClient.getApplicationJobCatalog()` and `getApplicationJobTemplate()`**
+  (`ApplicationJobCatalog`, `ApplicationJobTemplate`, `applicationJobDocuments`):
+  `getObject` (`application/vnd.sap.adt.blues.v2+xml`) and `getSource`
+  (`application/json`), one `GET` each, `version` and `accept` as given. Measured
+  `200` on ABAP cloud and on premise, an absent name `404` (2026-11-28).
+- **`AdtClient.getApplicationLog()`**, gated by the type tables, answering the
+  handler `AdtRuntimeClient.getApplicationLog()` answers.
+- **`AdtRuntimeClient.getKeywordDocumentation()`** (`KeywordDocumentation`,
+  `keywordDocumentationDocuments`): `query`, `topic` and `position`, one `GET`
+  each on `/sap/bc/adt/docu/abap/langu`, `language`, `version` and `format`
+  sent only when given, as given, `''` included. See ERRATA for the no-hit
+  `200`, the topic form missing from discovery and the `500` of an unknown
+  `version`.
+- **The address records** `APPLICATION_LOG`, `APPLICATION_JOB_CATALOG`,
+  `APPLICATION_JOB_TEMPLATE` and `KEYWORD_DOCUMENTATION`, exported.
+- **`accept`** on both application log reads.
 - **`AdtUtils.getNavigationTarget(uri, options?)`** — one `POST /sap/bc/adt/navigation/target`:
   where a reference leads. `uri` is sent as the query value, encoded once; `filter`,
   `fullname` only when given; `application/xml` by default; no body; its answer through the
@@ -82,7 +102,6 @@ decision 53). See [MIGRATION-49.md](docs/usage/MIGRATION-49.md).
 - ERRATA: a source position's end stops before the period; a function group include's
   outline answers the whole group; a local method's definition link by system; `HEAD` on a
   source is refused.
-
 - **`patchTableSettings(read, changes, variant)`**, typed by the declared
   system kind (on premise neither the change nor the answer carries
   `isWritableByAMDP`), with `TableSettingsPatch`,
@@ -112,6 +131,12 @@ carries none, and SAP's own bound applies. Measured on the BTP ABAP environment
 (2026-11-27).
 
 ### Fixed
+
+- **A namespaced application log object name** was written into the path raw,
+  as several segments; it is now one segment, percent-encoded with its case
+  as given (the name goes to SAP exactly as given). Measured `200` on premise for
+  the `%2f` names, and on ABAP cloud at the upper-, mixed- and lowercase
+  addresses alike (2026-11-28).
 
 - **`getSqlQuery` sends `row_number` as given, and no `rowNumber` without
   one.** A missing or `0` bound was sent as 100. Without `rowNumber` SAP answers
