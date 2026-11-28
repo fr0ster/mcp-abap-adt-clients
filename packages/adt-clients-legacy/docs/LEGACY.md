@@ -445,8 +445,11 @@ On premise, BASIS 7.40, 2026-10-01, over RFC and over HTTP. **These measurements
   source carried the method (adt-clients' corpus,
   `activation-class-basis-740`). `analyseActivation` of adt-strategies 0.22.0
   reads every empty `200` as activated. Should 7.40 ever answer
-  `activationExecuted="false"` without a message, the activation reads the
-  flat inactive list once and judges by it (not seen on 7.40).
+  `activationExecuted="false"` without a message (not seen on 7.40), the
+  activation sends nothing more (adt-clients 49.0.0, one member, one request):
+  the caller reads the flat inactive list (`getInactiveObjects`, which keeps
+  the older document) and hands it with the uris the activation named to its
+  reading.
 - **`/sap/bc/adt/activation/runs` is not in the discovery** (2026-11-09, over
   RFC, the same 34 609-character document as recorded on 2026-10-27,
   `system-description-basis-740`): `/activation` and
