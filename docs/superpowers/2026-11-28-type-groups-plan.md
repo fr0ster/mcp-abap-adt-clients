@@ -18,8 +18,10 @@ The goal (`2026-11-28-type-groups-goal.md`) and the spec bind every task.
 **Versions:**
 - `@mcp-abap-adt/interfaces-adt` takes the next minor of the version in its `package.json` when
   Task 3 starts (33.0.0 today, so 33.1.0).
-- `@mcp-abap-adt/adt-clients` takes the next minor of its `package.json` when Task 12 starts
-  (48.0.0 today, so 48.1.0).
+- `@mcp-abap-adt/adt-clients` takes the next minor on top of the latest version on the registry
+  when Task 4 starts. The patch 48.0.1 is published before type groups, so that is most likely
+  48.1.0. The branch takes that release from `main` before Task 4, and Task 12 writes the
+  version.
 - adt-strategies and adt-clients-legacy keep their versions.
 
 **Pull requests:**
