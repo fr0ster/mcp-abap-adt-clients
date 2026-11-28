@@ -1,6 +1,9 @@
 /**
- * Every lockable handler keeps its lock in the client's registry when SAP
- * does not confirm the UNLOCK as a release, and drops it when SAP does.
+ * Every lockable handler records a lock in the client's registry when SAP
+ * granted it (a 2xx LOCK answer carrying a handle), whatever the caller's
+ * `analyse` makes of it, and keeps it when SAP does not confirm the UNLOCK
+ * as a release; it drops it when SAP does. The registry records SAP's
+ * state, never the caller's verdict.
  *
  * A refused UNLOCK (a 403 the connection rejects with, or a 500 it resolves)
  * may leave the lock held; the registry is what `unlockAll` releases from, so
@@ -19,18 +22,8 @@ import { createLibraryLogger } from '../../helpers/testLogger';
 import { bodyFor, invoke, wireUrl } from '../capabilities/behaviourGuard';
 import { HANDLERS, type HandlerEntry } from '../capabilities/manifest';
 
-/**
- * The lockable handlers whose lock is in no registry at all, so no UNLOCK
- * can drop one: an include's lock is handed to the caller (`onLock`), and a
- * service binding's is not recorded. Their missing registration is a gap of
- * its own, outside this check; `records no lock` below fails as soon as one
- * of them starts recording, and it then joins the check.
- */
-const LOCK_NOT_RECORDED = new Set(['include', 'serviceBinding']);
-
 const LOCKABLE = Object.entries(HANDLERS as Record<string, HandlerEntry>)
   .filter(([, entry]) => entry.capabilities.includes('lockable'))
-  .filter(([name]) => !LOCK_NOT_RECORDED.has(name))
   .map(([name]) => name)
   .sort();
 
@@ -85,20 +78,13 @@ function clientAnswering(unlock: UnlockAnswer) {
   return { client, unlocks };
 }
 
-describe.each([...LOCK_NOT_RECORDED].sort())('%s', (name) => {
-  it('records no lock in the registry', async () => {
-    const entry = (HANDLERS as Record<string, HandlerEntry>)[name];
-    if (!entry) throw new Error(`no manifest entry ${name}`);
-    const { client } = clientAnswering('released');
-    const handler = entry.factory(client) as Record<string, unknown>;
-    await invoke(handler, 'lock', entry.config);
-    expect(client.pendingLocks).toHaveLength(0);
-  });
-});
-
 describe('an UNLOCK SAP does not confirm keeps the lock in the registry', () => {
   it('finds the lockable handlers', () => {
     expect(LOCKABLE.length).toBeGreaterThan(20);
+    // The include and the service binding record their locks too.
+    expect(LOCKABLE).toEqual(
+      expect.arrayContaining(['include', 'serviceBinding']),
+    );
   });
 
   describe.each(LOCKABLE)('%s', (name) => {
@@ -114,6 +100,33 @@ describe('an UNLOCK SAP does not confirm keeps the lock in the registry', () => 
         expect(client.pendingLocks).toHaveLength(1);
         await invoke(handler, 'unlock', entry.config);
         expect(unlocks).toHaveLength(1);
+        expect(client.pendingLocks).toHaveLength(1);
+      },
+    );
+
+    it.each<[string, () => never | { origin: 'refusal'; message: string }]>([
+      [
+        'reports a failure',
+        () => ({ origin: 'refusal', message: 'judged a failure' }),
+      ],
+      [
+        'throws',
+        () => {
+          throw new Error('the analyse threw');
+        },
+      ],
+    ])(
+      "records a lock SAP granted (200 with a handle) when the caller's analyse %s",
+      async (_what, analyse) => {
+        const { client } = clientAnswering('released');
+        const handler = entry.factory(client) as Record<string, unknown>;
+        const lock = handler.lock as (
+          config: unknown,
+          options: { analyse: unknown },
+        ) => Promise<unknown>;
+        await lock
+          .call(handler, entry.config, { analyse })
+          .catch(() => undefined);
         expect(client.pendingLocks).toHaveLength(1);
       },
     );
