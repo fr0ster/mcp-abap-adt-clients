@@ -1,0 +1,25 @@
+{
+  "case": "navigate-module-abap-cloud",
+  "step": 1,
+  "stepTag": "target",
+  "capturedAt": "2026-11-28",
+  "note": "Recorded 2026-11-28 with scripts/adt-nc.ts, read only: a dialog module of a delivered function group. Only the content type of the answer's headers is kept; no host, user or system id.",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/navigation/target?uri=%2Fsap%2Fbc%2Fadt%2Ffunctions%2Fgroups%2Fseworkingarea%2Fincludes%2Flseworkingareai01%2Fsource%2Fmain%23type%3DFUGR%252FPM%3Bname%3DEXIT",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/navigation/target?uri=%2Fsap%2Fbc%2Fadt%2Ffunctions%2Fgroups%2Fseworkingarea%2Fincludes%2Flseworkingareai01%2Fsource%2Fmain%23type%3DFUGR%252FPM%3Bname%3DEXIT",
+    "headers": {
+      "Accept": "application/xml"
+    },
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/xml; charset=utf-8"
+    },
+    "bodyFile": "navigate-module-abap-cloud--01-target.body.xml"
+  }
+}
