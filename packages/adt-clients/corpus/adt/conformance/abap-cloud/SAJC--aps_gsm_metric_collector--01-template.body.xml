@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:mainObject adtcore:responsible="SAP" adtcore:masterLanguage="EN" adtcore:masterSystem="SAP" adtcore:abapLanguageVersion="standard" adtcore:name="APS_GSM_METRIC_COLLECTOR" adtcore:type="SAJC" adtcore:changedAt="2022-11-28T15:12:45Z" adtcore:version="active" adtcore:createdAt="2022-07-14T17:01:28Z" adtcore:changedBy="SAP" adtcore:createdBy="SAP" adtcore:description="APS-TMO: Metric Collector" adtcore:language="EN" xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/s_gsm_co" adtcore:type="DEVC/K" adtcore:name="S_GSM_CO"/>
+</adtcore:mainObject>
