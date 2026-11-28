@@ -100,9 +100,11 @@ src/
 Every ADT object address is built in `src/endpoints/objects.ts`: one record per
 kind, with its full `collection` and `validation` paths and a `uri(...)` that
 takes exactly what the address needs (a function include needs its group, a
-class include its class and kind). `seg(name)` is the only way a name enters an
-address: lowercased and percent-encoded. A transport request number is the
-exception and keeps its case, because the address is case-sensitive.
+class include its class and kind). `seg(name)` is how a name enters an
+address: lowercased and percent-encoded. Two records keep the name's case: a
+transport request number, because the address is case-sensitive, and a type
+group (`TYPE_GROUP.uri`), whose name goes into the address as the caller gave
+it, percent-encoded and never case-folded (SAP serves either case, measured).
 `src/__tests__/unit/endpoints/noHardcodedObjectAddresses.test.ts` fails on any
 of those paths written anywhere else in `src/`. Service endpoints (activation,
 check runs, ATC, discovery) are not in the registry yet.
@@ -111,11 +113,13 @@ check runs, ATC, discovery) are not in the registry yet.
 in both cases, so a change can be checked against SAP rather than assumed.
 
 **An address by type code** (`buildObjectUri`, `src/endpoints/codes.ts`, since
-38.0.0) is read from the ADT type tables of `@mcp-abap-adt/interfaces-adt`: the
-code's collection (the entry's, or the code's own where it differs), then the
-name, and for a code with a parent API the parent's address followed by the
-child's segment. What does not follow the rule is a typed exception with its
-reason: `MSAG/NN` has no address of its own (a message is a row of its class),
+38.0.0) is its code's record: `OWN_ADDRESS` and `PARENTED_ADDRESS` name, per
+code, the record of `objects.ts` that builds it, keyed by the type codes of
+`@mcp-abap-adt/interfaces-adt` so that a code the tables add does not compile
+until its record is named — the address a group operation or where-used sends
+is the one the object's own handler sends (a type group's name kept as given
+included). A code whose API no handler serves yet is refused, not guessed.
+What has no address of its own is a typed exception with its reason: `MSAG/NN` has no address of its own (a message is a row of its class),
 and `VIEW/DV`, which no API serves, keeps the group operations' address under
 `/sap/bc/adt/ddic/views` (`GROUP_ONLY_ADDRESS`). No code outside the tables is
 addressed.

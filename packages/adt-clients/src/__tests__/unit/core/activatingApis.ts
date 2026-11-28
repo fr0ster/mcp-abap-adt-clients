@@ -95,6 +95,7 @@ const ACTIVATING = {
   table: (c: AdtClient): IActivating => c.getTable(),
   tableType: (c: AdtClient): IActivating => c.getTableType(),
   transformation: (c: AdtClient): IActivating => c.getTransformation(),
+  typeGroup: (c: AdtClient): IActivating => c.getTypeGroup(),
 };
 
 export type ActivatingApi = keyof typeof ACTIVATING;

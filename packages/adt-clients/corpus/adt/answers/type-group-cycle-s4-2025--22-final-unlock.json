@@ -1,0 +1,28 @@
+{
+  "case": "type-group-cycle-s4-2025",
+  "step": 22,
+  "stepTag": "final-unlock",
+  "capturedAt": "2026-11-28",
+  "note": "Recorded by the type group measurement probe through @mcp-abap-adt/connection, S/4HANA 2025 on premise: one Z type group of its own in a local package, created, written, activated and deleted by the probe. Scrubbed of host, user, system id and lock handle.",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/ddic/typegroups/ZTG3A?_action=UNLOCK&lockHandle=0000000000000000000000000000000000000000",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/ddic/typegroups/ZTG3A?_action=UNLOCK&lockHandle=0000000000000000000000000000000000000000",
+    "headers": {},
+    "headersNote": "Caller-supplied headers only, as the probe sent them through @mcp-abap-adt/connection; the connection adds the session, CSRF and Authorization headers below this point.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-length": "0",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0"
+    },
+    "body": ""
+  }
+}

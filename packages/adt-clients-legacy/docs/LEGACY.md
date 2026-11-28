@@ -229,6 +229,7 @@ await client.getFunctionInclude().create(config, {
 | Data Element | `getDataElement()` | `/sap/bc/adt/ddic/dataelements` | `404` (s11-dtel-meta-raw) |
 | Table settings | `getTableSettings()` | `/sap/bc/adt/ddic/db/settings` | not measured; not advertised (7.40's `typestructure` lists `TABL/DTT`, its discovery has no such collection) |
 | Table Type | `getTableType()` | `/sap/bc/adt/ddic/tabletypes` | not measured; not advertised |
+| Type group | `getTypeGroup()` | `/sap/bc/adt/ddic/typegroups` | not measured; not advertised (7.40's `typestructure` lists `TYPE/DG`, its discovery has no such collection) |
 | Access Control | `getAccessControl()` | `/sap/bc/adt/acm/dcl/sources` | not measured; not advertised |
 | Service Definition | `getServiceDefinition()` | `/sap/bc/adt/ddic/srvd/sources` | not measured; not advertised |
 | Service Binding | `getServiceBinding()` | `/sap/bc/adt/businessservices/bindings` | not measured; not advertised |

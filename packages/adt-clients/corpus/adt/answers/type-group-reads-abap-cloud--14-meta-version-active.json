@@ -1,0 +1,33 @@
+{
+  "case": "type-group-reads-abap-cloud",
+  "step": 14,
+  "stepTag": "meta-version-active",
+  "capturedAt": "2026-11-28",
+  "note": "Recorded by the read-only type group probe through @mcp-abap-adt/connection (scripts/adt-nc.ts) on ABAP Cloud: GETs of an SAP type group only. Scrubbed of host.",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/ddic/typegroups/abap?version=active",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/ddic/typegroups/abap?version=active",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.ddic.typegroups.v3+xml"
+    },
+    "headersNote": "Caller-supplied headers only, as the probe sent them through @mcp-abap-adt/connection; the connection adds the session, CSRF and Authorization headers below this point.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.ddic.typegroups.v3+xml; charset=utf-8",
+      "content-length": "641",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "etag": "202503280829500018",
+      "last-modified": "Fri, 28 Mar 2025 08:29:50 GMT",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0"
+    },
+    "bodyFile": "type-group-reads-abap-cloud--14-meta-version-active.body.xml"
+  }
+}

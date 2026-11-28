@@ -82,6 +82,7 @@ const EXPECTED: Record<ActivatingApi, () => string[]> = {
   table: () => [own('ZGUARD_TAB', 'TABL/DT')],
   tableType: () => [own('ZGUARD_TTYP', 'TTYP/DA')],
   transformation: () => [own('ZGUARD_XSLT', 'XSLT/VT')],
+  typeGroup: () => [own('ZGRD', 'TYPE/DG')],
 };
 
 describe('the uris an activation names are the ones a caller builds', () => {

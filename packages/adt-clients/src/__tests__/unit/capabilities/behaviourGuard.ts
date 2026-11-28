@@ -390,9 +390,28 @@ export async function invoke(
         source: String(config.source ?? '" guard'),
         lockHandle: 'GUARD-LOCK',
       });
+    case 'delete':
+      // A delete with no `checkDeletion` beside it is the locked one
+      // (`IAdtLockedDeletable`): it runs under the caller's lock, and its
+      // handle is required. Every other delete takes none.
+      return fn.call(
+        handler,
+        config,
+        lockedDelete(handler)
+          ? { ...headers, lockHandle: 'GUARD-LOCK' }
+          : headers,
+      );
     default:
       return fn.call(handler, config, headers);
   }
+}
+
+/** Whether `handler`'s delete is the locked one: no `checkDeletion` beside it. */
+export function lockedDelete(handler: Record<string, unknown>): boolean {
+  return (
+    typeof handler.delete === 'function' &&
+    typeof handler.checkDeletion !== 'function'
+  );
 }
 
 /**
@@ -467,6 +486,15 @@ export async function invokeWithOptions(
         source: String(config.source ?? '" guard'),
         lockHandle: 'GUARD-LOCK',
       });
+      return;
+    case 'delete':
+      await fn.call(
+        handler,
+        config,
+        lockedDelete(handler)
+          ? { ...options, lockHandle: 'GUARD-LOCK' }
+          : options,
+      );
       return;
     default:
       await fn.call(handler, config, options);

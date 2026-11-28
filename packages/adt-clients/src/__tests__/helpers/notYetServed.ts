@@ -1,8 +1,7 @@
 /**
  * The APIs `@mcp-abap-adt/interfaces-adt` 34.0.0's tables name that this
  * package does not serve yet, and their codes. 34.0.0 carries the rows of
- * several tasks released at once — type groups (fr0ster/mcp-abap-adt-clients
- * #335) and the application log and job catalog/template reads — whose
+ * several tasks released at once — the application log and job catalog/template reads — whose
  * factories land with those tasks, not with C7.
  *
  * Every exhaustive check over the tables leaves exactly these out, and
@@ -12,7 +11,6 @@
 import type { AdtApiName, AdtTypeCode } from '@mcp-abap-adt/interfaces-adt';
 
 export const NOT_YET_SERVED = [
-  'typeGroup',
   'applicationLog',
   'applicationJobCatalog',
   'applicationJobTemplate',
@@ -21,7 +19,6 @@ export const NOT_YET_SERVED = [
 export type NotYetServedApi = (typeof NOT_YET_SERVED)[number];
 
 export const NOT_YET_SERVED_CODES = [
-  'TYPE/DG',
   'APLO/TYP',
   'SAJC',
   'SAJT',

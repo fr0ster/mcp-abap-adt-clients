@@ -51,6 +51,7 @@ const absent = [
   'getAppendStructure',
   'getTableSettings',
   'getTextElements',
+  'getTypeGroup',
 ] as const;
 
 /** The endpoint each type's refusal names (its collection). */
@@ -61,6 +62,7 @@ const endpointOf: Record<string, string> = {
   getAppendStructure: '/sap/bc/adt/ddic/structures',
   getTableSettings: '/sap/bc/adt/ddic/db/settings',
   getTextElements: '/sap/bc/adt/textelements/programs',
+  getTypeGroup: '/sap/bc/adt/ddic/typegroups',
 };
 
 /**

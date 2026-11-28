@@ -30,6 +30,7 @@ export const ATOM_METHODS = {
   updatable: ['update'],
   metadataUpdatable: ['updateMetadata'],
   deletable: ['delete', 'checkDeletion'],
+  lockedDeletable: ['delete'],
   validatable: ['validate'],
   checkable: ['check'],
   activatable: ['activate'],
@@ -862,6 +863,43 @@ export const HANDLERS = {
       readTransport: '/sap/bc/adt/xslt/transformations/zguard_xslt/transport',
     },
     capabilities: [...FULL, 'metadataUpdatable'],
+  },
+  typeGroup: {
+    factory: (c: AdtClient) => c.getTypeGroup(),
+    // The name is kept as given in every address: no case folding.
+    subject: '/sap/bc/adt/ddic/typegroups/ZGRD',
+    config: {
+      source: 'TYPE-POOL zgrd .',
+      typeGroupName: 'ZGRD',
+      packageName: '$TMP',
+      description: 'guard',
+    },
+    requests: {
+      create: '/sap/bc/adt/ddic/typegroups',
+      read: '/sap/bc/adt/ddic/typegroups/ZGRD/source/main',
+      readMetadata: '/sap/bc/adt/ddic/typegroups/ZGRD',
+      update: '/sap/bc/adt/ddic/typegroups/ZGRD/source/main',
+      // A DELETE on its own address under the caller's lock (measured), with
+      // no deletion check beside it.
+      delete: [{ method: 'DELETE', path: '/sap/bc/adt/ddic/typegroups/ZGRD' }],
+      validate: '/sap/bc/adt/ddic/typegroups/validation',
+      activate: '/sap/bc/adt/activation',
+      lock: '/sap/bc/adt/ddic/typegroups/ZGRD',
+      unlock: '/sap/bc/adt/ddic/typegroups/ZGRD',
+      getVersions: '/sap/bc/adt/ddic/typegroups/ZGRD/source/main/versions',
+    },
+    capabilities: [
+      'creatable',
+      'readable',
+      'metadataReadable',
+      'updatable',
+      'lockedDeletable',
+      'validatable',
+      'activatable',
+      'lockable',
+      'versionable',
+    ],
+    why: "a type group (TYPE/DG): its delete is a DELETE under the caller's lock with no deletion check (IAdtLockedDeletable), and the check run, the metadata write and the transport read are not offered for it (fr0ster/mcp-abap-adt-clients#305)",
   },
   // ── Objects with no version history ──────────────────────────────────────
   domain: {

@@ -290,6 +290,26 @@ declared.
 throw surfaces from the member call as itself, as every reading's does.
 A program reference's `name` and `uri` are optional (measured on premise for #333): SAP sends a reference with no ABAP source behind it — the "Runtime analysis" root, an object's creation, a call from the kernel — as an element with no `adtcore:name`, `adtcore:uri` or `adtcore:type`, and the reading answers both absent. The fields kept required are on every row of the recorded hit list (11), statements (15) and DB accesses (2): a row's `index`, a statement's `id`, a timing's `time` and `percentage`.
 
+## Type groups: what their answers say
+
+Measured on S/4HANA 2025 and on ABAP Cloud (corpus `type-group-*`).
+
+- **Validation's `objtype` is `TYPE/DG` exactly.** `typedg`, `type` and `TYPEDG`
+  are refused `400` (`InvalidTypeGroupName`, SY/530 on ABAP Cloud), although
+  other validations take the lowercase codes. `validate` sends `TYPE%2FDG`.
+- **A valid name answers an empty `200`**, not a `CHECK_RESULT` document. A
+  taken name (`SDDIC_ADT_TYPE_GROUP`/002) and one longer than five characters
+  (E2/129) answer `400 InvalidTypeGroupName`. Read the status, not a body.
+- **The metadata read refuses a request with no `Accept` at all** (`400`
+  "Accept header missing", on premise). The connector's request without a
+  caller `Accept` is answered `200`, so the connector supplies a header of its
+  own; the library sends v3 by default.
+- **ABAP Cloud lists the collection with an empty `app:accept`**, and its
+  typestructure lists `CREATE`. A create in the configured test package
+  answered `403` EU/519 (`S_DEVELOP`): an authorization refusal decides
+  nothing, so no write is in the cloud row. Where-used, search and the reads
+  of SAP's type groups work.
+
 ## abapGit: what an answer says
 
 Read from SAP's handler code (onprem `ZCL_ABAPGIT_RES_*`, cloud

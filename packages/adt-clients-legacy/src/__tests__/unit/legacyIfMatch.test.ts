@@ -67,6 +67,7 @@ const SENDS_NO_REQUEST: ReadonlySet<string> = new Set([
   'AdtFeatureToggleAbsentLegacy.update',
   'AdtTransformationAbsentLegacy.update',
   'AdtTransformationAbsentLegacy.updateMetadata',
+  'AdtTypeGroupAbsentLegacy.update',
   'AdtScalarFunctionAbsentLegacy.update',
   'AdtScalarFunctionAbsentLegacy.updateMetadata',
   'AdtScalarFunctionImplementationAbsentLegacy.update',

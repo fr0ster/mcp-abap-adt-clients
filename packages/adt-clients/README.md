@@ -325,6 +325,7 @@ where 7.40 is not measured (its [LEGACY.md](https://github.com/fr0ster/mcp-abap-
 | Scalar functions | `getScalarFunction()` | `DSFD/SCF` | ✅ | ✅ | — |
 | Scalar function implementations | `getScalarFunctionImplementation()` | `DSFI/SFI` | ✅ | ✅ | — |
 | Transformations | `getTransformation()` | `XSLT/VT` | ✅ | ✅ | — |
+| Type groups | `getTypeGroup()` | `TYPE/DG` | ✅ | ✅ validation, reads and versions only | — |
 | Message classes | `getMessageClass()` | `MSAG/N` | ✅ | ✅ | ✅ |
 | Messages | `getMessageClassMessage()` | `MSAG/NN`, read from its class | ✅ | ✅ | ✅ |
 | Packages | `getPackage()` | `DEVC/K` | ✅ | ✅ | — |

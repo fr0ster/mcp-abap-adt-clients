@@ -31,6 +31,21 @@ of member that still sent two requests are split (to be released as 49.0.0,
 with `@mcp-abap-adt/adt-strategies` 0.30.0 and the interfaces-adt change of
 decision 53). See [MIGRATION-49.md](docs/usage/MIGRATION-49.md).
 
+### Added
+
+- **Type groups (`TYPE/DG`): `getTypeGroup()`**, `AdtTypeGroup`,
+  `TypeGroupValues`, `typeGroupDocuments` and the address record `TYPE_GROUP`
+  (fr0ster/mcp-abap-adt-clients#305, interfaces-adt 34.0.0). One request per
+  member: `validate`, `create`, `readMetadata`, `read`, `update`, `lock`,
+  `unlock`, `activate`, `getVersions`, `getVersionSource` and `delete` — a
+  `DELETE` under the caller's lock with no deletion check
+  (`IAdtLockedDeletable`). The name goes into every address and body as the
+  caller gave it, never case-folded, and `buildObjectUri` keeps a `TYPE/DG`
+  name as given too; the description is sent whole. ABAP Cloud is served
+  `validate`, the reads and the versions: its row lists no write. See
+  [Type groups](docs/usage/CLIENT_API_REFERENCE.md#type-groups-gettypegroup)
+  and [ERRATA](docs/usage/ERRATA.md#type-groups-what-their-answers-say).
+
 ### Changed (breaking)
 
 - **Every activation member sends the activation alone.** Each handler's

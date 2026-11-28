@@ -302,6 +302,7 @@ const HANDLER: {
   scalarFunction: (c) => c.getScalarFunction(),
   scalarFunctionImplementation: (c) => c.getScalarFunctionImplementation(),
   transformation: (c) => c.getTransformation(),
+  typeGroup: (c) => c.getTypeGroup(),
   messageClass: (c) => c.getMessageClass(),
   messageClassMessage: (c) => c.getMessageClassMessage(),
   featureToggle: (c) => c.getFeatureToggle(),
@@ -418,6 +419,8 @@ const SOURCE_READ: {
       ),
   transformation: (c, name) =>
     c.getTransformation().read({ transformationName: name }, undefined, JUDGED),
+  typeGroup: (c, name) =>
+    c.getTypeGroup().read({ typeGroupName: name }, undefined, JUDGED),
   featureToggle: (c, name) =>
     c
       .getFeatureToggle()
@@ -564,6 +567,25 @@ export type ConformanceRule =
   | 'metadata-type'
   /** A code of the table on a release with samples has a readable record. */
   | 'sample';
+
+/**
+ * The codes whose record keeps the name as the caller gave it, never
+ * case-folded (`TYPE_GROUP.uri`). urimapper answers their address in lower
+ * case, and the address in the name's own case is served too (measured on
+ * S/4HANA 2025 and ABAP Cloud: `GET /sap/bc/adt/ddic/typegroups/ABAP`, `200`,
+ * corpus `type-group-reads-abap-cloud--15`, `type-group-cycle-s4-2025--08`),
+ * so for them the two addresses agree when they differ in case alone.
+ */
+const NAME_KEPT_AS_GIVEN: ReadonlySet<string> = new Set(['TYPE/DG']);
+
+/** Whether the library's address is urimapper's (rule 5). */
+function sameAddress(code: string, built: string, answered: string): boolean {
+  if (built === answered) return true;
+  return (
+    NAME_KEPT_AS_GIVEN.has(code) &&
+    built.toLowerCase() === answered.toLowerCase()
+  );
+}
 
 /** One conflict: its rule, where, and what was found. */
 export interface IConflict {
@@ -824,7 +846,7 @@ export function checkTypeTable(
           addressNotRun.push([code, sample.urimapper.reason]);
         } else {
           const built = libraryAddress(code, sample.name, sample.parent);
-          if (built !== sample.urimapper.uri) {
+          if (!sameAddress(code, built, sample.urimapper.uri)) {
             conflict(
               'address',
               api,

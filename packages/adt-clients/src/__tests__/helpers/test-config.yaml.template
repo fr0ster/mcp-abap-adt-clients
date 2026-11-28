@@ -1495,6 +1495,24 @@ create_table:
 # its settings written to non-default values under their own lock, the table
 # activated, the active settings read back, the table deleted.
 # The table name is fresh per run (ZAC_TS + 6 characters).
+type_groups:
+  test_cases:
+    - name: "adt_type_group"
+      enabled: true
+      # The cycle of writes: the cloud row lists none of them.
+      available_in: ["onprem"]
+      description: "A type group of the run's own (a fresh name of five characters): create, write, activate, versions, delete"
+      params:
+        description: "ADT type group"
+        # package_name: uses environment.default_package if omitted
+        # transport_request: uses environment.default_transport if omitted; given, the create, the write and the delete carry it as corrNr
+    - name: "adt_type_group_reads"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Validation, and the reads and versions of an SAP type group"
+      params:
+        sap_type_group: "ABAP"
+
 table_settings:
   test_cases:
     - name: "adt_table_settings"

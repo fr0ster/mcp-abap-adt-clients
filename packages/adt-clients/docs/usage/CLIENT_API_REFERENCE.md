@@ -477,6 +477,45 @@ await toggle.activate({ featureToggleName: 'ZMY_FEATURE' }, { headers });
 // bind to transports through the /toggle and /check endpoints instead.
 ```
 
+### Type groups (`getTypeGroup()`)
+
+Type groups (`TYPE/DG`, `/sap/bc/adt/ddic/typegroups`). Each member sends one
+request; the name is sent **as given** — never case-folded, never checked (at
+most 5 characters is SAP's rule, and SAP refuses a longer one) — and the
+description whole (the metadata advertises `descriptionTextLimit="70"`; what
+SAP does beyond it is SAP's answer).
+
+| Member | Request |
+|---|---|
+| `validate` | `POST …/typegroups/validation?objtype=TYPE%2FDG&objname=…[&packagename=…][&description=…]` — an empty `200` when valid, `400 InvalidTypeGroupName` when not |
+| `create` | `POST …/typegroups[?corrNr=…]`, the `atypgr:abapTypeGroup` document — the type group is inactive until activated |
+| `readMetadata` | `GET …/typegroups/{name}`, `Accept` v3 by default (the read is refused without one) |
+| `read` | `GET …/{name}/source/main` |
+| `update` | `PUT …/{name}/source/main?lockHandle=…[&corrNr=…]`, the whole source |
+| `lock` / `unlock` | `POST …/{name}?_action=LOCK&accessMode=MODIFY` / `?_action=UNLOCK&lockHandle=…`, each stateful for its request alone |
+| `activate` | `POST /sap/bc/adt/activation`, the checklist as it came |
+| `getVersions` / `getVersionSource` | `GET …/{name}/source/main/versions` / the entry's content uri |
+| `delete` | `DELETE …/{name}?lockHandle=…[&corrNr=…]`, under the caller's lock (`IAdtLockedDeletable`); there is no deletion check |
+
+On ABAP Cloud only `validate`, the reads and the versions are served: the
+cloud row lists no write (a create answered `403` `S_DEVELOP`, which decides
+nothing), so `create`, `update`, `lock`, `unlock`, `activate` and `delete` do
+not compile on `AdtClientCloud`.
+
+Compiled as written by `src/__tests__/typechecks/exact/typeGroupExample.ts`.
+
+```typescript
+const client = await createAdtClient(connection, { variant: 'onprem' });
+const tg = client.getTypeGroup();
+await tg.create({ typeGroupName: 'ZTG1', packageName: '$TMP', description: 'Types' }, { headers });
+const locked = await tg.lock({ typeGroupName: 'ZTG1' });
+if (!locked.ok) throw new Error(locked.getError().message);
+const lockHandle = locked.getResult().value;
+await tg.update({ typeGroupName: 'ZTG1' }, { headers: writeHeaders, lockHandle, source: 'TYPE-POOL ztg1 .' });
+await tg.unlock({ typeGroupName: 'ZTG1' }, lockHandle);
+await tg.activate({ typeGroupName: 'ZTG1' }, { headers: activationHeaders });
+```
+
 ### Standalone `PROG/I` includes (`getInclude()`)
 
 Since 13.0.0. An include is **not** a program and **not** a function-group

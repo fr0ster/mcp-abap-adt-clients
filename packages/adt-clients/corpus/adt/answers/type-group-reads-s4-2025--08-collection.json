@@ -1,0 +1,31 @@
+{
+  "case": "type-group-reads-s4-2025",
+  "step": 8,
+  "stepTag": "collection",
+  "capturedAt": "2026-11-28",
+  "note": "Recorded by the read-only type group probe through @mcp-abap-adt/connection (scripts/adt-nc.ts), S/4HANA 2025 on premise: GETs of SAP type groups only. Scrubbed of host and system id.",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/ddic/typegroups",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/ddic/typegroups",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.ddic.typegroups.v3+xml"
+    },
+    "headersNote": "Caller-supplied headers only, as the probe sent them through @mcp-abap-adt/connection; the connection adds the session, CSRF and Authorization headers below this point.",
+    "body": null
+  },
+  "response": {
+    "status": 400,
+    "statusText": "Bad Request",
+    "headers": {
+      "content-type": "application/xml",
+      "content-length": "517",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0"
+    },
+    "bodyFile": "type-group-reads-s4-2025--08-collection.body.xml"
+  }
+}

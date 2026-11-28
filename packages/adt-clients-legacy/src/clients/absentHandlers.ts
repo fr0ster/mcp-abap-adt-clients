@@ -1,5 +1,5 @@
 /**
- * The handlers of the 20 types a legacy system (SAP_BASIS 7.40, measured on
+ * The handlers of the 21 types a legacy system (SAP_BASIS 7.40, measured on
  * 7.40 SP04) does not have at all (C5 of #304).
  *
  * The legacy client still hands one out, so a caller of `AdtClient` that is
@@ -37,6 +37,7 @@ import {
   AdtTableSettings,
   AdtTextElements,
   AdtTransformation,
+  AdtTypeGroup,
   type AppendStructureValues,
   AUTHORIZATION_FIELD,
   type AuthorizationFieldValues,
@@ -74,6 +75,8 @@ import {
   type TextElementsValues,
   TRANSFORMATION,
   type TransformationValues,
+  TYPE_GROUP,
+  type TypeGroupValues,
 } from '@mcp-abap-adt/adt-clients';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
@@ -1184,6 +1187,65 @@ export class AdtTransformationAbsentLegacy extends AdtTransformation<
   }
 
   override async check(): Promise<IAdtResponse<never>> {
+    return failed(this.#absence());
+  }
+
+  override async lock(): Promise<IAdtResponse<never>> {
+    return failed(this.#absence());
+  }
+
+  override async unlock(): Promise<IAdtResponse<never>> {
+    return failed(this.#absence());
+  }
+
+  override async getVersions(): Promise<IAdtResponse<never>> {
+    return failed(this.#absence());
+  }
+
+  override async getVersionSource(): Promise<IAdtResponse<never>> {
+    return failed(this.#absence());
+  }
+}
+
+/**
+ * AdtTypeGroup on a legacy system: every operation refuses, nothing is sent.
+ * 7.40 SP04's discovery lists no type group collection (the corpus's
+ * `system-description-basis-740--03-discovery`); not measured.
+ */
+export class AdtTypeGroupAbsentLegacy extends AdtTypeGroup<
+  TypeGroupValues,
+  'basis740'
+> {
+  /** The refusal every operation answers. */
+  #absence(): IAdtError {
+    return absentRefusal('TypeGroup', TYPE_GROUP.collection, 'not-advertised');
+  }
+
+  override async validate(): Promise<IAdtResponse<never>> {
+    return failed(this.#absence());
+  }
+
+  override async create(): Promise<IAdtResponse<never>> {
+    return failed(this.#absence());
+  }
+
+  override async read(): Promise<IAdtResponse<never>> {
+    return failed(this.#absence());
+  }
+
+  override async readMetadata(): Promise<IAdtResponse<never>> {
+    return failed(this.#absence());
+  }
+
+  override async update(): Promise<IAdtResponse<never>> {
+    return failed(this.#absence());
+  }
+
+  override async delete(): Promise<IAdtResponse<never>> {
+    return failed(this.#absence());
+  }
+
+  override async activate(): Promise<IAdtResponse<never>> {
     return failed(this.#absence());
   }
 

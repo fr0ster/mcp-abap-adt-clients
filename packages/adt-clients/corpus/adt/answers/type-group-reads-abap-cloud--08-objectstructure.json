@@ -1,0 +1,29 @@
+{
+  "case": "type-group-reads-abap-cloud",
+  "step": 8,
+  "stepTag": "objectstructure",
+  "capturedAt": "2026-11-28",
+  "note": "Recorded by the read-only type group probe through @mcp-abap-adt/connection (scripts/adt-nc.ts) on ABAP Cloud: GETs of an SAP type group only. Scrubbed of host.",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/ddic/typegroups/abap/objectstructure",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/ddic/typegroups/abap/objectstructure",
+    "headers": {},
+    "headersNote": "Caller-supplied headers only, as the probe sent them through @mcp-abap-adt/connection; the connection adds the session, CSRF and Authorization headers below this point.",
+    "body": null
+  },
+  "response": {
+    "status": 404,
+    "statusText": "Not Found",
+    "headers": {
+      "content-type": "text/plain; charset=utf-8",
+      "content-length": "26",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0"
+    },
+    "bodyFile": "type-group-reads-abap-cloud--08-objectstructure.body.txt"
+  }
+}

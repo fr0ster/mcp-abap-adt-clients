@@ -30,6 +30,7 @@ import type {
   IAdtEnhancementHost,
   IAdtIncludeEnhancementHost,
   IAdtLockable,
+  IAdtLockedDeletable,
   IAdtLockFreeMetadataUpdatable,
   IAdtLockFreeUpdatable,
   IAdtMainProgramsReadable,
@@ -123,25 +124,32 @@ type OffersAtom<T, A extends string> = A extends 'enhancementHost'
                   >
                 : A extends 'deletable'
                   ? Offers<T, IAdtDeletable<any, any, never>>
-                  : A extends 'validatable'
-                    ? Offers<T, IAdtValidatable<any, any, never>>
-                    : A extends 'checkable'
-                      ? Offers<T, IAdtCheckable<any, any, never>>
-                      : A extends 'activatable'
-                        ? Offers<T, IAdtActivatable<any, any, never>>
-                        : A extends 'lockable'
-                          ? Offers<T, IAdtLockable<any, never>>
-                          : A extends 'versionable'
-                            ? Offers<T, IAdtVersionable<any, any, any, never>>
-                            : A extends 'transportAware'
-                              ? Offers<T, IAdtTransportAware<any, any, never>>
-                              : // An atom this chain does not know resolves to
-                                // `never`, and `never extends true` is vacuously true
-                                // — so it would drop out of the product and be checked
-                                // by nothing at all. `everyAtomIsMapped` below refuses
-                                // to compile if a new atom is added to the manifest
-                                // without a line here.
-                                never;
+                  : A extends 'lockedDeletable'
+                    ? // Every unlocked delete satisfies the locked one's
+                      // signature against `any` configs; the locked atom is
+                      // the delete with no `checkDeletion` beside it.
+                      T extends { checkDeletion: unknown }
+                      ? false
+                      : Offers<T, IAdtLockedDeletable<any, any, never>>
+                    : A extends 'validatable'
+                      ? Offers<T, IAdtValidatable<any, any, never>>
+                      : A extends 'checkable'
+                        ? Offers<T, IAdtCheckable<any, any, never>>
+                        : A extends 'activatable'
+                          ? Offers<T, IAdtActivatable<any, any, never>>
+                          : A extends 'lockable'
+                            ? Offers<T, IAdtLockable<any, never>>
+                            : A extends 'versionable'
+                              ? Offers<T, IAdtVersionable<any, any, any, never>>
+                              : A extends 'transportAware'
+                                ? Offers<T, IAdtTransportAware<any, any, never>>
+                                : // An atom this chain does not know resolves to
+                                  // `never`, and `never extends true` is vacuously true
+                                  // — so it would drop out of the product and be checked
+                                  // by nothing at all. `everyAtomIsMapped` below refuses
+                                  // to compile if a new atom is added to the manifest
+                                  // without a line here.
+                                  never;
 
 /**
  * Every atom in the manifest has a line in the chain above.
@@ -222,6 +230,11 @@ export type Offenders = {
 // contracts are `IAdtTextElementsReadable` / `IAdtTextElementsUpdatable`,
 // `IAdtTableSettingsUpdatable` and `IAdtMessageClassMessageUpdatable`, each
 // checked by its handler's own tests.
+//
+// The four local class includes since the locked delete (`IAdtLockedDeletable`,
+// type groups): each has a `delete` with no `checkDeletion` beside it — the
+// include written empty, which this check reads, against `any` configs, as the
+// locked atom. It is no deletion of its own and is not claimed.
 export type KnownDisagreements =
   | 'include.enhancementHost — offered but not claimed'
   | 'class.includeEnhancementHost — offered but not claimed'
@@ -231,7 +244,11 @@ export type KnownDisagreements =
   | 'textElements.readable — offered but not claimed'
   | 'textElements.updatable — offered but not claimed'
   | 'tableSettings.metadataUpdatable — offered but not claimed'
-  | 'messageClassMessage.updatable — offered but not claimed';
+  | 'messageClassMessage.updatable — offered but not claimed'
+  | 'localTestClass.lockedDeletable — offered but not claimed'
+  | 'localTypes.lockedDeletable — offered but not claimed'
+  | 'localDefinitions.lockedDeletable — offered but not claimed'
+  | 'localMacros.lockedDeletable — offered but not claimed';
 
 /**
  * The assertion.

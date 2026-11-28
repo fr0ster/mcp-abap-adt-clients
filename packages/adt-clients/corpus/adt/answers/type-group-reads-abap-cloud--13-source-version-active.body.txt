@@ -1,0 +1,360 @@
+type-pool ABAP .
+
+
+************************************************************************
+* WARNING!!!!! DO NOT CHANGE ANY OF THE FOLLOWING TYPES! WARNING !!!!! *
+* !!!!!!!! All types have to synchronized with ABAP kernel types !!!!! *
+************************************************************************
+
+************************************************************************
+* NAMES WITH PREFIX "ABAP_" DECLARED IN THE DDIC
+* MUST NOT BE REDEFINED HERE!
+************************************************************************
+* abap_encod
+* abap_endia
+* abap_repl
+
+************************************************************************
+**** GENERAL ***********************************************************
+types:
+  ABAP_BOOL type C length 1.
+* constants for abap_bool
+constants:
+  ABAP_TRUE      type ABAP_BOOL value 'X',
+  ABAP_FALSE     type ABAP_BOOL value ' ',
+  ABAP_UNDEFINED type ABAP_BOOL value '-',
+  ABAP_ON        type ABAP_BOOL value 'X',
+  ABAP_OFF       type ABAP_BOOL value ' '.
+
+
+************************************************************************
+**** DESCRIBE   ********************************************************
+constants:
+  ABAP_MAX_ABS_TYPE_NAME_LN   type I value        200,
+  ABAP_MAX_CLASS_NAME_LN      type I value         30,
+  ABAP_MAX_INTF_NAME_LN       type I value         30,
+  ABAP_MAX_COMP_NAME_LN       type I value         30,
+  ABAP_MAX_KEY_NAME_LN        type I value        255,
+  ABAP_MAX_CLASS_COMP_NAME_LN type I value         61,
+  ABAP_MAX_EDIT_MASK_LN       type I value          7,
+  ABAP_MAX_HELP_ID_LN         type I value         62,
+  ABAP_MAX_DB_STRING_LN       type I value  536870912,
+  ABAP_MAX_DB_RAWSTRING_LN    type I value 1073741824.
+
+
+
+types:
+* type kinds
+  ABAP_TYPEKIND     type C length 1, " check CL_ABAP_TYPEDESCR for values
+  ABAP_TYPECATEGORY type C length 1, " check CL_ABAP_TYPEDESCR for values
+  ABAP_TYPEPROPKIND type C length 1,
+  ABAP_STRUCTKIND   type C length 1,
+  ABAP_TABLEKIND    type C length 1,
+  ABAP_KEYDEFKIND   type C length 1,
+  ABAP_CLASSKIND    type C length 1,
+  ABAP_INTFKIND     type C length 1,
+  ABAP_PARMKIND     type C length 1,
+* misc
+  ABAP_EDITMASK     type C length ABAP_MAX_EDIT_MASK_LN,
+  ABAP_HELPID       type C length ABAP_MAX_HELP_ID_LN,
+  ABAP_VISIBILITY   type C length 1,
+* name types
+  ABAP_TYPENAME     type C length ABAP_MAX_CLASS_COMP_NAME_LN,
+  ABAP_ABSTYPENAME  type C length ABAP_MAX_ABS_TYPE_NAME_LN,
+  ABAP_COMPNAME     type C length ABAP_MAX_COMP_NAME_LN,
+  ABAP_KEYNAME      type C length ABAP_MAX_KEY_NAME_LN,
+  ABAP_KEYCOMPNAME  type          ABAP_KEYNAME,
+  ABAP_CLASSNAME    type C length ABAP_MAX_CLASS_NAME_LN,
+  ABAP_INTFNAME     type C length ABAP_MAX_INTF_NAME_LN,
+  ABAP_ATTRNAME     type C length ABAP_MAX_CLASS_COMP_NAME_LN,
+  ABAP_METHNAME     type C length ABAP_MAX_CLASS_COMP_NAME_LN,
+  ABAP_EVNTNAME     type C length ABAP_MAX_CLASS_COMP_NAME_LN,
+  ABAP_PARMNAME     type C length ABAP_MAX_COMP_NAME_LN,
+  ABAP_EXCPNAME     type C length ABAP_MAX_COMP_NAME_LN,
+* structure component description
+  begin of ABAP_COMPDESCR,
+    LENGTH    type I,
+    DECIMALS  type I,
+    TYPE_KIND type ABAP_TYPEKIND,
+    NAME      type ABAP_COMPNAME,
+  end of ABAP_COMPDESCR,
+  ABAP_COMPDESCR_TAB type standard table of ABAP_COMPDESCR
+                     with key NAME,
+  begin of ABAP_COMPONENTDESCR,
+    NAME       type STRING,
+    TYPE       type ref to CL_ABAP_DATADESCR,
+    AS_INCLUDE type ABAP_BOOL,
+    SUFFIX     type STRING,
+  end of ABAP_COMPONENTDESCR,
+  ABAP_COMPONENT_TAB type standard table of ABAP_COMPONENTDESCR
+                     with key NAME,
+  begin of ABAP_SIMPLE_COMPONENTDESCR,
+    NAME type STRING,
+    TYPE type ref to CL_ABAP_DATADESCR,
+  end of ABAP_SIMPLE_COMPONENTDESCR,
+  ABAP_COMPONENT_SYMBOL_TAB type hashed table of ABAP_SIMPLE_COMPONENTDESCR
+                            with unique key NAME,
+  ABAP_COMPONENT_VIEW_TAB   type standard table of ABAP_SIMPLE_COMPONENTDESCR
+                          with key NAME,
+* key description of tables
+  begin of ABAP_KEYDESCR,
+    NAME type ABAP_KEYNAME,
+  end of ABAP_KEYDESCR,
+  ABAP_KEYDESCR_TAB type standard table of ABAP_KEYDESCR
+                    with key NAME,
+* description of all secondary keys and primary key of tables
+  begin of ABAP_TABLE_KEYCOMPDESCR,
+    NAME type ABAP_KEYCOMPNAME,
+  end of ABAP_TABLE_KEYCOMPDESCR,
+  begin of ABAP_TABLE_KEYDESCR,
+    COMPONENTS  type standard table of ABAP_TABLE_KEYCOMPDESCR
+                         with non-unique default key
+                         initial size 4,
+    NAME        type ABAP_COMPNAME,
+    IS_PRIMARY  type ABAP_BOOL,
+    ACCESS_KIND type ABAP_TABLEKIND,
+    IS_UNIQUE   type ABAP_BOOL,
+    KEY_KIND    type ABAP_KEYDEFKIND,
+  end of ABAP_TABLE_KEYDESCR,
+  ABAP_TABLE_KEYDESCR_TAB type standard table of ABAP_TABLE_KEYDESCR
+                          with non-unique key NAME
+                          initial size 2,
+* map for mapping table key names to table key aliases
+  begin of ABAP_KEY_ALIAS_PAIR,
+    NAME  type ABAP_COMPNAME,
+    ALIAS type ABAP_COMPNAME,
+  end of ABAP_KEY_ALIAS_PAIR,
+  ABAP_KEY_ALIAS_MAP type sorted table of ABAP_KEY_ALIAS_PAIR
+                          with non-unique key NAME
+                          with unique sorted key KEY_ALIAS components ALIAS
+                          initial size 2,
+* parameter description (methods and event)
+  begin of ABAP_PARMDESCR,
+    LENGTH      type I,
+    DECIMALS    type I,
+    TYPE_KIND   type ABAP_TYPEKIND,
+    NAME        type ABAP_PARMNAME,
+    PARM_KIND   type ABAP_PARMKIND,
+    BY_VALUE    type ABAP_BOOL,
+    IS_OPTIONAL type ABAP_BOOL,
+  end of ABAP_PARMDESCR,
+  ABAP_PARMDESCR_TAB type standard table of ABAP_PARMDESCR
+                     with key NAME,
+* exception description (method and event)
+  begin of ABAP_EXCPDESCR,
+    NAME         type ABAP_EXCPNAME,
+    IS_RESUMABLE type ABAP_BOOL, "abap_false for old exceptions,
+    "abap_true or abap_false for class based exceptions
+  end of ABAP_EXCPDESCR,
+  ABAP_EXCPDESCR_TAB type standard table of ABAP_EXCPDESCR
+                     with key NAME,
+* exposed and access friend description
+  begin of ABAP_FRNDDESCR,
+    NAME type ABAP_CLASSNAME,
+  end of ABAP_FRNDDESCR,
+  ABAP_FRNDDESCR_TAB type standard table of ABAP_FRNDDESCR
+                     with key NAME,
+* included interfaces / interface implementation description
+  begin of ABAP_INTFDESCR,
+    NAME         type ABAP_INTFNAME,
+    IS_INHERITED type ABAP_BOOL,
+  end of ABAP_INTFDESCR,
+  ABAP_INTFDESCR_TAB type standard table of ABAP_INTFDESCR
+                     with key NAME,
+* type definition inside class / interface
+  begin of ABAP_TYPEDEF,
+    NAME         type ABAP_TYPENAME,
+    ALIAS_FOR    type ABAP_TYPENAME,
+    VISIBILITY   type ABAP_VISIBILITY,
+    IS_INTERFACE type ABAP_BOOL,
+    IS_INHERITED type ABAP_BOOL,
+  end of ABAP_TYPEDEF,
+  ABAP_TYPEDEF_TAB type standard table of ABAP_TYPEDEF
+                     with key NAME,
+* attribute description
+  begin of ABAP_ATTRDESCR,
+    LENGTH       type I,
+    DECIMALS     type I,
+    NAME         type ABAP_ATTRNAME,
+    TYPE_KIND    type ABAP_TYPEKIND,
+    VISIBILITY   type ABAP_VISIBILITY,
+    IS_INTERFACE type ABAP_BOOL,
+    IS_INHERITED type ABAP_BOOL,
+    IS_CLASS     type ABAP_BOOL,
+    IS_CONSTANT  type ABAP_BOOL,
+    IS_VIRTUAL   type ABAP_BOOL,
+    IS_READ_ONLY type ABAP_BOOL,
+    ALIAS_FOR    type ABAP_ATTRNAME,
+  end of ABAP_ATTRDESCR,
+  ABAP_ATTRDESCR_TAB type standard table of ABAP_ATTRDESCR
+                     with key NAME,
+* method description
+  begin of ABAP_METHDESCR,
+    PARAMETERS       type ABAP_PARMDESCR_TAB,
+    EXCEPTIONS       type ABAP_EXCPDESCR_TAB,
+    NAME             type ABAP_METHNAME,
+    FOR_EVENT        type ABAP_EVNTNAME,
+    OF_CLASS         type ABAP_CLASSNAME,
+    VISIBILITY       type ABAP_VISIBILITY,
+    IS_INTERFACE     type ABAP_BOOL,
+    IS_INHERITED     type ABAP_BOOL,
+    IS_REDEFINED     type ABAP_BOOL,
+    IS_ABSTRACT      type ABAP_BOOL,
+    IS_FINAL         type ABAP_BOOL,
+    IS_CLASS         type ABAP_BOOL,
+    ALIAS_FOR        type ABAP_METHNAME,
+    IS_RAISING_EXCPS type ABAP_BOOL, "abap_true if method declaration has a raising clause
+    "abap_false otherwise
+  end of ABAP_METHDESCR,
+  ABAP_METHDESCR_TAB type standard table of ABAP_METHDESCR
+                     with key NAME,
+* event description
+  begin of ABAP_EVNTDESCR,
+    PARAMETERS   type ABAP_PARMDESCR_TAB,
+    NAME         type ABAP_EVNTNAME,
+    VISIBILITY   type ABAP_VISIBILITY,
+    IS_INTERFACE type ABAP_BOOL,
+    IS_INHERITED type ABAP_BOOL,
+    IS_CLASS     type ABAP_BOOL,
+    ALIAS_FOR    type ABAP_EVNTNAME,
+  end of ABAP_EVNTDESCR,
+  ABAP_EVNTDESCR_TAB type standard table of ABAP_EVNTDESCR
+                     with key NAME,
+
+* table for get_friend_types
+  ABAP_FRNDTYPES_TAB type standard table of ref to CL_ABAP_TYPEDESCR
+                     with key TABLE_LINE.
+
+
+************************************************************************
+************* DYNAMIC CALL FUNCTION ************************************
+types:
+* CALL FUNCTION ... PARAMETER-TABLE
+  begin of ABAP_FUNC_PARMBIND,
+    VALUE     type ref to DATA,
+    TABLES_WA type ref to DATA,
+    KIND      type I,
+    NAME      type ABAP_PARMNAME,
+  end of ABAP_FUNC_PARMBIND,
+  ABAP_FUNC_PARMBIND_TAB type sorted table of ABAP_FUNC_PARMBIND
+                         with unique key KIND NAME,
+* CALL FUNCTION ... EXCEPTION-TABLE
+  begin of ABAP_FUNC_EXCPBIND,
+    MESSAGE type ref to DATA,
+    VALUE   type I,
+    NAME    type ABAP_EXCPNAME,
+  end of ABAP_FUNC_EXCPBIND,
+  ABAP_FUNC_EXCPBIND_TAB type hashed table of ABAP_FUNC_EXCPBIND
+                         with unique key NAME.
+
+constants:
+  ABAP_FUNC_EXPORTING type ABAP_FUNC_PARMBIND-KIND value 10,
+  ABAP_FUNC_IMPORTING type ABAP_FUNC_PARMBIND-KIND value 20,
+  ABAP_FUNC_TABLES    type ABAP_FUNC_PARMBIND-KIND value 30,
+  ABAP_FUNC_CHANGING  type ABAP_FUNC_PARMBIND-KIND value 40.
+
+************************************************************************
+************* DYNAMIC INVOKE *******************************************
+types:
+* PARAMETER-TABLE
+  begin of ABAP_PARMBIND,
+    NAME  type ABAP_PARMNAME,
+    KIND  type ABAP_PARMKIND,
+    VALUE type ref to DATA,
+  end of ABAP_PARMBIND,
+  ABAP_PARMBIND_TAB type hashed table of ABAP_PARMBIND
+                    with unique key NAME,
+* EXCEPTION-TABLE
+  begin of ABAP_EXCPBIND,
+    NAME  type ABAP_EXCPNAME,
+    VALUE type I,
+  end of ABAP_EXCPBIND,
+  ABAP_EXCPBIND_TAB type hashed table of ABAP_EXCPBIND
+                    with unique key NAME.
+
+
+************************************************************************
+**** Types for CL_ABAP_CHAR_UTILITIES **********************************
+types:
+  ABAP_CHAR1(1)           type C,
+  ABAP_CR_LF(2)           type C,
+  ABAP_BYTE_ORDER_MARK(2) type X,
+  ABAP_BYTE_ORDER_UTF8(3) type X.
+
+
+************************************************************************
+**** CONVERSION ********************************************************
+types:
+  ABAP_ENCODING type ABAP_ENCOD,
+  ABAP_ENDIAN   type ABAP_ENDIA.
+
+************************************************************************
+**** CALL TRANSFORMATION ***********************************************
+
+* PARAMETER TABLE
+types:
+  ABAP_TRANS_PARMNAME  type STRING,
+  ABAP_TRANS_PARMVALUE type STRING,
+  ABAP_TRANS_PARMREF   type ref to DATA.
+
+types:
+  begin of ABAP_TRANS_PARMBIND,
+    NAME  type ABAP_TRANS_PARMNAME,
+    VALUE type ABAP_TRANS_PARMVALUE,
+  end of ABAP_TRANS_PARMBIND,
+  begin of ABAP_TRANS_PARM_OBJ_BIND,
+    NAME  type ABAP_TRANS_PARMNAME,
+    VALUE type ABAP_TRANS_PARMREF,
+  end of ABAP_TRANS_PARM_OBJ_BIND.
+
+types:
+  ABAP_TRANS_PARMBIND_TAB
+      type standard table of ABAP_TRANS_PARMBIND with key NAME,
+  ABAP_TRANS_PARM_OBJ_BIND_TAB
+      type sorted table of ABAP_TRANS_PARM_OBJ_BIND with unique key NAME.
+
+* OBJECT TABLE
+types:
+  ABAP_TRANS_OBJNAME type STRING.
+
+types:
+  begin of ABAP_TRANS_OBJBIND,
+    NAME  type ABAP_TRANS_OBJNAME,
+    VALUE type ref to OBJECT,
+  end of ABAP_TRANS_OBJBIND.
+
+types:
+  ABAP_TRANS_OBJBIND_TAB
+      type standard table of ABAP_TRANS_OBJBIND with key NAME.
+
+* SOURCE TABLE
+types:
+  ABAP_TRANS_SRCNAME type STRING.
+
+types:
+  begin of ABAP_TRANS_SRCBIND,
+    NAME  type ABAP_TRANS_SRCNAME,
+    VALUE type ref to DATA,
+  end of ABAP_TRANS_SRCBIND.
+
+types:
+  ABAP_TRANS_SRCBIND_TAB
+       type standard table of ABAP_TRANS_SRCBIND with key NAME,
+  ABAP_TRANS_SRCBIND_TAB_SORTED
+       type sorted table of ABAP_TRANS_SRCBIND with unique key NAME.
+
+* RESULT TABLE
+types:
+  ABAP_TRANS_RESNAME type STRING.
+
+types:
+  begin of ABAP_TRANS_RESBIND,
+    NAME  type ABAP_TRANS_RESNAME,
+    VALUE type ref to DATA,
+  end of ABAP_TRANS_RESBIND.
+
+types:
+  ABAP_TRANS_RESBIND_TAB
+       type standard table of ABAP_TRANS_RESBIND with key NAME,
+  ABAP_TRANS_RESBIND_TAB_SORTED
+       type sorted table of ABAP_TRANS_RESBIND with unique key NAME.

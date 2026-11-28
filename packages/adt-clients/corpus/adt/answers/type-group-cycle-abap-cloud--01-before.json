@@ -1,0 +1,31 @@
+{
+  "case": "type-group-cycle-abap-cloud",
+  "step": 1,
+  "stepTag": "before",
+  "capturedAt": "2026-11-28",
+  "note": "Recorded by the type group measurement probe through @mcp-abap-adt/connection on ABAP Cloud, in the configured test package: validation and the create attempt (refused 403 EU/519 S_DEVELOP, nothing created). Scrubbed of host, user and lock handle.",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/ddic/typegroups/ZTG3A",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/ddic/typegroups/ZTG3A",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.ddic.typegroups.v3+xml"
+    },
+    "headersNote": "Caller-supplied headers only, as the probe sent them through @mcp-abap-adt/connection; the connection adds the session, CSRF and Authorization headers below this point.",
+    "body": null
+  },
+  "response": {
+    "status": 404,
+    "statusText": "Not Found",
+    "headers": {
+      "content-type": "application/xml",
+      "content-length": "466",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0"
+    },
+    "bodyFile": "type-group-cycle-abap-cloud--01-before.body.xml"
+  }
+}

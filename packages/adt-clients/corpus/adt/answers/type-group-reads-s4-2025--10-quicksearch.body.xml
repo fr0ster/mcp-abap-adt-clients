@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/typegroups/besit" adtcore:type="TYPE/DG" adtcore:name="BESIT"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/typegroups/llty" adtcore:type="TYPE/DG" adtcore:name="LLTY"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/typegroups/me01" adtcore:type="TYPE/DG" adtcore:name="ME01"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/typegroups/meein" adtcore:type="TYPE/DG" adtcore:name="MEEIN"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/typegroups/mmcnt" adtcore:type="TYPE/DG" adtcore:name="MMCNT"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/typegroups/oijg0" adtcore:type="TYPE/DG" adtcore:name="OIJG0"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/typegroups/oijt1" adtcore:type="TYPE/DG" adtcore:name="OIJT1"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/typegroups/oijw0" adtcore:type="TYPE/DG" adtcore:name="OIJW0"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/typegroups/oijwf" adtcore:type="TYPE/DG" adtcore:name="OIJWF"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/typegroups/oijwi" adtcore:type="TYPE/DG" adtcore:name="OIJWI"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/typegroups/p04p1" adtcore:type="TYPE/DG" adtcore:name="P04P1"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/typegroups/p04pm" adtcore:type="TYPE/DG" adtcore:name="P04PM"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/typegroups/p04pp" adtcore:type="TYPE/DG" adtcore:name="P04PP"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/typegroups/p04ps" adtcore:type="TYPE/DG" adtcore:name="P04PS"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/typegroups/p04pt" adtcore:type="TYPE/DG" adtcore:name="P04PT"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/typegroups/p04px" adtcore:type="TYPE/DG" adtcore:name="P04PX"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/typegroups/pbe02" adtcore:type="TYPE/DG" adtcore:name="PBE02"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/typegroups/pbe03" adtcore:type="TYPE/DG" adtcore:name="PBE03"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/typegroups/pbete" adtcore:type="TYPE/DG" adtcore:name="PBETE"/>
+  <adtcore:objectReference adtcore:uri="/sap/bc/adt/ddic/typegroups/vabap" adtcore:type="TYPE/DG" adtcore:name="VABAP"/>
+</adtcore:objectReferences>

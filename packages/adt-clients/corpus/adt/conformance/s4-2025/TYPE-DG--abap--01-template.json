@@ -1,0 +1,30 @@
+{
+  "case": "TYPE-DG--abap",
+  "step": 1,
+  "stepTag": "template",
+  "capturedAt": "2026-11-28",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/vit/wb/object_type/typedg/object_name/ABAP",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/vit/wb/object_type/typedg/object_name/ABAP",
+    "headers": {
+      "Accept": "*/*"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded by a hand-run read-only client for the conformance check (scripts/adt-nc.ts through @mcp-abap-adt/connection); it added Authorization, the client and the session cookie, none of which is recorded. Redirects were not followed.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.basic.object.properties+xml; charset=utf-8",
+      "content-length": "585",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-server": "true"
+    },
+    "bodyFile": "TYPE-DG--abap--01-template.body.xml"
+  }
+}

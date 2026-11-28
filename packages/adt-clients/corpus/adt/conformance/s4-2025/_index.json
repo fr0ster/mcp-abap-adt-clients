@@ -281,6 +281,29 @@
         "metadata": "TTYP-DA--sapplco_address_tab--03-metadata.json"
       }
     },
+    "TYPE/DG": {
+      "apis": ["typeGroup"],
+      "sample": {
+        "name": "ABAP",
+        "parent": null,
+        "origin": "standard"
+      },
+      "statuses": {
+        "template": 200,
+        "urimapper": 200,
+        "metadata": 200
+      },
+      "location": null,
+      "urimapperAccept": "application/xml",
+      "urimapperUri": "/sap/bc/adt/ddic/typegroups/abap",
+      "libraryUri": "/sap/bc/adt/ddic/typegroups/ABAP",
+      "urimapperMatchesLibrary": false,
+      "files": {
+        "template": "TYPE-DG--abap--01-template.json",
+        "urimapper": "TYPE-DG--abap--02-urimapper.json",
+        "metadata": "TYPE-DG--abap--03-metadata.json"
+      }
+    },
     "DOMA/DD": {
       "apis": ["domain"],
       "sample": {
