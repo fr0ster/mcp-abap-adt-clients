@@ -31,6 +31,15 @@ of member that still sent two requests are split (to be released as 49.0.0,
 with `@mcp-abap-adt/adt-strategies` 0.30.0 and the interfaces-adt change of
 decision 53). See [MIGRATION-49.md](docs/usage/MIGRATION-49.md).
 
+### Fixed
+
+- **A lock leaves the client's registry only when SAP released it.** Every
+  handler's `unlock` drops the registry entry only when SAP answered the
+  UNLOCK with a 2xx, before any `analyse` runs; a refused (`403`), failed
+  (`500`) or unanswered UNLOCK keeps it, so `unlockAll` can still release a
+  lock SAP still holds. One request either way. Before, all but the table
+  settings and the text elements dropped the entry whatever SAP answered.
+
 ### Changed (breaking)
 
 - **Every activation member sends the activation alone.** Each handler's
