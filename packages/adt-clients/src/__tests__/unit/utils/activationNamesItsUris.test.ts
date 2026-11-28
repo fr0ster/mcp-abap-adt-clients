@@ -127,12 +127,10 @@ describe('the uris an activation names are the ones a caller builds', () => {
 
   it("activateTestClasses: the class's uri with #testclass=", async () => {
     const { client, calls } = recordingClient();
-    await client
-      .getClass()
-      .activateTestClasses({
-        className: 'ZCL_GUARD',
-        testClassName: 'LTCL_GUARD',
-      });
+    await client.getClass().activateTestClasses({
+      className: 'ZCL_GUARD',
+      testClassName: 'LTCL_GUARD',
+    });
     expect(urisIn(calls[0]?.data)).toEqual([
       `${own('ZCL_GUARD', 'CLAS/OC')}#testclass=${encodeURIComponent('LTCL_GUARD')}`,
     ]);
