@@ -44,24 +44,6 @@ const TABLE_SETTINGS_SAMPLE =
 const TEXT_ELEMENTS_SAMPLE =
   "open: no PROG/PX or CLAS/OCX sample is recorded: the live conformance run builds each sample's template, urimapper and metadata reads from that sample's recorded files, so a code with none cannot be recorded until a sample is seeded (RSPARAM's text elements on premise and on the cloud, a class's); seeding them is a separate tooling task";
 
-const DEFINITIONS_SAMPLE =
-  'pending, on premise only: SAP serves the three (the definition reads answered 200 on S/4HANA 2025, 2026-11-28, corpus/adt/answers/read-application-*-definition-s4-2025); their conformance samples are seeded and recorded by a hand run of the live check on premise, not yet made. On ABAP cloud they are recorded (conformance/abap-cloud). This entry leaves with that run (fr0ster/mcp-abap-adt#404)';
-
-/** The three definition codes, with no conformance sample on premise yet. */
-const DEFINITIONS_DIVERGENCES: IDivergence[] = (
-  [
-    ['applicationJobCatalog', 'SAJC'],
-    ['applicationJobTemplate', 'SAJT'],
-    ['applicationLog', 'APLO/TYP'],
-  ] as const
-).map(([api, code]) => ({
-  rule: 'sample',
-  api,
-  code,
-  detail: 'no sample is recorded',
-  reason: DEFINITIONS_SAMPLE,
-}));
-
 /** The text elements' two codes, with no sample on either release. */
 const TEXT_ELEMENTS_DIVERGENCES: IDivergence[] = [
   {
@@ -90,7 +72,6 @@ export const DIVERGENCES: { readonly [R in RecordedRelease]: IDivergence[] } = {
       detail: 'no sample is recorded',
       reason: TABLE_SETTINGS_SAMPLE,
     },
-    ...DEFINITIONS_DIVERGENCES,
     ...TEXT_ELEMENTS_DIVERGENCES,
     {
       rule: 'address',

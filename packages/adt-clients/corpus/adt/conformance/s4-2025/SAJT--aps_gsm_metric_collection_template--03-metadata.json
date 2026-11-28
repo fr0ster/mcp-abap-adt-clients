@@ -1,0 +1,37 @@
+{
+  "case": "SAJT--aps_gsm_metric_collection_template",
+  "step": 3,
+  "stepTag": "metadata",
+  "capturedAt": "2026-11-28T11:35:46.587Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/applicationjob/templates/aps_gsm_metric_collection_template",
+    "params": {
+      "version": "active"
+    },
+    "effectiveUrl": "/sap/bc/adt/applicationjob/templates/aps_gsm_metric_collection_template?version=active",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.blues.v2+xml"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded by the live conformance check (typeTablesConformance.test.ts); the connection added the authentication and the session, none of which is recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.blues.v2+xml; charset=utf-8",
+      "content-length": "931",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "etag": "20220919131230001application/vnd.sap.adt.blues.v2+xml4n4Y6OuJaO74XEocSG5/rfl0PV4=Exg34eav5ROvnHlwrNVzJaCoPQ4=",
+      "last-modified": "Mon, 19 Sep 2022 13:12:30 GMT",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=236401",
+      "sap-server": "true",
+      "sap-perf-fesrec": "239847.000000"
+    },
+    "bodyFile": "SAJT--aps_gsm_metric_collection_template--03-metadata.body.xml"
+  }
+}

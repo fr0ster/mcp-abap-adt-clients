@@ -1,0 +1,35 @@
+{
+  "case": "SAJC--aps_gsm_metric_collector",
+  "step": 2,
+  "stepTag": "urimapper",
+  "capturedAt": "2026-11-28T11:35:46.586Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/vit/urimapper",
+    "params": {
+      "uri": "/sap/bc/adt/vit/wb/object_type/sajc/object_name/APS_GSM_METRIC_COLLECTOR"
+    },
+    "effectiveUrl": "/sap/bc/adt/vit/urimapper?uri=%2Fsap%2Fbc%2Fadt%2Fvit%2Fwb%2Fobject_type%2Fsajc%2Fobject_name%2FAPS_GSM_METRIC_COLLECTOR",
+    "headers": {
+      "Accept": "application/xml"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded by the live conformance check (typeTablesConformance.test.ts); the connection added the authentication and the session, none of which is recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/xml; charset=utf-8",
+      "content-length": "243",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=6703",
+      "sap-server": "true",
+      "sap-perf-fesrec": "10407.000000"
+    },
+    "bodyFile": "SAJC--aps_gsm_metric_collector--02-urimapper.body.xml"
+  }
+}

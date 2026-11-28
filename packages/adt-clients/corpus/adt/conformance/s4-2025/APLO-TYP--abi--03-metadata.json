@@ -1,0 +1,37 @@
+{
+  "case": "APLO-TYP--abi",
+  "step": 3,
+  "stepTag": "metadata",
+  "capturedAt": "2026-11-28T11:35:46.585Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/applicationlog/objects/abi",
+    "params": {
+      "version": "active"
+    },
+    "effectiveUrl": "/sap/bc/adt/applicationlog/objects/abi?version=active",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.blues.v1+xml"
+    },
+    "headersNote": "Caller-supplied headers only. Recorded by the live conformance check (typeTablesConformance.test.ts); the connection added the authentication and the session, none of which is recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.blues.v1+xml; charset=utf-8",
+      "content-length": "781",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "etag": "19720331210000001application/vnd.sap.adt.blues.v1+xmlW22RC33p7xOIxVbZ0R337t6AOzM=u61jTuYaxvXztp2cirr3FNEk8mQ=",
+      "last-modified": "Fri, 31 Mar 1972 21:00:00 GMT",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=35615",
+      "sap-server": "true",
+      "sap-perf-fesrec": "39408.000000"
+    },
+    "bodyFile": "APLO-TYP--abi--03-metadata.body.xml"
+  }
+}
