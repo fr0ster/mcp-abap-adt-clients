@@ -412,6 +412,7 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
       contentTypes: this.contentTypes,
       results,
       systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
     });
   }
 
@@ -1048,6 +1049,7 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
     return new AdtServiceBinding<ServiceValues, V>(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
       results,
     });
   }

@@ -46,7 +46,11 @@ import {
 import { createLanguage } from '../../utils/xml';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
-import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
+import {
+  createLockTracker,
+  failedWireStatus,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateDataElement } from './activation';
 import { checkDataElement } from './check';
@@ -488,18 +492,24 @@ export class AdtDataElement<
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E | IAdtError>> {
     const name = this.name(config);
-    const answer = await answering(
-      () =>
-        inStatefulSession(this.connection, () =>
+    return answering(
+      async () => {
+        const locked = await inStatefulSession(this.connection, () =>
           lockDataElement(this.connection, name),
-        ),
+        );
+        // The registry records SAP's state, not the caller's verdict: a lock
+        // SAP granted (a 2xx carrying a handle) is recorded here, before any
+        // `analyse` runs, so one it reports as a failure, or throws over, is
+        // still released by `unlockAll`.
+        const handle = lockHandleOf(locked);
+        if (!failedWireStatus(locked) && handle) {
+          this.lockTracker.track(name, handle);
+        }
+        return locked;
+      },
       lockHandleOf,
       options?.analyse,
     );
-    if (answer.ok && answer.getResult().value) {
-      this.lockTracker.track(name, answer.getResult().value);
-    }
-    return answer;
   }
 
   /** Unlock the object. */
@@ -524,10 +534,18 @@ export class AdtDataElement<
         // UNLOCK must run stateful (older BASIS #106); stateless after.
         this.connection.setSessionType('stateful');
         try {
-          return await unlockDataElement(this.connection, name, lockHandle);
+          const unlocked = await unlockDataElement(
+            this.connection,
+            name,
+            lockHandle,
+          );
+          // The registry records SAP's state, not the caller's verdict: the lock
+          // leaves it only when SAP answered the UNLOCK with a 2xx, before any
+          // `analyse` runs; a refused or unanswered one may leave it held.
+          if (!failedWireStatus(unlocked)) this.lockTracker.untrack(name);
+          return unlocked;
         } finally {
           this.connection.setSessionType('stateless');
-          this.lockTracker.untrack(name);
         }
       },
       nothing,

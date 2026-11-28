@@ -62,6 +62,7 @@ import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { writeObjectDocument } from '../shared/documentWrite';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import type { LockRegistry } from '../shared/LockRegistry';
+import { failedWireStatus } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateFunctionModule } from './activation';
 import { checkFunctionModule } from './check';
@@ -772,18 +773,24 @@ export class AdtFunctionModule<
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E | IAdtError>> {
     const { group, module } = this.names(config);
-    const answer = await answering(
-      () =>
-        inStatefulSession(this.connection, () =>
+    return answering(
+      async () => {
+        const locked = await inStatefulSession(this.connection, () =>
           lockFunctionModule(this.connection, group, module),
-        ),
+        );
+        // The registry records SAP's state, not the caller's verdict: a lock
+        // SAP granted (a 2xx carrying a handle) is recorded here, before any
+        // `analyse` runs, so one it reports as a failure, or throws over, is
+        // still released by `unlockAll`.
+        const handle = lockHandleOf(locked);
+        if (!failedWireStatus(locked) && handle) {
+          this.trackLock(group, module, handle);
+        }
+        return locked;
+      },
       lockHandleOf,
       options?.analyse,
     );
-    if (answer.ok && answer.getResult().value) {
-      this.trackLock(group, module, answer.getResult().value);
-    }
-    return answer;
   }
 
   /** Unlock the function module. */
@@ -819,7 +826,10 @@ export class AdtFunctionModule<
         const result = await inStatefulSession(this.connection, () =>
           unlockFunctionModule(this.connection, group, module, lockHandle),
         );
-        this.untrackLock(group, module);
+        // The registry records SAP's state, not the caller's verdict: the lock
+        // leaves it only when SAP answered the UNLOCK with a 2xx, before any
+        // `analyse` runs; a refused or unanswered one may leave it held.
+        if (!failedWireStatus(result)) this.untrackLock(group, module);
         return result;
       },
       nothing,

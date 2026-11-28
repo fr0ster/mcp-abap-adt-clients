@@ -47,7 +47,11 @@ import {
 import { createLanguage } from '../../utils/xml';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
-import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
+import {
+  createLockTracker,
+  failedWireStatus,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import { createMessageClass } from './create';
 import { checkDeletion, deleteMessageClass } from './delete';
 import { lockMessageClass } from './lock';
@@ -419,18 +423,24 @@ export class AdtMessageClass<
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E | IAdtError>> {
     const name = this.name(config);
-    const answer = await answering(
-      () =>
-        inStatefulSession(this.connection, () =>
+    return answering(
+      async () => {
+        const locked = await inStatefulSession(this.connection, () =>
           lockMessageClass(this.connection, name),
-        ),
+        );
+        // The registry records SAP's state, not the caller's verdict: a lock
+        // SAP granted (a 2xx carrying a handle) is recorded here, before any
+        // `analyse` runs, so one it reports as a failure, or throws over, is
+        // still released by `unlockAll`.
+        const handle = lockHandleOf(locked);
+        if (!failedWireStatus(locked) && handle) {
+          this.lockTracker.track(name, handle);
+        }
+        return locked;
+      },
       lockHandleOf,
       options?.analyse,
     );
-    if (answer.ok && answer.getResult().value) {
-      this.lockTracker.track(name, answer.getResult().value);
-    }
-    return answer;
   }
 
   /** Unlock the message class. */
@@ -455,13 +465,14 @@ export class AdtMessageClass<
       // The UNLOCK reaches the context the LOCK opened only if it is sent
       // stateful; stateless, it releases nothing and still answers 200.
       async () => {
-        try {
-          return await inStatefulSession(this.connection, () =>
-            unlockMessageClass(this.connection, name, lockHandle),
-          );
-        } finally {
-          this.lockTracker.untrack(name);
-        }
+        const unlocked = await inStatefulSession(this.connection, () =>
+          unlockMessageClass(this.connection, name, lockHandle),
+        );
+        // The registry records SAP's state, not the caller's verdict: the lock
+        // leaves it only when SAP answered the UNLOCK with a 2xx, before any
+        // `analyse` runs; a refused or unanswered one may leave it held.
+        if (!failedWireStatus(unlocked)) this.lockTracker.untrack(name);
+        return unlocked;
       },
       nothing,
       options?.analyse,

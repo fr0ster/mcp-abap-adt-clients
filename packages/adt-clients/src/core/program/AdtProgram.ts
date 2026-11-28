@@ -67,7 +67,11 @@ import { createLanguage } from '../../utils/xml';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { writeObjectDocument } from '../shared/documentWrite';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
-import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
+import {
+  createLockTracker,
+  failedWireStatus,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateProgram } from './activation';
 import { checkProgram } from './check';
@@ -697,18 +701,24 @@ export class AdtProgram<
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E | IAdtError>> {
     const name = config.programName;
-    const answer = await answering(
-      () =>
-        inStatefulSession(this.connection, () =>
+    return answering(
+      async () => {
+        const locked = await inStatefulSession(this.connection, () =>
           lockProgram(this.connection, name),
-        ),
+        );
+        // The registry records SAP's state, not the caller's verdict: a lock
+        // SAP granted (a 2xx carrying a handle) is recorded here, before any
+        // `analyse` runs, so one it reports as a failure, or throws over, is
+        // still released by `unlockAll`.
+        const handle = lockHandleOf(locked);
+        if (!failedWireStatus(locked) && handle) {
+          this.lockTracker.track(name, handle);
+        }
+        return locked;
+      },
       lockHandleOf,
       options?.analyse,
     );
-    if (answer.ok && answer.getResult().value) {
-      this.lockTracker.track(name, answer.getResult().value);
-    }
-    return answer;
   }
 
   /** Unlock the program. */
@@ -735,7 +745,10 @@ export class AdtProgram<
         const result = await inStatefulSession(this.connection, () =>
           unlockProgram(this.connection, name, lockHandle),
         );
-        this.lockTracker.untrack(name);
+        // The registry records SAP's state, not the caller's verdict: the lock
+        // leaves it only when SAP answered the UNLOCK with a 2xx, before any
+        // `analyse` runs; a refused or unanswered one may leave it held.
+        if (!failedWireStatus(result)) this.lockTracker.untrack(name);
         return result;
       },
       nothing,
