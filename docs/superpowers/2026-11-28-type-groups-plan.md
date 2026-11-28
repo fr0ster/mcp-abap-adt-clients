@@ -113,8 +113,13 @@ and the factory.
 - **`clients/handlerFactories.test.ts` and `factoryStrategy.test.ts`.** `getTypeGroup()` answers
   an `AdtTypeGroup`, with and without a result set.
 - **`helpers/typeTableConformance.ts` (`HANDLER`).** `typeGroup: (c) => c.getTypeGroup()`.
-  - The conformance cases for type groups (`conformance/typeTablesConformance.test.ts`) are
-    **known red** until Task 7. The rows list operations whose members do not exist yet.
+- **Known red from this task until Task 7:**
+  - the type group cases of `conformance/typeTablesConformance.test.ts`: the rows list
+    operations whose members do not exist yet;
+  - `capabilities/completeness.test.ts` ("every factory on AdtClient is in the manifest"):
+    `getTypeGroup()` is not in the manifest yet;
+  - `core/activationPreaudit.test.ts` ("finds the activating APIs of the type tables"): the
+    table serves `activate` on `typeGroup`, and `ACTIVATING` has no entry for it yet.
 
 **Files:**
 - `packages/adt-clients/package.json`: the `@mcp-abap-adt/interfaces-adt` range raised to the
@@ -213,17 +218,28 @@ corpus recordings):
   - a guard test shows both paths.
 - **The capability manifest** (`capabilities/manifest.ts`): the atom
   `lockedDeletable: ['delete']`, and `typeGroup` with its atoms.
+- **The activation lists** (`core/activatingApis.ts`). The type group enters `ACTIVATING`, so the
+  preaudit tests (`core/activationPreaudit.test.ts`) cover it.
+  - A new export, `ONE_REQUEST_ACTIVATIONS = ['typeGroup']`, and `READING_ACTIVATIONS`:
+    `ACTIVATING_APIS` without it.
+  - `utils/activationRead.test.ts`'s two-request cases ("every activation member reads after …")
+    run over `READING_ACTIVATIONS`, so every existing handler keeps its coverage unchanged.
+  - A new case in the same file, over `ONE_REQUEST_ACTIVATIONS`, asserts one POST and no
+    `context` after the same silent and warnings-only checklists.
+  - This split stands on its own. It does not depend on any later change to how other types
+    activate.
 
 **Files:**
 - `activation.ts`, through `activateObjectInSession`;
 - `delete.ts`;
 - the members in `AdtTypeGroup.ts`: `activate` through `answering`, and `delete` as
   `IAdtLockedDeletable`, both gated;
-- `behaviourGuard.ts` and `manifest.ts`.
+- `behaviourGuard.ts`, `manifest.ts`, `activatingApis.ts` and `activationRead.test.ts`.
 
-**Known red turned green:** the type group conformance cases of Task 4.
+**Known red turned green:** the three of Task 4 (conformance, completeness, the preaudit list).
 
-**Commits:** the guard's locked-delete path; activation; delete; the manifest.
+**Commits:** the guard's locked-delete path; the split activation lists; activation; delete;
+the manifest.
 
 ## Task 8 — exports and variant gates
 
@@ -234,7 +250,6 @@ corpus recordings):
   - on the on-premise client every member compiles.
 - **`publicApiSurface.test.ts`.** `AdtTypeGroup` and `typeGroupDocuments` are values of the root.
   A typecheck fixture imports `TypeGroupValues` from the package root.
-- **`core/activatingApis.ts`.** The type group is an activation member that sends one request.
 
 **Files:** `src/index.ts`, with the three exports.
 
