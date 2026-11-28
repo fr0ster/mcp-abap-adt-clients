@@ -140,6 +140,7 @@ export {
   type ServiceDefinitionValues,
 } from './core/serviceDefinition';
 export {
+  type AdtUtilResults,
   AdtUtils,
   type UtilValues,
 } from './core/shared/AdtUtils';

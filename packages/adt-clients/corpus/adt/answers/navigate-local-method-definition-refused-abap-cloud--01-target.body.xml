@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework">
+  <namespace id="com.sap.adt"/>
+  <type id="uriMappingError"/>
+  <message lang="EN">Object INVALIDATE not found</message>
+  <localizedMessage lang="EN">Object INVALIDATE not found</localizedMessage>
+  <properties>
+    <entry key="T100KEY-ID">EU</entry>
+    <entry key="T100KEY-NO">061</entry>
+    <entry key="T100KEY-V1">INVALIDATE</entry>
+  </properties>
+</exc:exception>

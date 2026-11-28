@@ -1322,6 +1322,18 @@ export const LEGACY_SENDS: Record<string, Rows<SendsRow>> = {
         [get('/sap/bc/adt/oo/classes/zcl_guard/objectstructure')],
         calling('getObjectOutline', () => ['CLAS/OC', 'ZCL_GUARD']),
       ),
+      utils.sends(
+        'getNavigationTarget',
+        '§10.2 inherited, not measured on 7.40: sent as the modern client sends it',
+        [
+          post('/sap/bc/adt/navigation/target', {
+            uri: '/sap/bc/adt/programs/programs/zguard/source/main#type=PROG%2FPU;name=F',
+          }),
+        ],
+        calling('getNavigationTarget', () => [
+          '/sap/bc/adt/programs/programs/zguard/source/main#type=PROG%2FPU;name=F',
+        ]),
+      ),
     ]),
     ...METADATA.sends,
     ...SOURCE.sends,

@@ -353,6 +353,15 @@ export const RECORDS = {
   TRANSPORT_REQUEST,
 } as const;
 
+/**
+ * Where a reference leads: `POST …?uri=<reference>` answers an
+ * `adtcore:objectReference` with the include and the start (`#start=l,c`).
+ * Its discovery template is `/sap/bc/adt/navigation/target{?uri,filter,fullname}`.
+ */
+export const NAVIGATION = {
+  target: '/sap/bc/adt/navigation/target',
+} as const;
+
 export const DEBUGGER = '/sap/bc/adt/debugger';
 export const BATCH = {
   communication: '/sap/bc/adt/communication/batch',

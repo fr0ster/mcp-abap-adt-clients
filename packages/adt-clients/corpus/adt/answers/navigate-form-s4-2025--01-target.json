@@ -1,0 +1,25 @@
+{
+  "case": "navigate-form-s4-2025",
+  "step": 1,
+  "stepTag": "target",
+  "capturedAt": "2026-11-28",
+  "note": "Recorded 2026-11-28 with scripts/adt-nc.ts, read only: a form of a program, by its outline fragment. Only the content type of the answer's headers is kept; no host, user or system id.",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/navigation/target?uri=%2Fsap%2Fbc%2Fadt%2Fprograms%2Fprograms%2Fzabapgit_standalone%2Fsource%2Fmain%23type%3DPROG%252FPU%3Bname%3DADJUST_TOOLBAR",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/navigation/target?uri=%2Fsap%2Fbc%2Fadt%2Fprograms%2Fprograms%2Fzabapgit_standalone%2Fsource%2Fmain%23type%3DPROG%252FPU%3Bname%3DADJUST_TOOLBAR",
+    "headers": {
+      "Accept": "application/xml"
+    },
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/xml; charset=utf-8"
+    },
+    "bodyFile": "navigate-form-s4-2025--01-target.body.xml"
+  }
+}

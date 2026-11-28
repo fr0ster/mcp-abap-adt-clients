@@ -92,7 +92,11 @@ import type {
   IAdtError,
   IAdtGroupLifecycle,
   IAdtHeaders,
+  IAdtNavigationTargetOptions,
+  IAdtNavigationTargetReadable,
   IAdtObjectAccess,
+  IAdtObjectOutlineOptions,
+  IAdtObjectOutlineReadable,
   IAdtObjectProperties,
   IAdtObjectSearch,
   IAdtOperationOptions,
@@ -130,6 +134,7 @@ import {
 import { checkDeletionGroup, deleteObjectsGroup } from './groupDeletion';
 import type { AdtLoggedOptions } from './handlerOptions';
 import { getInclude as getIncludeUtil } from './include';
+import { getNavigationTarget as getNavigationTargetUtil } from './navigationTarget';
 import { fetchNodeStructure as fetchNodeStructureUtil } from './nodeStructure';
 import { getObjectProperties as getObjectPropertiesUtil } from './objectProperties';
 import {
@@ -257,7 +262,7 @@ type WhereUsedParamCode<V extends AdtVariant> = Extract<
  * The parser overloads went in 30.0.0, when the reading became something
  * injected once rather than passed per call — and since 19.0.0 there is nothing
  * left that a reading cannot reach. Every member below that makes a request
- * takes its shape from a slot of `IUtilResults`, all twenty-two of them. The three
+ * takes its shape from a slot of the result set, all twenty-four of them. The three
  * that take none — `modifyWhereUsedScope`, `supportsSourceCode` and
  * `getObjectSourceUri` — make no request, so there is no answer for a strategy
  * to read.
@@ -293,9 +298,20 @@ function performEvery(
   }
 }
 
+/**
+ * The result set `AdtUtils` takes: interfaces-adt's `IUtilResults` with the
+ * outline's and the navigation's slots required — their members read their
+ * answers through them, so a set without them would leave a member with no
+ * reading. interfaces-adt keeps them optional so a set written before them
+ * still is an `IUtilResults`; here a set names them, spreading `utilDocuments`
+ * or giving its own.
+ */
+export type AdtUtilResults = IUtilResults &
+  Required<Pick<IUtilResults, 'objectOutline' | 'navigationTarget'>>;
+
 /** What each slot of the result set answers. */
 export type UtilValues = {
-  readonly [K in keyof IUtilResults]: unknown;
+  readonly [K in keyof AdtUtilResults]: unknown;
 };
 
 export class AdtUtils<
@@ -320,7 +336,9 @@ export class AdtUtils<
     IAdtDataPreview<T['query'], T['columns'], T['contents']>,
     IAdtDiscovery<T['discovery']>,
     IAdtObjectAccess<T['source'], T['metadata'], T['include']>,
-    IAdtObjectProperties<T['objectProperties']>
+    IAdtObjectProperties<T['objectProperties']>,
+    IAdtObjectOutlineReadable<T['objectOutline']>,
+    IAdtNavigationTargetReadable<T['navigationTarget']>
 {
   protected connection: IAbapConnection;
   private logger: ILogger;
@@ -1195,9 +1213,9 @@ export class AdtUtils<
    * only. `@mcp-abap-adt/adt-strategies`' `readObjectOutline` reads the
    * answer into a tree.
    *
-   * **The document as it came, always.** `IUtilResults` of interfaces-adt has
-   * no slot for this member, so no reading can be given for it, as for
-   * `getTypeStructure`. It joins the set when the contract package names it.
+   * Its answer goes through the result set's `objectOutline` slot
+   * (`rawDocument` in `utilDocuments`); `objectOutline` of adt-strategies is a
+   * reading for it.
    *
    * @param options.version - Sent as `version`; SAP changes only the
    *   answer's `xml:base` with it (measured)
@@ -1207,34 +1225,69 @@ export class AdtUtils<
   getObjectOutline<E extends IAdtError>(
     objectType: AdtOutlineCode,
     objectName: string,
-    options: ({
-      version?: AdtReadVersion;
-      accept?: string;
-    } & IAdtAnalyseOptions<E>) & { analyse: IAnalyse<E> },
-  ): Promise<IAdtResponse<string, E | IAdtError>>;
+    options: IAdtObjectOutlineOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['objectOutline'], E | IAdtError>>;
   getObjectOutline(
     objectType: AdtOutlineCode,
     objectName: string,
-    options?: {
-      version?: AdtReadVersion;
-      accept?: string;
-    } & IAdtAnalyseOptions<IAdtError>,
-  ): Promise<IAdtResponse<string, IAdtError>>;
+    options?: IAdtObjectOutlineOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['objectOutline'], IAdtError>>;
   async getObjectOutline<E extends IAdtError = IAdtError>(
     objectType: AdtOutlineCode,
     objectName: string,
-    options?: {
-      version?: AdtReadVersion;
-      accept?: string;
-    } & IAdtAnalyseOptions<E>,
-  ): Promise<IAdtResponse<string, E | IAdtError>> {
+    options?: IAdtObjectOutlineOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<T['objectOutline'], E | IAdtError>> {
     return answering(
       () =>
         getObjectOutlineUtil(this.connection, objectType, objectName, {
           version: options?.version,
           accept: options?.accept,
         }),
-      rawDocument,
+      this.results.objectOutline,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Where a reference leads — `POST /sap/bc/adt/navigation/target?uri=…`, one
+   * request, no body. Given an outline's name fragment
+   * (`<include>/source/main#type=PROG%2FPU;name=…`) SAP answers an
+   * `adtcore:objectReference` whose `uri` names the include and the start,
+   * `#start=line,column` (measured on premise and on ABAP cloud). The end is
+   * not given. `@mcp-abap-adt/adt-strategies`' `readNavigationTarget` reads it.
+   *
+   * Its answer goes through the result set's `navigationTarget` slot
+   * (`rawDocument` in `utilDocuments`); `navigationTarget` of adt-strategies
+   * is a reading for it.
+   *
+   * @param uri - The reference, as the outline's link names it; sent as the
+   *   `uri` query value, encoded once
+   * @param options.filter - The template's `filter`, sent only when given
+   * @param options.fullname - The template's `fullname`, sent only when given
+   * @param options.accept - The Accept to send; `application/xml` by default
+   */
+  getNavigationTarget<E extends IAdtError>(
+    uri: string,
+    options: IAdtNavigationTargetOptions &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<T['navigationTarget'], E | IAdtError>>;
+  getNavigationTarget(
+    uri: string,
+    options?: IAdtNavigationTargetOptions & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<T['navigationTarget'], IAdtError>>;
+  async getNavigationTarget<E extends IAdtError = IAdtError>(
+    uri: string,
+    options?: IAdtNavigationTargetOptions & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<T['navigationTarget'], E | IAdtError>> {
+    return answering(
+      () =>
+        getNavigationTargetUtil(this.connection, uri, {
+          filter: options?.filter,
+          fullname: options?.fullname,
+          accept: options?.accept,
+        }),
+      this.results.navigationTarget,
       options?.analyse,
     );
   }
@@ -1248,8 +1301,8 @@ export class AdtUtils<
    * level. Measured on premise and on ABAP cloud.
    * `@mcp-abap-adt/adt-strategies`' `readStructureElementInfo` reads it.
    *
-   * **The document as it came, always**, as for `getObjectOutline`:
-   * `IUtilResults` of interfaces-adt has no slot for this member. A name
+   * **The document as it came, always**: `IUtilResults` of interfaces-adt
+   * has no slot for this member. A name
    * that does not exist answers `200` with an element info naming nothing.
    *
    * @param options.accept - The Accept to send; SAP answers only

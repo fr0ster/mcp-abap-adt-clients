@@ -44,6 +44,13 @@ decision 53). See [MIGRATION-49.md](docs/usage/MIGRATION-49.md).
   and hands it to `analyseActivation` as `context.activation`. With
   `analyseActivation` alone such an answer is now "not decided".
 
+- **A utilities result set names `objectOutline` and `navigationTarget`.**
+  `getUtils(results)` and `AdtUtils` take `AdtUtilResults` (exported):
+  interfaces-adt's `IUtilResults` with both slots required, since
+  `getObjectOutline` and `getNavigationTarget` read their answers through
+  them. `utilDocuments` names both (`rawDocument`). See
+  [MIGRATION-49.md](docs/usage/MIGRATION-49.md#a-utilities-result-set-names-the-outline-and-the-navigation).
+
 ### Removed (breaking)
 
 - **`answeringActivation`**, and with it the activation exchange and this
@@ -64,6 +71,17 @@ decision 53). See [MIGRATION-49.md](docs/usage/MIGRATION-49.md).
   handler.
 
 ### Added
+
+- **`AdtUtils.getNavigationTarget(uri, options?)`** — one `POST /sap/bc/adt/navigation/target`:
+  where a reference leads. `uri` is sent as the query value, encoded once; `filter`,
+  `fullname` only when given; `application/xml` by default; no body; its answer through the
+  `navigationTarget` slot (fr0ster/mcp-abap-adt#401).
+- **`AdtUtils` implements `IAdtObjectOutlineReadable` and `IAdtNavigationTargetReadable`**
+  (interfaces-adt 34.0.0): a consumer's contract composed from the atoms reaches both members.
+- Corpus: navigation answers recorded on ABAP cloud and on premise.
+- ERRATA: a source position's end stops before the period; a function group include's
+  outline answers the whole group; a local method's definition link by system; `HEAD` on a
+  source is refused.
 
 - **`patchTableSettings(read, changes, variant)`**, typed by the declared
   system kind (on premise neither the change nor the answer carries
