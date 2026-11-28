@@ -2341,6 +2341,39 @@ if (answer.ok) {
 }
 ```
 
+### AdtUtils (Navigation target)
+
+`getNavigationTarget(uri, options?)` is one `POST /sap/bc/adt/navigation/target`
+with `uri` as the query value, encoded once, and no body; `options.filter` and
+`options.fullname` (the discovery template's other parameters) are sent only
+when given, `options.accept` replaces the default `application/xml`. Given an
+outline's name fragment — `<include>/source/main#type=PROG%2FPU;name=…`, as
+`getObjectOutline` links a program's or a function group's element — SAP
+answers an `adtcore:objectReference` whose `uri` is `<include>#start=l,c`: the
+line of the element's statement and the column of its name (measured on
+premise and on ABAP cloud, 2026-11-28). The end is not given.
+
+A local method's definition link is refused on ABAP cloud (`400`,
+`uriMappingError`, EU/061) and is the same href as its implementation link on
+premise, answering the same start. Independent navigations share one
+`AdtBatchConnection('communication')` envelope on both, each part answered as
+alone.
+
+`IUtilResults` of interfaces-adt has no slot for this member yet, so it answers
+the document as it came; `readNavigationTarget` / `navigationTarget` of
+`@mcp-abap-adt/adt-strategies` read it.
+
+```typescript
+import { readNavigationTarget } from '@mcp-abap-adt/adt-strategies';
+
+const answer = await client
+  .getUtils()
+  .getNavigationTarget('/sap/bc/adt/programs/programs/zprog/source/main#type=PROG%2FPU;name=F');
+if (answer.ok) {
+  readNavigationTarget(answer.getResult().value); // { include, start: { line, column } }
+}
+```
+
 ### AdtUtils (Element info)
 
 Two members, one GET each, both with `Accept:

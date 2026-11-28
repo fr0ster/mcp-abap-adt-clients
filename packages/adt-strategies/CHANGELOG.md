@@ -14,6 +14,14 @@ Tags follow the same rule: these releases are tagged
 The tags made before the packages moved under `packages/` are
 `adt-strategies@<version>`.
 
+## [Unreleased]
+
+### Added
+
+- **`readNavigationTarget` / `navigationTarget`** — the include a navigation answer leads to and
+  its `start`; a refusal or a reference without a readable start reads as `undefined`
+  (fr0ster/mcp-abap-adt#401).
+
 ## [0.29.0] - 2026-11-27
 
 The source rules of fr0ster/mcp-abap-adt-clients#304: this package's `src`

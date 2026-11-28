@@ -227,6 +227,7 @@ Critical conventions used across object modules:
 
 `AdtUtils` (in `core/shared/AdtUtils.ts`) covers non-object CRUD operations:
 - discovery, search, where-used (including scope workflow), object/node/package structures.
+- an object's outline (`getObjectOutline`) and where a reference leads (`getNavigationTarget`).
 - SQL query and table contents.
 - group activation/deletion and inactive objects.
 - source/metadata helpers for supported object types.

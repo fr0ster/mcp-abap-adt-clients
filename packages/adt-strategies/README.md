@@ -236,6 +236,7 @@ document.
 | export | reads what this member answers | answers |
 |---|---|---|
 | `readObjectOutline`, `objectOutline` | `getObjectOutline` (`<object uri>/objectstructure`) | `IObjectOutline`: the root element and its children, with visibility, level and the links' positions |
+| `readNavigationTarget`, `navigationTarget` | `getNavigationTarget` (`POST /sap/bc/adt/navigation/target`) | `INavigationTarget`: the include a reference leads to and its `start` (line from 1, column from 0); `undefined` for a refusal or a reference without a readable start |
 | `readStructureElementInfo`, `structureElementInfo` | `getStructureElementInfo` (`/sap/bc/adt/ddic/elementinfo?path=`) | `IStructureElementInfo`: the structure's code, name, URI and short text; `components` in document order (name — a field's, or `.include` / `.append` —, `includeName`, `partOfInclude`, `includeLevel`, `dataElement`, `dataType`, `length`, `decimals`, `isKey`, every property as written); `includes`, the components naming a structure; the package |
 | `readServiceDefinitionElementInfo`, `serviceDefinitionElementInfo` | `getServiceDefinitionElementInfo` (`/sap/bc/adt/ddic/srvd/elementinfo?path=`) | `IServiceDefinitionElementInfo`: the definition's code, name, URI and short text; `entities` (name, URI, `alias` — absent when the `expose` has no `as`), in document order, not the source's; `links` (an extension's); the package |
 

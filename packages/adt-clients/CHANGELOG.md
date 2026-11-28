@@ -24,6 +24,20 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`AdtUtils.getNavigationTarget(uri, options?)`** — one `POST /sap/bc/adt/navigation/target`:
+  where a reference leads. `uri` is sent as the query value, encoded once; `filter`,
+  `fullname` only when given; `application/xml` by default; no body. The document as it
+  came, like `getObjectOutline`, until interfaces-adt carries its atom and slot
+  (fr0ster/mcp-abap-adt#401).
+- Corpus: navigation answers recorded on ABAP cloud and on premise.
+- ERRATA: a source position's end stops before the period; a function group include's
+  outline answers the whole group; a local method's definition link by system; `HEAD` on a
+  source is refused.
+
 ## [48.0.0] - 2026-11-27
 
 fr0ster/mcp-abap-adt-clients#304: this package's `src` holds no cast but
