@@ -221,12 +221,15 @@ includes, named by the group's own outline.
 **What actually happened.** Measured 2026-11-28: on ABAP cloud the
 `definitionIdentifier` is refused, `400` `uriMappingError`, EU/061 "Object …
 not found", and the `implementationIdentifier` answers `200` at the `METHOD`
-statement; on premise the two links are the same href and both answer the
-same start, the `METHOD` statement.
+statement; on premise, in a program of one include, the two links are the
+same href and both answer the same start, the `METHOD` statement, and in a
+function group the links name different includes and the implementation
+link's start lies in the implementation include, not the one it names.
 
 **Rule.** Navigate a local method by its `implementationIdentifier`; its
-declaration is part of its local class's definition. Never take the link's
-rel as proof of which statement a start is.
+declaration is part of its local class's definition. Take the include from the
+answer, never from the link, and never take the link's rel as proof of which
+statement a start is.
 
 ## `HEAD` on a source is refused
 

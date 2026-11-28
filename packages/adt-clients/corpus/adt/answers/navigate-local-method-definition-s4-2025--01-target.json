@@ -3,7 +3,7 @@
   "step": 1,
   "stepTag": "target",
   "capturedAt": "2026-11-28",
-  "note": "Recorded 2026-11-28 with scripts/adt-nc.ts, read only: a local method's definitionIdentifier: on premise the same href as its implementation link, and the same start. Only the content type of the answer's headers is kept; no host, user or system id.",
+  "note": "Recorded 2026-11-28 with scripts/adt-nc.ts, read only: a local method's definitionIdentifier in a program of one include: on premise the same href as its implementation link, and the same start. Only the content type of the answer's headers is kept; no host, user or system id.",
   "request": {
     "method": "POST",
     "url": "/sap/bc/adt/navigation/target?uri=%2Fsap%2Fbc%2Fadt%2Fprograms%2Fprograms%2Fzabapgit_standalone%2Fsource%2Fmain%23type%3DPROG%252FPLM%3Bname%3DKHGWLAQDITPZSYOBMRZSEQBSCSIZHOADD",

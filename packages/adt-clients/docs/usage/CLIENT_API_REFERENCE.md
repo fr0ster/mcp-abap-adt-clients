@@ -2354,8 +2354,11 @@ line of the element's statement and the column of its name (measured on
 premise and on ABAP cloud, 2026-11-28). The end is not given.
 
 A local method's definition link is refused on ABAP cloud (`400`,
-`uriMappingError`, EU/061) and is the same href as its implementation link on
-premise, answering the same start. Independent navigations share one
+`uriMappingError`, EU/061) and answers a start on premise. The start may lie in
+another include of the same object than the one the link names: on premise a
+function group's local method, linked into its class-definition include,
+answered its start in the implementation include. Independent navigations
+share one
 `AdtBatchConnection('communication')` envelope on both, each part answered as
 alone.
 

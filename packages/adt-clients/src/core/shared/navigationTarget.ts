@@ -7,8 +7,8 @@
  * the line of the element's statement, the column of its name. Several such
  * requests share one `/communication/batch` envelope on both systems, each
  * part answered as alone. A local method's definition link is refused on the
- * cloud (`400`, EU/061) and is the same href as its implementation link on
- * premise.
+ * cloud (`400`, EU/061) and answers a start on premise. The start's include is
+ * the answer's: it may be another include of the same object than the link's.
  */
 
 import type {
