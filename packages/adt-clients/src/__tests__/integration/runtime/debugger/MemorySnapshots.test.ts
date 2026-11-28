@@ -57,6 +57,7 @@ import {
   missingCaseMessage,
 } from '../../../helpers/caseGate';
 import { CleanupSteps } from '../../../helpers/cleanupSteps';
+import { expectResult } from '../../../helpers/contract';
 import {
   ensureDebugTarget,
   markerLines,
@@ -413,7 +414,7 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
           analyse: analyseException,
           user: identity.requestUser,
         });
-        expect(list.ok).toBe(true);
+        expectResult(list, 'the snapshot list');
         for (const entry of documentOf(list).split('</mi:snapshot>')) {
           const file = tag(entry, 'fileName') ?? '';
           for (const stop of ['before', 'after'] as const) {
@@ -444,20 +445,20 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
       const header = await snapshots.getById(after, {
         analyse: analyseException,
       });
-      expect(header.ok).toBe(true);
+      expectResult(header, 'the snapshot');
       expect(tag(documentOf(header), 'fileName')).toContain(stops.after?.file);
 
       const overview = await snapshots.getOverview(after, {
         analyse: analyseException,
       });
-      expect(overview.ok).toBe(true);
+      expectResult(overview, 'the overview');
       expect(documentOf(overview)).toContain('abapDynMemObjectsUsed');
 
       const ranking = await snapshots.getRankingList(after, {
         analyse: analyseException,
         maxNumberOfObjects: 5,
       });
-      expect(ranking.ok).toBe(true);
+      expectResult(ranking, 'the ranking list');
       expect(documentOf(ranking)).toContain('memoryObject');
 
       // The delta puts the filled table first, as an object added.
@@ -465,7 +466,7 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
         analyse: analyseException,
         maxNumberOfObjects: 5,
       });
-      expect(delta.ok).toBe(true);
+      expectResult(delta, 'the delta ranking list');
       const first = documentOf(delta).split('</mi:memoryObject>')[0];
       expect(tag(first, 'text')).toContain('LT_ROWS');
       expect(tag(first, 'deltaSegment')).toBe('added');
@@ -474,14 +475,14 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
       const deltaOverview = await snapshots.getDeltaOverview(before, after, {
         analyse: analyseException,
       });
-      expect(deltaOverview.ok).toBe(true);
+      expectResult(deltaOverview, 'the delta overview');
       expect(documentOf(deltaOverview)).toContain('<mi:delta>');
 
       const references = await snapshots.getReferences(after, key, {
         analyse: analyseException,
         maxNumberOfReferences: 5,
       });
-      expect(references.ok).toBe(true);
+      expectResult(references, 'the references');
       expect(documentOf(references)).toContain('LT_ROWS');
 
       const deltaReferences = await snapshots.getDeltaReferences(
@@ -490,21 +491,21 @@ describe('Memory under the debugger (AbapDebugger, MemorySnapshots)', () => {
         key,
         { analyse: analyseException, maxNumberOfReferences: 5 },
       );
-      expect(deltaReferences.ok).toBe(true);
+      expectResult(deltaReferences, 'the delta references');
 
       // A table of strings has no children of its own.
       const children = await snapshots.getChildren(after, key, {
         analyse: analyseException,
         maxNumberOfObjects: 5,
       });
-      expect(children.ok).toBe(true);
+      expectResult(children, 'the children');
       const deltaChildren = await snapshots.getDeltaChildren(
         before,
         after,
         key,
         { analyse: analyseException, maxNumberOfObjects: 5 },
       );
-      expect(deltaChildren.ok).toBe(true);
+      expectResult(deltaChildren, 'the delta children');
 
       const missing = await snapshots.getById(
         '00000000000000000000000000000000',

@@ -41,9 +41,10 @@ import type {
   IDebuggerIdentity,
   IDebuggerLineBreakpoint,
 } from '@mcp-abap-adt/interfaces-adt';
-import type {
-  IAbapConnection,
-  ISessionLifecycleAware,
+import {
+  ADT_SESSION_ERROR,
+  type IAbapConnection,
+  type ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
@@ -1219,7 +1220,14 @@ describe('ABAP debugger modes (AbapDebugger)', () => {
 
         const after = await session.api.getStack({ analyse: analyseException });
         record(7, `a stack read on that session afterwards: ${summary(after)}`);
-        expect(statusOf(after)).toBe(400);
+        // SAP answers that read 400 "Session no longer exists" (ERRATA.md,
+        // measured 2026-10-11). The connection (22.0.1 and later) reads that
+        // 400 as the session gone and raises ADT_SESSION_REPLACED in its place,
+        // with no response; the library passes the verdict on as it came.
+        expect(after.ok).toBe(false);
+        expect(after.ok ? undefined : after.getError().sessionError).toBe(
+          ADT_SESSION_ERROR.SESSION_REPLACED,
+        );
       });
     },
     STEP_TIMEOUT,
