@@ -48,10 +48,17 @@ import {
   type AdtTextElements,
   type AdtTransformation,
   type AppendStructureValues,
+  type ApplicationJobCatalog,
+  type ApplicationJobTemplate,
+  type ApplicationJobValues,
+  type ApplicationLog,
+  type ApplicationLogValues,
   AUTHORIZATION_FIELD,
   type AuthorizationFieldValues,
   accessControlDocuments,
   appendStructureDocuments,
+  applicationJobDocuments,
+  applicationLogDocuments,
   authorizationFieldDocuments,
   BEHAVIOR_DEFINITION,
   type BehaviorDefinitionValues,
@@ -78,6 +85,8 @@ import {
   functionGroupDocuments,
   functionIncludeDocuments,
   functionModuleDocuments,
+  type IApplicationJobResults,
+  type IApplicationLogResults,
   type IncludeValues,
   type InterfaceValues,
   includeDocuments,
@@ -200,6 +209,9 @@ import {
   AdtTableSettingsAbsentLegacy,
   AdtTextElementsAbsentLegacy,
   AdtTransformationAbsentLegacy,
+  ApplicationJobCatalogAbsentLegacy,
+  ApplicationJobTemplateAbsentLegacy,
+  ApplicationLogAbsentLegacy,
   type LegacySettingsKind,
 } from './absentHandlers';
 
@@ -916,6 +928,60 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
       logger: this.logger,
       systemContext: this.systemContext,
       lockRegistry: this.lockRegistry,
+      results,
+    });
+  }
+
+  override getApplicationLog(
+    this: this & AdtServedBy<'applicationLog'>,
+  ): ApplicationLog<ResultValuesOf<typeof applicationLogDocuments>>;
+  override getApplicationLog<R extends IApplicationLogResults>(
+    this: this & AdtServedBy<'applicationLog'>,
+    results: R,
+  ): ApplicationLog<ResultValuesOf<R>>;
+  override getApplicationLog(
+    this: this & AdtServedBy<'applicationLog'>,
+    results: IApplicationLogResults = applicationLogDocuments,
+  ): ApplicationLog<ApplicationLogValues> {
+    this.assertConnected();
+    return new ApplicationLogAbsentLegacy(this.connection, {
+      logger: this.logger,
+      results,
+    });
+  }
+
+  override getApplicationJobCatalog(
+    this: this & AdtServedBy<'applicationJobCatalog'>,
+  ): ApplicationJobCatalog<ResultValuesOf<typeof applicationJobDocuments>>;
+  override getApplicationJobCatalog<R extends IApplicationJobResults>(
+    this: this & AdtServedBy<'applicationJobCatalog'>,
+    results: R,
+  ): ApplicationJobCatalog<ResultValuesOf<R>>;
+  override getApplicationJobCatalog(
+    this: this & AdtServedBy<'applicationJobCatalog'>,
+    results: IApplicationJobResults = applicationJobDocuments,
+  ): ApplicationJobCatalog<ApplicationJobValues> {
+    this.assertConnected();
+    return new ApplicationJobCatalogAbsentLegacy(this.connection, {
+      logger: this.logger,
+      results,
+    });
+  }
+
+  override getApplicationJobTemplate(
+    this: this & AdtServedBy<'applicationJobTemplate'>,
+  ): ApplicationJobTemplate<ResultValuesOf<typeof applicationJobDocuments>>;
+  override getApplicationJobTemplate<R extends IApplicationJobResults>(
+    this: this & AdtServedBy<'applicationJobTemplate'>,
+    results: R,
+  ): ApplicationJobTemplate<ResultValuesOf<R>>;
+  override getApplicationJobTemplate(
+    this: this & AdtServedBy<'applicationJobTemplate'>,
+    results: IApplicationJobResults = applicationJobDocuments,
+  ): ApplicationJobTemplate<ApplicationJobValues> {
+    this.assertConnected();
+    return new ApplicationJobTemplateAbsentLegacy(this.connection, {
+      logger: this.logger,
       results,
     });
   }

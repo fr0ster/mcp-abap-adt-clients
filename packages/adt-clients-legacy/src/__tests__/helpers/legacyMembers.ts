@@ -505,6 +505,9 @@ const MSAG_URI = MESSAGE_CLASS.uri('ZGUARD_MSG');
 /** The absent types' `*AbsentLegacy` handlers (§10.1), by their public members. */
 const ABSENT = {
   getAccessControl: [...SOURCE_OBJECT_MEMBERS, 'updateMetadata'],
+  getApplicationLog: ['getObject', 'getSource', 'validateName'],
+  getApplicationJobCatalog: ['getObject', 'getSource'],
+  getApplicationJobTemplate: ['getObject', 'getSource'],
   getAppendStructure: [...SOURCE_OBJECT_MEMBERS],
   getTableSettings: [
     'lock',
@@ -618,6 +621,9 @@ const ABSENT = {
 const CLIENT_GETTERS = [
   'getAccessControl',
   'getAppendStructure',
+  'getApplicationJobCatalog',
+  'getApplicationJobTemplate',
+  'getApplicationLog',
   'getAuthorizationField',
   'getBehaviorDefinition',
   'getBehaviorImplementation',

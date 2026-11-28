@@ -161,6 +161,65 @@ exports[`an absent legacy handler refuses every operation, as before getAppendSt
 }
 `;
 
+exports[`an absent legacy handler refuses every operation, as before getApplicationJobCatalog: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": undefined,
+  "refusals": {
+    "getObject": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ApplicationJobCatalog is not supported on this SAP system: /sap/bc/adt/applicationjob/catalogs, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "getSource": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ApplicationJobCatalog is not supported on this SAP system: /sap/bc/adt/applicationjob/catalogs, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+  },
+}
+`;
+
+exports[`an absent legacy handler refuses every operation, as before getApplicationJobTemplate: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": undefined,
+  "refusals": {
+    "getObject": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ApplicationJobTemplate is not supported on this SAP system: /sap/bc/adt/applicationjob/templates, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "getSource": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ApplicationJobTemplate is not supported on this SAP system: /sap/bc/adt/applicationjob/templates, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+  },
+}
+`;
+
+exports[`an absent legacy handler refuses every operation, as before getApplicationLog: each operation answers the same refusal and sends nothing 1`] = `
+{
+  "objectType": undefined,
+  "refusals": {
+    "getObject": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ApplicationLog is not supported on this SAP system: /sap/bc/adt/applicationlog/objects, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "getSource": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ApplicationLog is not supported on this SAP system: /sap/bc/adt/applicationlog/objects, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+    "validateName": {
+      "code": "ADT_UNSUPPORTED_OPERATION",
+      "message": "ApplicationLog is not supported on this SAP system: /sap/bc/adt/applicationlog/objects, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
+      "origin": "refusal",
+    },
+  },
+}
+`;
+
 exports[`an absent legacy handler refuses every operation, as before getAuthorizationField: each operation answers the same refusal and sends nothing 1`] = `
 {
   "objectType": "AuthorizationField",
