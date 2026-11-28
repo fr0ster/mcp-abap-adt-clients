@@ -71,7 +71,11 @@ declare const onPremiseRead: {
   settings: ITableSettingsRead;
 };
 // The cloud patch's answer is the cloud write's settings, the flag among them.
-const cloudPatched = patchTableSettings(cloudRead, { sizeCategory: '1' });
+const cloudPatched = patchTableSettings(
+  cloudRead,
+  { sizeCategory: '1' },
+  'cloud',
+);
 export const cloudPatchWritten = cloudPatched.ok
   ? cloud.updateMetadata(
       {
@@ -82,33 +86,46 @@ export const cloudPatchWritten = cloudPatched.ok
       { headers, lockHandle: 'H', ifMatch: 'E' },
     )
   : undefined;
-export const cloudPatchFlag = patchTableSettings(cloudRead, {
-  isWritableByAMDP: false,
-});
+export const cloudPatchFlag = patchTableSettings(
+  cloudRead,
+  { isWritableByAMDP: false },
+  'cloud',
+);
+export const cloudFromGenericRead = patchTableSettings(
+  // @ts-expect-error a cloud patch takes a cloud read: the flag must be there
+  onPremiseRead,
+  { sizeCategory: '1' },
+  'cloud',
+);
 // @ts-expect-error a patch names at least one setting
-export const emptyPatch = patchTableSettings(onPremiseRead, {});
-// @ts-expect-error a buffering change names at least one field
-export const emptyBuffering = patchTableSettings(onPremiseRead, {
-  buffering: {},
-});
-// The on-premise answer carries no flag to the on-premise write once the
-// caller leaves it out, as the read never has it there (Code).
-const onPremisePatched = patchTableSettings(onPremiseRead, {
-  sizeCategory: '1',
-});
+export const emptyPatch = patchTableSettings(onPremiseRead, {}, 'onprem');
+export const emptyBuffering = patchTableSettings(
+  onPremiseRead,
+  // @ts-expect-error a buffering change names at least one field
+  { buffering: {} },
+  'onprem',
+);
+export const onPremiseFlag = patchTableSettings(
+  onPremiseRead,
+  // @ts-expect-error on premise a change does not name isWritableByAMDP
+  { isWritableByAMDP: true },
+  'onprem',
+);
+// The on-premise answer is the on-premise write's settings, as it is.
+const onPremisePatched = patchTableSettings(
+  onPremiseRead,
+  { sizeCategory: '1' },
+  'onprem',
+);
 export const onPremisePatchWritten = onPremisePatched.ok
-  ? (() => {
-      const { isWritableByAMDP: _cloudOnly, ...settings } =
-        onPremisePatched.settings;
-      return onPremise.updateMetadata(
-        {
-          tableName: 'ZT',
-          description: onPremisePatched.description,
-          settings,
-        },
-        { headers, lockHandle: 'H', ifMatch: 'E' },
-      );
-    })()
+  ? onPremise.updateMetadata(
+      {
+        tableName: 'ZT',
+        description: onPremisePatched.description,
+        settings: onPremisePatched.settings,
+      },
+      { headers, lockHandle: 'H', ifMatch: 'E' },
+    )
   : undefined;
 
 // The declared system kind is tied to the handler's type (Codex round 2).

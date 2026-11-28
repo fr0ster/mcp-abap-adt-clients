@@ -1,5 +1,5 @@
 /**
- * `patchTableSettings(read, changes)` — the settings change as the caller's
+ * `patchTableSettings(read, changes, variant)` — the settings change as the caller's
  * three calls (C7, 49.0.0): `readMetadata` (one GET), this patch (no request),
  * `updateMetadata` (one PUT with the read's ETag as `If-Match`).
  *
@@ -69,7 +69,11 @@ const OK = { status: 200, statusText: 'OK', headers: {}, data: '' };
 
 describe('patchTableSettings', () => {
   it('changes the named setting and keeps every other one and the description as read', () => {
-    const patched = patchTableSettings(ONPREM, { dataClassCategory: 'APPL2' });
+    const patched = patchTableSettings(
+      ONPREM,
+      { dataClassCategory: 'APPL2' },
+      'onprem',
+    );
     expect(patched).toEqual({
       ok: true,
       description: ONPREM.description,
@@ -77,13 +81,26 @@ describe('patchTableSettings', () => {
     });
   });
 
+  it('on premise answers no isWritableByAMDP, even from a read that carried one', () => {
+    const withFlag = {
+      ...ONPREM,
+      settings: { ...ONPREM.settings, isWritableByAMDP: true },
+    };
+    const patched = patchTableSettings(
+      withFlag,
+      { sizeCategory: '2' },
+      'onprem',
+    );
+    expect(patched.ok && 'isWritableByAMDP' in patched.settings).toBe(false);
+  });
+
   it('on premise answers no isWritableByAMDP', () => {
-    const patched = patchTableSettings(ONPREM, { sizeCategory: '2' });
+    const patched = patchTableSettings(ONPREM, { sizeCategory: '2' }, 'onprem');
     expect(patched.ok && 'isWritableByAMDP' in patched.settings).toBe(false);
   });
 
   it('keeps the cloud flag as read when the change does not name it', () => {
-    const patched = patchTableSettings(CLOUD, { sizeCategory: '2' });
+    const patched = patchTableSettings(CLOUD, { sizeCategory: '2' }, 'cloud');
     expect(patched.ok && patched.settings.isWritableByAMDP).toBe(
       CLOUD.settings.isWritableByAMDP,
     );
@@ -91,12 +108,20 @@ describe('patchTableSettings', () => {
 
   it('writes the cloud flag a change names', () => {
     const flipped = !CLOUD.settings.isWritableByAMDP;
-    const patched = patchTableSettings(CLOUD, { isWritableByAMDP: flipped });
+    const patched = patchTableSettings(
+      CLOUD,
+      { isWritableByAMDP: flipped },
+      'cloud',
+    );
     expect(patched.ok && patched.settings.isWritableByAMDP).toBe(flipped);
   });
 
   it('changes the translation by its value alone, the other attributes as read', () => {
-    const patched = patchTableSettings(ONPREM, { translation: { value: 'B' } });
+    const patched = patchTableSettings(
+      ONPREM,
+      { translation: { value: 'B' } },
+      'onprem',
+    );
     expect(patched.ok && patched.settings.translation).toEqual({
       ...ONPREM.settings.translation,
       value: 'B',
@@ -104,9 +129,13 @@ describe('patchTableSettings', () => {
   });
 
   it('changes buffering field by field and keeps the rest as read', () => {
-    const patched = patchTableSettings(ONPREM, {
-      buffering: { type: 'G', areaKeyFields: 2 },
-    });
+    const patched = patchTableSettings(
+      ONPREM,
+      {
+        buffering: { type: 'G', areaKeyFields: 2 },
+      },
+      'onprem',
+    );
     expect(patched.ok && patched.settings.buffering).toEqual({
       allowed: ONPREM.settings.buffering.allowed,
       type: 'G',
@@ -128,7 +157,11 @@ describe('patchTableSettings', () => {
         },
       },
     };
-    const patched = patchTableSettings(read, { buffering: { type: 'P' } });
+    const patched = patchTableSettings(
+      read,
+      { buffering: { type: 'P' } },
+      'onprem',
+    );
     expect(patched.ok && patched.settings.buffering).toEqual({
       allowed: ONPREM.settings.buffering.allowed,
       type: 'P',
@@ -140,9 +173,13 @@ describe('patchTableSettings', () => {
     // The read's type is empty (not buffered): a count without a type
     // compiles, and the merged type is what is refused.
     expect(ONPREM.settings.buffering.type).toBe('');
-    const patched = patchTableSettings(ONPREM, {
-      buffering: { areaKeyFields: 2 },
-    });
+    const patched = patchTableSettings(
+      ONPREM,
+      {
+        buffering: { areaKeyFields: 2 },
+      },
+      'onprem',
+    );
     expect(patched).toEqual({
       ok: false,
       reason: 'area-key-fields-need-type-g',
@@ -152,17 +189,25 @@ describe('patchTableSettings', () => {
   });
 
   it('accepts an areaKeyFields change when the change itself makes the type G', () => {
-    const patched = patchTableSettings(ONPREM, {
-      buffering: { type: 'G', areaKeyFields: 1 },
-    });
+    const patched = patchTableSettings(
+      ONPREM,
+      {
+        buffering: { type: 'G', areaKeyFields: 1 },
+      },
+      'onprem',
+    );
     expect(patched.ok).toBe(true);
   });
 
   it('leaves its arguments as they were', () => {
     const before = structuredClone(ONPREM);
-    patchTableSettings(ONPREM, {
-      loggingEnabled: !ONPREM.settings.loggingEnabled,
-    });
+    patchTableSettings(
+      ONPREM,
+      {
+        loggingEnabled: !ONPREM.settings.loggingEnabled,
+      },
+      'onprem',
+    );
     expect(ONPREM).toEqual(before);
   });
 });
@@ -192,7 +237,11 @@ describe("the settings change as the caller's three calls", () => {
     if (!read.ok) throw new Error('the read failed');
     const current = read.getResult().value;
 
-    const patched = patchTableSettings(current, { dataClassCategory: 'APPL2' });
+    const patched = patchTableSettings(
+      current,
+      { dataClassCategory: 'APPL2' },
+      'onprem',
+    );
     expect(requests).toHaveLength(1);
     if (!patched.ok) throw new Error(patched.message);
 
@@ -236,7 +285,7 @@ describe("the settings change as the caller's three calls", () => {
   it('on the cloud, the flag read goes back with the PUT', async () => {
     const { connection, requests } = sequence([OK]);
     const settings = new AdtClientCloud(connection).getTableSettings();
-    const patched = patchTableSettings(CLOUD, { sizeCategory: '2' });
+    const patched = patchTableSettings(CLOUD, { sizeCategory: '2' }, 'cloud');
     if (!patched.ok) throw new Error(patched.message);
     await settings.updateMetadata(
       {
