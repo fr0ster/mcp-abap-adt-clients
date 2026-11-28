@@ -502,8 +502,11 @@ cloud row lists no write (a create answered `403` `S_DEVELOP`, which decides
 nothing), so `create`, `update`, `lock`, `unlock`, `activate` and `delete` do
 not compile on `AdtClientCloud`.
 
+Compiled as written by `src/__tests__/typechecks/exact/typeGroupExample.ts`.
+
 ```typescript
-const tg = createAdtClient(connection, { variant: 'onprem' }).getTypeGroup();
+const client = await createAdtClient(connection, { variant: 'onprem' });
+const tg = client.getTypeGroup();
 await tg.create({ typeGroupName: 'ZTG1', packageName: '$TMP', description: 'Types' }, { headers });
 const locked = await tg.lock({ typeGroupName: 'ZTG1' });
 if (!locked.ok) throw new Error(locked.getError().message);
