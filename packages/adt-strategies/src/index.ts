@@ -168,6 +168,11 @@ export {
   type ISystemMessageEntry,
 } from './results/feeds';
 export {
+  type INavigationTarget,
+  navigationTarget,
+  readNavigationTarget,
+} from './results/navigation';
+export {
   type IObjectOutline,
   type IOutlineElement,
   type IOutlineLink,
