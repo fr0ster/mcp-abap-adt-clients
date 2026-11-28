@@ -744,8 +744,14 @@ export class BaseTester<TConfig extends object, TState = unknown> {
     what: string,
   ): Promise<void> {
     if (answer.ok) return;
-    if (!this.connection) throw new Error(failureOf(answer, what));
-    await expectActivated(answer, this.connection, config, what, this.logger);
+    // The handler's own connection: a tester given a client holds none of
+    // its own (`setup({ client })`).
+    const connection =
+      this.connection ??
+      (this.adtObject as unknown as { connection?: IAbapConnection })
+        .connection;
+    if (!connection) throw new Error(failureOf(answer, what));
+    await expectActivated(answer, connection, config, what, this.logger);
   }
 
   /**
