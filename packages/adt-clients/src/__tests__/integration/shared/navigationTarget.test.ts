@@ -10,9 +10,9 @@
  *
  * Measured (2026-11-28): every fragment answers `200` with an
  * `adtcore:objectReference` whose uri is the element's include and
- * `#start=line,column`; a local method's definition link is refused on ABAP
- * cloud (`400`, EU/061) and is the same href, answering the same start, as its
- * implementation link on premise.
+ * `#start=line,column` in an include of the same object (not always the include
+ * the link names); a local method's definition link is refused on ABAP cloud
+ * (`400`, EU/061) and answers a start on premise.
  *
  * Enable debug logs: DEBUG_ADT_TESTS=true npm test -- integration/shared/navigationTarget
  */
@@ -105,6 +105,22 @@ function includeOf(uri: string): string {
   return hash < 0 ? uri : uri.slice(0, hash);
 }
 
+/**
+ * The object a source belongs to: the address before `/includes/` or
+ * `/source/` — a function group's includes share it. SAP may answer an
+ * element's start in another include of the same object than the one its
+ * link names (measured on premise: a local method's implementation link into
+ * the class-definition include answers the implementation include).
+ */
+function objectOf(uri: string): string {
+  const include = includeOf(uri);
+  for (const marker of ['/includes/', '/source/']) {
+    const at = include.indexOf(marker);
+    if (at >= 0) return include.slice(0, at);
+  }
+  return include;
+}
+
 describe('Shared - getNavigationTarget', () => {
   let connection: (IAbapConnection & ISessionLifecycleAware) | undefined;
   let utils: AdtUtils | undefined;
@@ -169,7 +185,7 @@ describe('Shared - getNavigationTarget', () => {
           if (!answer.ok) throw new Error(answer.getError().message);
           const reference = referenceOf(answer.getResult().value);
           expect(reference).toContain('#start=');
-          expect(includeOf(reference ?? '')).toBe(includeOf(item.href));
+          expect(objectOf(reference ?? '')).toBe(objectOf(item.href));
           answers.push(answer.getResult().value);
         }
 
@@ -188,14 +204,16 @@ describe('Shared - getNavigationTarget', () => {
               400,
             );
           } else {
-            expect(definition.href).toBe(implementation.href);
+            // On premise the definition link answers a start in the same
+            // object; which include and statement it is, the caller decides
+            // from the source.
             if (!answer.ok) throw new Error(answer.getError().message);
-            const alone = await utils.getNavigationTarget(implementation.href, {
-              analyse: analyseException,
-            });
-            expect(referenceOf(answer.getResult().value)).toBe(
-              alone.ok ? referenceOf(alone.getResult().value) : 'refused',
+            const reference = referenceOf(answer.getResult().value);
+            testsLogger.info?.(
+              `definition link ${definition.href} -> ${reference}; implementation link ${implementation.href}`,
             );
+            expect(reference).toContain('#start=');
+            expect(objectOf(reference ?? '')).toBe(objectOf(definition.href));
           }
         } else {
           testsLogger.info?.(
