@@ -11,7 +11,10 @@
  * and writes the whole set with the read's ETag as `If-Match` (a read with no
  * ETag fails the test); unlocks on every path. Activates the table, which
  * activates its settings, reads the active settings back and asserts that
- * every setting is what was written, the unchanged ones included. Cleanup
+ * every setting is what was written, the unchanged ones included. Then
+ * changes some settings as a caller does since 49.0.0: under the lock, the
+ * read, `patchTableSettings` (no request) and the write with the read's ETag;
+ * the active read shows the patch and every other setting as read. Cleanup
  * releases any lock still held, then deletes the table and reads its absence
  * back — also when a step failed.
  *
@@ -26,10 +29,7 @@ import {
   analyseException,
   tableSettings,
 } from '@mcp-abap-adt/adt-strategies';
-import {
-  type ITableSettingsRead,
-  TABLE_SETTINGS_MEDIA_TYPE,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { ITableSettingsRead } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   ISessionLifecycleAware,
@@ -37,6 +37,7 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
+import { patchTableSettings } from '../../../../core/tableSettings/patch';
 import { tableSettingsDocuments } from '../../../../core/tableSettings/types';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { freshSuffix } from '../../../helpers/abapUnitProbes';
@@ -315,23 +316,66 @@ describe("A table's technical settings (AdtTableSettings)", () => {
                   loggingEnabled: false,
                 }
               : { sizeCategory: '2', isWritableByAMDP: false };
+        // The caller's three calls under the lock (49.0.0): the read right
+        // before the PUT, the patch (no request), the write guarded by the
+        // read's ETag.
         await releasing(
-          async () =>
-            expectResult(
-              await settings.patchMetadata(
+          async () => {
+            const current = expectResult(
+              await settings.readMetadata(
+                { tableName },
+                { analyse: analyseException, version: 'inactive' },
+              ),
+              `read the settings of ${tableName} for the patch`,
+            );
+            if (!current.etag) {
+              throw new Error(
+                `the settings read of ${tableName} answered no ETag: the patch cannot be guarded with If-Match`,
+              );
+            }
+            // A cloud read without isWritableByAMDP would reset it on the
+            // write (measured 2026-11-19): the caller refuses it. The patch is
+            // typed by the declared system kind.
+            const amdp = current.settings.isWritableByAMDP;
+            if (isCloudSystem && amdp === undefined) {
+              throw new Error(
+                `the cloud settings read of ${tableName} answered no ts:isWritableByAMDP`,
+              );
+            }
+            const patched =
+              isCloudSystem && amdp !== undefined
+                ? patchTableSettings(
+                    {
+                      description: current.description,
+                      settings: { ...current.settings, isWritableByAMDP: amdp },
+                    },
+                    changes,
+                    'cloud',
+                  )
+                : patchTableSettings(current, { sizeCategory: '2' }, 'onprem');
+            if (!patched.ok) {
+              throw new Error(
+                `the patch of ${tableName} was refused: ${patched.message}`,
+              );
+            }
+            return expectResult(
+              await settings.updateMetadata(
                 {
                   tableName,
                   transportRequest,
-                  changes,
+                  description: patched.description,
+                  settings: patched.settings,
                 },
                 {
                   analyse: analyseException,
-                  headers: { accept: TABLE_SETTINGS_MEDIA_TYPE },
+                  headers: integrationHeadersOf(settings, 'updateMetadata'),
                   lockHandle: patchLock,
+                  ifMatch: current.etag,
                 },
               ),
-              `patch the settings of ${tableName}`,
-            ),
+              `write the patched settings of ${tableName}`,
+            );
+          },
           () =>
             settings.unlock({ tableName }, patchLock, {
               analyse: analyseException,

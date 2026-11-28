@@ -24,6 +24,104 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+C7 of the owner's rule — one member, one endpoint, one request: the two kinds
+of member that still sent two requests are split (to be released as 49.0.0,
+with `@mcp-abap-adt/adt-strategies` 0.30.0 and the interfaces-adt change of
+decision 53). See [MIGRATION-49.md](docs/usage/MIGRATION-49.md).
+
+### Changed (breaking)
+
+- **Every activation member sends the activation alone.** Each handler's
+  `activate`, `getClass().activateTestClasses` and `getUtils().activateObjects`
+  send `POST /sap/bc/adt/activation` and call `analyse` with the verdict and the
+  answer, never a context. After a checklist that does not state its outcome
+  (`activationExecuted="false"` with no message, or no `activationExecuted` and
+  only `W`/`I`/`S` messages) they no longer read
+  `GET /sap/bc/adt/activation/inactiveobjects`: the caller reads it
+  (`getInactiveObjects`, adt-strategies' `readUnstatedActivation` says when)
+  and hands it to `analyseActivation` as `context.activation`. With
+  `analyseActivation` alone such an answer is now "not decided".
+
+### Removed (breaking)
+
+- **`answeringActivation`**, and with it the activation exchange and this
+  package's copy of the activation reading (`activationReading.ts`, the copy of
+  adt-strategies' `severity()`). A handler class built on the package answers
+  with `answering`.
+- **`AdtTableSettings.patchMetadata`** and the type **`TableSettingsPatchConfig`**
+  (interfaces-adt decision 51, superseded by 53). A settings change is the
+  caller's `readMetadata`, `patchTableSettings` and `updateMetadata` with the
+  read's ETag. With it went its runtime checks before the PUT (a failed read, a
+  read without an ETag, an incomplete document, a declared cloud read without
+  `ts:isWritableByAMDP`, a change set naming no setting): the caller checks
+  them, adt-strategies' strict readings throw for an incomplete or a cloud
+  read without the flag, and an empty change set does not compile.
+- **The `variant: 'cloud'` constructor option of `AdtTableSettings`**
+  (`TableSettingsVariantOption`): `patchMetadata`'s cloud check was its only
+  reader. `AdtClientCloud.getTableSettings()` still answers a `'cloud'`-typed
+  handler.
+
+### Added
+
+- **`patchTableSettings(read, changes, variant)`**, typed by the declared
+  system kind (on premise neither the change nor the answer carries
+  `isWritableByAMDP`), with `TableSettingsPatch`,
+  `TableSettingsPatchRefusal` and `ITableSettingsPatchRead`: the settings read
+  with `changes` overlaid — sends no request. Every setting not named as read,
+  `buffering` field by field, `translation` by its value, the cloud's
+  `isWritableByAMDP` as read unless named; refuses
+  (`area-key-fields-need-type-g`) an `areaKeyFields` change whose resulting
+  type is not `G`.
+
+### Tests and docs
+
+- Every capability-manifest member issues exactly one request
+  (`behaviour.test.ts`); every activation member sends the POST alone after a
+  silent and an unstated checklist (`activationOneRequest.test.ts`); the uris
+  each activation names are pinned against `buildObjectUri`
+  (`activationNamesItsUris.test.ts`); the caller's recipe
+  (`helpers/activationJudged.ts`) gives 48.0.0's verdicts on every recorded
+  answer (`activationEquivalence.test.ts`); the settings change is counted call
+  by call (`patch.test.ts`). The live suites read the list and patch the
+  settings as a caller. README, CLIENT_API_REFERENCE, ERRATA, DECISIONS
+  (decision 20) and MIGRATION-49.
+
+fr0ster/mcp-abap-adt#391: the library picks no bound of its own. A bound the
+caller gives goes out exactly as given, `0` included; without one the request
+carries none, and SAP's own bound applies. Measured on the BTP ABAP environment
+(2026-11-27).
+
+### Fixed
+
+- **`getSqlQuery` sends `row_number` as given, and no `rowNumber` without
+  one.** A missing or `0` bound was sent as 100. Without `rowNumber` SAP answers
+  100 records (selections of 163, 249, 1716 and 8466 measured); it refuses `0`,
+  a negative number and 2147483647 with `400`, and 2147483646 was the largest
+  it accepted.
+- **`search` sends `maxResults` as given, and none without one.** A missing or
+  `0` bound was sent as 100. Without `maxResults` the quick search answers 200
+  hits (of 8886 measured), and `maxResults=0` answers 200 too.
+- **`getAllTypes` sends no `maxItemCount` without one.** A missing one was
+  sent as 999. Without it SAP answers 100 object types of 375, `0` the same;
+  999 and 100000 answer all 375.
+- **`getTableContents` sends `max_rows` as given, and no `rowNumber` without
+  one.** A missing or `0` bound was sent as 100. `/datapreview/ddic` without
+  `rowNumber` answers 101 records and ignores `0`.
+- **`getAtc().startRun` sends no `maximumVerdicts` without one.** A missing cap
+  was sent as 100; SAP accepts a run payload without the attribute. A cap given
+  is still refused before the request when it is not a positive integer.
+
+### Documentation
+
+- **ERRATA, "The debugger freeing its session is answered as an ICF 500":**
+  SAP's `400` "Session no longer exists" on the next request reaches the
+  caller as the connection's verdict since `@mcp-abap-adt/connection` 22.0.1 —
+  a failure with `sessionError: 'ADT_SESSION_REPLACED'` and no response
+  (on premise, 2026-11-28, connection 25.2.0). The library passes it on as it
+  came; no code changed.
+
 ## [48.0.0] - 2026-11-27
 
 fr0ster/mcp-abap-adt-clients#304: this package's `src` holds no cast but

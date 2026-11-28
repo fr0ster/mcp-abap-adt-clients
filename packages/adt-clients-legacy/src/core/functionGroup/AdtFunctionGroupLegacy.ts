@@ -17,7 +17,6 @@ import {
   AdtFunctionGroup,
   type AdtPerformedBy,
   answering,
-  answeringActivation,
   FUNCTION_GROUP,
   type FunctionGroupValues,
   type functionGroupDocuments,
@@ -144,9 +143,11 @@ export class AdtFunctionGroupLegacy<
    * 7.40 SP04 in `$TMP`: after a write of the group's source, this one
    * reference activated the group and its main program both.
    *
-   * `preauditRequested` is sent as given; absent, `true`. Through the base's
-   * activation helper: after a silent checklist alone, the inactive list is
-   * read once and handed to `analyse`.
+   * `preauditRequested` is sent as given; absent, `true`. One request, as
+   * every activation member: the inactive list, when a checklist does not
+   * state the outcome, is the caller's to read (`getInactiveObjects`) and to
+   * hand to its `analyse`. The reference's uri is `buildObjectUri(name,
+   * 'FUGR/F')`.
    */
   override activate<E extends IAdtError>(
     config: AdtObjectIdentity<IFunctionGroupConfig, 'functionGroupName'>,
@@ -171,10 +172,9 @@ export class AdtFunctionGroupLegacy<
 
     const preauditRequested = options.preauditRequested ?? true;
 
-    return answeringActivation(
-      connection,
-      (sent) =>
-        sent.makeAdtRequest({
+    return answering(
+      () =>
+        connection.makeAdtRequest({
           url: `/sap/bc/adt/activation?method=activate&preauditRequested=${preauditRequested}`,
           method: 'POST',
           timeout: 0,

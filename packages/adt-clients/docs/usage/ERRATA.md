@@ -43,6 +43,11 @@ the next request on that session answers `400` "Session no longer exists". The
 refusal. Measured on premise (2026-10-11), BASIS 816; the server code that
 handles the method (BASIS 816, read 2026-10-11) releases the debugger's session
 inside the request, and nothing in it writes an ADT answer after that.
+`@mcp-abap-adt/connection` 22.0.1 and later reads that `400` as the session
+gone: the stack read then fails with `sessionError: 'ADT_SESSION_REPLACED'`
+and no response, and that connection instance is spent (on premise,
+2026-11-28, connection 25.2.0: the read came back with no status and the
+connection's "The SAP session no longer exists" words).
 
 **Why the library has a strategy for it.** `analyseDebuggerFreed` from
 `@mcp-abap-adt/adt-strategies` (0.9.0), passed to `terminateDebugger`, answers
@@ -128,13 +133,16 @@ and the active source both said so), SAP_BASIS 751 to `false`.
 | empty | activated |
 | any other document | not activated: the answer does not state the activation |
 
-For the two checklists the inactive list decides, every adt-clients member
-that sends `POST /activation` reads `GET /sap/bc/adt/activation/inactiveobjects`
-once, after those answers only, and hands the list to `analyse`
-(`IAdtAnalyseContext`); the client judges neither, the verdict is the
+For the two checklists the inactive list decides (`readUnstatedActivation`
+answers `silent` or `unstated`), the caller reads
+`GET /sap/bc/adt/activation/inactiveobjects` after the answer and hands the
+list to `analyseActivation` (`IAdtAnalyseContext`) with the uris the activation
+named. Until adt-clients 48.0.0 every member that sends `POST /activation` read
+it itself; since 49.0.0 it sends the activation alone (one member, one
+endpoint, one request), and the client judges neither, the verdict is the
 strategy's. After the checklist with no verdict, a read that fails leaves the
-answer as it was and hands the refusal's response, if any, as the list;
-an entry counts when its `uri` or `parentUri` is one the request named
+answer as it was and the refusal's response, if any, is the list; an entry
+counts when its `uri` or `parentUri` is one the request named
 (`stillInactiveAmong`). A caller who wants another verdict passes its own
 `analyse`.
 

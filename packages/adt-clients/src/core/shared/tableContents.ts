@@ -56,6 +56,12 @@ export async function getTableColumns(
  * carries `timeout: 0` — none — and how long to wait is the caller's, set on the
  * connection it hands in. Until 31.0.0 this set the library's own long
  * deadline (120 s by default).
+ *
+ * **No row bound of the library's.** `max_rows` goes out as `rowNumber`
+ * exactly as given; without one the URL carries none and SAP's own bound
+ * applies (mcp-abap-adt#391): on the BTP ABAP environment (2026-11-27) a
+ * request without `rowNumber` answered 101 records, and `0` was ignored the
+ * same way. Until 48.0.0 a missing or `0` bound was sent as 100.
  */
 export async function getTableContents(
   connection: IAbapConnection,
@@ -63,10 +69,11 @@ export async function getTableContents(
   params: IGetTableContentsParams,
 ): Promise<IAdtWireResponse> {
   const tableName = params.table_name.toUpperCase();
-  const maxRows = params.max_rows || 100;
+  const bound =
+    params.max_rows === undefined ? '' : `rowNumber=${params.max_rows}&`;
 
   return connection.makeAdtRequest({
-    url: `/sap/bc/adt/datapreview/ddic?rowNumber=${maxRows}&ddicEntityName=${encodeURIComponent(tableName)}`,
+    url: `/sap/bc/adt/datapreview/ddic?${bound}ddicEntityName=${encodeURIComponent(tableName)}`,
     method: 'POST',
     // No deadline: the contract requires a number, and 0 is what the wires
     // read as "do not abort". How long to wait is the caller's.

@@ -476,7 +476,7 @@ describe('analyseActivation answers every row of the activation table', () => {
     }
     return verdict;
   };
-  /** The facts the member hands beside a silent checklist. */
+  /** The facts a caller hands beside a silent checklist. */
   const listed = (
     named: readonly string[],
     inactiveObjects: IAdtWireResponse,

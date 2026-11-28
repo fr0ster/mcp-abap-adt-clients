@@ -183,6 +183,10 @@ export {
 } from './core/table';
 export {
   AdtTableSettings,
+  type ITableSettingsPatchRead,
+  patchTableSettings,
+  type TableSettingsPatch,
+  type TableSettingsPatchRefusal,
   type TableSettingsValues,
 } from './core/tableSettings';
 export {
@@ -251,10 +255,7 @@ export {
   TRANSPORT_REQUEST,
   versionsUri,
 } from './endpoints/objects';
-export {
-  answeringActivation,
-  buildObjectUri,
-} from './utils/activationUtils';
+export { buildObjectUri } from './utils/activationUtils';
 /**
  * The refusal a 2xx can carry.
  *

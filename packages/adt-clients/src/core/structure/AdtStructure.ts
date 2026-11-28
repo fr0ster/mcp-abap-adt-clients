@@ -41,7 +41,6 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { STRUCTURE } from '../../endpoints/objects';
-import { answeringActivation } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
@@ -541,11 +540,10 @@ export class AdtStructure<
 
     const name = this.name(config);
 
-    return answeringActivation(
-      connection,
-      (sent) =>
+    return answering(
+      () =>
         activateStructure(
-          sent,
+          connection,
           options.headers,
           name,
           options.preauditRequested ?? true,

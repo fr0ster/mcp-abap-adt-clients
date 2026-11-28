@@ -1,16 +1,25 @@
 /**
- * Step 39a of #304: the activation reading moved out of activationUtils.ts
- * into activationReading.ts, which only reads. It gives what the code before
- * the move gave (copied below as the oracle) on every recorded activation
- * answer and on hand-written checklists.
+ * When the inactive list decides an activation (C7, adt-clients 49.0.0).
+ *
+ * Until adt-clients 48.0.0 the client read the list itself after a checklist
+ * that does not state its outcome, and decided when with a private copy of
+ * this package's `severity()`. Since the split the caller reads the list, and
+ * `readUnstatedActivation` tells it when. The function is the one predicate
+ * `readActivationRefusal` decides by, so the two cannot drift.
+ *
+ * - The oracle: 48.0.0's reading, copied below as it was, on every recorded
+ *   activation answer and on hand-written edges.
+ * - The agreement: on the same answers, `readUnstatedActivation` is
+ *   defined exactly when `readActivationRefusal` without a list answers "could
+ *   not be decided".
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
-import { unstatedOutcome } from '../../../utils/activationReading';
+import { readActivationRefusal, readUnstatedActivation } from '../index';
 
-// ---- the code before the move, as it was ----
+// ---- adt-clients 48.0.0's reading (src/utils/activationReading.ts), as it was ----
 const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@',
@@ -116,7 +125,7 @@ function oldUnstatedOutcome(
 
 // ---- end of the copy ----
 
-const ANSWERS = join(__dirname, '../../../../corpus/adt/answers');
+const ANSWERS = join(__dirname, '../../../adt-clients/corpus/adt/answers');
 const recorded = readdirSync(ANSWERS)
   .filter((f) => /^activat/.test(f) && f.endsWith('.json'))
   .sort()
@@ -154,17 +163,72 @@ const edges: [string, IAdtWireResponse][] = [
   ['untyped', checklist('<msg/>')],
   ['mixed', checklist('<msg type="W"/><msg type="ERROR"/>')],
   ['refused', checklist('<chkl:properties activationExecuted="false"/>', 403)],
+  [
+    'not executed, one warning',
+    checklist('<chkl:properties activationExecuted="false"/><msg type="W"/>'),
+  ],
+  [
+    'not executed, cancelled',
+    checklist(
+      '<chkl:properties activationExecuted="false"/><msg type="W"/><msg type="E"/>',
+    ),
+  ],
+  [
+    'executed, one warning',
+    checklist('<chkl:properties activationExecuted="true"/><msg type="W"/>'),
+  ],
+  [
+    'no verdict, no message',
+    checklist('<chkl:properties checkExecuted="true"/>'),
+  ],
+  ['no verdict, info and success', checklist('<msg type="I"/><msg type="S"/>')],
   ['empty', { status: 200, statusText: '', headers: {}, data: '' }],
   ['not xml', { status: 200, statusText: '', headers: {}, data: '<a' }],
 ];
 
-describe('the activation reading reads as before the move', () => {
-  it('on every recorded activation answer and the edges', () => {
+describe('readUnstatedActivation', () => {
+  it("answers what adt-clients 48.0.0's reading answered, on every recorded activation answer and the edges", () => {
     expect(recorded.length).toBeGreaterThan(5);
     for (const [name, answer] of [...recorded, ...edges])
-      expect([name, unstatedOutcome(answer)]).toEqual([
+      expect([name, readUnstatedActivation(answer)]).toEqual([
         name,
         oldUnstatedOutcome(answer),
       ]);
+  });
+
+  it.each([
+    ['silent', 'silent'],
+    ['one warning', 'unstated'],
+    ['executed', undefined],
+    ['an error', undefined],
+    ['untyped', undefined],
+    ['mixed', undefined],
+    ['refused', undefined],
+    ['not executed, one warning', undefined],
+    ['not executed, cancelled', undefined],
+    ['executed, one warning', undefined],
+    ['no verdict, no message', undefined],
+    ['no verdict, info and success', 'unstated'],
+    ['empty', undefined],
+    ['not xml', undefined],
+  ])('%s: %s', (name, expected) => {
+    const edge = edges.find(([n]) => n === name);
+    if (!edge) throw new Error(`no edge ${name}`);
+    expect(readUnstatedActivation(edge[1])).toBe(expected);
+  });
+
+  it('is defined exactly when the reading without a list could not decide', () => {
+    for (const [name, answer] of [...recorded, ...edges]) {
+      if (answer.status < 200 || answer.status >= 300) continue;
+      const refusal = readActivationRefusal(answer.data);
+      const undecided =
+        refusal?.message.includes(
+          "without the list of inactive objects the activation's outcome could not be decided",
+        ) === true;
+      expect([name, readUnstatedActivation(answer) !== undefined]).toEqual([
+        name,
+        undecided,
+      ]);
+    }
   });
 });

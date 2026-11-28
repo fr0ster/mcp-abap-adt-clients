@@ -98,27 +98,22 @@ describe('activateObjects', () => {
     expect(answer.ok && answer.getResult().value).toBe('objectActivation');
   });
 
-  it('reads the inactive list once after a silent checklist', async () => {
+  it('sends the activation alone after a silent checklist, and hands analyse no context (C7)', async () => {
     const silent =
       '<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties checkExecuted="false" activationExecuted="false" generationExecuted="false"/></chkl:messages>';
     const { connection, utils } = recording(silent);
-    let named: readonly string[] | undefined;
+    const contexts: unknown[] = [];
     await utils.activateObjects([...OBJECTS], undefined, {
       headers: headersOf(utils, 'activateObjects'),
       analyse: (verdict, _answer, context) => {
-        named = context?.activation?.named;
+        contexts.push(context);
         return verdict;
       },
     });
     expect(connection.events).toEqual([
       'POST /sap/bc/adt/activation?method=activate&preauditRequested=false',
-      'GET /sap/bc/adt/activation/inactiveobjects',
     ]);
-    expect(named).toEqual([
-      '/sap/bc/adt/oo/classes/zcl_guard',
-      '/sap/bc/adt/functions/groups/zfg_guard/fmodules/z_fm_guard',
-      '/sap/bc/adt/ddic/ddl/sources/zddl_guard',
-    ]);
+    expect(contexts).toEqual([undefined]);
   });
 
   it('refuses a code the tables do not activate, without a request', async () => {

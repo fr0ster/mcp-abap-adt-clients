@@ -175,14 +175,14 @@ export async function createAtcWorklist(
 /** The run payload: one inclusive object set, every reference in it. */
 export function buildRunPayload(
   objectUris: readonly string[],
-  maximumVerdicts: number,
+  maximumVerdicts: number | undefined,
 ): string {
   const references = objectUris
     .map((uri) => `<adtcore:objectReference adtcore:uri="${uri}"/>`)
     .join('');
   return (
     '<?xml version="1.0" encoding="UTF-8"?>' +
-    `<atc:run maximumVerdicts="${maximumVerdicts}" xmlns:atc="http://www.sap.com/adt/atc">` +
+    `<atc:run${maximumVerdicts === undefined ? '' : ` maximumVerdicts="${maximumVerdicts}"`} xmlns:atc="http://www.sap.com/adt/atc">` +
     '<objectSets xmlns:adtcore="http://www.sap.com/adt/core">' +
     '<objectSet kind="inclusive">' +
     `<adtcore:objectReferences>${references}</adtcore:objectReferences>` +
@@ -203,7 +203,7 @@ export async function startAtcRun(
   connection: IAbapConnection,
   worklistId: string,
   objectUris: readonly string[],
-  maximumVerdicts: number,
+  maximumVerdicts: number | undefined,
   wait: boolean,
 ): Promise<IAdtWireResponse> {
   return connection.makeAdtRequest({
