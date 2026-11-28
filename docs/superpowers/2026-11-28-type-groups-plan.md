@@ -3,289 +3,331 @@
 This plan carries out `2026-11-28-type-groups-spec.md` in the order of the spec's section 6.
 The goal (`2026-11-28-type-groups-goal.md`) and the spec bind every task.
 
-**How every task works:**
-- **Tests first.** The tests named under "Tests first" are written first and fail. Then the
-  files are changed until they pass.
-- **Small commits.** A task holds one or more small commits, one per logical change, each
-  ending with the session's attribution lines.
-- **The gates.** A task is done when its tests pass and each package's `build`, `lint:check` and
-  `test:check` are green.
+**Every task:**
+- **Tests first.** The tests named under "Tests first" are written first, and they fail. Then
+  the files change until they pass.
+- **Small commits.** Each logical change is its own commit, ending with the session's
+  attribution lines.
+- **The gate.** A task is done when:
+  - its tests pass;
+  - every test that passed before still passes;
+  - each package's `build`, `lint:check` and `test:check` are green.
+- **Known red cases.** A task that leaves a test red names it as known red, and names the task
+  that turns it green.
+
+**Versions:**
+- `@mcp-abap-adt/interfaces-adt` takes the next minor of the version in its `package.json` when
+  Task 3 starts (33.0.0 today, so 33.1.0).
+- `@mcp-abap-adt/adt-clients` takes the next minor of its `package.json` when Task 12 starts
+  (48.0.0 today, so 48.1.0).
+- adt-strategies and adt-clients-legacy keep their versions.
+
+**Pull requests:**
+- interfaces-adt is a separate repository. Its change is one PR in that repository, linked
+  from this PR and linking back.
+- Everything in this repository stays in this PR.
 
 ## Task 1 — Measurements (done)
 
-Both rows are settled by measurement (spec 1.3).
-- **On premise:** the cycle run (`type-group-cycle-s4-2025`) and the read probe
-  (`type-group-reads-s4-2025`).
-- **Cloud:** the measurement run (`type-group-cycle-abap-cloud`) and the read probe
-  (`type-group-reads-abap-cloud`).
+Both rows are settled by measurement (spec 1.3):
+- **On premise:** `type-group-cycle-s4-2025` and `type-group-reads-s4-2025`.
+- **Cloud:** `type-group-cycle-abap-cloud` and `type-group-reads-abap-cloud`.
 - **Committed in this PR:** the scrubbed corpus, under
   `packages/adt-clients/corpus/adt/answers/type-group-*`.
 
-**Still open:** `corrNr` and long polling on the metadata read. They are proven in Task 12; if
-refused, they come out of the members. Neither changes a row.
+**Still open:** `corrNr` and long polling on the metadata read, proven in Task 11. Neither changes
+a row.
 
 ## Task 2 — interfaces-adt: the contract
 
-**Repository:** `mcp-abap-adt-interfaces`, package `packages/interfaces-adt`.
-- Work in a worktree of its own (`.worktrees/type-groups`, branch `feat/type-groups` off
-  `origin/main`).
-- One PR in that repository carries this contract and links this PR.
+**Where:**
+- Repository `mcp-abap-adt-interfaces`, package `packages/interfaces-adt`.
+- Worktree `.worktrees/type-groups`, branch `feat/type-groups` off `origin/main`.
+- The PR is opened at the first commit and linked from this PR.
 
 **Tests first** (`src/__typechecks__/typeGroup.ts`, run by `test:check`):
-- `'typeGroup'` is an `AdtApiName`.
-- `ITypeGroupConfig`:
-  - requires only `typeGroupName`;
-  - has the optional fields the spec lists (2.1);
-  - has no `transformationType`.
-- `ITypeGroupResults` holds exactly the nine slots of 2.1. A result set missing one, or carrying
-  `check`, `metadataUpdated`, `transport` or `deletionCheck`, does not compile.
-- `IAdtLockedDeletable`:
-  - `delete` without `lockHandle` does not compile;
-  - a class implementing it needs no `checkDeletion`;
-  - both overloads take `analyse`.
-- `ADT_TYPES_ONPREM.typeGroup.codes['TYPE/DG'].operations` is exactly the on-premise tuple of
-  2.3, and the cloud one is exactly the cloud tuple.
-- `nameMaxLength` is `5`, and `evidence` names each release's typestructure case.
-- `AdtTypeCodeWith<'cloud', 'create'>` does not include `TYPE/DG`, while
-  `AdtTypeCodeWith<'cloud', 'validate'>` and `AdtTypeCodeWith<'onprem', 'delete'>` do.
+- **The name.** `'typeGroup'` is an `AdtApiName`.
+- **`ITypeGroupConfig`.** It requires only `typeGroupName`, has the optional fields of spec 2.1,
+  and has no `transformationType`.
+- **`ITypeGroupResults`.** It holds exactly the nine slots of spec 2.1. A set missing one, or
+  carrying `check`, `metadataUpdated`, `transport` or `deletionCheck`, does not compile.
+- **`IAdtLockedDeletable`.**
+  - `delete` without `lockHandle` does not compile.
+  - An implementing class needs no `checkDeletion`.
+  - Both overloads take `analyse`.
+- **The rows.**
+  - The on-premise operations are exactly the tuple of spec 2.3, and the cloud ones exactly the
+    cloud tuple.
+  - `nameMaxLength` is `5`, and `evidence` names each release's typestructure case.
+  - `AdtTypeCodeWith<'cloud', 'create'>` lacks `TYPE/DG`; `AdtTypeCodeWith<'cloud', 'validate'>`
+    and `AdtTypeCodeWith<'onprem', 'delete'>` include it.
 
-**Files and their interfaces:**
-- `src/adt/IAdtCapabilities.ts`: `IAdtLockedDeletable<TConfig, TDeleted, TRequired>`, as in
-  spec 2.2, with its doc comment saying why it exists beside `IAdtDeletable`.
+**Files and interfaces:**
+- `src/adt/IAdtCapabilities.ts`: `IAdtLockedDeletable<TConfig, TDeleted, TRequired>` (spec 2.2).
 - `src/adt/IAdtTypeGroup.ts`: `ITypeGroupConfig` and `ITypeGroupResults`.
 - `src/adt/IAdtTypeTable.ts`: `'typeGroup'` in `AdtApiName`.
 - `src/adt/AdtTypeTables.ts`: the two rows of spec 2.3.
-- `src/index.ts`: the new exports.
+- `src/index.ts`: the exports.
 
 **Commits:**
-1. the typecheck fixture with the atom, and the atom;
-2. the config and the results;
-3. the API name and the two rows.
+1. the atom and its typecheck cases;
+2. the config, the results and their cases;
+3. the name, the rows and their cases.
 
 ## Task 3 — interfaces-adt: docs and release
 
-**Tests first:** if a doc shows a type group example, a `src/__typechecks__/` fixture compiles
-it, as `docExamples33.ts` does for that release's examples.
+**Tests first:** if a doc shows a type group example, a `src/__typechecks__/` fixture compiles it,
+as `docExamples33.ts` does for its release.
 
 **Files:**
-- `README.md` and the package docs: every list of API names, atoms or table rows.
-- `docs/architecture/` where it lists atoms.
-- `CHANGELOG.md`: the new name, types, atom and rows. Its version and date are asked of the
-  owner, since the repository rule is never to change a version unasked.
-- The version bump, once given, with `npm install --package-lock-only` at the root.
+- `README.md` and the package docs, wherever they list API names, atoms or rows.
+- `docs/architecture/`, wherever it lists atoms.
+- `CHANGELOG.md`: the minor's entry, dated on the day of each edit.
+- `package.json`: the next minor (see "Versions").
+- The root `package-lock.json`: `npm install --package-lock-only`.
 
-**Commits:** the docs; then the CHANGELOG with the version bump.
+**Commits:** the docs; then the CHANGELOG, the version and the lockfile.
 
 **Then:**
 1. Codex reviews the PR, then the owner.
-2. The PR is merged and tagged, following that repository's release flow.
-3. The owner publishes.
-4. A clean install from the registry, outside the repository, proves the release: the version
-   resolves, and `import { ADT_TYPES_CLOUD }` carries the row.
+2. The PR is merged and tagged, and the owner publishes.
+3. A clean install from the registry, outside the repository, proves it: the version resolves,
+   and `ADT_TYPES_CLOUD.typeGroup` carries the cloud row.
 
-Nothing in adt-clients goes on until that version is on the registry.
+Nothing in adt-clients goes on before this.
 
-## Task 4 — adt-clients: take the published contract
+## Task 4 — adt-clients: the published contract, a buildable milestone
+
+This task takes the new contract and adds what every exhaustive map over `AdtApiName` needs, so
+that `test:check` compiles: the address, the types, an `AdtTypeGroup` that declares no atom yet,
+and the factory.
 
 **Tests first:**
-- `src/__tests__/unit/endpoints/typeTables.test.ts` gains the type group cases: its rows' evidence
-  names a typestructure case of its release, and `nameMaxLength` equals that case's
-  `OBJNAME_MAXLENGTH`.
-- These fail until the new range is installed.
+- **`endpoints/typeTables.test.ts`.** The rows' evidence names a typestructure case of its
+  release, and `nameMaxLength` equals that case's `OBJNAME_MAXLENGTH`.
+- **`endpoints/objects.test.ts`.**
+  - `TYPE_GROUP.uri('ZTg1')` keeps the name's case, and `TYPE_GROUP.uri('Z/1')` encodes it.
+  - `.collection` and `.validation` are the measured paths.
+- **`clients/handlerFactories.test.ts` and `factoryStrategy.test.ts`.** `getTypeGroup()` answers
+  an `AdtTypeGroup`, with and without a result set.
+- **`helpers/typeTableConformance.ts` (`HANDLER`).** `typeGroup: (c) => c.getTypeGroup()`.
+  - The conformance cases for type groups (`conformance/typeTablesConformance.test.ts`) are
+    **known red** until Task 7. The rows list operations whose members do not exist yet.
 
 **Files:**
 - `packages/adt-clients/package.json`: the `@mcp-abap-adt/interfaces-adt` range raised to the
   published minor.
-- The root `package-lock.json`, regenerated by npm only (`npm install --package-lock-only`, then
-  `npm ci --ignore-scripts`).
-- The lockfile is checked for any `"link": true` but the workspace siblings.
+- The root `package-lock.json`: regenerated by npm only (`npm install --package-lock-only`, then
+  `npm ci --ignore-scripts`). Checked for any `"link": true` but the workspace siblings.
+- `src/endpoints/objects.ts`: the `TYPE_GROUP` record (spec 3.1, no `seg`), in the records list.
+- `src/constants/contentTypes.ts`: `ACCEPT_TYPE_GROUP`.
+- `src/core/typeGroup/types.ts`: `typeGroupDocuments` and the snake_case params.
+- `src/core/typeGroup/AdtTypeGroup.ts`:
+  - `TypeGroupValues`;
+  - the class with its generics, constructor, lock tracker and `name()`.
+- `src/core/typeGroup/index.ts`.
+- `src/clients/AdtClient.ts`: `getTypeGroup()`, two overloads, gated `AdtServedBy<'typeGroup'>`.
+- `src/__tests__/helpers/typeTableConformance.ts`: the `HANDLER` entry.
 
-**Commit:** the range and the lockfile.
+**Commits:**
+1. the range and the lockfile;
+2. the record and the constant;
+3. the types, the class and the factory.
 
-## Task 5 — the address and the media type
+## Task 5 — the reads and validation
 
-**Tests first:**
-- `src/__tests__/unit/endpoints/objects.test.ts`: `TYPE_GROUP.uri('ZTg1')` keeps the name's case,
-  and `TYPE_GROUP.uri('Z/1')` encodes it.
-- `TYPE_GROUP.collection` and `.validation` are the measured paths.
+**Tests first** (`unit/core/typeGroup/typeGroup.test.ts`, against a recording connection and the
+corpus recordings):
+- **Requests.** `validate`, `readMetadata`, `read`, `getVersions` and `getVersionSource` each send
+  exactly one request, the one in spec 3.2's table: URL, method, every header, no body.
+- **Names.**
+  - A mixed-case name arrives unchanged in the path and the query.
+  - A name longer than 5 characters is sent as given, with no refusal of the library's own.
+- **Headers and query.**
+  - `readMetadata`'s Accept defaults to v3, and `options.accept` replaces it.
+  - `version` and `withLongPolling` go into the query as the table says.
+- **Timeout.** Each member hands its `timeout` option to the request (`withCallTimeout`).
+- **Answers.** Each member answers its corpus recording through `typeGroupDocuments` unchanged.
+  Validation's empty 200 is no failure; its 400 `InvalidTypeGroupName` is a failure carrying the
+  response.
+- **Strategies.**
+  - A custom result set: each member answers what that set's slot made of the answer.
+  - A caller's `analyse` is called once with that answer, and its verdict is the result's.
 
 **Files:**
-- `src/endpoints/objects.ts`: the `TYPE_GROUP` record (spec 3.1), with no `seg`, and its entry in
-  the records list.
-- `src/constants/contentTypes.ts`: `ACCEPT_TYPE_GROUP`.
+- `src/core/typeGroup/validation.ts`, `read.ts`, `versions.ts`;
+- the members in `AdtTypeGroup.ts` with their atoms' overload pairs: `IAdtValidatable`,
+  `IAdtMetadataReadable`, `IAdtReadable`, `IAdtVersionable`.
 
-**Commit:** the record and the constant.
+**Commits:** validation; the metadata and source reads; the versions.
 
-## Task 6 — the module: types and the reads
-
-**Tests first** (`src/__tests__/unit/core/typeGroup/typeGroup.test.ts`, a recording connection):
-- `validate`, `readMetadata`, `read`, `getVersions` and `getVersionSource` each send exactly the
-  one request of spec 3.2's table: URL, method, every header, no body.
-- A mixed-case name arrives unchanged in the path and the query.
-- `readMetadata` defaults its Accept to v3, and a caller's `options.accept` replaces it.
-- `version` and `withLongPolling` go into the query as the table says.
-
-**Files** (`src/core/typeGroup/`):
-- `types.ts`: `typeGroupDocuments` and the snake_case params.
-- `validation.ts`, `read.ts`, `versions.ts`: each low-level function builds one request from
-  `TYPE_GROUP`.
-- `AdtTypeGroup.ts`:
-  - the class with the constructor, the lock tracker and `name()`;
-  - the members `validate`, `readMetadata`, `read`, `getVersions` and `getVersionSource`, each
-    through `withCallTimeout` and `answering`, with the overload pairs of their atoms.
-- `index.ts`.
-
-**Commits:** the types; the reads; validation.
-
-## Task 7 — the module: create, the source write, lock and unlock
+## Task 6 — create, the source write, lock and unlock
 
 **Tests first** (same file):
-- `create` sends spec 3.2's request and body:
+- **`create`** sends spec 3.2's single request and body:
+  - the caller's header pair as given;
   - the name, the package and the description exactly as given, XML-escaped;
-  - a description over 70 characters sent whole;
+  - a name over 5 characters, and a description over 70, sent whole;
   - the language attributes and `sap-language` only with `masterLanguage`;
   - `corrNr` only with `transportRequest`.
-- `update` sends the PUT with `lockHandle`, `corrNr` only when given, and `If-Match` only when
-  given.
-- `lock` sends the LOCK stateful and is stateless again after it. It answers the handle from the
-  corpus lock body, and `''` from a body without one.
-- `unlock` sends the UNLOCK stateful and answers nothing.
-- Nothing but `lock` and `unlock` touches the session type.
-- The gate: these members carry `AdtPerformedBy<'typeGroup', …>`, checked in Task 9.
+- **`update`** sends one PUT:
+  - with `lockHandle`, `corrNr` only when given, and `If-Match` only when given;
+  - with the caller's header pair, and the source exactly as given as the body.
+- **`lock`** sends one LOCK, stateful for that request, and is stateless after it. It answers the
+  handle from the corpus lock body, `''` from a body without one, and records the handle in the
+  client's lock registry.
+- **`unlock`** sends one UNLOCK, stateful for that request, answers nothing, and releases the
+  handle in the registry.
+- **Session.** Nothing but `lock` and `unlock` touches the session type
+  (`capabilities/behaviour.test.ts`).
+- **The same as Task 5** for each of these members: timeout, corpus answer, custom result set,
+  `analyse` once.
 
 **Files:**
 - `create.ts`, `update.ts`, `lock.ts`, `unlock.ts`;
-- the members in `AdtTypeGroup.ts`: `lock` through `inStatefulSession` and `lockHandleOf`, with the
-  lock tracker; `unlock` answering `nothing`.
+- the members in `AdtTypeGroup.ts`:
+  - `IAdtCreatable`, `IAdtUpdatable` and `IAdtLockable`;
+  - `lock` through `inStatefulSession` and `lockHandleOf`, with the tracker;
+  - `unlock` with `nothing`;
+  - each gated `AdtPerformedBy<'typeGroup', …>`.
 
 **Commits:** create; the source write; lock and unlock.
 
-## Task 8 — the module: activation and delete
+## Task 7 — activation and delete
 
 **Tests first:**
-- `activate` sends exactly one request, the activation POST with the measured body naming
-  `TYPE_GROUP.uri(name)` and the name as given.
-- It sends nothing after a checklist, even one with `activationExecuted="false"` and no
-  message.
-- `analyse` gets no `context`.
-- `delete` sends `DELETE …?lockHandle=…`, with `corrNr` only when given and the caller's pair.
-  Without `lockHandle` it does not compile (a typecheck case).
+- **`activate`** sends exactly one request: the activation POST with the caller's pair and the
+  measured body, naming `TYPE_GROUP.uri(name)` and the name as given.
+  - It sends nothing after any checklist, including `activationExecuted="false"` with no
+    message.
+  - `analyse` gets no `context`.
+- **`delete`** sends exactly one `DELETE …?lockHandle=…`, with `corrNr` only when given and the
+  caller's pair. Without `lockHandle` it does not compile (a typecheck case).
+- **The same as Task 5** for both: timeout, corpus answer, custom result set, `analyse` once.
+- **The behaviour guard** (`capabilities/behaviourGuard.ts`):
+  - `invoke` and `invokeWithOptions` pass `lockHandle: 'GUARD-LOCK'` to `delete` on a handler
+    whose manifest names `lockedDeletable`;
+  - the call to `delete` of every `deletable` handler is unchanged;
+  - a guard test shows both paths.
+- **The capability manifest** (`capabilities/manifest.ts`): the atom
+  `lockedDeletable: ['delete']`, and `typeGroup` with its atoms.
 
 **Files:**
 - `activation.ts`, through `activateObjectInSession`;
 - `delete.ts`;
-- the members in `AdtTypeGroup.ts`: `activate` through `answering`, and `delete` implementing
-  `IAdtLockedDeletable`.
+- the members in `AdtTypeGroup.ts`: `activate` through `answering`, and `delete` as
+  `IAdtLockedDeletable`, both gated;
+- `behaviourGuard.ts` and `manifest.ts`.
 
-**Commits:** activation; delete.
+**Known red turned green:** the type group conformance cases of Task 4.
 
-## Task 9 — the factory, the exports, the gates
+**Commits:** the guard's locked-delete path; activation; delete; the manifest.
+
+## Task 8 — exports and variant gates
 
 **Tests first:**
-- `src/__tests__/unit/clients/variantGates.test.ts`, and its typecheck fixtures under
-  `src/__tests__/typechecks/`:
+- **`clients/variantGates.test.ts`,** with typecheck fixtures under `src/__tests__/typechecks/`:
   - on the cloud client, `create`, `update`, `lock`, `unlock`, `activate` and `delete` of
     `getTypeGroup()` do not compile, and the rest do;
   - on the on-premise client every member compiles.
-- `publicApiSurface.test.ts`: `AdtTypeGroup` and `typeGroupDocuments` are exported.
-- `capabilities/manifest.ts`: `typeGroup` with its atoms, and the atom
-  `lockedDeletable: ['delete']`.
-- `core/activatingApis.ts`: the type group as an activation member that sends one request.
-- `clients/handlerFactories.test.ts` and `factoryStrategy.test.ts` cover `getTypeGroup()` with
-  and without a result set.
+- **`publicApiSurface.test.ts`.** `AdtTypeGroup` and `typeGroupDocuments` are values of the root.
+  A typecheck fixture imports `TypeGroupValues` from the package root.
+- **`core/activatingApis.ts`.** The type group is an activation member that sends one request.
 
-**Files:**
-- `src/clients/AdtClient.ts`: `getTypeGroup()` with its two overloads, gated
-  `AdtServedBy<'typeGroup'>`;
-- `src/index.ts`.
+**Files:** `src/index.ts`, with the three exports.
 
-**Commits:** the factory; the exports.
+**Commit:** the exports.
 
-## Task 10 — answers from the corpus, strategies forwarded
+## Task 9 — the cross-cutting guards
 
-**Tests first** (`typeGroup.test.ts`, the connection answering corpus recordings):
-- **The shipped documents.** Each member answers its recording through `typeGroupDocuments`
-  unchanged:
-  - validation's empty 200 is no failure;
-  - its 400 `InvalidTypeGroupName` is a failure carrying the response;
-  - the cloud create's 403 is a failure.
-- **A custom result set.** Each member answers what the set's slot made of the wire answer.
-- **A caller's `analyse`.** It is called once per member with that answer, and its verdict is the
-  result's.
-- **The guards stay green:** `onlyCorpusStrategiesShip`, `corpusCarriesNoIdentity` (the new
-  recordings), `notesNameNoSystem`, `noHardcodedObjectAddresses` and `typeCodeScan`.
+**Tests first:** none new. These guards run over the new code and corpus, and stay green:
+`onlyCorpusStrategiesShip`, `corpusCarriesNoIdentity`, `notesNameNoSystem`,
+`noHardcodedObjectAddresses`, `typeCodeScan`, `noInputValidation`, `overloadPairs` and
+`requestHeaders`.
 
-**Files:** tests only. If a test shows a member deviating, the fix goes in the member.
+**Files:** none, unless a guard finds a deviation. The fix then goes into the member or the
+recording, never into the guard.
 
-**Commit:** the corpus-driven tests.
+**Commit:** only the fixes, each its own.
 
-## Task 11 — the live suite
+## Task 10 — the live suite
 
-**Tests first** (they are the suite):
-`src/__tests__/integration/core/typeGroup/TypeGroup.test.ts`, with spec 5.3's cases:
-- **On premise:** one case per operation, the cycle in order, `expectLockReleased` after the
-  write's unlock, and the transportable-package case with `corrNr` plus the metadata read with
-  `withLongPolling=true`.
+**Tests first** (they are the suite): `integration/core/typeGroup/TypeGroup.test.ts`, with spec
+5.3's cases.
+- **On premise:**
+  - one case per operation, in cycle order;
+  - `expectLockReleased` after the write's unlock;
+  - the transportable-package case with `corrNr`, and the metadata read with
+    `withLongPolling=true`.
 - **Cloud:** validation, the reads of `ABAP`, the version list, and a version's source.
-- Each case is enabled by the variant's row. A failing case logs SAP's status and message, and
-  cleanup runs also on failure.
+- **Every case:** enabled by the variant's row; it logs SAP's status and message on failure, and
+  its cleanup runs also on failure.
 
 **Files:**
-- `src/__tests__/helpers/test-config.yaml.template`: the `type_groups` section.
-- `src/__tests__/helpers/overlays/onprem.yaml` and `cloud.yaml`: the empty forms of the new keys.
+- `src/__tests__/helpers/test-config.yaml.template`: the `type_groups` section;
+- `src/__tests__/helpers/overlays/onprem.yaml` and `cloud.yaml`: the empty forms of the new keys;
 - `docs/development/TEST_CONFIG_SCHEMA.md`: the keys.
-- `test:check:integration` covers the suite.
 
 **Commits:** the config keys; the suite.
 
-## Task 12 — live runs
+## Task 11 — live runs
 
-Each run waits for the owner's go, and the owner is told when the suite is ready.
+Each run starts on the owner's go. The owner is told when the suite is ready.
 
-**On premise.**
-- The owner runs, or allows a run of, `npm run test:detached -- integration/core/typeGroup`,
-  with the on-premise session and overlay. The overlay gives a transportable package and a
-  transport for the `corrNr` case.
-- If `corrNr` or long polling on the metadata read is refused, it is removed from the members
-  (and from their tests) in a commit of its own, and the run is repeated.
+**On premise:**
+- `npm run test:detached -- integration/core/typeGroup`, with the on-premise session and an
+  overlay that gives a transportable package and a transport.
+- If `corrNr` or long polling on the metadata read is refused:
+  1. it leaves the member and its tests, in a commit of its own;
+  2. the run is repeated.
 
-**On the cloud test system.** The same suite, with the cloud session and overlay.
+**Cloud:** the same suite with the cloud session and overlay.
 
-A failure that shows a row wrong stops the release: the measurement is redone, and the row is
-corrected in interfaces-adt before adt-clients is tagged (spec 6).
+**If a run shows a published row wrong**, the release stops, and the contract is released again
+before adt-clients goes on:
+1. the measurement for that operation is redone and committed to the corpus;
+2. the row is corrected in a new interfaces-adt PR, with its typecheck case changed first, and
+   a patch version in its CHANGELOG;
+3. Codex and the owner review it, it is merged and tagged, the owner publishes, and a clean
+   install from the registry proves the corrected row;
+4. adt-clients raises its range to that patch and regenerates the lockfile, with the link check;
+5. the members' gates, the unit tests and both live suites run again before Task 12.
 
 **Commit:** only the fixes a run needs, each its own.
 
-## Task 13 — adt-clients docs
+## Task 12 — adt-clients docs and version
 
 **Tests first:**
 - `check:docs` (`docsImportsResolve`): every name the docs import exists.
-- `notesNameNoSystem`: no system named.
+- `notesNameNoSystem`: no system is named.
 
 **Files:**
-- `README.md`: the type group in the object and factory lists, with its members per variant and
-  its one-request activation.
+- `README.md`: the type group in the object and factory lists, its members per variant, and its
+  one-request activation.
 - `docs/usage/CLIENT_API_REFERENCE.md` and `ADT_OBJECT_ENTITIES.md`: the members and requests.
 - `docs/usage/ERRATA.md`: the four entries of spec 7.
-- `docs/architecture/` where it lists object types or atoms.
-- `CHANGELOG.md`: the minor's entry. Its version and date are asked of the owner, and the date is
-  set on every edit.
+- `docs/architecture/`, wherever it lists object types or atoms.
+- `CHANGELOG.md`: the minor's entry, dated on the day of each edit.
+- `packages/adt-clients/package.json`: the next minor (see "Versions").
+- The root `package-lock.json`: `npm install --package-lock-only`, then the link check.
 
-**Commits:** the README and usage docs; ERRATA; the CHANGELOG with the version bump and lockfile.
+**Commits:** the README and usage docs; ERRATA; the CHANGELOG, the version and the lockfile.
 
-## Task 14 — release gate and hand-off
+## Task 13 — release gate and hand-off
 
 **Checks:**
-- At the root: `npm run check`, and every package's `build`, `lint:check`, `test:check` and
+- At the root, `npm run check`, plus each package's `build`, `lint:check`, `test:check` and
   `test:unit`.
-- Every `package.json` of the release declares only semver ranges, every range resolves on the
-  registry, and the lockfile holds no link but the workspace siblings.
+- Every `package.json` of the release declares only semver ranges, and every range resolves on
+  the registry.
+- The lockfile holds no link but the workspace siblings.
 - The PR's CI is green after the last push.
 
-**The documents leave.** The goal, spec and plan under `docs/superpowers/` are deleted in a
-commit of their own. What they still owe goes into the PR description first: mcp-abap-adt's type
-group tools; the later task for the check run, deletion check, metadata write and transport; and
-7.40 in the legacy-coverage task.
+**The documents leave.** The goal, the spec and the plan are deleted in a commit of their own.
+What they still owe goes into the PR description first:
+- mcp-abap-adt's type group tools;
+- the later task for the check run, deletion check, metadata write and transport;
+- 7.40, in the legacy-coverage task.
 
 **Then:**
 1. Codex reviews, then the owner.
