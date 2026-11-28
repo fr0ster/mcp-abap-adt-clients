@@ -20,6 +20,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  analyseException,
   type IOutlineElement,
   readObjectOutline,
 } from '@mcp-abap-adt/adt-strategies';
@@ -143,6 +144,7 @@ describe('Shared - getNavigationTarget', () => {
         const outline = await utils.getObjectOutline(objectType, objectName, {
           version: VERSION,
           accept: OUTLINE_ACCEPT,
+          analyse: analyseException,
         });
         if (!outline.ok) throw new Error(outline.getError().message);
         const root = readObjectOutline(outline.getResult().value).root;
@@ -161,7 +163,9 @@ describe('Shared - getNavigationTarget', () => {
         const answers: string[] = [];
         for (const item of alone) {
           logTestStep(`navigate ${item.kind} ${item.rel}`, testsLogger);
-          const answer = await utils.getNavigationTarget(item.href);
+          const answer = await utils.getNavigationTarget(item.href, {
+            analyse: analyseException,
+          });
           if (!answer.ok) throw new Error(answer.getError().message);
           const reference = referenceOf(answer.getResult().value);
           expect(reference).toContain('#start=');
@@ -175,7 +179,9 @@ describe('Shared - getNavigationTarget', () => {
           (item) => item.kind === 'PLM',
         );
         if (definition && implementation) {
-          const answer = await utils.getNavigationTarget(definition.href);
+          const answer = await utils.getNavigationTarget(definition.href, {
+            analyse: analyseException,
+          });
           if (getTargetSystem() === 'cloud') {
             expect(answer.ok).toBe(false);
             expect(answer.ok ? 0 : answer.getError().response?.status).toBe(
@@ -184,7 +190,9 @@ describe('Shared - getNavigationTarget', () => {
           } else {
             expect(definition.href).toBe(implementation.href);
             if (!answer.ok) throw new Error(answer.getError().message);
-            const alone = await utils.getNavigationTarget(implementation.href);
+            const alone = await utils.getNavigationTarget(implementation.href, {
+              analyse: analyseException,
+            });
             expect(referenceOf(answer.getResult().value)).toBe(
               alone.ok ? referenceOf(alone.getResult().value) : 'refused',
             );
@@ -205,7 +213,7 @@ describe('Shared - getNavigationTarget', () => {
           results: utilDocuments,
         });
         const pending = alone.map((item) =>
-          batched.getNavigationTarget(item.href),
+          batched.getNavigationTarget(item.href, { analyse: analyseException }),
         );
         await batch.execute();
         const parts = await Promise.all(pending);
