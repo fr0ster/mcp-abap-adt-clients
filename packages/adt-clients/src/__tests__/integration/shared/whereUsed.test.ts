@@ -560,11 +560,13 @@ describe('Shared - getWhereUsed', () => {
         );
       }
 
-      // Verify no packages in references (they should be filtered out)
-      const hasPackages = result.references.some(
-        (ref) => ref.type === 'DEVC/K',
-      );
-      expect(hasPackages).toBe(false);
+      // SAP lists the packages above each place of use as `DEVC/K` nodes
+      // (recorded: `read-where-used-list-structure--01`). Since adt-strategies
+      // 0.28.0 the reading keeps them, each marked `kind: 'package'`; which to
+      // show is the caller's decision.
+      for (const ref of result.references) {
+        expect(ref.kind).toBe(ref.type === 'DEVC/K' ? 'package' : 'object');
+      }
 
       testsLogger.info?.('✅ Test complete: parsed results received');
     },
@@ -703,12 +705,19 @@ describe('Shared - getWhereUsed', () => {
         return utilWhereUsedReferences({ data: String(document) } as never);
       };
 
+      // The places of use, without the `DEVC/K` nodes SAP lists above them
+      // (recorded: `read-where-used-list-structure--01`; kept by the reading
+      // since adt-strategies 0.28.0 as `kind: 'package'`). The type filter
+      // selects places of use; the packages come with whatever is found.
+      const placesOf = (result: IWhereUsedListResult) =>
+        result.references.filter((ref) => ref.kind === 'object');
+
       // Step 1: search ALL types — the "select all" baseline.
       logTestStep('where-used: ALL types (baseline)', testsLogger);
       const all = await searchWith(
         utils.modifyWhereUsedScope(await scopeOf(), { enableAll: true }),
       );
-      const allTypes = [...new Set(all.references.map(codeOf))].sort();
+      const allTypes = [...new Set(placesOf(all).map(codeOf))].sort();
       testsLogger.info?.(
         `📊 ALL: ${all.references.length} refs across types [${allTypes.join(', ')}]`,
       );
@@ -726,19 +735,19 @@ describe('Shared - getWhereUsed', () => {
       const kept = await searchWith(
         utils.modifyWhereUsedScope(await scopeOf(), { enableOnly: [keepType] }),
       );
-      const keptTypes = [...new Set(kept.references.map(codeOf))].sort();
+      const keptTypes = [...new Set(placesOf(kept).map(codeOf))].sort();
       testsLogger.info?.(
         `📊 KEEP [${keepType}]: ${kept.references.length} refs across types [${keptTypes.join(', ')}]`,
       );
 
       // Every returned reference must be the type we asked for — proves SAP did
       // not search (and did not return) any of the other ~40 object types.
-      for (const ref of kept.references) {
+      for (const ref of placesOf(kept)) {
         expect(codeOf(ref)).toBe(keepType);
       }
-      expect(kept.references.length).toBeLessThanOrEqual(all.references.length);
+      expect(placesOf(kept).length).toBeLessThanOrEqual(placesOf(all).length);
       if (allTypes.includes(keepType)) {
-        expect(kept.references.length).toBeGreaterThan(0);
+        expect(placesOf(kept).length).toBeGreaterThan(0);
       }
 
       // Step 2b (EXCLUDE): narrow to a type that SAP CAN search for this object
@@ -768,7 +777,7 @@ describe('Shared - getWhereUsed', () => {
         );
         // Filtering to a type the object does not reference yields no results,
         // even though enableAllTypes returned matches.
-        expect(excluded.references.length).toBe(0);
+        expect(placesOf(excluded)).toEqual([]);
       } else {
         testsLogger.warn?.(
           '⚠️ Could not pick an absent type — skipping the exclude assertion',
