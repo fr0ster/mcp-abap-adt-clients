@@ -432,11 +432,20 @@ H2. **One activation recipe** in mcp-abap-adt (for example
        for the code, name and parent the member was given, or the URI B1a
        recorded). The two responses keep their roles: the activation's answer
        is what a cleared verdict is read from, and the list is only a fact;
-    4. keeps 48.0.0's behaviour when the read fails. After `silent`, the call
-       fails with the read's cause and response, worded as 48.0.0 worded it
-       ("The activation's outcome could not be decided: …"). After `unstated`,
-       the starting verdict stays, with the refusal's response as the list, or
-       no context when no response came back;
+    4. keeps 48.0.0's behaviour when the read fails. After `silent`, the
+       starting verdict is **replaced before the strategy runs**: the recipe
+       builds the read-failure verdict first, as `activationExchange` did. That
+       verdict carries the read's cause and response, worded as 48.0.0 worded it
+       ("The activation's outcome could not be decided: …"). The recipe then
+       calls `analyseActivation(readFailureVerdict, activationAnswer)`, so the
+       activation's answer stays the answer and the read's failure is the
+       verdict. After `unstated`, the original starting verdict stays, with the
+       refusal's response as the list, or no context when no response came
+       back. A test replays a silent checklist followed by a refused read, and
+       one followed by a read with no response. Each asserts the verdict
+       `analyseActivation` was handed, the answer it was handed, and the
+       result, all equal to what 48.0.0's `activationRead.test.ts` cases
+       assert;
     5. keeps the session marks as 48.0.0 set them. A failure built from the
        read carries the read's code and no activation mark. A cleared success
        carries the activation answer's mark. A marked read after an unmarked
