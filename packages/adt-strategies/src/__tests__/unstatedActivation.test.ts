@@ -163,6 +163,25 @@ const edges: [string, IAdtWireResponse][] = [
   ['untyped', checklist('<msg/>')],
   ['mixed', checklist('<msg type="W"/><msg type="ERROR"/>')],
   ['refused', checklist('<chkl:properties activationExecuted="false"/>', 403)],
+  [
+    'not executed, one warning',
+    checklist('<chkl:properties activationExecuted="false"/><msg type="W"/>'),
+  ],
+  [
+    'not executed, cancelled',
+    checklist(
+      '<chkl:properties activationExecuted="false"/><msg type="W"/><msg type="E"/>',
+    ),
+  ],
+  [
+    'executed, one warning',
+    checklist('<chkl:properties activationExecuted="true"/><msg type="W"/>'),
+  ],
+  [
+    'no verdict, no message',
+    checklist('<chkl:properties checkExecuted="true"/>'),
+  ],
+  ['no verdict, info and success', checklist('<msg type="I"/><msg type="S"/>')],
   ['empty', { status: 200, statusText: '', headers: {}, data: '' }],
   ['not xml', { status: 200, statusText: '', headers: {}, data: '<a' }],
 ];
@@ -185,6 +204,11 @@ describe('readUnstatedActivation', () => {
     ['untyped', undefined],
     ['mixed', undefined],
     ['refused', undefined],
+    ['not executed, one warning', undefined],
+    ['not executed, cancelled', undefined],
+    ['executed, one warning', undefined],
+    ['no verdict, no message', undefined],
+    ['no verdict, info and success', 'unstated'],
     ['empty', undefined],
     ['not xml', undefined],
   ])('%s: %s', (name, expected) => {
@@ -198,10 +222,9 @@ describe('readUnstatedActivation', () => {
       if (answer.status < 200 || answer.status >= 300) continue;
       const refusal = readActivationRefusal(answer.data);
       const undecided =
-        refusal !== null &&
-        refusal.message.includes(
+        refusal?.message.includes(
           "without the list of inactive objects the activation's outcome could not be decided",
-        );
+        ) === true;
       expect([name, readUnstatedActivation(answer) !== undefined]).toEqual([
         name,
         undecided,

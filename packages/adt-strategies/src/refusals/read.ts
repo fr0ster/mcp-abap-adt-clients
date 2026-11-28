@@ -534,6 +534,67 @@ function byInactiveList(
   );
 }
 
+/**
+ * The two checklists whose outcome the inactive list decides, and nothing
+ * else: `silent` — `activationExecuted="false"` and no message (S/4HANA 2025,
+ * fr0ster/mcp-abap-adt#351) — and `unstated` — no `activationExecuted`, and
+ * messages of {@link LIST_DECIDES_BESIDE} alone (SAP_BASIS 7.52,
+ * fr0ster/mcp-abap-adt#360).
+ */
+export type AdtUnstatedActivation = 'silent' | 'unstated';
+
+/**
+ * The one predicate behind both {@link readActivationRefusal} and
+ * {@link readUnstatedActivation}, over a checklist's root and its messages.
+ */
+function unstatedChecklist(
+  root: unknown,
+  messages: ReadonlyArray<AdtMessage>,
+): AdtUnstatedActivation | undefined {
+  const executed = at(root, 'properties', '@activationExecuted');
+  if ((executed === 'false' || executed === false) && messages.length === 0) {
+    return 'silent';
+  }
+  // SAP sets the verdict attributes only when its activation run starts
+  // (CL_SEU_ADT_RES_ACTIVATION, `lif_phased_activation~run`), so a checklist
+  // without one and with warnings alone says nothing about the object:
+  // SAP_BASIS 7.52 answered it for a program it activated
+  // (fr0ster/mcp-abap-adt#360). The inactive list decides.
+  if (
+    executed === undefined &&
+    messages.length > 0 &&
+    messages.every((m) => LIST_DECIDES_BESIDE.has(m.type))
+  ) {
+    return 'unstated';
+  }
+  return undefined;
+}
+
+/**
+ * Whether an activation's answer leaves its outcome to the inactive list, and
+ * how ({@link AdtUnstatedActivation}); `undefined` for every other answer — a
+ * non-2xx status, a document that is no `chkl:messages`, a checklist that
+ * states its outcome.
+ *
+ * **For the caller who reads the list** (adt-clients 49.0.0: an activation
+ * member sends the activation alone). After `silent` or `unstated`, read
+ * `GET /sap/bc/adt/activation/inactiveobjects` (`getUtils().getInactiveObjects()`)
+ * and hand it with the uris the activation named to
+ * {@link readActivationRefusal} — or to `analyseActivation` as
+ * `context.activation`. It is the predicate {@link readActivationRefusal}
+ * decides by, so it answers a kind exactly when that reading, without a list,
+ * answers that the outcome could not be decided.
+ */
+export function readUnstatedActivation(
+  answer: IAdtWireResponse,
+): AdtUnstatedActivation | undefined {
+  if (answer.status < 200 || answer.status >= 300) return undefined;
+  const parsed = wellFormed(answer.data);
+  if (!rootIs(parsed, 'messages')) return undefined;
+  const root = field(parsed, 'messages');
+  return unstatedChecklist(root, checklistMessagesOf(root));
+}
+
 /** A checklist's `msg` elements, each read into one message. */
 function checklistMessagesOf(root: unknown): AdtMessage[] {
   return asArray(field(root, 'msg')).map((msg) => {
@@ -646,12 +707,12 @@ export function readActivationRefusal(
   const errors = messages.filter((m) => m.type.toUpperCase() === 'E');
   const executed = at(root, 'properties', '@activationExecuted');
   const activated = executed === 'true' || executed === true;
-  const declaredNotActivated = executed === 'false' || executed === false;
-  const unstated = executed === undefined;
 
   if (activated && errors.length === 0) return null;
 
-  if (declaredNotActivated && messages.length === 0) {
+  const listDecides = unstatedChecklist(root, messages);
+
+  if (listDecides === 'silent') {
     return byInactiveList(
       'SAP answered that no activation ran and gave no message',
       'SAP answered that no activation ran',
@@ -660,16 +721,9 @@ export function readActivationRefusal(
     );
   }
 
-  // SAP sets the verdict attributes only when its activation run starts
-  // (CL_SEU_ADT_RES_ACTIVATION, `lif_phased_activation~run`), so a checklist
-  // without one and with warnings alone says nothing about the object:
-  // SAP_BASIS 7.52 answered it for a program it activated
-  // (fr0ster/mcp-abap-adt#360). The inactive list decides.
-  if (
-    unstated &&
-    messages.length > 0 &&
-    messages.every((m) => LIST_DECIDES_BESIDE.has(m.type))
-  ) {
+  // A checklist with no verdict and warnings alone: the inactive list decides
+  // (see `unstatedChecklist`).
+  if (listDecides === 'unstated') {
     return byInactiveList(
       'SAP answered no activationExecuted verdict and only warnings',
       'SAP answered no activationExecuted verdict and only warnings',
