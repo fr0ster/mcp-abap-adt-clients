@@ -72,6 +72,42 @@ async function variantGates(
   // @ts-expect-error -- ADT_TYPES_BASIS_740's `ddl` lists no `versions`
   await basis740.getDdl().getVersions({ ddlName: 'ZI_GATE' });
 
+  // Type groups: on premise every member; on ABAP Cloud validation, the reads
+  // and the versions, and no write (the cloud row of ADT_TYPES_CLOUD).
+  const tg = { typeGroupName: 'ZTG' };
+  const tgHeaders = { headers: { accept: 'a', contentType: 'c' } };
+  const tgCreate = { typeGroupName: 'ZTG', packageName: 'ZPKG' };
+  const tgWrite = { ...tgHeaders, lockHandle: 'L', source: 'TYPE-POOL ztg .' };
+  const tgOnPrem = onprem.getTypeGroup();
+  await tgOnPrem.create(tgCreate, tgHeaders);
+  await tgOnPrem.update(tg, tgWrite);
+  await tgOnPrem.lock(tg);
+  await tgOnPrem.unlock(tg, 'L');
+  await tgOnPrem.activate(tg, tgHeaders);
+  await tgOnPrem.delete(tg, { ...tgHeaders, lockHandle: 'L' });
+  // @ts-expect-error -- the delete runs under the caller's lock
+  await tgOnPrem.delete(tg, tgHeaders);
+  const tgCloud = cloud.getTypeGroup();
+  await tgCloud.validate(tg);
+  await tgCloud.readMetadata(tg);
+  await tgCloud.read(tg);
+  await tgCloud.getVersions(tg);
+  await tgCloud.getVersionSource('/x');
+  // @ts-expect-error -- ADT_TYPES_CLOUD's `TYPE/DG` lists no `create`
+  await tgCloud.create(tgCreate, tgHeaders);
+  // @ts-expect-error -- ADT_TYPES_CLOUD's `TYPE/DG` lists no `update`
+  await tgCloud.update(tg, tgWrite);
+  // @ts-expect-error -- ADT_TYPES_CLOUD's `TYPE/DG` lists no `lock`
+  await tgCloud.lock(tg);
+  // @ts-expect-error -- ADT_TYPES_CLOUD's `TYPE/DG` lists no `unlock`
+  await tgCloud.unlock(tg, 'L');
+  // @ts-expect-error -- ADT_TYPES_CLOUD's `TYPE/DG` lists no `activate`
+  await tgCloud.activate(tg, tgHeaders);
+  // @ts-expect-error -- ADT_TYPES_CLOUD's `TYPE/DG` lists no `delete`
+  await tgCloud.delete(tg, { ...tgHeaders, lockHandle: 'L' });
+  // @ts-expect-error -- ADT_TYPES_BASIS_740 serves no `typeGroup`
+  basis740.getTypeGroup();
+
   // A metadata write: on premise only for a program, on both modern variants
   // for the other four, and on no 7.40 client, whose table lists none.
   const write = {

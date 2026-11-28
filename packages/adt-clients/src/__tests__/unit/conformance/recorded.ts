@@ -44,6 +44,18 @@ const TABLE_SETTINGS_SAMPLE =
 const TEXT_ELEMENTS_SAMPLE =
   "open: no PROG/PX or CLAS/OCX sample is recorded: the live conformance run builds each sample's template, urimapper and metadata reads from that sample's recorded files, so a code with none cannot be recorded until a sample is seeded (RSPARAM's text elements on premise and on the cloud, a class's); seeding them is a separate tooling task";
 
+const TYPE_GROUP_SAMPLE =
+  "open: no TYPE/DG sample is recorded: the live conformance run builds each sample's template, urimapper and metadata reads from that sample's recorded files, so a code with none cannot be recorded until a sample is seeded (SAP's ABAP type group on both releases); seeding it is a separate tooling task";
+
+/** The type group's code, with no sample on either release. */
+const TYPE_GROUP_DIVERGENCE: IDivergence = {
+  rule: 'sample',
+  api: 'typeGroup',
+  code: 'TYPE/DG',
+  detail: 'no sample is recorded',
+  reason: TYPE_GROUP_SAMPLE,
+};
+
 /** The text elements' two codes, with no sample on either release. */
 const TEXT_ELEMENTS_DIVERGENCES: IDivergence[] = [
   {
@@ -73,6 +85,7 @@ export const DIVERGENCES: { readonly [R in RecordedRelease]: IDivergence[] } = {
       reason: TABLE_SETTINGS_SAMPLE,
     },
     ...TEXT_ELEMENTS_DIVERGENCES,
+    TYPE_GROUP_DIVERGENCE,
     {
       rule: 'address',
       api: 'messageClassMessage',
@@ -91,6 +104,7 @@ export const DIVERGENCES: { readonly [R in RecordedRelease]: IDivergence[] } = {
       reason: TABLE_SETTINGS_SAMPLE,
     },
     ...TEXT_ELEMENTS_DIVERGENCES,
+    TYPE_GROUP_DIVERGENCE,
     {
       rule: 'address',
       api: 'messageClassMessage',
