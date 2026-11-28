@@ -41,6 +41,7 @@ import {
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import {
   createLockTracker,
+  failedWireStatus,
   type LockRegistry,
   type LockTracker,
 } from '../shared/LockRegistry';
@@ -182,10 +183,14 @@ export abstract class AdtClassMemberBase<
         // UNLOCK must run stateful (older BASIS #106); stateless after.
         this.connection.setSessionType('stateful');
         try {
-          return await unlockClass(this.connection, name, lockHandle);
+          const unlocked = await unlockClass(this.connection, name, lockHandle);
+          // The registry records SAP's state, not the caller's verdict: the lock
+          // leaves it only when SAP answered the UNLOCK with a 2xx, before any
+          // `analyse` runs; a refused or unanswered one may leave it held.
+          if (!failedWireStatus(unlocked)) this.lockTracker.untrack(name);
+          return unlocked;
         } finally {
           this.connection.setSessionType('stateless');
-          this.lockTracker.untrack(name);
         }
       },
       nothing,

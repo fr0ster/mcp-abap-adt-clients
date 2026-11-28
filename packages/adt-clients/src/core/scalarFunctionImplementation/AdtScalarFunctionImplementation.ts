@@ -53,7 +53,11 @@ import {
 import { createLanguage } from '../../utils/xml';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
-import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
+import {
+  createLockTracker,
+  failedWireStatus,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateScalarFunctionImplementation } from './activation';
 import { checkScalarFunctionImplementation } from './check';
@@ -798,14 +802,18 @@ export class AdtScalarFunctionImplementation<
         // UNLOCK must run stateful (older BASIS #106); stateless after.
         this.connection.setSessionType('stateful');
         try {
-          return await unlockScalarFunctionImplementation(
+          const unlocked = await unlockScalarFunctionImplementation(
             this.connection,
             name,
             lockHandle,
           );
+          // The registry records SAP's state, not the caller's verdict: the lock
+          // leaves it only when SAP answered the UNLOCK with a 2xx, before any
+          // `analyse` runs; a refused or unanswered one may leave it held.
+          if (!failedWireStatus(unlocked)) this.lockTracker.untrack(name);
+          return unlocked;
         } finally {
           this.connection.setSessionType('stateless');
-          this.lockTracker.untrack(name);
         }
       },
       nothing,

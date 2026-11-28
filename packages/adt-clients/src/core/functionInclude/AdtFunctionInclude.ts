@@ -55,6 +55,7 @@ import {
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
 import type { LockRegistry } from '../shared/LockRegistry';
+import { failedWireStatus } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateFunctionInclude } from './activation';
 import { checkFunctionInclude } from './check';
@@ -786,7 +787,10 @@ export class AdtFunctionInclude<
         const result = await inStatefulSession(this.connection, () =>
           unlockFunctionInclude(this.connection, group, include, lockHandle),
         );
-        this.untrackLock(group, include);
+        // The registry records SAP's state, not the caller's verdict: the lock
+        // leaves it only when SAP answered the UNLOCK with a 2xx, before any
+        // `analyse` runs; a refused or unanswered one may leave it held.
+        if (!failedWireStatus(result)) this.untrackLock(group, include);
         return result;
       },
       nothing,

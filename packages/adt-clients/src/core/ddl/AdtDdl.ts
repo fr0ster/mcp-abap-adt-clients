@@ -56,7 +56,11 @@ import { createLanguage } from '../../utils/xml';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { writeObjectDocument } from '../shared/documentWrite';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
-import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
+import {
+  createLockTracker,
+  failedWireStatus,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateDDLS } from './activation';
 import { checkDdl } from './check';
@@ -623,10 +627,14 @@ export class AdtDdl<
       async () => {
         this.connection.setSessionType('stateful');
         try {
-          return await unlockDDLS(this.connection, name, lockHandle);
+          const unlocked = await unlockDDLS(this.connection, name, lockHandle);
+          // The registry records SAP's state, not the caller's verdict: the lock
+          // leaves it only when SAP answered the UNLOCK with a 2xx, before any
+          // `analyse` runs; a refused or unanswered one may leave it held.
+          if (!failedWireStatus(unlocked)) this.lockTracker.untrack(name);
+          return unlocked;
         } finally {
           this.connection.setSessionType('stateless');
-          this.lockTracker.untrack(name);
         }
       },
       nothing,
