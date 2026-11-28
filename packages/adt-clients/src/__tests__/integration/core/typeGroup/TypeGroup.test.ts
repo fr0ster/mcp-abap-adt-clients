@@ -104,6 +104,88 @@ function freshName(): string {
   return `ZTG${two}`;
 }
 
+/** One request the cycle's client sent, and the status SAP answered. */
+interface ISentRequest {
+  readonly method: string;
+  readonly url: string;
+  readonly headers: Readonly<Record<string, string>>;
+  status: number | undefined;
+}
+
+/**
+ * The suite's connection, recording every request the cycle's client sends
+ * and SAP's status, so the log proves what went out: each request carrying
+ * `corrNr`, `withLongPolling` or `If-Match` is written as it was sent.
+ */
+function recording(
+  connection: IAbapConnection & ISessionLifecycleAware,
+  sent: ISentRequest[],
+): IAbapConnection & ISessionLifecycleAware {
+  // What the client writes onto this connection (its request trace wraps
+  // `makeAdtRequest` by assignment) stays on the proxy: written through to the
+  // shared connection, the two wrappers would call each other.
+  const own = new Map<PropertyKey, unknown>();
+  return new Proxy(connection, {
+    set(_target, property, value) {
+      own.set(property, value);
+      return true;
+    },
+    get(target, property, receiver) {
+      if (own.has(property)) return own.get(property);
+      const value: unknown = Reflect.get(target, property, receiver);
+      if (typeof value !== 'function') return value;
+      if (property !== 'makeAdtRequest') return value.bind(target);
+      return async (
+        request: Parameters<IAbapConnection['makeAdtRequest']>[0],
+      ) => {
+        const entry: ISentRequest = {
+          method: request.method,
+          url: request.url,
+          headers: { ...(request.headers ?? {}) },
+          status: undefined,
+        };
+        sent.push(entry);
+        try {
+          const answer = await target.makeAdtRequest(request);
+          entry.status = answer.status;
+          return answer;
+        } catch (error) {
+          entry.status = (
+            error as { response?: { status?: number } }
+          ).response?.status;
+          throw error;
+        }
+      };
+    },
+  });
+}
+
+/**
+ * Log, from `sent[from]` on, each request that carried `what` (a query
+ * parameter, or `If-Match`), with SAP's status; and fail when none did.
+ */
+function logCarrying(
+  sent: readonly ISentRequest[],
+  from: number,
+  what: 'corrNr' | 'withLongPolling' | 'If-Match',
+): void {
+  const carrying = sent
+    .slice(from)
+    .filter((r) =>
+      what === 'If-Match'
+        ? r.headers['If-Match'] !== undefined
+        : r.url.includes(`${what}=`),
+    );
+  if (carrying.length === 0) {
+    throw new Error(`no request carried ${what}`);
+  }
+  for (const r of carrying) {
+    logTestStep(
+      `sent with ${what}: ${r.method} ${r.url}${what === 'If-Match' ? ` (If-Match ${r.headers['If-Match']})` : ''} → SAP ${r.status ?? 'no answer'}`,
+    );
+  }
+}
+
 /** A failure's status and what SAP said, for the log of a failing step. */
 function said(answer: { ok: boolean; getError?: () => unknown }): string {
   if (answer.ok || !answer.getError) return 'ok';
@@ -118,6 +200,7 @@ describe('Type groups (AdtTypeGroup)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let isCloudSystem = false;
   let onprem: AdtClientOnPrem;
+  const sent: ISentRequest[] = [];
   let cloud: AdtClientCloud;
 
   beforeAll(async () => {
@@ -128,7 +211,11 @@ describe('Type groups (AdtTypeGroup)', () => {
         connection,
         isCloudSystem,
       );
-      onprem = new AdtClientOnPrem(connection, libraryLogger, systemContext);
+      onprem = new AdtClientOnPrem(
+        recording(connection, sent),
+        libraryLogger,
+        systemContext,
+      );
       cloud = new AdtClientCloud(connection, libraryLogger, systemContext);
     } catch (error) {
       skipUnlessConfigured(error, testsLogger);
@@ -264,6 +351,7 @@ describe('Type groups (AdtTypeGroup)', () => {
         expect(said(valid)).toBe('ok');
 
         logTestStep('create', testsLogger);
+        const createdFrom = sent.length;
         const create = await group.create(
           {
             typeGroupName: name,
@@ -278,6 +366,7 @@ describe('Type groups (AdtTypeGroup)', () => {
         );
         expect(said(create)).toBe('ok');
         created = true;
+        if (transportRequest) logCarrying(sent, createdFrom, 'corrNr');
 
         logTestStep('read inactive', testsLogger);
         expectResult(
@@ -293,6 +382,7 @@ describe('Type groups (AdtTypeGroup)', () => {
         );
         expect(String(initial).toLowerCase()).toContain('type-pool');
         if (transportRequest) {
+          const pollFrom = sent.length;
           expectResult(
             await group.readMetadata(id, {
               withLongPolling: true,
@@ -300,6 +390,7 @@ describe('Type groups (AdtTypeGroup)', () => {
             }),
             'readMetadata withLongPolling',
           );
+          logCarrying(sent, pollFrom, 'withLongPolling');
         }
 
         logTestStep('lock, write with If-Match, unlock', testsLogger);
@@ -308,6 +399,7 @@ describe('Type groups (AdtTypeGroup)', () => {
           await group.lock(id, { analyse: analyseException }),
           'lock',
         );
+        const writeFrom = sent.length;
         await releasing(
           async () => {
             // The source read's ETag, from the wire itself.
@@ -332,6 +424,8 @@ describe('Type groups (AdtTypeGroup)', () => {
           () => group.unlock(id, handle, { analyse: analyseException }),
           'unlock',
         );
+        logCarrying(sent, writeFrom, 'If-Match');
+        if (transportRequest) logCarrying(sent, writeFrom, 'corrNr');
         if (lockReleaseCheckEnabled()) {
           await verifyLockReleased(
             async (logger): Promise<IVerifierSession> => {
@@ -392,7 +486,9 @@ describe('Type groups (AdtTypeGroup)', () => {
         );
 
         logTestStep('lock, delete, unlock', testsLogger);
+        const deleteFrom = sent.length;
         deleted = await deleteUnderLock(group, id);
+        if (transportRequest) logCarrying(sent, deleteFrom, 'corrNr');
         expect(deleted).toBe(true);
         const gone = await group.readMetadata(id, {
           analyse: analyseException,
