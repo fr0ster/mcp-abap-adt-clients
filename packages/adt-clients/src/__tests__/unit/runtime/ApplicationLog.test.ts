@@ -1,111 +1,171 @@
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import {
   ApplicationLog,
   applicationLogDocuments,
 } from '../../../runtime/applicationLog/ApplicationLog';
+import {
+  connectionAnswering,
+  NAME_CASES,
+  quietLogger,
+  REFUSALS,
+} from './supportReadsHarness';
 
-describe('ApplicationLog', () => {
-  function createConnectionMock() {
-    return {
-      makeAdtRequest: jest.fn().mockResolvedValue({ status: 200, data: '' }),
-    } as unknown as IAbapConnection;
-  }
+const OBJECTS = '/sap/bc/adt/applicationlog/objects';
+const PROPERTIES =
+  'http://www.sap.com/wbobj/applicationlogobjects/aplotyp/properties';
+const SOURCE = 'http://www.sap.com/wbobj/applicationlogobjects/aplotyp/source';
 
-  function createLogger() {
-    return {
-      log: jest.fn(),
-      error: jest.fn(),
-      warn: jest.fn(),
-      debug: jest.fn(),
-    } as any;
-  }
-
-  it('getObject() delegates to /sap/bc/adt/applicationlog/objects/Z_MY_LOG', async () => {
-    const connection = createConnectionMock();
-    const appLog = new ApplicationLog(connection, {
-      logger: createLogger(),
-      results: applicationLogDocuments,
-    });
-
-    await appLog.getObject('Z_MY_LOG');
-
-    expect(connection.makeAdtRequest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        url: '/sap/bc/adt/applicationlog/objects/Z_MY_LOG',
-        method: 'GET',
-      }),
-    );
+function applicationLog(answer?: { status: number; data: string }) {
+  const { connection, requests } = connectionAnswering(answer);
+  const log = new ApplicationLog(connection, {
+    logger: quietLogger,
+    results: applicationLogDocuments,
   });
+  return { log, requests };
+}
+
+describe('ApplicationLog.getObject', () => {
+  it.each(NAME_CASES)(
+    '%j is addressed as one segment, %s',
+    async (name, segment) => {
+      const { log, requests } = applicationLog();
+      await log.getObject(name);
+      expect(requests).toHaveLength(1);
+      expect(requests[0]?.url).toBe(`${OBJECTS}/${segment}`);
+      expect(requests[0]?.method).toBe('GET');
+    },
+  );
 
   // Until 36.0.1 both reads sent `application/xml`, refused `406` (SADT_RESOURCE
   // 037). Measured on an on-premise system (2026-10-19): the properties answer
   // `200` to blues.v1+xml, the source `200` to application/json and `406` to
   // blues.v1+xml.
-  it('getObject() sends exactly Accept application/vnd.sap.adt.blues.v1+xml', async () => {
-    const connection = createConnectionMock();
-    const appLog = new ApplicationLog(connection, {
-      logger: createLogger(),
-      results: applicationLogDocuments,
-    });
-
-    await appLog.getObject('Z_MY_LOG');
-
-    const sent = (connection.makeAdtRequest as jest.Mock).mock.calls[0][0];
-    expect(sent.headers).toEqual({
+  it('sends blues.v1+xml and the properties relation by default, timeout 0, no parameter', async () => {
+    const { log, requests } = applicationLog();
+    await log.getObject('Z_LOG');
+    expect(requests[0]?.headers).toEqual({
       Accept: 'application/vnd.sap.adt.blues.v1+xml',
-      'X-sap-adt-relation':
-        'http://www.sap.com/wbobj/applicationlogobjects/aplotyp/properties',
+      'X-sap-adt-relation': PROPERTIES,
+    });
+    expect(requests[0]?.timeout).toBe(0);
+    expect(requests[0]?.params).toEqual({});
+  });
+
+  it("sends the caller's Accept as given", async () => {
+    const { log, requests } = applicationLog();
+    await log.getObject('Z_LOG', { accept: 'text/html' });
+    expect(requests[0]?.headers).toEqual({
+      Accept: 'text/html',
+      'X-sap-adt-relation': PROPERTIES,
     });
   });
 
-  it('getSource() sends exactly Accept application/json', async () => {
-    const connection = createConnectionMock();
-    const appLog = new ApplicationLog(connection, {
-      logger: createLogger(),
-      results: applicationLogDocuments,
+  it('sends each option as its parameter, and no other', async () => {
+    const { log, requests } = applicationLog();
+    await log.getObject('Z_LOG', {
+      corrNr: 'REQ',
+      lockHandle: 'LH',
+      version: 'inactive',
+      accessMode: 'MODIFY',
+      action: 'LOCK',
     });
+    expect(requests[0]?.params).toEqual({
+      corrNr: 'REQ',
+      lockHandle: 'LH',
+      version: 'inactive',
+      accessMode: 'MODIFY',
+      _action: 'LOCK',
+    });
+  });
 
-    await appLog.getSource('Z_MY_LOG');
+  it.each([
+    ['404', REFUSALS.notFound],
+    ['406', REFUSALS.notAcceptable],
+    ['the HTML 500 of a 21-character name', REFUSALS.overlongName],
+  ])(
+    'a %s comes back through analyse with its status and body',
+    async (_label, refusal) => {
+      const { log, requests } = applicationLog(refusal);
+      const answer = await log.getObject('Z_LOG', {
+        analyse: analyseException,
+      });
+      expect(requests).toHaveLength(1);
+      expect(answer.ok).toBe(false);
+      if (answer.ok) return;
+      const error = answer.getError();
+      expect(error.response?.status).toBe(refusal.status);
+      expect(error.response?.data).toBe(refusal.data);
+    },
+  );
+});
 
-    const sent = (connection.makeAdtRequest as jest.Mock).mock.calls[0][0];
-    expect(sent.headers).toEqual({
+describe('ApplicationLog.getSource', () => {
+  it.each(NAME_CASES)(
+    '%j is addressed as one segment, %s',
+    async (name, segment) => {
+      const { log, requests } = applicationLog();
+      await log.getSource(name);
+      expect(requests).toHaveLength(1);
+      expect(requests[0]?.url).toBe(`${OBJECTS}/${segment}/source/main`);
+    },
+  );
+
+  it('sends application/json and the source relation by default, timeout 0, no parameter', async () => {
+    const { log, requests } = applicationLog();
+    await log.getSource('Z_LOG');
+    expect(requests[0]?.headers).toEqual({
       Accept: 'application/json',
-      'X-sap-adt-relation':
-        'http://www.sap.com/wbobj/applicationlogobjects/aplotyp/source',
+      'X-sap-adt-relation': SOURCE,
+    });
+    expect(requests[0]?.timeout).toBe(0);
+    expect(requests[0]?.params).toEqual({});
+  });
+
+  it("sends the caller's Accept and each option, and no other parameter", async () => {
+    const { log, requests } = applicationLog();
+    await log.getSource('Z_LOG', {
+      accept: 'text/html',
+      corrNr: 'REQ',
+      lockHandle: 'LH',
+      version: 'active',
+    });
+    expect(requests[0]?.headers).toEqual({
+      Accept: 'text/html',
+      'X-sap-adt-relation': SOURCE,
+    });
+    expect(requests[0]?.params).toEqual({
+      corrNr: 'REQ',
+      lockHandle: 'LH',
+      version: 'active',
     });
   });
 
-  it('getSource() delegates to /sap/bc/adt/applicationlog/objects/Z_MY_LOG/source/main', async () => {
-    const connection = createConnectionMock();
-    const appLog = new ApplicationLog(connection, {
-      logger: createLogger(),
-      results: applicationLogDocuments,
-    });
+  it.each([
+    ['404', REFUSALS.notFound],
+    ['406', REFUSALS.notAcceptable],
+    ['the HTML 500 of a 21-character name', REFUSALS.overlongName],
+  ])(
+    'a %s comes back through analyse with its status and body',
+    async (_label, refusal) => {
+      const { log, requests } = applicationLog(refusal);
+      const answer = await log.getSource('Z_LOG', {
+        analyse: analyseException,
+      });
+      expect(requests).toHaveLength(1);
+      expect(answer.ok).toBe(false);
+      if (answer.ok) return;
+      expect(answer.getError().response?.status).toBe(refusal.status);
+      expect(answer.getError().response?.data).toBe(refusal.data);
+    },
+  );
+});
 
-    await appLog.getSource('Z_MY_LOG');
-
-    expect(connection.makeAdtRequest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        url: '/sap/bc/adt/applicationlog/objects/Z_MY_LOG/source/main',
-        method: 'GET',
-      }),
-    );
-  });
-
-  it('validateName() delegates to /sap/bc/adt/applicationlog/objects/validation', async () => {
-    const connection = createConnectionMock();
-    const appLog = new ApplicationLog(connection, {
-      logger: createLogger(),
-      results: applicationLogDocuments,
-    });
-
-    await appLog.validateName('Z_MY_LOG');
-
-    expect(connection.makeAdtRequest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        url: '/sap/bc/adt/applicationlog/objects/validation',
-        method: 'GET',
-      }),
-    );
+describe('ApplicationLog.validateName', () => {
+  it('reads the validation address with the name as a parameter', async () => {
+    const { log, requests } = applicationLog();
+    await log.validateName('Z_LOG');
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.url).toBe(`${OBJECTS}/validation`);
+    expect(requests[0]?.params).toEqual({ objectName: 'Z_LOG' });
   });
 });

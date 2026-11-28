@@ -274,6 +274,33 @@ export const FEATURE_TOGGLE = {
   toggle: (name: string) => `${FEATURE_TOGGLE.uri(name)}/toggle`,
 } as const;
 
+/** An application log object (`APLO/TYP`), read as its definition. */
+export const APPLICATION_LOG = {
+  collection: '/sap/bc/adt/applicationlog/objects',
+  validation: '/sap/bc/adt/applicationlog/objects/validation',
+  uri: (name: string) => `/sap/bc/adt/applicationlog/objects/${seg(name)}`,
+} as const;
+
+/** An application job catalog (`SAJC`), read as its definition. */
+export const APPLICATION_JOB_CATALOG = {
+  collection: '/sap/bc/adt/applicationjob/catalogs',
+  uri: (name: string) => `/sap/bc/adt/applicationjob/catalogs/${seg(name)}`,
+} as const;
+
+/** An application job template (`SAJT`), read as its definition. */
+export const APPLICATION_JOB_TEMPLATE = {
+  collection: '/sap/bc/adt/applicationjob/templates',
+  uri: (name: string) => `/sap/bc/adt/applicationjob/templates/${seg(name)}`,
+} as const;
+
+/**
+ * The ABAP keyword documentation: one collection, its forms told apart by
+ * their query parameters (`query`, `object`, `uri`), none of them an address.
+ */
+export const KEYWORD_DOCUMENTATION = {
+  collection: '/sap/bc/adt/docu/abap/langu',
+} as const;
+
 export const AUTHORIZATION_FIELD = {
   collection: '/sap/bc/adt/aps/iam/auth',
   validation: '/sap/bc/adt/aps/iam/auth/validation',
@@ -346,6 +373,10 @@ export const RECORDS = {
   TRANSFORMATION,
   MESSAGE_CLASS,
   FEATURE_TOGGLE,
+  APPLICATION_LOG,
+  APPLICATION_JOB_CATALOG,
+  APPLICATION_JOB_TEMPLATE,
+  KEYWORD_DOCUMENTATION,
   AUTHORIZATION_FIELD,
   ENHANCEMENT,
   SCALAR_FUNCTION,

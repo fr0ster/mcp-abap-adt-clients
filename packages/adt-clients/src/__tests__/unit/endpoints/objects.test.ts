@@ -4,6 +4,9 @@
  * registry would compare it with itself.
  */
 import {
+  APPLICATION_JOB_CATALOG,
+  APPLICATION_JOB_TEMPLATE,
+  APPLICATION_LOG,
   CLASS,
   CLASS_INCLUDE,
   ENHANCEMENT,
@@ -11,6 +14,7 @@ import {
   FUNCTION_GROUP,
   FUNCTION_INCLUDE,
   FUNCTION_MODULE,
+  KEYWORD_DOCUMENTATION,
   PACKAGE,
   PROGRAM,
   PROGRAM_INCLUDE,
@@ -73,6 +77,25 @@ describe('records', () => {
   });
   it('package', () => {
     expect(PACKAGE.uri('$TMP')).toBe('/sap/bc/adt/packages/%24tmp');
+  });
+  // Measured on premise (2026-11-28): the namespaced names' %2f addresses
+  // answered 200 (fr0ster/mcp-abap-adt#404).
+  it('application log, job catalog and job template definitions', () => {
+    expect(APPLICATION_LOG.uri('/NS/LOG')).toBe(
+      '/sap/bc/adt/applicationlog/objects/%2Fns%2Flog',
+    );
+    expect(APPLICATION_LOG.validation).toBe(
+      '/sap/bc/adt/applicationlog/objects/validation',
+    );
+    expect(APPLICATION_JOB_CATALOG.uri('Z_CAT')).toBe(
+      '/sap/bc/adt/applicationjob/catalogs/z_cat',
+    );
+    expect(APPLICATION_JOB_TEMPLATE.uri('Z T')).toBe(
+      '/sap/bc/adt/applicationjob/templates/z%20t',
+    );
+    expect(KEYWORD_DOCUMENTATION.collection).toBe(
+      '/sap/bc/adt/docu/abap/langu',
+    );
   });
   it('enhancement takes its subtype as a segment', () => {
     expect(ENHANCEMENT.uri('enhoxhb', 'ZENH')).toBe(
@@ -148,6 +171,9 @@ describe('records', () => {
     expect(Object.keys(RECORDS).sort()).toEqual(
       [
         'ACCESS_CONTROL',
+        'APPLICATION_JOB_CATALOG',
+        'APPLICATION_JOB_TEMPLATE',
+        'APPLICATION_LOG',
         'AUTHORIZATION_FIELD',
         'BEHAVIOR_DEFINITION',
         'CLASS',
@@ -162,6 +188,7 @@ describe('records', () => {
         'FUNCTION_INCLUDE',
         'FUNCTION_MODULE',
         'INTERFACE',
+        'KEYWORD_DOCUMENTATION',
         'MESSAGE_CLASS',
         'METADATA_EXTENSION',
         'PACKAGE',
