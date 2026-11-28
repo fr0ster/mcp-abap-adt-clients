@@ -688,18 +688,24 @@ export class AdtFunctionGroup<
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E | IAdtError>> {
     const name = config.functionGroupName;
-    const answer = await answering(
-      () =>
-        inStatefulSession(this.connection, () =>
+    return answering(
+      async () => {
+        const locked = await inStatefulSession(this.connection, () =>
           lockFunctionGroup(this.connection, name),
-        ),
+        );
+        // The registry records SAP's state, not the caller's verdict: a lock
+        // SAP granted (a 2xx carrying a handle) is recorded here, before any
+        // `analyse` runs, so one it reports as a failure, or throws over, is
+        // still released by `unlockAll`.
+        const handle = lockHandleOf(locked);
+        if (!failedWireStatus(locked) && handle) {
+          this.lockTracker.track(name, handle);
+        }
+        return locked;
+      },
       lockHandleOf,
       options?.analyse,
     );
-    if (answer.ok && answer.getResult().value) {
-      this.lockTracker.track(name, answer.getResult().value);
-    }
-    return answer;
   }
 
   /** Unlock the function group. */

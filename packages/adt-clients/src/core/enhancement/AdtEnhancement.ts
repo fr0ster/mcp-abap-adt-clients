@@ -719,22 +719,24 @@ export class AdtEnhancement<
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<string, E | IAdtError>> {
     const name = this.name(config);
-    const answer = await answering(
-      () =>
-        inStatefulSession(this.connection, () =>
+    return answering(
+      async () => {
+        const locked = await inStatefulSession(this.connection, () =>
           lockEnhancement(this.connection, this.enhancementType(config), name),
-        ),
+        );
+        // The registry records SAP's state, not the caller's verdict: a lock
+        // SAP granted (a 2xx carrying a handle) is recorded here, before any
+        // `analyse` runs, so one it reports as a failure, or throws over, is
+        // still released by `unlockAll`.
+        const handle = lockHandleOf(locked);
+        if (!failedWireStatus(locked) && handle) {
+          this.lockTracker.track(name, handle, this.enhancementType(config));
+        }
+        return locked;
+      },
       lockHandleOf,
       options?.analyse,
     );
-    if (answer.ok && answer.getResult().value) {
-      this.lockTracker.track(
-        name,
-        answer.getResult().value,
-        this.enhancementType(config),
-      );
-    }
-    return answer;
   }
 
   /** Unlock the object. */
