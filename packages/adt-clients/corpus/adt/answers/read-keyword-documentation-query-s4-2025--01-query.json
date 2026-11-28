@@ -29,12 +29,12 @@
     },
     {
       "kind": "other",
-      "href": "http://onprem.example:8000/sap/public/bc/abap/docu?sap-language=EN&tree=X&version=X&sap-client=000&object=ABENABAP&style=adt",
+      "href": "http://sap.example.local:8000/sap/public/bc/abap/docu?sap-language=EN&tree=X&version=X&sap-client=000&object=ABENABAP&style=adt",
       "label": "Browser Version ADT Style"
     },
     {
       "kind": "other",
-      "href": "http://onprem.example:8000/sap/public/bc/abap/docu?sap-language=EN&tree=X&version=X&sap-client=000&object=ABENABAP&style=ui5",
+      "href": "http://sap.example.local:8000/sap/public/bc/abap/docu?sap-language=EN&tree=X&version=X&sap-client=000&object=ABENABAP&style=ui5",
       "label": "Browser Version UI5 Style"
     },
     {
