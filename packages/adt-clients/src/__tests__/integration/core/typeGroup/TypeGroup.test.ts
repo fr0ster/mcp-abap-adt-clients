@@ -14,7 +14,8 @@
  * - **Both variants** (`type_groups/adt_type_group_reads`): what the cloud row
  *   serves — validation, the metadata and source of SAP's `ABAP` type group
  *   (with and without `version=active`), its version list and one version's
- *   source. No write runs on the cloud: its row lists none.
+ *   source, each in a case of its own. No write runs on the cloud: its row
+ *   lists none.
  *
  * Run: npm test -- --testPathPatterns 'integration/core/typeGroup/TypeGroup\.test\.ts$'
  */
@@ -230,94 +231,123 @@ describe('Type groups (AdtTypeGroup)', () => {
   const reader = () =>
     isCloudSystem ? cloud.getTypeGroup() : onprem.getTypeGroup();
 
-  gate(SECTION, READS)(
-    'validates names and reads an SAP type group, its versions and a version source',
-    async () => {
-      const testCase = configuredCase(SECTION, READS);
-      if (!testCase) throw new Error(missingCaseMessage(SECTION, READS));
-      const title = 'TypeGroup - reads';
-      logTestStart(testsLogger, title, testCase);
-      try {
-        const group = reader();
-        const sapGroup = String(testCase.params?.sap_type_group ?? 'ABAP');
+  /**
+   * One case of what the cloud row serves, on its own: a failure of one
+   * leaves the others to run (validation needs no object; the reads take
+   * SAP's type group).
+   */
+  function readsCase(
+    title: string,
+    body: (group: ReturnType<typeof reader>, sapGroup: string) => Promise<void>,
+  ): void {
+    gate(SECTION, READS)(
+      title,
+      async () => {
+        const testCase = configuredCase(SECTION, READS);
+        if (!testCase) throw new Error(missingCaseMessage(SECTION, READS));
+        const label = `TypeGroup - ${title}`;
+        logTestStart(testsLogger, label, testCase);
+        try {
+          await body(
+            reader(),
+            String(testCase.params?.sap_type_group ?? 'ABAP'),
+          );
+          logTestSuccess(testsLogger, label);
+        } catch (error) {
+          logTestError(testsLogger, label, error);
+          throw error;
+        } finally {
+          logTestEnd(testsLogger, label);
+        }
+      },
+      getTimeout('test'),
+    );
+  }
 
-        const free = await group.validate(
-          { typeGroupName: freshName(), description: 'probe' },
-          { analyse: analyseException },
-        );
-        expect(said(free)).toBe('ok');
-        const taken = await group.validate(
-          { typeGroupName: 'SLIS', description: 'probe' },
-          { analyse: analyseException },
-        );
-        expect(taken.ok).toBe(false);
-        expect(said(taken)).toContain('InvalidTypeGroupName');
-        const long = await group.validate(
-          { typeGroupName: 'ZTG4817', description: 'probe' },
-          { analyse: analyseException },
-        );
-        expect(long.ok).toBe(false);
-        expect(said(long)).toContain('InvalidTypeGroupName');
+  readsCase('validates a free, a taken and a too long name', async (group) => {
+    const free = await group.validate(
+      { typeGroupName: freshName(), description: 'probe' },
+      { analyse: analyseException },
+    );
+    expect(said(free)).toBe('ok');
+    const taken = await group.validate(
+      { typeGroupName: 'SLIS', description: 'probe' },
+      { analyse: analyseException },
+    );
+    expect(taken.ok).toBe(false);
+    expect(said(taken)).toContain('InvalidTypeGroupName');
+    const long = await group.validate(
+      { typeGroupName: 'ZTG4817', description: 'probe' },
+      { analyse: analyseException },
+    );
+    expect(long.ok).toBe(false);
+    expect(said(long)).toContain('InvalidTypeGroupName');
+  });
 
-        const metadata = expectResult(
-          await group.readMetadata(
+  readsCase(
+    "reads an SAP type group's metadata, with and without version=active",
+    async (group, sapGroup) => {
+      const metadata = expectResult(
+        await group.readMetadata(
+          { typeGroupName: sapGroup },
+          { analyse: analyseException },
+        ),
+        'readMetadata',
+      );
+      expect(String(metadata)).toContain('atypgr:abapTypeGroup');
+      const active = expectResult(
+        await group.readMetadata(
+          { typeGroupName: sapGroup },
+          { version: 'active', analyse: analyseException },
+        ),
+        'readMetadata active',
+      );
+      expect(String(active)).toContain('adtcore:type="TYPE/DG"');
+    },
+  );
+
+  readsCase(
+    "reads an SAP type group's source, with and without version=active",
+    async (group, sapGroup) => {
+      const source = expectResult(
+        await group.read({ typeGroupName: sapGroup }, undefined, {
+          analyse: analyseException,
+        }),
+        'read',
+      );
+      expect(String(source).toLowerCase()).toContain('type-pool');
+      expectResult(
+        await group.read({ typeGroupName: sapGroup }, 'active', {
+          analyse: analyseException,
+        }),
+        'read active',
+      );
+    },
+  );
+
+  readsCase(
+    "lists an SAP type group's versions and reads one version's source",
+    async (group, sapGroup) => {
+      const feed = String(
+        expectResult(
+          await group.getVersions(
             { typeGroupName: sapGroup },
             { analyse: analyseException },
           ),
-          'readMetadata',
-        );
-        expect(String(metadata)).toContain('atypgr:abapTypeGroup');
-        const active = expectResult(
-          await group.readMetadata(
-            { typeGroupName: sapGroup },
-            { version: 'active', analyse: analyseException },
-          ),
-          'readMetadata active',
-        );
-        expect(String(active)).toContain('adtcore:type="TYPE/DG"');
-
-        const source = expectResult(
-          await group.read({ typeGroupName: sapGroup }, undefined, {
-            analyse: analyseException,
-          }),
-          'read',
-        );
-        expect(String(source).toLowerCase()).toContain('type-pool');
-        expectResult(
-          await group.read({ typeGroupName: sapGroup }, 'active', {
-            analyse: analyseException,
-          }),
-          'read active',
-        );
-
-        const feed = String(
-          expectResult(
-            await group.getVersions(
-              { typeGroupName: sapGroup },
-              { analyse: analyseException },
-            ),
-            'getVersions',
-          ),
-        );
-        const at = feed.indexOf('src="');
-        expect(at).toBeGreaterThan(-1);
-        const contentUri = feed.slice(at + 5, feed.indexOf('"', at + 5));
-        const version = expectResult(
-          await group.getVersionSource(contentUri, {
-            analyse: analyseException,
-          }),
-          'getVersionSource',
-        );
-        expect(String(version).toLowerCase()).toContain('type-pool');
-        logTestSuccess(testsLogger, title);
-      } catch (error) {
-        logTestError(testsLogger, title, error);
-        throw error;
-      } finally {
-        logTestEnd(testsLogger, title);
-      }
+          'getVersions',
+        ),
+      );
+      const at = feed.indexOf('src="');
+      expect(at).toBeGreaterThan(-1);
+      const contentUri = feed.slice(at + 5, feed.indexOf('"', at + 5));
+      const version = expectResult(
+        await group.getVersionSource(contentUri, {
+          analyse: analyseException,
+        }),
+        'getVersionSource',
+      );
+      expect(String(version).toLowerCase()).toContain('type-pool');
     },
-    getTimeout('test'),
   );
 
   gate(SECTION, CYCLE)(
@@ -523,14 +553,17 @@ async function deleteUnderLock(
   const locked = await group.lock(id, { analyse: analyseException });
   if (!locked.ok) return false;
   const handle = locked.getResult().value;
-  try {
-    const deleted = await group.delete(id, {
-      headers: integrationHeadersOf(group, 'delete'),
-      lockHandle: handle,
-      analyse: analyseException,
-    });
-    return deleted.ok;
-  } finally {
-    await group.unlock(id, handle, { analyse: analyseException });
-  }
+  // The UNLOCK's answer is judged too: a refused release fails the step.
+  return releasing(
+    async () =>
+      (
+        await group.delete(id, {
+          headers: integrationHeadersOf(group, 'delete'),
+          lockHandle: handle,
+          analyse: analyseException,
+        })
+      ).ok,
+    () => group.unlock(id, handle, { analyse: analyseException }),
+    'unlock after delete',
+  );
 }
