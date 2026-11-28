@@ -51,13 +51,13 @@ the tracking issue's table: raw requests on S/4HANA 2025, recordings kept for th
 | Metadata links | enhancement options and implementations | enhancement options and implementations |
 | `GET …/{name}/source/main`, `text/plain` | 200 | 200 |
 | `GET …/{name}/source/main/versions` | 200, atom feed | 200, atom feed |
-| `GET <an entry's content uri>` (version source) | not measured | not measured |
+| `GET <an entry's content uri>` (version source) | not measured | 200, `text/plain` |
 | `GET …/{name}/objectstructure` | 404 | 404 |
 | `GET …/typegroups` (the collection) | 400, no type group name | 400, no type group name |
 | `GET …/typegroups/validation` | 405 | 405 |
 | quickSearch, `objectType=TYPE/DG` | found | found (SAP's type groups; none in the customer namespace) |
-| validate, `objtype=TYPE/DG` (raw) | valid name: 200, empty body; taken or too long: 400 `InvalidTypeGroupName`; `objtype` `typedg`, `type` or `TYPEDG`: 400 | not measured |
-| create (raw) | 200, empty body; the object is inactive, source `TYPE-POOL <name>.` | not measured |
+| validate, `objtype=TYPE/DG` (raw) | valid name: 200, empty body; taken or too long: 400 `InvalidTypeGroupName`; `objtype` `typedg`, `type` or `TYPEDG`: 400 | served: valid 200 empty, taken or too long 400 `InvalidTypeGroupName`, `typedg` 400 |
+| create (raw) | 200, empty body; the object is inactive, source `TYPE-POOL <name>.` | 403 EU/519 `S_DEVELOP` in the trial's test package: an authorization refusal, so it decides nothing |
 | lock, source write, unlock (raw) | 200 each | not measured |
 | activate (raw) | `chkl:messages`, `activationExecuted="true"` | not measured |
 | delete: lock, `DELETE ?lockHandle`, unlock (raw) | 200, then the read answers 404 | not measured |
