@@ -153,6 +153,8 @@ async function judge(
   expect(listRead).toBe(judged.listRead);
   if (judged.verdict === ADT_NO_FAILURE) return { ok: true, listRead };
   const failure = judged.verdict;
+  if (!('stillInactive' in failure))
+    throw new Error('expected the activation failure');
   return {
     ok: false,
     listRead,

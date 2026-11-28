@@ -26,18 +26,23 @@ import {
   type IAdtActivationFailure,
   readUnstatedActivation,
 } from '@mcp-abap-adt/adt-strategies';
-import type {
-  AdtNoFailure,
-  IAdtAnalyseContext,
-  IAdtError,
-  IAdtResponse,
-  IAnalyse,
+import {
+  ADT_NO_FAILURE,
+  type AdtNoFailure,
+  type IAdtAnalyseContext,
+  type IAdtError,
+  type IAdtResponse,
+  type IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 
-/** What the recipe answers: the verdict, and whether it read the list. */
+/**
+ * What the recipe answers: the verdict, and whether it read the list. The
+ * verdict is `analyseActivation`'s (an `IAdtActivationFailure`), or — when the
+ * member answered without calling its `analyse` — the member's own failure.
+ */
 export interface IActivationJudged {
-  readonly verdict: IAdtActivationFailure | AdtNoFailure;
+  readonly verdict: IAdtActivationFailure | IAdtError | AdtNoFailure;
   /** The activation's answer, which a cleared verdict is read from. */
   readonly answer: IAdtWireResponse | undefined;
   readonly listRead: boolean;
@@ -49,19 +54,25 @@ export type InactiveListRead = () => Promise<
 >;
 
 export async function activationJudged(
-  activate: (analyse: IAnalyse) => Promise<unknown>,
+  activate: (analyse: IAnalyse) => Promise<IAdtResponse<unknown, IAdtError>>,
   readInactiveList: InactiveListRead,
   named: readonly string[],
 ): Promise<IActivationJudged> {
   let started: IAdtError | AdtNoFailure | undefined;
   let answer: IAdtWireResponse | undefined;
-  await activate((verdict, answered) => {
+  const answered = await activate((verdict, wire) => {
     started = verdict;
-    answer = answered;
+    answer = wire;
     return verdict;
   });
+  // A member that answered without its `analyse` (a stub; a judge composed
+  // around the recording one that stopped first) is judged by its own answer.
   if (started === undefined) {
-    throw new Error('the member answered without calling its analyse');
+    return {
+      verdict: answered.ok ? ADT_NO_FAILURE : answered.getError(),
+      answer: undefined,
+      listRead: false,
+    };
   }
 
   const kind =

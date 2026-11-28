@@ -131,7 +131,7 @@ describe('Activation answers (fr0ster/mcp-abap-adt#351)', () => {
   const inactiveList = () =>
     client
       .getUtils({ ...utilDocuments, inactive: wireItself })
-      .getInactiveObjects();
+      .getInactiveObjects({ analyse: analyseException });
 
   /** Whether the inactive list names `uri`. */
   const listed = async (uri: string): Promise<boolean> => {
@@ -353,7 +353,10 @@ describe('Activation answers (fr0ster/mcp-abap-adt#351)', () => {
           [buildObjectUri(group, 'FUGR/F')],
         );
         expect(sentSince(mark)).toEqual([`POST ${ACTIVATION}false`, INACTIVE]);
-        if (judgedSilent.verdict === ADT_NO_FAILURE) {
+        if (
+          judgedSilent.verdict === ADT_NO_FAILURE ||
+          !('stillInactive' in judgedSilent.verdict)
+        ) {
           throw new Error('the group alone, false: expected not activated');
         }
         const silent = judgedSilent.verdict;

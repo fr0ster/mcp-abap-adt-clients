@@ -189,8 +189,11 @@ async function judgedGroup(replay: IReplay) {
 }
 
 /** The verdict as the activation's failure; a throw when it is none. */
-function failureOf(verdict: IAdtActivationFailure | AdtNoFailure) {
-  if (verdict === ADT_NO_FAILURE) throw new Error('expected a failure');
+function failureOf(
+  verdict: IAdtActivationFailure | IAdtError | AdtNoFailure,
+): IAdtActivationFailure {
+  if (verdict === ADT_NO_FAILURE || !('stillInactive' in verdict))
+    throw new Error('expected the activation failure');
   return verdict;
 }
 

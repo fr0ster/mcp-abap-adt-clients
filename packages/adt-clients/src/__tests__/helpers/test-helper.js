@@ -1942,7 +1942,7 @@ async function activateSharedFunctionGroup(
     () =>
       client
         .getUtils({ ...wiredUtils, inactive: wireItself })
-        .getInactiveObjects(),
+        .getInactiveObjects({ analyse: analyseException }),
     [groupUri, `${groupUri}/source/main`],
   );
   // An `exc:exception` inside a 200 is no checklist: read it first, as
