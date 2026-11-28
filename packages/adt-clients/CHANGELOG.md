@@ -39,6 +39,12 @@ decision 53). See [MIGRATION-49.md](docs/usage/MIGRATION-49.md).
   (`500`) or unanswered UNLOCK keeps it, so `unlockAll` can still release a
   lock SAP still holds. One request either way. Before, all but the table
   settings and the text elements dropped the entry whatever SAP answered.
+- **A lock SAP granted is in the registry whatever `analyse` says.** Every
+  handler records a LOCK answered with a 2xx and a handle before any `analyse`
+  runs, so one the caller judges a failure, or whose `analyse` throws, is still
+  released by `unlockAll`.
+- **The include and the service binding record their locks** in the client's
+  registry, as every other lockable handler; before, neither did.
 
 ### Changed (breaking)
 
