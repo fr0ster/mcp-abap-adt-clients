@@ -24,7 +24,7 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [48.0.1] - 2026-11-27
+## [Unreleased]
 
 fr0ster/mcp-abap-adt#391: the library picks no bound of its own. A bound the
 caller gives goes out exactly as given, `0` included; without one the request
