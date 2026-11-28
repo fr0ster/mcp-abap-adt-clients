@@ -36,7 +36,6 @@ import { expectResult } from '../../../helpers/contract';
 import {
   createTestAdtClient,
   createTestConnection,
-  getTargetSystem,
   releaseTestConnection,
   skipUnlessConfigured,
 } from '../../../helpers/sessionConfig';
@@ -132,14 +131,12 @@ function statusOf(answer: IAdtResponse<unknown>): number | undefined {
 describe('Application definitions (APLO, SAJC, SAJT)', () => {
   let connection: IAbapConnection & ISessionLifecycleAware;
   let client: AdtClient;
-  let systemKind: string | undefined;
 
   beforeAll(async () => {
     try {
       connection = await createTestConnection(logger);
       const resolved = await createTestAdtClient(connection, logger);
       client = resolved.client;
-      systemKind = getTargetSystem();
     } catch (error) {
       skipUnlessConfigured(error, logger);
     }
@@ -194,22 +191,15 @@ describe('Application definitions (APLO, SAJC, SAJT)', () => {
   });
 
   gate(SECTION, CASE)(
-    'an APLO name of 21 characters: SAP answers it as it is (500 on cloud)',
+    'an APLO name of 21 characters: SAP answers it as it is (500 on both kinds)',
     async () => {
       const name = await absentName(client, 'APLO', 21);
       const object = statusOf(await reads(client, 'APLO').object(name));
       const source = statusOf(await reads(client, 'APLO').source(name));
-      logger.info?.(
-        `APLO 21 characters on ${systemKind}: object ${object}, source ${source}`,
-      );
-      // Measured on cloud (2026-11-28): 500 for both. On premise unverified:
-      // recorded, not asserted.
-      if (systemKind === 'cloud') {
-        expect(object).toBe(500);
-        expect(source).toBe(500);
-      } else {
-        expect(object).toEqual(expect.any(Number));
-      }
+      logger.info?.(`APLO 21 characters: object ${object}, source ${source}`);
+      // Measured on ABAP cloud and on premise (2026-11-28): 500 for both reads.
+      expect(object).toBe(500);
+      expect(source).toBe(500);
     },
     getTimeout('test'),
   );

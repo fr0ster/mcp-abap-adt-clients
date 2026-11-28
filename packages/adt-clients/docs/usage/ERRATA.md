@@ -457,14 +457,14 @@ code 500") and the answer whole, the page included.
 
 ## An application log object name of 21 characters answers an ICF 500
 
-**Symptom.** On ABAP cloud (2026-11-28), an absent application log object
-name of 21 characters answered `500` with an ICF error page ("Data was lost
-while copying a value"), for the object document and the source alike; an
-absent name of 7 characters answered `404`
+**Symptom.** On ABAP cloud and on premise (2026-11-28), an absent application
+log object name of 21 characters answered `500` with an ICF error page (on
+cloud "Data was lost while copying a value"), for the object document and the
+source alike; an absent name of 7 characters answered `404`
 (`refusal-application-log-name-21-abap-cloud`,
 `refusal-application-log-absent-abap-cloud`). The recorded typestructure gives
 `APLO/TYP` an `OBJNAME_MAXLENGTH` of 20; that the length causes the `500` is
-inferred, not verified. On premise it is not measured.
+inferred, not verified.
 
 **What the library does.** The name goes to SAP as given, through `seg()`, and
 the `500` comes back through `analyse` as SAP sent it; nothing checks the name's
