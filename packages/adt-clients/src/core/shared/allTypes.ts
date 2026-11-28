@@ -21,12 +21,14 @@ import type {
  *   Until 48.0.0 a missing one was sent as 999.
  * @param name - Name filter pattern (default: '*')
  * @param data - Data filter (default: 'usedByProvider')
- * @returns Axios response with XML containing all object types
+ * @returns The object types list as SAP sent it: as many types as
+ *   `maxItemCount` asks for, or SAP's own bound without one
  *
  * @example
  * ```typescript
- * const response = await getAllTypes(connection);
- * // Response contains XML with all ADT object types
+ * // Every type: 999 answered all 375 on the BTP ABAP environment (2026-11-27),
+ * // 2147483647 is the largest SAP accepts; without a count SAP answers 100.
+ * const response = await getAllTypes(connection, 2147483647);
  * ```
  */
 export async function getAllTypes(

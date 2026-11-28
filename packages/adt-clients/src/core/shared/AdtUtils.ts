@@ -1401,12 +1401,14 @@ export class AdtUtils<
    *   ABAP environment, 2026-11-27)
    * @param name - Name filter pattern (default: '*')
    * @param data - Data filter (default: 'usedByProvider')
-   * @returns Axios response with XML containing all object types
+   * @returns The object types list: as many types as `maxItemCount` asks
+   *   for, or SAP's own bound (100) without one
    *
    * @example
    * ```typescript
-   * const response = await utils.getAllTypes();
-   * // Response contains XML with all ADT object types
+   * // The bound the library used to send, 999, read all 375 types on the BTP
+   * // ABAP environment (2026-11-27); 2147483647 is the largest SAP accepts.
+   * const response = await utils.getAllTypes(2147483647);
    * ```
    */
   getAllTypes<E extends IAdtError>(
