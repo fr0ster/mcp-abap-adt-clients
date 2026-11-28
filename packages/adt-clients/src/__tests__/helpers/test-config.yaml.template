@@ -2710,6 +2710,15 @@ navigation_target:
         # group has local classes with methods (a local method's two links).
         object_type: "PROG/I"
         object_name: "LSEWORKINGAREAFAC"
+    - name: "navigate_program_elements_onprem"
+      enabled: true
+      description: "Navigate a one-include program's elements: its local methods' definition links answer a start"
+      available_in: ["onprem"]
+      params:
+        # A program of one include with local classes, present on the on-premise
+        # test system (measured 2026-11-28); not delivered by SAP.
+        object_type: "PROG/P"
+        object_name: "ZABAPGIT_STANDALONE"
 
 # Node Structure (fetchNodeStructure)
 node_structure:

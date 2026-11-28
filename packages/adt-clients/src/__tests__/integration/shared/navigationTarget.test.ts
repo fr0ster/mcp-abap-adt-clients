@@ -11,8 +11,9 @@
  * Measured (2026-11-28): every fragment answers `200` with an
  * `adtcore:objectReference` whose uri is the element's include and
  * `#start=line,column` in an include of the same object (not always the include
- * the link names); a local method's definition link is refused on ABAP cloud
- * (`400`, EU/061) and answers a start on premise.
+ * the link names); a function group's local method's definition link is
+ * refused on both systems (`400`, EU/061), a program's answers a start on
+ * premise.
  *
  * Enable debug logs: DEBUG_ADT_TESTS=true npm test -- integration/shared/navigationTarget
  */
@@ -38,7 +39,6 @@ import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { configuredCase, gate } from '../../helpers/caseGate';
 import {
   createTestConnection,
-  getTargetSystem,
   releaseTestConnection,
   skipUnlessConfigured,
 } from '../../helpers/sessionConfig';
@@ -62,6 +62,8 @@ type Kind = (typeof KINDS)[number];
 
 interface INavigated {
   kind: Kind;
+  /** The element's whole `adtcore:type` (`FUGR/PLM`, `PROG/PLM`, …). */
+  type: string;
   rel: string;
   href: string;
 }
@@ -85,7 +87,12 @@ function firstLinks(root: IOutlineElement, rel: string): INavigated[] {
       continue;
     const link = element.links.find((item) => item.rel === rel);
     if (link?.fragment?.startsWith('type=')) {
-      found.push({ kind, rel, href: link.href });
+      found.push({
+        kind,
+        type: element.type ?? element.unknownType ?? '',
+        rel,
+        href: link.href,
+      });
     }
   }
   return found;
@@ -144,6 +151,7 @@ describe('Shared - getNavigationTarget', () => {
   for (const caseName of [
     'navigate_outline_elements_cloud',
     'navigate_outline_elements_onprem',
+    'navigate_program_elements_onprem',
   ]) {
     gate('navigation_target', caseName)(
       `${caseName}: each element's fragment leads to its start, alone and in one envelope`,
@@ -198,20 +206,20 @@ describe('Shared - getNavigationTarget', () => {
           const answer = await utils.getNavigationTarget(definition.href, {
             analyse: analyseException,
           });
-          if (getTargetSystem() === 'cloud') {
+          // As measured (2026-11-28): a function group's local method
+          // (`FUGR/PLM`) answers 400 on both systems; a program's
+          // (`PROG/PLM`, on premise only) answers a start.
+          testsLogger.info?.(
+            `definition link ${definition.type} ${definition.href} -> ${answer.ok ? referenceOf(answer.getResult().value) : answer.getError().response?.status}`,
+          );
+          if (definition.type.startsWith('FUGR/')) {
             expect(answer.ok).toBe(false);
             expect(answer.ok ? 0 : answer.getError().response?.status).toBe(
               400,
             );
           } else {
-            // On premise the definition link answers a start in the same
-            // object; which include and statement it is, the caller decides
-            // from the source.
             if (!answer.ok) throw new Error(answer.getError().message);
             const reference = referenceOf(answer.getResult().value);
-            testsLogger.info?.(
-              `definition link ${definition.href} -> ${reference}; implementation link ${implementation.href}`,
-            );
             expect(reference).toContain('#start=');
             expect(objectOf(reference ?? '')).toBe(objectOf(definition.href));
           }
