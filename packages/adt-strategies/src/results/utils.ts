@@ -651,3 +651,58 @@ export const utilDiscoveryCollections: IResultStrategy<ReadonlySet<string>> = (
   }
   return collections;
 };
+
+/**
+ * The parameter names a discovery template declares in its `{?a,b,…}`
+ * expressions, in order of appearance; a template with none declares none.
+ */
+function templateParameters(template: string): string[] {
+  const names: string[] = [];
+  let from = template.indexOf('{?');
+  while (from >= 0) {
+    const close = template.indexOf('}', from + 2);
+    if (close < 0) break;
+    for (const name of template.slice(from + 2, close).split(',')) {
+      const trimmed = name.trim();
+      if (trimmed !== '') names.push(trimmed);
+    }
+    from = template.indexOf('{?', close + 1);
+  }
+  return names;
+}
+
+/**
+ * What `GET /sap/bc/adt/discovery` answers, read into each collection's path
+ * (as `utilDiscoveryCollections` reads them) and the union of the parameter
+ * names its templates declare (`{?a,b,…}` of every
+ * `adtcomp:templateLink/@template`); a collection with no template maps to
+ * the empty set. An answer that is no `app:service` document reads as
+ * `undefined`: a consumer answers that as "discovery could not be read".
+ */
+export const utilDiscoveryTemplates: IResultStrategy<
+  ReadonlyMap<string, ReadonlySet<string>> | undefined
+> = (answer) => {
+  const xml = rawOf(answer);
+  if (xml.trim() === '' || XMLValidator.validate(xml) !== true) {
+    return undefined;
+  }
+  const service = field(parsedOrNothing(discoveryParser, xml), 'service');
+  if (!isElement(service)) return undefined;
+  const collections = new Map<string, Set<string>>();
+  for (const workspace of listOf(field(service, 'workspace'))) {
+    for (const collection of listOf(field(workspace, 'collection'))) {
+      const href = leafText(at(collection, '@href'));
+      if (!href?.startsWith('/')) continue;
+      const parameters = collections.get(href) ?? new Set<string>();
+      for (const link of listOf(
+        at(collection, 'templateLinks', 'templateLink'),
+      )) {
+        const template = leafText(at(link, '@template'));
+        if (template === undefined) continue;
+        for (const name of templateParameters(template)) parameters.add(name);
+      }
+      collections.set(href, parameters);
+    }
+  }
+  return collections;
+};
