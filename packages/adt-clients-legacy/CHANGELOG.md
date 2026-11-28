@@ -4,6 +4,14 @@ All notable changes to this package are documented here. The package follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html); the repository keeps
 one changelog per package.
 
+## [Unreleased]
+
+### Added
+
+- `getNavigationTarget`, inherited from adt-clients' `AdtUtils`, is decided in the member
+  inventory and in `docs/LEGACY.md`: not measured on 7.40, sent as the modern client sends it
+  (fr0ster/mcp-abap-adt#401).
+
 ## [0.12.0] - 2026-11-27
 
 Released with `@mcp-abap-adt/adt-clients` 48.0.0 (fr0ster/mcp-abap-adt-clients#304),
