@@ -51,6 +51,15 @@ carries none, and SAP's own bound applies. Measured on the BTP ABAP environment
   was sent as 100; SAP accepts a run payload without the attribute. A cap given
   is still refused before the request when it is not a positive integer.
 
+### Documentation
+
+- **ERRATA, "The debugger freeing its session is answered as an ICF 500":**
+  SAP's `400` "Session no longer exists" on the next request reaches the
+  caller as the connection's verdict since `@mcp-abap-adt/connection` 22.0.1 —
+  a failure with `sessionError: 'ADT_SESSION_REPLACED'` and no response
+  (on premise, 2026-11-28, connection 25.2.0). The library passes it on as it
+  came; no code changed.
+
 ## [48.0.0] - 2026-11-27
 
 fr0ster/mcp-abap-adt-clients#304: this package's `src` holds no cast but
