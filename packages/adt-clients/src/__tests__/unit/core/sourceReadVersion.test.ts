@@ -338,7 +338,7 @@ describe('the application log passes the version as request params', () => {
     expect(
       await sent((r) => r.getApplicationLog().getObject('ZLOG_V', { version })),
     ).toEqual({
-      url: '/sap/bc/adt/applicationlog/objects/ZLOG_V',
+      url: '/sap/bc/adt/applicationlog/objects/zlog_v',
       params: { version },
     });
   });
@@ -347,7 +347,7 @@ describe('the application log passes the version as request params', () => {
     expect(
       await sent((r) => r.getApplicationLog().getSource('ZLOG_V', { version })),
     ).toEqual({
-      url: '/sap/bc/adt/applicationlog/objects/ZLOG_V/source/main',
+      url: '/sap/bc/adt/applicationlog/objects/zlog_v/source/main',
       params: { version },
     });
   });

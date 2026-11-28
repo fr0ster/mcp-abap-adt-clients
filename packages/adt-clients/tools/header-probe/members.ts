@@ -338,6 +338,11 @@ function universalFor(
         // makes it answer 406/037 for any Accept (measured).
         if (key === 'object_type') return 'program';
         if (key === 'query') return objectName;
+        // The keyword documentation's topic form names a topic (`object`), its
+        // position form a place in a source (`uri`): the probe program's start.
+        if (key === 'object') return objectName;
+        if (key === 'uri')
+          return `/sap/bc/adt/programs/programs/${objectName.toLowerCase()}/source/main#start=1,1`;
         if (key === 'maxResults' || key === 'max_results') return 1;
         if (key === 'rootEntity') return objectName;
         if (key === 'implementationType') return 'managed';
