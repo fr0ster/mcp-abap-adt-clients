@@ -57,7 +57,16 @@ export async function activationJudged(
   activate: (analyse: IAnalyse) => Promise<IAdtResponse<unknown, IAdtError>>,
   readInactiveList: InactiveListRead,
   named: readonly string[],
+  // The strategy the verdict goes through; `null` is a caller with none, as
+  // a member given no `analyse` answered by its starting verdict alone.
+  judge: IAnalyse | null = analyseActivation,
 ): Promise<IActivationJudged> {
+  const judgedBy = (
+    verdict: IAdtError | AdtNoFailure,
+    wire: IAdtWireResponse | undefined,
+    context?: IAdtAnalyseContext,
+  ): IAdtError | AdtNoFailure =>
+    judge === null ? verdict : judge(verdict, wire, context);
   let started: IAdtError | AdtNoFailure | undefined;
   let answer: IAdtWireResponse | undefined;
   const answered = await activate((verdict, wire) => {
@@ -79,7 +88,7 @@ export async function activationJudged(
     answer === undefined ? undefined : readUnstatedActivation(answer);
   if (kind === undefined) {
     return {
-      verdict: analyseActivation(started, answer),
+      verdict: judgedBy(started, answer),
       answer,
       listRead: false,
     };
@@ -104,7 +113,7 @@ export async function activationJudged(
     }
   }
   return {
-    verdict: analyseActivation(verdict, answer, context),
+    verdict: judgedBy(verdict, answer, context),
     answer,
     listRead: true,
   };
