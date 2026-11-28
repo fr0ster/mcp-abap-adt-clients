@@ -1,1 +1,12 @@
-<?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><namespace id="com.sap.adt"/><type id="InvalidTypeGroupName"/><message lang="EN">Select a name for the type group with a maximum of five characters</message><localizedMessage lang="EN">Select a name for the type group with a maximum of five characters</localizedMessage><properties><entry key="LONGTEXT">&lt;HTML&gt;&lt;HEAD&gt;&lt;TITLE&gt;Conversion of SAPscript Text E2129 to HTML&lt;/TITLE&gt;&lt;META http-equiv="Content-Type" content="text/html; charset=utf-8"&gt;&lt;/HEAD&gt;&lt;BODY&gt;&lt;P&gt;&lt;STRONG&gt;Select a name for the type group with a maximum of five characters&lt;/STRONG&gt;&lt;/P&gt;&lt;P&gt;Message No. E2129&lt;/P&gt;&lt;P&gt;&lt;STRONG&gt;Diagnosis&lt;/STRONG&gt;&lt;/P&gt;&lt;P&gt;The name of a type group may not exceed 5 places.&lt;/P&gt;&lt;P&gt;&lt;STRONG&gt;System Response&lt;/STRONG&gt;&lt;/P&gt;&lt;P&gt;&lt;/P&gt;&lt;P&gt;&lt;STRONG&gt;Procedure&lt;/STRONG&gt;&lt;/P&gt;&lt;P&gt;Correct your entry.&lt;/P&gt;&lt;/BODY&gt;&lt;/HTML&gt;</entry><entry key="T100KEY-ID">E2</entry><entry key="T100KEY-NO">129</entry></properties></exc:exception>
+<?xml version="1.0" encoding="utf-8"?>
+<exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework">
+  <namespace id="com.sap.adt"/>
+  <type id="InvalidTypeGroupName"/>
+  <message lang="EN">Select a name for the type group with a maximum of five characters</message>
+  <localizedMessage lang="EN">Select a name for the type group with a maximum of five characters</localizedMessage>
+  <properties>
+    <entry key="LONGTEXT">&lt;HTML&gt;&lt;HEAD&gt;&lt;TITLE&gt;Conversion of SAPscript Text E2129 to HTML&lt;/TITLE&gt;&lt;META http-equiv="Content-Type" content="text/html; charset=utf-8"&gt;&lt;/HEAD&gt;&lt;BODY&gt;&lt;P&gt;&lt;STRONG&gt;Select a name for the type group with a maximum of five characters&lt;/STRONG&gt;&lt;/P&gt;&lt;P&gt;Message No. E2129&lt;/P&gt;&lt;P&gt;&lt;STRONG&gt;Diagnosis&lt;/STRONG&gt;&lt;/P&gt;&lt;P&gt;The name of a type group may not exceed 5 places.&lt;/P&gt;&lt;P&gt;&lt;STRONG&gt;System Response&lt;/STRONG&gt;&lt;/P&gt;&lt;P&gt;&lt;/P&gt;&lt;P&gt;&lt;STRONG&gt;Procedure&lt;/STRONG&gt;&lt;/P&gt;&lt;P&gt;Correct your entry.&lt;/P&gt;&lt;/BODY&gt;&lt;/HTML&gt;</entry>
+    <entry key="T100KEY-ID">E2</entry>
+    <entry key="T100KEY-NO">129</entry>
+  </properties>
+</exc:exception>
