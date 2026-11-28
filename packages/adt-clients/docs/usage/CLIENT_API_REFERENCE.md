@@ -2352,9 +2352,10 @@ interface each link names a position, `<include>#start=l,c;end=l,c` (lines from
 1, columns from 0, `end` exclusive); a program's links name their target, a
 function group's a source URI. No element carries a signature.
 
-`IUtilResults` of interfaces-adt has no slot for this member, so it answers the
-document as it came, as `getTypeStructure` does; `readObjectOutline` /
-`objectOutline` of `@mcp-abap-adt/adt-strategies` read it into a tree.
+Its answer goes through the result set's `objectOutline` slot (`rawDocument` in
+`utilDocuments`, so the document as it came by default); `objectOutline` of
+`@mcp-abap-adt/adt-strategies` is a reading for the slot, and `readObjectOutline`
+the same over a document.
 
 ```typescript
 import { readObjectOutline } from '@mcp-abap-adt/adt-strategies';
@@ -2388,9 +2389,9 @@ share one
 `AdtBatchConnection('communication')` envelope on both, each part answered as
 alone.
 
-`IUtilResults` of interfaces-adt has no slot for this member yet, so it answers
-the document as it came; `readNavigationTarget` / `navigationTarget` of
-`@mcp-abap-adt/adt-strategies` read it.
+Its answer goes through the result set's `navigationTarget` slot (`rawDocument`
+in `utilDocuments`); `navigationTarget` of `@mcp-abap-adt/adt-strategies` is a
+reading for the slot, and `readNavigationTarget` the same over a document.
 
 ```typescript
 import { readNavigationTarget } from '@mcp-abap-adt/adt-strategies';

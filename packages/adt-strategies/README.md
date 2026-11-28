@@ -227,6 +227,15 @@ failure to `status` and, from an `exc:exception` document, `messageClass`
 `gitHttpStatus` (R11's `http_status`, an integer); any other answer is its
 status alone.
 
+**The outline and the navigation.** Since adt-clients 49.0.0 `getObjectOutline` and
+`getNavigationTarget` read their answers through the result set's `objectOutline` and
+`navigationTarget` slots; these are readings for them, in a set or over a document:
+
+| export | reads what this member answers | answers |
+|---|---|---|
+| `readObjectOutline`, `objectOutline` | `getObjectOutline` (`<object uri>/objectstructure`) | `IObjectOutline`: the root element and its children, with visibility, level and the links' positions |
+| `readNavigationTarget`, `navigationTarget` | `getNavigationTarget` (`POST /sap/bc/adt/navigation/target`) | `INavigationTarget`: the include a reference leads to and its `start` (line from 1, column from 0); `undefined` for a refusal or a reference without a readable start |
+
 **Readings of members with no slot.** `IUtilResults` of interfaces-adt names no
 slot for these `getUtils()` members, so the member answers the document as it
 came (`IAdtResponse<string>`) and you read it with the pure function — or pass
@@ -236,8 +245,6 @@ document.
 
 | export | reads what this member answers | answers |
 |---|---|---|
-| `readObjectOutline`, `objectOutline` | `getObjectOutline` (`<object uri>/objectstructure`) | `IObjectOutline`: the root element and its children, with visibility, level and the links' positions |
-| `readNavigationTarget`, `navigationTarget` | `getNavigationTarget` (`POST /sap/bc/adt/navigation/target`) | `INavigationTarget`: the include a reference leads to and its `start` (line from 1, column from 0); `undefined` for a refusal or a reference without a readable start |
 | `readStructureElementInfo`, `structureElementInfo` | `getStructureElementInfo` (`/sap/bc/adt/ddic/elementinfo?path=`) | `IStructureElementInfo`: the structure's code, name, URI and short text; `components` in document order (name — a field's, or `.include` / `.append` —, `includeName`, `partOfInclude`, `includeLevel`, `dataElement`, `dataType`, `length`, `decimals`, `isKey`, every property as written); `includes`, the components naming a structure; the package |
 | `readServiceDefinitionElementInfo`, `serviceDefinitionElementInfo` | `getServiceDefinitionElementInfo` (`/sap/bc/adt/ddic/srvd/elementinfo?path=`) | `IServiceDefinitionElementInfo`: the definition's code, name, URI and short text; `entities` (name, URI, `alias` — absent when the `expose` has no `as`), in document order, not the source's; `links` (an extension's); the package |
 

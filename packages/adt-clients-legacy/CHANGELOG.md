@@ -23,6 +23,8 @@ released as 0.13.0 on `@mcp-abap-adt/adt-clients` `^49.0.0`).
 - `getNavigationTarget`, inherited from adt-clients' `AdtUtils`, is decided in the member
   inventory and in `docs/LEGACY.md`: not measured on 7.40, sent as the modern client sends it
   (fr0ster/mcp-abap-adt#401).
+- `getUtils(results)` takes adt-clients' `AdtUtilResults`, which names the `objectOutline` and
+  `navigationTarget` slots, as adt-clients' does.
 
 ## [0.12.0] - 2026-11-27
 
