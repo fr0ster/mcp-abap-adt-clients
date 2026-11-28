@@ -342,6 +342,36 @@ describe('lock and unlock', () => {
     expect(unlocked.ok && unlocked.getResult().value).toBeUndefined();
   });
 
+  it('keeps the lock in the registry when SAP refuses the UNLOCK, sending one request', async () => {
+    const lockAnswer = recorded('type-group-cycle-s4-2025--12-lock');
+    const refused = {
+      status: 403,
+      statusText: 'Forbidden',
+      headers: {},
+      data: '<exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><type id="ExceptionResourceNoAccess"/><message lang="EN">refused</message></exc:exception>',
+    };
+    let answer: IAdtWireResponse = lockAnswer;
+    const requests: IAbapRequestOptions[] = [];
+    const connection = {
+      setSessionType: () => undefined,
+      isConnected: () => true,
+      makeAdtRequest: async (options: IAbapRequestOptions) => {
+        requests.push(options);
+        if (answer.status >= 400)
+          throw { message: 'refused', response: answer };
+        return answer;
+      },
+    } as unknown as IAbapConnection;
+    const client = new AdtClientOnPrem(connection);
+    const group = client.getTypeGroup();
+    await group.lock({ typeGroupName: 'ZTG3A' });
+    answer = refused;
+    const unlocked = await group.unlock({ typeGroupName: 'ZTG3A' }, 'LH');
+    expect(unlocked.ok).toBe(false);
+    expect(requests).toHaveLength(2);
+    expect(client.pendingLocks).toContain('TypeGroup/ZTG3A');
+  });
+
   it('records the handle in the lock registry and releases it on unlock', async () => {
     const { connection } = recording(
       recorded('type-group-cycle-s4-2025--12-lock'),

@@ -366,7 +366,7 @@ export class AdtTypeGroup<
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E | IAdtError>> {
     const name = this.name(config);
-    return answering(
+    const answer = await answering(
       async () => {
         // UNLOCK must run stateful, or it releases nothing; stateless after.
         this.connection.setSessionType('stateful');
@@ -374,12 +374,16 @@ export class AdtTypeGroup<
           return await unlockTypeGroup(this.connection, name, lockHandle);
         } finally {
           this.connection.setSessionType('stateless');
-          this.lockTracker.untrack(name);
         }
       },
       nothing,
       options?.analyse,
     );
+    // The lock leaves the registry only when the UNLOCK was answered as a
+    // release: a refused or unanswered one may leave it held, and the
+    // registry's `unlockAll` must still be able to release it.
+    if (answer.ok) this.lockTracker.untrack(name);
+    return answer;
   }
 
   /** Activate the type group: one request, its checklist as it came. */
