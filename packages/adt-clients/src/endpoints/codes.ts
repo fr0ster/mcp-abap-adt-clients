@@ -3,10 +3,9 @@
  * `@mcp-abap-adt/interfaces-adt`.
  *
  * The tables are the library's declaration of what it serves; an object's
- * address is its code's collection (the entry's, or the code's own where it
- * differs) followed by its name — and, for a code with a parent API, the
- * parent's address followed by the child's segment. What does not follow that
- * rule is an irregular address below, typed and named with its reason.
+ * address is built by its code's record in `objects.ts`, named once per code
+ * in {@link OWN_ADDRESS} and {@link PARENTED_ADDRESS}. What has no address of
+ * its own is an irregular address below, typed and named with its reason.
  *
  * Internal. Nothing here is exported from the package.
  */
@@ -24,7 +23,38 @@ import {
   type AdtUtilityCode,
   type IAdtCodeFacts,
 } from '@mcp-abap-adt/interfaces-adt';
-import { DDIC_VIEW } from './objects';
+import {
+  ACCESS_CONTROL,
+  AUTHORIZATION_FIELD,
+  BEHAVIOR_DEFINITION,
+  CLASS,
+  DATA_ELEMENT,
+  DDIC_VIEW,
+  DDL_SOURCE,
+  DOMAIN,
+  ENHANCEMENT,
+  FEATURE_TOGGLE,
+  FUNCTION_GROUP,
+  FUNCTION_INCLUDE,
+  FUNCTION_MODULE,
+  INTERFACE,
+  MESSAGE_CLASS,
+  METADATA_EXTENSION,
+  PACKAGE,
+  PROGRAM,
+  PROGRAM_INCLUDE,
+  SCALAR_FUNCTION,
+  SCALAR_FUNCTION_IMPLEMENTATION,
+  SERVICE_BINDING,
+  SERVICE_DEFINITION,
+  STRUCTURE,
+  TABLE,
+  TABLE_SETTINGS,
+  TABLE_TYPE,
+  TEXT_ELEMENTS,
+  TRANSFORMATION,
+  TYPE_GROUP,
+} from './objects';
 
 /**
  * Every table, read as the entry shape it satisfies. The variant does not
@@ -93,6 +123,91 @@ export const NO_OWN_ADDRESS: Readonly<Partial<Record<string, string>>> =
   NO_OWN_ADDRESS_REASON;
 
 /**
+ * A code whose API the library serves no handler for yet: interfaces-adt
+ * 34.0.0's tables carry its row for a task that lands later, and no record of
+ * `objects.ts` addresses it. Its address is refused until that task writes
+ * the record.
+ */
+function notServedYet(api: AdtApiName): (name: string) => string {
+  return (name) => {
+    throw new Error(
+      `No ADT address is known for ${name}: the library serves no ${api} yet`,
+    );
+  };
+}
+
+/**
+ * Every code with an address of its own, and the record that builds it: the
+ * one place `buildObjectUri` takes an address from. Keyed by the type codes
+ * of the tables, so a code the tables add fails to compile here until its
+ * record is named.
+ */
+export const OWN_ADDRESS = {
+  'CLAS/OC': (name: string) => CLASS.uri(name),
+  'INTF/OI': (name: string) => INTERFACE.uri(name),
+  'PROG/P': (name: string) => PROGRAM.uri(name),
+  'PROG/I': (name: string) => PROGRAM_INCLUDE.uri(name),
+  'FUGR/F': (name: string) => FUNCTION_GROUP.uri(name),
+  'DEVC/K': (name: string) => PACKAGE.uri(name),
+  'DDLS/DF': (name: string) => DDL_SOURCE.uri(name),
+  'TABL/DT': (name: string) => TABLE.uri(name),
+  'TABL/DTT': (name: string) => TABLE_SETTINGS.uri(name),
+  // The code's address is a program's text elements; a function group's are
+  // the same code under `functiongroups`, named by the where-used container
+  // or the activation reference's uri.
+  'PROG/PX': (name: string) => TEXT_ELEMENTS.uri('program', name),
+  'CLAS/OCX': (name: string) => TEXT_ELEMENTS.uri('class', name),
+  'TABL/DS': (name: string) => STRUCTURE.uri(name),
+  'TTYP/DA': (name: string) => TABLE_TYPE.uri(name),
+  // The name kept as given, never case-folded: the type group's record.
+  'TYPE/DG': (name: string) => TYPE_GROUP.uri(name),
+  'DOMA/DD': (name: string) => DOMAIN.uri(name),
+  'DTEL/DE': (name: string) => DATA_ELEMENT.uri(name),
+  'DCLS/DL': (name: string) => ACCESS_CONTROL.uri(name),
+  'BDEF/BDO': (name: string) => BEHAVIOR_DEFINITION.uri(name),
+  'DDLX/EX': (name: string) => METADATA_EXTENSION.uri(name),
+  'SRVD/SRV': (name: string) => SERVICE_DEFINITION.uri(name),
+  'SRVB/SVB': (name: string) => SERVICE_BINDING.uri(name),
+  'DSFD/SCF': (name: string) => SCALAR_FUNCTION.uri(name),
+  'DSFI/SFI': (name: string) => SCALAR_FUNCTION_IMPLEMENTATION.uri(name),
+  'XSLT/VT': (name: string) => TRANSFORMATION.uri(name),
+  'MSAG/N': (name: string) => MESSAGE_CLASS.uri(name),
+  'FTG2/FT': (name: string) => FEATURE_TOGGLE.uri(name),
+  AUTH: (name: string) => AUTHORIZATION_FIELD.uri(name),
+  'ENHO/XHH': (name: string) => ENHANCEMENT.uri('enhoxhh', name),
+  'ENHO/XHB': (name: string) => ENHANCEMENT.uri('enhoxhb', name),
+  'ENHS/XSB': (name: string) => ENHANCEMENT.uri('enhsxsb', name),
+  'APLO/TYP': notServedYet('applicationLog'),
+  SAJC: notServedYet('applicationJobCatalog'),
+  SAJT: notServedYet('applicationJobTemplate'),
+} as const satisfies {
+  readonly [C in Exclude<
+    AdtTypeCode,
+    AdtParentedTypeCode | keyof typeof NO_OWN_ADDRESS_REASON
+  >]: (name: string) => string;
+};
+
+/** Every code addressed under its parent, and the record that builds it. */
+export const PARENTED_ADDRESS = {
+  'FUGR/FF': (parent: string, name: string) =>
+    FUNCTION_MODULE.uri(parent, name),
+  'FUGR/I': (parent: string, name: string) =>
+    FUNCTION_INCLUDE.uri(parent, name),
+} as const satisfies {
+  readonly [C in AdtParentedTypeCode]: (parent: string, name: string) => string;
+};
+
+/** {@link OWN_ADDRESS}, by a code's text: absent for any other code. */
+export const OWN_ADDRESS_OF: ReadonlyMap<string, (name: string) => string> =
+  new Map(Object.entries(OWN_ADDRESS));
+
+/** {@link PARENTED_ADDRESS}, by a code's text: absent for any other code. */
+export const PARENTED_ADDRESS_OF: ReadonlyMap<
+  string,
+  (parent: string, name: string) => string
+> = new Map(Object.entries(PARENTED_ADDRESS));
+
+/**
  * The codes a group operation addresses that no table of interfaces-adt
  * 21.0.0 types: `VIEW/DV`, a DDIC database view. Every release lists it
  * (`system-description-s4-2025--07-typestructure`,
@@ -130,11 +245,3 @@ export const GROUP_ONLY_ADDRESS_OF: ReadonlyMap<
   string,
   (name: string) => string
 > = new Map(Object.entries(GROUP_ONLY_ADDRESS));
-
-/** The parent's API entry in the table that names the child. */
-export function parentEntry(
-  e: ICodeEntry,
-  parent: AdtApiName,
-): AdtApiEntry<string> | undefined {
-  return e.table[parent];
-}

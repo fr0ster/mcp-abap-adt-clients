@@ -8,7 +8,6 @@
 
 import type {
   AdtParentedTypeCode,
-  AdtTypeCode,
   IAdtHeaders,
 } from '@mcp-abap-adt/interfaces-adt';
 import type {
@@ -20,15 +19,10 @@ import {
   codeEntries,
   GROUP_ONLY_ADDRESS_OF,
   NO_OWN_ADDRESS,
-  PARENTED_SEGMENT,
-  parentEntry,
+  OWN_ADDRESS_OF,
+  PARENTED_ADDRESS_OF,
 } from '../endpoints/codes';
-import { seg } from '../endpoints/objects';
 import { requestHeaders } from './requestHeaders';
-
-/** {@link PARENTED_SEGMENT}, read by any code: absent for an unparented one. */
-const PARENTED_SEGMENT_BY_CODE: Readonly<Partial<Record<string, string>>> =
-  PARENTED_SEGMENT;
 
 /**
  * What `buildObjectUri` takes after the code: the parent's name, required for
@@ -42,10 +36,10 @@ export type ParentArgument<C extends string> = [C] extends [AdtParentedTypeCode]
   : [parentName?: string];
 
 /**
- * An object's ADT address, from the type tables of
- * `@mcp-abap-adt/interfaces-adt`: its code's collection followed by its name,
- * or, for a code with a parent API, the parent's address, the code's segment
- * and its name. Used by individual and group activation, group deletion and
+ * An object's ADT address: its code's record (`OWN_ADDRESS` /
+ * `PARENTED_ADDRESS` of `endpoints/codes.ts`, keyed by the type codes of
+ * `@mcp-abap-adt/interfaces-adt`) — the same address the object's own
+ * handler sends. Used by individual and group activation, group deletion and
  * where-used.
  *
  * @param name - Object name (e.g., 'ZCL_MY_CLASS', 'Z_MY_PROGRAM')
@@ -74,32 +68,26 @@ export function buildObjectUri<C extends AdtAddressableCode>(
     throw new Error(`${type} ${name}: ${irregular}`);
   }
 
-  const { entry, facts } = first;
-  if (facts.parent === null) {
-    // A type group's name is kept as given (its record, `TYPE_GROUP.uri`);
-    // every other code's is folded to lower case by `seg`.
-    const segment = type === 'TYPE/DG' ? encodeURIComponent(name) : seg(name);
-    return `${facts.collection ?? entry.collection}/${segment}`;
-  }
+  // Each address is its code's record (`endpoints/codes.ts`), taken from a
+  // table keyed by the type codes: no branch here names a code.
+  const own = OWN_ADDRESS_OF.get(type);
+  if (own) return own(name);
 
   // A parented code is addressed under its parent, and the address means
   // nothing without it. A reference typed by its code requires the parent; one
   // typed `AdtTypeCode` may lack it, and that is the caller's argument.
-  const parent = parentEntry(first, facts.parent);
-  const segment: string | undefined = PARENTED_SEGMENT_BY_CODE[type];
+  const parented = PARENTED_ADDRESS_OF.get(type);
+  if (!parented) {
+    // A table code with no builder is a defect of this library: the typed
+    // tables in codes.ts name every code.
+    throw new Error(`The ADT type tables name no address for ${type}`);
+  }
   if (!parentName) {
     throw new Error(
-      `${type} is addressed under its parent (${facts.parent}); pass the parent's name as parentName for ${name}`,
+      `${type} is addressed under its parent (${first.facts.parent}); pass the parent's name as parentName for ${name}`,
     );
   }
-  if (!parent || !segment) {
-    // A table that names a parent API it has no entry for, or a parented code
-    // without its segment, is a defect of this library, not the caller's.
-    throw new Error(
-      `The ADT type tables name no address for ${type} under ${facts.parent}`,
-    );
-  }
-  return `${parent.collection}/${seg(parentName)}/${segment}/${seg(name)}`;
+  return parented(parentName, name);
 }
 
 /**
