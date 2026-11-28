@@ -26,7 +26,8 @@ describe('AdtUtils readings', () => {
   });
 
   /**
-   * `getObjectOutline`, the two element-info reads and `getTypeStructure` are
+   * `getObjectOutline`, `getNavigationTarget`, the two element-info reads and
+   * `getTypeStructure` are
    * the members whose reading cannot be injected yet: `IUtilResults` of interfaces-adt has no slot for
    * them, and a slot added here would make `getUtils` take a wider set than
    * the one a consumer composes from the contract package. They answer the
@@ -35,6 +36,7 @@ describe('AdtUtils readings', () => {
    */
   const AWAITING_ITS_SLOT = [
     'getObjectOutline',
+    'getNavigationTarget',
     'getStructureElementInfo',
     'getServiceDefinitionElementInfo',
     'getTypeStructure',

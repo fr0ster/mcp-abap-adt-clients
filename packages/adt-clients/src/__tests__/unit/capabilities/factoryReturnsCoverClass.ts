@@ -99,7 +99,8 @@ type ServiceBindingAtoms = LifecycleAtoms &
  * The members of `AdtUtils` no atom of interfaces-adt declares:
  * `getTypeStructure`, added for the conformance check of the ADT type tables,
  * which calls it on the class, `getObjectOutline`, an object's outline
- * (`<object uri>/objectstructure`), and the element infos of a structure and
+ * (`<object uri>/objectstructure`), `getNavigationTarget`, where a reference
+ * leads (`POST /navigation/target`), and the element infos of a structure and
  * of a service definition (`getStructureElementInfo`,
  * `getServiceDefinitionElementInfo`). Named here, not hidden: until the
  * contract package carries their atoms, a consumer's composed contract cannot
@@ -108,6 +109,7 @@ type ServiceBindingAtoms = LifecycleAtoms &
 type AwaitingItsAtom =
   | 'getTypeStructure'
   | 'getObjectOutline'
+  | 'getNavigationTarget'
   | 'getStructureElementInfo'
   | 'getServiceDefinitionElementInfo';
 

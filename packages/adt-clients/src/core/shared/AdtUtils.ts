@@ -130,6 +130,10 @@ import {
 import { checkDeletionGroup, deleteObjectsGroup } from './groupDeletion';
 import type { AdtLoggedOptions } from './handlerOptions';
 import { getInclude as getIncludeUtil } from './include';
+import {
+  getNavigationTarget as getNavigationTargetUtil,
+  type INavigationTargetRequest,
+} from './navigationTarget';
 import { fetchNodeStructure as fetchNodeStructureUtil } from './nodeStructure';
 import { getObjectProperties as getObjectPropertiesUtil } from './objectProperties';
 import {
@@ -1228,6 +1232,49 @@ export class AdtUtils<
       () =>
         getObjectOutlineUtil(this.connection, objectType, objectName, {
           version: options?.version,
+          accept: options?.accept,
+        }),
+      rawDocument,
+      options?.analyse,
+    );
+  }
+
+  /**
+   * Where a reference leads — `POST /sap/bc/adt/navigation/target?uri=…`, one
+   * request, no body. Given an outline's name fragment
+   * (`<include>/source/main#type=PROG%2FPU;name=…`) SAP answers an
+   * `adtcore:objectReference` whose `uri` names the include and the start,
+   * `#start=line,column` (measured on premise and on ABAP cloud). The end is
+   * not given. `@mcp-abap-adt/adt-strategies`' `readNavigationTarget` reads it.
+   *
+   * **The document as it came, always**, as for `getObjectOutline`:
+   * `IUtilResults` of interfaces-adt has no slot for this member yet.
+   *
+   * @param uri - The reference, as the outline's link names it; sent as the
+   *   `uri` query value, encoded once
+   * @param options.filter - The template's `filter`, sent only when given
+   * @param options.fullname - The template's `fullname`, sent only when given
+   * @param options.accept - The Accept to send; `application/xml` by default
+   */
+  getNavigationTarget<E extends IAdtError>(
+    uri: string,
+    options: (INavigationTargetRequest & IAdtAnalyseOptions<E>) & {
+      analyse: IAnalyse<E>;
+    },
+  ): Promise<IAdtResponse<string, E | IAdtError>>;
+  getNavigationTarget(
+    uri: string,
+    options?: INavigationTargetRequest & IAdtAnalyseOptions<IAdtError>,
+  ): Promise<IAdtResponse<string, IAdtError>>;
+  async getNavigationTarget<E extends IAdtError = IAdtError>(
+    uri: string,
+    options?: INavigationTargetRequest & IAdtAnalyseOptions<E>,
+  ): Promise<IAdtResponse<string, E | IAdtError>> {
+    return answering(
+      () =>
+        getNavigationTargetUtil(this.connection, uri, {
+          filter: options?.filter,
+          fullname: options?.fullname,
           accept: options?.accept,
         }),
       rawDocument,
