@@ -48,15 +48,67 @@ const configExtensions = [];
 async function writeAndActivate(handler, config, options, logger) {
   await writeSource(handler, config, options, logger);
   if (typeof handler.activate === 'function') {
-    // `analyseActivation` reads the verdict inside the 200:
-    // activationExecuted="false" or a message of type E is a refusal.
+    // `analyseActivation` reads the verdict inside the 200: a message of type
+    // E is a refusal. A checklist that leaves the outcome to the inactive
+    // list — a re-activation with nothing to do answers the silent one —
+    // is decided by the list, which the caller reads since adt-clients
+    // 49.0.0 (the member sends the activation alone).
     const activated = await handler.activate(config, {
       headers: integrationHeadersOf(handler, 'activate', config),
       analyse: judged(analyseActivation),
     });
     if (activated && activated.ok === false) {
-      throw new Error(failureOf(activated, 'activate'));
+      const {
+        readUnstatedActivation,
+      } = require('@mcp-abap-adt/adt-strategies');
+      // The failure carries the activation's answer it was read from.
+      const answer = activated.getError().response;
+      if (!answer || readUnstatedActivation(answer) === undefined) {
+        throw new Error(failureOf(activated, 'activate'));
+      }
+      await inactiveListDecides(handler, config, logger);
     }
+  }
+}
+
+/**
+ * After a checklist that leaves the outcome to the inactive list: the list
+ * decides. The object is activated when no listed object carries one of the
+ * names its config names (its own, its parent's: a parent still listed fails
+ * the setup too, which is the safe side for a shared dependency); a list
+ * that cannot be read, or that lists one, throws.
+ */
+async function inactiveListDecides(handler, config, logger) {
+  const { AdtUtils } = require('../../core/shared/AdtUtils');
+  const { utilDocuments } = require('../../core/shared/utilResultSet');
+  const { utilInactiveObjects } = require('@mcp-abap-adt/adt-strategies');
+  const utils = new AdtUtils(handler.connection, {
+    logger,
+    results: { ...utilDocuments, inactive: utilInactiveObjects },
+  });
+  const listed = await utils.getInactiveObjects({ analyse: analyseException });
+  if (!listed.ok) {
+    throw new Error(failureOf(listed, 'read the inactive list after activate'));
+  }
+  const names = new Set(
+    Object.entries(config)
+      .filter(
+        ([key, value]) =>
+          key.endsWith('Name') &&
+          key !== 'packageName' &&
+          typeof value === 'string',
+      )
+      .map(([, value]) => value.toUpperCase()),
+  );
+  const still = (listed.getResult().value?.objects ?? []).filter((o) =>
+    names.has(String(o.name ?? '').toUpperCase()),
+  );
+  if (still.length > 0) {
+    throw new Error(
+      `activate: SAP answered no verdict and the inactive list still names ${still
+        .map((o) => `${o.type} ${o.name}`)
+        .join(', ')}`,
+    );
   }
 }
 
