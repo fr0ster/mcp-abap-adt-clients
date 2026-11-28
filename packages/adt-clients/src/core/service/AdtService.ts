@@ -44,7 +44,6 @@ import {
 } from '../../constants/contentTypes';
 import { TYPE_CODE } from '../../constants/typeCodes';
 import { SERVICE_BINDING } from '../../endpoints/objects';
-import { answeringActivation } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { buildQueryString, limitDescription } from '../../utils/internalUtils';
@@ -859,10 +858,9 @@ export class AdtServiceBinding<
 
     const name = this.name(config);
 
-    return answeringActivation(
-      connection,
-      (sent) =>
-        this.activateRequest(sent, options.headers, {
+    return answering(
+      () =>
+        this.activateRequest(connection, options.headers, {
           bindingName: name,
           preauditRequested: options.preauditRequested ?? true,
         }),

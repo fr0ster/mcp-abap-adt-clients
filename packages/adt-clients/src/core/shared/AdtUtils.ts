@@ -169,10 +169,7 @@ import {
   codeHas,
   isGroupOnlyCode,
 } from '../../endpoints/codes';
-import {
-  answeringActivation,
-  buildObjectUri,
-} from '../../utils/activationUtils';
+import { buildObjectUri } from '../../utils/activationUtils';
 // Import types
 import {
   type AdtActivationCode,
@@ -672,10 +669,14 @@ export class AdtUtils<
       objects.filter((o) => !isActivatedWithoutTable(o.type)),
       'activate',
     );
-    return answeringActivation(
-      this.connection,
-      (sent) =>
-        activateObjects(sent, options.headers, objects, preauditRequested),
+    return answering(
+      () =>
+        activateObjects(
+          this.connection,
+          options.headers,
+          objects,
+          preauditRequested,
+        ),
       this.results.objectActivation,
       options?.analyse,
     );

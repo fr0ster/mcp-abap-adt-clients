@@ -55,7 +55,6 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { PROGRAM } from '../../endpoints/objects';
-import { answeringActivation } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
@@ -593,11 +592,10 @@ export class AdtProgram<
     // The caller's deadline, if they set one, on every request below.
     const connection = withCallTimeout(this.connection, options?.timeout);
 
-    return answeringActivation(
-      connection,
-      (sent) =>
+    return answering(
+      () =>
         activateProgram(
-          sent,
+          connection,
           options.headers,
           config.programName,
           options.preauditRequested ?? true,
