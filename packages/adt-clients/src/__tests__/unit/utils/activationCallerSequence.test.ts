@@ -1,11 +1,13 @@
 /**
- * The one read after a checklist that does not state its outcome
- * (fr0ster/mcp-abap-adt#351, #360): when an activation answers
- * `chkl:messages` with `activationExecuted="false"` and no message, or with
- * no `activationExecuted` and only `W`/`I`/`S` messages, the member reads
- * `GET /sap/bc/adt/activation/inactiveobjects` once and hands `analyse` the
- * list and the uris its request named; after every other answer it sends
- * nothing more.
+ * The inactive list after a checklist that does not state its outcome
+ * (fr0ster/mcp-abap-adt#351, #360), read by the caller (C7, 49.0.0): the
+ * member sends the activation alone, and the caller — when
+ * `readUnstatedActivation` answers `silent` or `unstated` — reads
+ * `getUtils().getInactiveObjects()` and hands it, with the uris the request
+ * named, to `analyseActivation` (`helpers/activationJudged.ts`, the recipe).
+ * These are 48.0.0's cases of the member's own read, rewritten over the
+ * caller's two calls; `activationEquivalence.test.ts` compares the recipe with
+ * 48.0.0's verdicts on every recorded answer.
  *
  * The answers are the recorded ones (`corpus/adt/answers/`), replayed by a
  * stub connection that answers by request.
@@ -13,7 +15,8 @@
 import { join } from 'node:path';
 import {
   analyseActivation,
-  readActivationRefusal,
+  type IAdtActivationFailure,
+  readUnstatedActivation,
 } from '@mcp-abap-adt/adt-strategies';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import {
@@ -29,8 +32,10 @@ import {
   type IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClient } from '../../../clients/AdtClient';
-import { answeringActivation } from '../../../utils/activationUtils';
-import { rawDocument } from '../../../utils/resultStrategy';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
+import { buildObjectUri } from '../../../utils/activationUtils';
+import { wireItself } from '../../../utils/resultStrategy';
+import { activationJudged } from '../../helpers/activationJudged';
 import { headersOf } from '../../helpers/adtHeaders';
 import { readExchange } from '../../helpers/recordedConformance';
 import { CriticalSectionConnection } from '../../helpers/recordingConnection';
@@ -160,14 +165,41 @@ async function activateGroup<E extends IAdtError>(
   return { answer, sent };
 }
 
-describe('the read after a silent checklist', () => {
-  it('reads the inactive list once, and hands it with the named uris', async () => {
-    const { analyse, seen } = spying();
-    const { sent } = await activateGroup(
-      { activation: SILENT, inactive: LISTED },
-      analyse,
-    );
+/** The uris the group's activation names (`activationNamesItsUris.test.ts`). */
+const NAMED = [
+  buildObjectUri('ZACT751P9325', 'FUGR/F'),
+  `${buildObjectUri('ZACT751P9325', 'FUGR/F')}/source/main`,
+];
 
+/** The group's activation, judged by the caller's recipe. */
+async function judgedGroup(replay: IReplay) {
+  const { client, sent } = replaying(replay);
+  const group = client.getFunctionGroup();
+  const utils = client.getUtils({ ...utilDocuments, inactive: wireItself });
+  const judged = await activationJudged(
+    (analyse) =>
+      group.activate(
+        { functionGroupName: 'ZACT751P9325' },
+        { headers: headersOf(group, 'activate'), analyse },
+      ),
+    () => utils.getInactiveObjects(),
+    NAMED,
+  );
+  return { judged, sent };
+}
+
+/** The verdict as the activation's failure; a throw when it is none. */
+function failureOf(verdict: IAdtActivationFailure | AdtNoFailure) {
+  if (verdict === ADT_NO_FAILURE) throw new Error('expected a failure');
+  return verdict;
+}
+
+describe("after a silent checklist, the caller's read", () => {
+  it('the member sends one POST; the caller reads the list once, with its Accept', async () => {
+    const { sent, judged } = await judgedGroup({
+      activation: SILENT,
+      inactive: LISTED,
+    });
     expect(sent.map((r) => [r.method, r.url])).toEqual([
       ['POST', '/sap/bc/adt/activation?method=activate&preauditRequested=true'],
       ['GET', INACTIVE],
@@ -176,35 +208,26 @@ describe('the read after a silent checklist', () => {
       Accept:
         'application/vnd.sap.adt.inactivectsobjects.v1+xml, application/xml;q=0.8',
     });
-    expect(seen).toHaveLength(1);
-    expect(seen[0]?.verdict).toBe(ADT_NO_FAILURE);
-    // The client puts the request back on every answer (`withRequestTrace`),
-    // so the answers handed on are the recorded ones with their request.
-    expect(seen[0]?.answer).toMatchObject(SILENT);
-    expect(seen[0]?.context?.activation?.named).toEqual([
-      GROUP,
-      `${GROUP}/source/main`,
-    ]);
-    expect(seen[0]?.context?.activation?.inactiveObjects).toMatchObject({
-      ...LISTED,
-      request: { method: 'GET', url: INACTIVE },
+    expect(judged.listRead).toBe(true);
+    expect(judged.answer).toMatchObject(SILENT);
+  });
+
+  it('the uris the caller names are the ones the POST sent', async () => {
+    const { sent } = await judgedGroup({
+      activation: SILENT,
+      inactive: LISTED,
     });
+    expect(urisIn(sent[0]?.data)).toEqual(NAMED);
   });
 
   it('analyseActivation then answers not activated, the group still listed', async () => {
-    const { answer } = await activateGroup(
-      { activation: SILENT, inactive: LISTED },
-      analyseActivation,
+    const { judged } = await judgedGroup({
+      activation: SILENT,
+      inactive: LISTED,
+    });
+    expect(failureOf(judged.verdict).stillInactive.map((o) => o.uri)).toEqual(
+      NAMED,
     );
-    expect(answer.ok).toBe(false);
-    if (answer.ok) return;
-    const failure = answer.getError();
-    if (!('stillInactive' in failure))
-      throw new Error('expected the activation failure');
-    expect(failure.stillInactive.map((o) => o.uri)).toEqual([
-      GROUP,
-      `${GROUP}/source/main`,
-    ]);
   });
 
   it.each([
@@ -244,145 +267,76 @@ describe('the read after a silent checklist', () => {
         `<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="${CHECKLIST_NS}"><chkl:properties checkExecuted="true"/></chkl:messages>`,
       ),
     ],
-  ])('after %s nothing more is sent', async (_what, activation) => {
-    const { analyse, seen } = spying();
-    const { sent } = await activateGroup({ activation }, analyse);
+  ])('after %s the caller reads nothing', async (_what, activation) => {
+    const { sent, judged } = await judgedGroup({ activation });
+    expect(readUnstatedActivation(activation)).toBeUndefined();
     expect(sent.map((r) => r.method)).toEqual(['POST']);
-    expect(seen[0]?.context).toBeUndefined();
+    expect(judged.listRead).toBe(false);
   });
 
-  it('a read that fails is the call failure, carrying its response', async () => {
-    const { analyse, seen } = spying();
-    const { answer } = await activateGroup(
-      { activation: SILENT, inactive: refused(500) },
-      analyse,
-    );
-
-    expect(answer.ok).toBe(false);
-    if (answer.ok) return;
-    const failure = answer.getError();
+  it("a read that fails replaces the starting verdict with the read's failure, carrying its response", async () => {
+    const { judged } = await judgedGroup({
+      activation: SILENT,
+      inactive: refused(500),
+    });
+    const failure = failureOf(judged.verdict);
     expect(failure.message).toContain(
       "activation's outcome could not be decided",
     );
     expect(failure.response?.status).toBe(500);
-    expect(seen[0]?.verdict).not.toBe(ADT_NO_FAILURE);
-    expect(seen[0]?.context).toBeUndefined();
-  });
-
-  it('a read that fails stays a failure without an analyse', async () => {
-    const { client } = replaying({
-      activation: SILENT,
-      inactive: refused(500),
-    });
-    const group = client.getFunctionGroup();
-    const answer = await group.activate(
-      { functionGroupName: 'ZACT751P9325' },
-      { headers: headersOf(group, 'activate') },
-    );
-    expect(answer.ok).toBe(false);
+    // The activation's answer stays the answer.
+    expect(judged.answer).toMatchObject(SILENT);
   });
 });
 
-describe('the read after a checklist with no verdict and warnings alone', () => {
+describe("after a checklist with no verdict and warnings alone, the caller's read", () => {
   it.each([
     ['the 7.52 shape', UNSTATED_WARNING],
     ['an I', unstatedWith('I')],
     ['an S', unstatedWith('S')],
-  ])('after %s it reads the inactive list once', async (_what, activation) => {
-    const { analyse, seen } = spying();
-    const { sent } = await activateGroup(
-      { activation, inactive: EMPTY },
-      analyse,
-    );
+  ])('after %s the caller reads the list once', async (_what, activation) => {
+    const { sent } = await judgedGroup({ activation, inactive: EMPTY });
     expect(sent.map((r) => [r.method, r.url])).toEqual([
       ['POST', '/sap/bc/adt/activation?method=activate&preauditRequested=true'],
       ['GET', INACTIVE],
     ]);
-    expect(seen[0]?.context?.activation?.named).toEqual([
-      GROUP,
-      `${GROUP}/source/main`,
-    ]);
   });
 
-  it('analyseActivation: none listed is activated, the warning kept in the document', async () => {
-    const { answer } = await activateGroup(
-      { activation: UNSTATED_WARNING, inactive: EMPTY },
-      analyseActivation,
-    );
-    expect(answer.ok).toBe(true);
-    if (!answer.ok) return;
-    expect(answer.getResult().value).toContain(
-      'Program ZUNITTEST_MOCKUP_LOADER_EXMPL',
+  it('none listed is activated', async () => {
+    const { judged } = await judgedGroup({
+      activation: UNSTATED_WARNING,
+      inactive: EMPTY,
+    });
+    expect(judged.verdict).toBe(ADT_NO_FAILURE);
+  });
+
+  it('the group still listed is not activated', async () => {
+    const { judged } = await judgedGroup({
+      activation: UNSTATED_WARNING,
+      inactive: LISTED,
+    });
+    expect(failureOf(judged.verdict).stillInactive.map((o) => o.uri)).toEqual(
+      NAMED,
     );
   });
 
-  it('analyseActivation: the group still listed is not activated', async () => {
-    const { answer } = await activateGroup(
-      { activation: UNSTATED_WARNING, inactive: LISTED },
-      analyseActivation,
-    );
-    expect(answer.ok).toBe(false);
-    if (answer.ok) return;
-    const failure = answer.getError();
-    if (!('stillInactive' in failure))
-      throw new Error('expected the activation failure');
-    expect(failure.stillInactive.map((o) => o.uri)).toEqual([
-      GROUP,
-      `${GROUP}/source/main`,
-    ]);
-  });
-
-  it('a refused read leaves the verdict as it was, its response the list', async () => {
-    const { analyse, seen } = spying();
-    const { answer } = await activateGroup(
-      { activation: UNSTATED_WARNING, inactive: refused(500) },
-      analyse,
-    );
-    expect(answer.ok).toBe(true);
-    expect(seen[0]?.verdict).toBe(ADT_NO_FAILURE);
-    expect(seen[0]?.context?.activation?.inactiveObjects.status).toBe(500);
-  });
-
-  it('a read with no response hands no list', async () => {
-    const { analyse, seen } = spying();
-    const { answer } = await activateGroup(
-      { activation: UNSTATED_WARNING, inactive: new Error('socket hang up') },
-      analyse,
-    );
-    expect(answer.ok).toBe(true);
-    expect(seen[0]?.verdict).toBe(ADT_NO_FAILURE);
-    expect(seen[0]?.context).toBeUndefined();
-  });
-
-  it('without an analyse the answer is what it was before the read existed', async () => {
-    const { client, sent } = replaying({
+  it("a refused read keeps the starting verdict; the refusal's response is the list, which cannot be read", async () => {
+    const { judged } = await judgedGroup({
       activation: UNSTATED_WARNING,
       inactive: refused(500),
     });
-    const group = client.getFunctionGroup();
-    const answer = await group.activate(
-      { functionGroupName: 'ZACT751P9325' },
-      { headers: headersOf(group, 'activate') },
-    );
-    expect(sent.map((r) => r.method)).toEqual(['POST', 'GET']);
-    expect(answer.ok).toBe(true);
+    const failure = failureOf(judged.verdict);
+    expect(failure.message).toContain('the inactive list could not be read');
+    expect(failure.response?.status).toBe(200);
   });
 
-  it.each([
-    ['refused', refused(500)],
-    ['with no response', new Error('socket hang up')],
-  ])('analyseActivation: a read %s is undecided', async (_what, inactive) => {
-    const { answer } = await activateGroup(
-      { activation: UNSTATED_WARNING, inactive },
-      analyseActivation,
-    );
-    expect(answer.ok).toBe(false);
-    if (answer.ok) return;
-    expect(answer.getError().message).toContain(
-      'SAP answered no activationExecuted verdict and only warnings',
-    );
-    expect(answer.getError().message).toContain(
-      "the activation's outcome could not be decided",
+  it('a read with no response hands no list: undecided without it', async () => {
+    const { judged } = await judgedGroup({
+      activation: UNSTATED_WARNING,
+      inactive: new Error('socket hang up'),
+    });
+    expect(failureOf(judged.verdict).message).toContain(
+      "without the list of inactive objects the activation's outcome could not be decided",
     );
   });
 });
@@ -395,34 +349,6 @@ function urisIn(body: unknown): string[] {
     .slice(1)
     .map((rest) => rest.slice(0, rest.indexOf('"')));
 }
-
-describe.each([
-  ['a silent checklist', SILENT],
-  ['a checklist with no verdict and warnings alone', UNSTATED_WARNING],
-])('every activation member reads after %s', (_what, activation) => {
-  it.each(ACTIVATING_APIS)(
-    '%s reads once and names what its request named',
-    async (api) => {
-      const { analyse, seen } = spying();
-      const { handler, config, calls } = activatingHandler(
-        api,
-        activation.data,
-      );
-      await handler.activate(config, {
-        headers: headersOf(handler, 'activate', config),
-        analyse,
-      });
-
-      const posts = calls.filter((c) => c.method === 'POST');
-      expect(calls.map((c) => c.method)).toEqual(['POST', 'GET']);
-      expect(calls[1]?.url).toBe(INACTIVE);
-      expect(seen[0]?.context?.activation?.named).toEqual(
-        urisIn(posts[0]?.data),
-      );
-      expect(seen[0]?.context?.activation?.named.length).toBeGreaterThan(0);
-    },
-  );
-});
 
 /**
  * An activation SAP executed and cancelled (V6, recorded 2026-11-19 on
@@ -491,150 +417,6 @@ describe.each([
   },
 );
 
-describe('the session mark: each answer names the request it is built from', () => {
-  /**
-   * Regression checks (interfaces-adt 27.3.0): the activation's answer and
-   * the read after it are two requests. A failure carries the facts of the
-   * request it was built from; a success the mark of the answer it was read
-   * from. After a marked answer connection 23.0.0 rejects every later request
-   * of the instance `ADT_NOT_CONNECTED`.
-   */
-  const REPLACED = ADT_SESSION_ERROR.SESSION_REPLACED;
-
-  function connectionAnswering(
-    activation: IAdtWireResponse,
-    inactive: IAdtWireResponse | Error,
-  ): IAbapConnection {
-    return {
-      connect: async () => undefined,
-      getBaseUrl: async () => undefined,
-      getSessionId: () => null,
-      setSessionType: () => undefined,
-      makeAdtRequest: async <T, D>(options: { url: string }) => {
-        const answer = options.url === INACTIVE ? inactive : activation;
-        if (answer instanceof Error) throw answer;
-        return answer as IAdtWireResponse<T, D>;
-      },
-    };
-  }
-
-  const activate = (connection: IAbapConnection) =>
-    connection.makeAdtRequest({
-      method: 'POST',
-      url: '/sap/bc/adt/activation',
-      timeout: 0,
-      data: `<adtcore:objectReference adtcore:uri="${GROUP}"/>`,
-    });
-
-  const spent = () =>
-    Object.assign(new Error('the session is gone'), {
-      code: ADT_SESSION_ERROR.NOT_CONNECTED,
-    });
-
-  it("a marked activation whose read is refused: the read's code, no mark", async () => {
-    const answer = await answeringActivation(
-      connectionAnswering({ ...SILENT, sessionLost: REPLACED }, spent()),
-      activate,
-      rawDocument,
-    );
-
-    expect(answer.ok).toBe(false);
-    if (answer.ok) return;
-    expect(answer.getError().sessionError).toBe(
-      ADT_SESSION_ERROR.NOT_CONNECTED,
-    );
-    expect('sessionLost' in answer.getError()).toBe(false);
-  });
-
-  it("cleared, the success carries the activation answer's mark", async () => {
-    const clears: IAnalyse = () => ADT_NO_FAILURE;
-    const answer = await answeringActivation(
-      connectionAnswering({ ...SILENT, sessionLost: REPLACED }, spent()),
-      activate,
-      rawDocument,
-      clears,
-    );
-
-    expect(answer.ok).toBe(true);
-    if (!answer.ok) return;
-    expect(answer.getResult().sessionLost).toBe(REPLACED);
-  });
-
-  it('a marked read after an unmarked activation: no mark on the answer', async () => {
-    const answer = await answeringActivation(
-      connectionAnswering(SILENT, { ...LISTED, sessionLost: REPLACED }),
-      activate,
-      rawDocument,
-      () => ADT_NO_FAILURE,
-    );
-
-    expect(answer.ok).toBe(true);
-    if (!answer.ok) return;
-    expect('sessionLost' in answer.getResult()).toBe(false);
-  });
-});
-
-/**
- * A message's type as SAP may spell it: the client reads the list after
- * exactly the types adt-strategies reads as `W`, `I` or `S` (its
- * `severity()`), so the reading never meets a checklist it would decide by a
- * list the client did not read. Pinned by behaviour: for each spelling, the
- * client reads the list exactly when `readActivationRefusal`, given no list,
- * answers that the outcome could not be decided without it.
- */
-describe('the client reads the list after the types the strategy reads as warnings', () => {
-  const SPELLINGS = [
-    'W',
-    'w',
-    ' W ',
-    'warning',
-    'Warning',
-    'WARN',
-    'I',
-    'info',
-    'Information',
-    'S',
-    'success',
-    'OK',
-    'tolerable',
-    'E',
-    'error',
-    'critical',
-    'fatal',
-    'A',
-    'X',
-    '',
-    'unknown',
-  ];
-
-  it.each(SPELLINGS)('type="%s"', async (type) => {
-    const document = unstatedWith(type);
-    const { analyse } = spying();
-    const { sent } = await activateGroup(
-      { activation: document, inactive: EMPTY },
-      analyse,
-    );
-    const read = sent.some((r) => r.url === INACTIVE);
-    const decidedByList =
-      readActivationRefusal(document.data)?.message.includes(
-        'without the list of inactive objects',
-      ) === true;
-    expect(read).toBe(decidedByList);
-  });
-
-  it.each(['warning', 'Information', 'success', 'OK', 'tolerable'])(
-    'type="%s" is read after',
-    async (type) => {
-      const { analyse } = spying();
-      const { sent } = await activateGroup(
-        { activation: unstatedWith(type), inactive: EMPTY },
-        analyse,
-      );
-      expect(sent.map((r) => r.method)).toEqual(['POST', 'GET']);
-    },
-  );
-});
-
 describe('a credential refusal SAP never saw, on the read, is thrown as it came', () => {
   /** A refusal the provider raised before SAP was asked (as the sweep builds one). */
   function providerRefused(): AuthRefusedError {
@@ -650,8 +432,8 @@ describe('a credential refusal SAP never saw, on the read, is thrown as it came'
     ['a checklist with no verdict and warnings alone', UNSTATED_WARNING],
   ])('after %s', async (_what, activation) => {
     const refusal = providerRefused();
-    const { analyse } = spying();
-    const answered = activateGroup({ activation, inactive: refusal }, analyse);
-    await expect(answered).rejects.toBe(refusal);
+    await expect(judgedGroup({ activation, inactive: refusal })).rejects.toBe(
+      refusal,
+    );
   });
 });
