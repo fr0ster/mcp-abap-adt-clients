@@ -1392,19 +1392,24 @@ export class AdtUtils<
   }
 
   /**
-   * Get all valid ADT object types
+   * Get the repository's ADT object types
    *
-   * Retrieves list of all valid ADT object types from the repository.
+   * Reads what SAP answers for the count given (`maxItemCount`), or for none
+   * (SAP's own bound).
    *
-   * @param maxItemCount - Maximum number of items to return (default: 999)
+   * @param maxItemCount - Maximum number of items to return, sent as given;
+   *   none given, none is sent and SAP's own bound applies (100 on the BTP
+   *   ABAP environment, 2026-11-27)
    * @param name - Name filter pattern (default: '*')
    * @param data - Data filter (default: 'usedByProvider')
-   * @returns Axios response with XML containing all object types
+   * @returns The object types list: as many types as `maxItemCount` asks
+   *   for, or SAP's own bound (100) without one
    *
    * @example
    * ```typescript
-   * const response = await utils.getAllTypes();
-   * // Response contains XML with all ADT object types
+   * // The bound the library used to send, 999, read all 375 types on the BTP
+   * // ABAP environment (2026-11-27); 2147483647 is the largest SAP accepts.
+   * const response = await utils.getAllTypes(2147483647);
    * ```
    */
   getAllTypes<E extends IAdtError>(
@@ -1420,7 +1425,7 @@ export class AdtUtils<
     options?: IAdtAnalyseOptions<IAdtError>,
   ): Promise<IAdtResponse<T['types'], IAdtError>>;
   async getAllTypes<E extends IAdtError = IAdtError>(
-    maxItemCount: number = 999,
+    maxItemCount?: number,
     name: string = '*',
     data: string = 'usedByProvider',
     options?: IAdtAnalyseOptions<E>,

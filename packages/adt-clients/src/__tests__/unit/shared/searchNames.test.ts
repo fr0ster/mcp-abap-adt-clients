@@ -86,7 +86,7 @@ describe('search: the filter is a search name of the variant', () => {
     const { connection, utils } = utilsOf<'onprem'>();
     await utils.search({ query: 'Z*' });
     expect(connection.sent.map((request) => request.url)).toEqual([
-      `${SEARCH}&query=Z*&maxResults=100`,
+      `${SEARCH}&query=Z*`,
     ]);
   });
 });
