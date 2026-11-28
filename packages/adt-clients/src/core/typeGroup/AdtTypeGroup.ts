@@ -51,7 +51,11 @@ import {
 import { createLanguage } from '../../utils/xml';
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
-import { createLockTracker, type LockTracker } from '../shared/LockRegistry';
+import {
+  createLockTracker,
+  failedWireStatus,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateTypeGroup } from './activation';
 import { createTypeGroup } from './create';
@@ -366,12 +370,22 @@ export class AdtTypeGroup<
     options?: IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<void, E | IAdtError>> {
     const name = this.name(config);
-    const answer = await answering(
+    return answering(
       async () => {
         // UNLOCK must run stateful, or it releases nothing; stateless after.
         this.connection.setSessionType('stateful');
         try {
-          return await unlockTypeGroup(this.connection, name, lockHandle);
+          const unlocked = await unlockTypeGroup(
+            this.connection,
+            name,
+            lockHandle,
+          );
+          // The registry records SAP's state, not the caller's verdict: the
+          // lock leaves it only when SAP answered the UNLOCK with a 2xx,
+          // before any `analyse` runs. A refused or unanswered UNLOCK may
+          // leave the lock held, and `unlockAll` must still release it.
+          if (!failedWireStatus(unlocked)) this.lockTracker.untrack(name);
+          return unlocked;
         } finally {
           this.connection.setSessionType('stateless');
         }
@@ -379,11 +393,6 @@ export class AdtTypeGroup<
       nothing,
       options?.analyse,
     );
-    // The lock leaves the registry only when the UNLOCK was answered as a
-    // release: a refused or unanswered one may leave it held, and the
-    // registry's `unlockAll` must still be able to release it.
-    if (answer.ok) this.lockTracker.untrack(name);
-    return answer;
   }
 
   /** Activate the type group: one request, its checklist as it came. */

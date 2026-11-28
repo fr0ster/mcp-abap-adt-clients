@@ -372,6 +372,32 @@ describe('lock and unlock', () => {
     expect(client.pendingLocks).toContain('TypeGroup/ZTG3A');
   });
 
+  it("keeps the lock when SAP refuses the UNLOCK, even when the caller's analyse clears it", async () => {
+    let status = 200;
+    const connection = {
+      setSessionType: () => undefined,
+      isConnected: () => true,
+      makeAdtRequest: async () => {
+        const answer = {
+          ...recorded('type-group-cycle-s4-2025--12-lock'),
+          status,
+        };
+        if (status >= 400) throw { message: 'refused', response: answer };
+        return answer;
+      },
+    } as unknown as IAbapConnection;
+    const client = new AdtClientOnPrem(connection);
+    const group = client.getTypeGroup();
+    await group.lock({ typeGroupName: 'ZTG3A' });
+    status = 403;
+    const unlocked = await group.unlock({ typeGroupName: 'ZTG3A' }, 'LH', {
+      analyse: () => ADT_NO_FAILURE,
+    });
+    // The caller judged it no failure; SAP's state is still a held lock.
+    expect(unlocked.ok).toBe(true);
+    expect(client.pendingLocks).toContain('TypeGroup/ZTG3A');
+  });
+
   it('records the handle in the lock registry and releases it on unlock', async () => {
     const { connection } = recording(
       recorded('type-group-cycle-s4-2025--12-lock'),
