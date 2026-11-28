@@ -1750,6 +1750,26 @@ On a legacy system (`@mcp-abap-adt/adt-clients-legacy`) `getSqlQuery` and `getTa
 without a request (`origin: 'refusal'`, `UNSUPPORTED_OPERATION`) — the endpoint
 is not there.
 
+**`getSqlQuery` sends `row_number` as given, and none when none is given.**
+`rowNumber` carries the caller's bound exactly, `0` included; without one the
+URL carries no `rowNumber` and SAP's own bound applies: 100 records, measured on
+the BTP ABAP environment (2026-11-27). There SAP refused `0`, a negative number
+and 2147483647 with `400` ("If UP TO or OFFSET is used, … cannot be
+specified"); 2147483646 was the largest accepted. Until 48.0.0 a missing or `0`
+bound was sent as 100.
+
+**`getTableContents` sends `max_rows` as given, and none when none is given.**
+`/datapreview/ddic` gets `rowNumber` exactly as given; without one the URL
+carries none, and SAP answered 101 records (its 100 and one more) and ignored
+`0` the same way (BTP ABAP environment, 2026-11-27). Until 48.0.0 a missing or
+`0` bound was sent as 100.
+
+**`getAllTypes` sends `maxItemCount` as given, and none when none is given.**
+It answers what SAP answers for that count: without one 100 of 375 object types
+(`0` and `-1` the same), 999 to 2147483647 all 375, 2147483648 refused `400`
+(BTP ABAP environment, 2026-11-27). A caller that wants every type passes a
+count, e.g. 2147483647. Until 48.0.0 a missing one was sent as 999.
+
 **`getSqlQuery` sends a line longer than 255 characters wrapped.** The
 freestyle preview (`/datapreview/freestyle`) keeps the first 255 characters of
 each line of the statement and drops the rest without a word (measured on
@@ -2157,7 +2177,9 @@ if (!listed.ok) {
 
 `search(criteria, options?)` is one `GET
 /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=…&maxResults=…`
-(`maxResults` 100 when not given), `Accept: application/xml`, with
+(`maxResults` exactly as given, `0` included, and none when not given: SAP's
+own bound then applies — 200 hits, measured on the BTP ABAP environment
+2026-11-27, where `maxResults=0` answered 200 too), `Accept: application/xml`, with
 `&objectType=<name>` when `criteria.objectType` is given. The default `search`
 slot answers the `adtcore:objectReferences` document as it came;
 `utilSearchHits` from `@mcp-abap-adt/adt-strategies` reads it into hits.
@@ -2820,8 +2842,9 @@ document; no finding model is published, because none has been confirmed
 against more than one system.
 
 `maximumVerdicts` (an option of `startRun`) is a **cap on results**, not a page
-size. Defaults to 100; a caller wanting everything raises it rather than
-paging. It must be a positive integer, and the object set must not be empty —
+size. Not given, the run payload carries none, and the cap is SAP's (SAP
+accepted such a run on the BTP ABAP environment, 2026-11-27; until 48.0.0 the
+library sent 100). Given, it must be a positive integer, and the object set must not be empty —
 both thrown before the request, because the argument is what is wrong.
 
 **Nothing here turns a missing value into a verdict.** Until 23.0.0 the chain

@@ -88,6 +88,31 @@ decision 53). See [MIGRATION-49.md](docs/usage/MIGRATION-49.md).
   settings as a caller. README, CLIENT_API_REFERENCE, ERRATA, DECISIONS
   (decision 20) and MIGRATION-49.
 
+fr0ster/mcp-abap-adt#391: the library picks no bound of its own. A bound the
+caller gives goes out exactly as given, `0` included; without one the request
+carries none, and SAP's own bound applies. Measured on the BTP ABAP environment
+(2026-11-27).
+
+### Fixed
+
+- **`getSqlQuery` sends `row_number` as given, and no `rowNumber` without
+  one.** A missing or `0` bound was sent as 100. Without `rowNumber` SAP answers
+  100 records (selections of 163, 249, 1716 and 8466 measured); it refuses `0`,
+  a negative number and 2147483647 with `400`, and 2147483646 was the largest
+  it accepted.
+- **`search` sends `maxResults` as given, and none without one.** A missing or
+  `0` bound was sent as 100. Without `maxResults` the quick search answers 200
+  hits (of 8886 measured), and `maxResults=0` answers 200 too.
+- **`getAllTypes` sends no `maxItemCount` without one.** A missing one was
+  sent as 999. Without it SAP answers 100 object types of 375, `0` the same;
+  999 and 100000 answer all 375.
+- **`getTableContents` sends `max_rows` as given, and no `rowNumber` without
+  one.** A missing or `0` bound was sent as 100. `/datapreview/ddic` without
+  `rowNumber` answers 101 records and ignores `0`.
+- **`getAtc().startRun` sends no `maximumVerdicts` without one.** A missing cap
+  was sent as 100; SAP accepts a run payload without the attribute. A cap given
+  is still refused before the request when it is not a positive integer.
+
 ### Documentation
 
 - **ERRATA, "The debugger freeing its session is answered as an ICF 500":**
