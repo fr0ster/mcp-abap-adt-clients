@@ -58,57 +58,15 @@ async function writeAndActivate(handler, config, options, logger) {
       analyse: judged(analyseActivation),
     });
     if (activated && activated.ok === false) {
-      const {
-        readUnstatedActivation,
-      } = require('@mcp-abap-adt/adt-strategies');
-      // The failure carries the activation's answer it was read from.
-      const answer = activated.getError().response;
-      if (!answer || readUnstatedActivation(answer) === undefined) {
-        throw new Error(failureOf(activated, 'activate'));
-      }
-      await inactiveListDecides(handler, config, logger);
+      const { expectActivated } = require('./activationOrList');
+      await expectActivated(
+        activated,
+        handler.connection,
+        config,
+        'activate',
+        logger,
+      );
     }
-  }
-}
-
-/**
- * After a checklist that leaves the outcome to the inactive list: the list
- * decides. The object is activated when no listed object carries one of the
- * names its config names (its own, its parent's: a parent still listed fails
- * the setup too, which is the safe side for a shared dependency); a list
- * that cannot be read, or that lists one, throws.
- */
-async function inactiveListDecides(handler, config, logger) {
-  const { AdtUtils } = require('../../core/shared/AdtUtils');
-  const { utilDocuments } = require('../../core/shared/utilResultSet');
-  const { utilInactiveObjects } = require('@mcp-abap-adt/adt-strategies');
-  const utils = new AdtUtils(handler.connection, {
-    logger,
-    results: { ...utilDocuments, inactive: utilInactiveObjects },
-  });
-  const listed = await utils.getInactiveObjects({ analyse: analyseException });
-  if (!listed.ok) {
-    throw new Error(failureOf(listed, 'read the inactive list after activate'));
-  }
-  const names = new Set(
-    Object.entries(config)
-      .filter(
-        ([key, value]) =>
-          key.endsWith('Name') &&
-          key !== 'packageName' &&
-          typeof value === 'string',
-      )
-      .map(([, value]) => value.toUpperCase()),
-  );
-  const still = (listed.getResult().value?.objects ?? []).filter((o) =>
-    names.has(String(o.name ?? '').toUpperCase()),
-  );
-  if (still.length > 0) {
-    throw new Error(
-      `activate: SAP answered no verdict and the inactive list still names ${still
-        .map((o) => `${o.type} ${o.name}`)
-        .join(', ')}`,
-    );
   }
 }
 
