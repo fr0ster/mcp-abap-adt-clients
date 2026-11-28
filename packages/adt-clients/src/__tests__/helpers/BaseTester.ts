@@ -53,7 +53,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { LogLevel } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtClient } from '../../clients/AdtClient';
-import { expectActivated } from './activationOrList';
+import { expectActivated, watchActivations } from './activationOrList';
 import { integrationHeadersOf } from './adtHeaders';
 import { configuredCase, missingCaseMessage } from './caseGate';
 import { expectResult, failureOf } from './contract';
@@ -364,6 +364,7 @@ export class BaseTester<TConfig extends object, TState = unknown> {
     logger?: ILogger,
   ) {
     this.adtObject = adtObject;
+    watchActivations(BaseTester.connectionOf(adtObject));
     this.loggerPrefix = loggerPrefix;
     this.testCaseKey = testCaseKey;
     this.testCaseName = testCaseName;
@@ -738,18 +739,20 @@ export class BaseTester<TConfig extends object, TState = unknown> {
    * the inactive list decides is read here, by the caller
    * (`activationOrList.ts`).
    */
+  /** The connection a handler sends through (a protected field, read as data). */
+  private static connectionOf(handler: object): IAbapConnection | undefined {
+    return (handler as { connection?: IAbapConnection }).connection;
+  }
+
   private async expectActivated(
     answer: IAdtResponse<unknown>,
     config: object,
     what: string,
   ): Promise<void> {
     if (answer.ok) return;
-    // The handler's own connection: a tester given a client holds none of
-    // its own (`setup({ client })`).
-    const connection =
-      this.connection ??
-      (this.adtObject as unknown as { connection?: IAbapConnection })
-        .connection;
+    // The handler's own connection, which `watchActivations` records the
+    // activation POST on.
+    const connection = BaseTester.connectionOf(this.adtObject);
     if (!connection) throw new Error(failureOf(answer, what));
     await expectActivated(answer, connection, config, what, this.logger);
   }
@@ -1764,6 +1767,7 @@ export class BaseTester<TConfig extends object, TState = unknown> {
     this.adtObject = (
       client as unknown as Record<string, () => TestableObject<TConfig>>
     )[factory]();
+    watchActivations(BaseTester.connectionOf(this.adtObject));
     this.client = client;
     return { connection, client };
   }

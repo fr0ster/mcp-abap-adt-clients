@@ -4,44 +4,71 @@
  * a checklist that leaves the outcome to the inactive list — a re-activation
  * with nothing to do answers the silent one, measured on the cloud — is a
  * failure of `analyseActivation` without the list. The suite then reads the
- * list itself and decides by name: the activation stands when no listed
- * object carries a name its config names (its own, its parent's — a parent
- * still listed fails too, the safe side for a test).
+ * list and hands it to `analyseActivation` with the uris the activation POST
+ * named — the same judgement as `activationJudged.ts` and 48.0.0's member
+ * (`stillInactiveAmong`: an object listed by `uri` or `parentUri`).
  *
- * The full recipe, with the uris and the strategy, is `activationJudged.ts`;
- * this is the setup's coarser form, for handlers it holds without their code.
+ * The uris are taken from the POST itself: {@link watchActivations} records
+ * them on the connection the handler sends through, so a handler held without
+ * its code or name is judged by what it actually sent.
  */
 import {
+  analyseActivation,
   analyseException,
   readUnstatedActivation,
-  utilInactiveObjects,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import {
+  ADT_NO_FAILURE,
+  type IAdtResponse,
+} from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAbapConnection,
+  IAbapRequestOptions,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AdtUtils } from '../../core/shared/AdtUtils';
 import { utilDocuments } from '../../core/shared/utilResultSet';
+import { wireItself } from '../../utils/resultStrategy';
 import { failureOf } from './contract';
 import { createLibraryLogger } from './testLogger';
 
-/** The names a config names: every `…Name` field but the package's. */
-function namesOf(config: object): Set<string> {
-  return new Set(
-    Object.entries(config)
-      .filter(
-        ([key, value]) =>
-          key.endsWith('Name') &&
-          key !== 'packageName' &&
-          typeof value === 'string',
-      )
-      .map(([, value]) => String(value).toUpperCase()),
-  );
+const ACTIVATION = '/sap/bc/adt/activation?';
+
+/** The uris the last activation POST on each watched connection named. */
+const named = new WeakMap<IAbapConnection, string[]>();
+const watched = new WeakSet<IAbapConnection>();
+
+/** The `adtcore:uri` of every reference a request body names, in order. */
+function urisIn(body: unknown): string[] {
+  if (typeof body !== 'string') return [];
+  return body
+    .split('adtcore:uri="')
+    .slice(1)
+    .map((rest) => rest.slice(0, rest.indexOf('"')));
+}
+
+/**
+ * Record, on `connection`, the uris every `POST /sap/bc/adt/activation`
+ * names. Idempotent; the request goes on as it came.
+ */
+export function watchActivations(
+  connection: IAbapConnection | undefined,
+): void {
+  if (connection === undefined || watched.has(connection)) return;
+  watched.add(connection);
+  const base = connection.makeAdtRequest.bind(connection);
+  connection.makeAdtRequest = (options: IAbapRequestOptions) => {
+    if (options.method === 'POST' && options.url.startsWith(ACTIVATION)) {
+      named.set(connection, urisIn(options.data));
+    }
+    return base(options);
+  };
 }
 
 /**
  * Resolves when the activation answered a success, or answered a checklist
- * the inactive list decides and the list no longer names the object; throws
- * otherwise, with the failure's words.
+ * the inactive list decides and `analyseActivation`, given the list and the
+ * uris the POST named, clears it; throws otherwise, with the failure's words.
  */
 export async function expectActivated(
   answer: IAdtResponse<unknown>,
@@ -55,25 +82,29 @@ export async function expectActivated(
   if (wire === undefined || readUnstatedActivation(wire) === undefined) {
     throw new Error(failureOf(answer, what));
   }
+  const uris = named.get(connection);
+  if (uris === undefined || uris.length === 0) {
+    throw new Error(
+      `${what} (${JSON.stringify(config)}): the activation's outcome is the inactive list's to decide, and no activation POST was recorded on this connection (watchActivations)`,
+    );
+  }
   const utils = new AdtUtils(connection, {
     logger,
-    results: { ...utilDocuments, inactive: utilInactiveObjects },
+    results: { ...utilDocuments, inactive: wireItself },
   });
   const listed = await utils.getInactiveObjects({ analyse: analyseException });
   if (!listed.ok) {
     throw new Error(
-      failureOf(listed, `${what}: read the inactive list after the activation`),
+      failureOf(
+        listed,
+        `${what}: the activation's outcome could not be decided, the inactive list could not be read`,
+      ),
     );
   }
-  const names = namesOf(config);
-  const still = listed
-    .getResult()
-    .value.objects.filter((o) => names.has(o.name.toUpperCase()));
-  if (still.length > 0) {
-    throw new Error(
-      `${what}: SAP answered no verdict and the inactive list still names ${still
-        .map((o) => `${o.type} ${o.name}`)
-        .join(', ')}`,
-    );
+  const verdict = analyseActivation(ADT_NO_FAILURE, wire, {
+    activation: { named: uris, inactiveObjects: listed.getResult().value },
+  });
+  if (verdict !== ADT_NO_FAILURE) {
+    throw new Error(`${what}: ${verdict.message}`);
   }
 }

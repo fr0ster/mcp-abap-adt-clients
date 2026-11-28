@@ -53,12 +53,13 @@ async function writeAndActivate(handler, config, options, logger) {
     // list — a re-activation with nothing to do answers the silent one —
     // is decided by the list, which the caller reads since adt-clients
     // 49.0.0 (the member sends the activation alone).
+    const { expectActivated, watchActivations } = require('./activationOrList');
+    watchActivations(handler.connection);
     const activated = await handler.activate(config, {
       headers: integrationHeadersOf(handler, 'activate', config),
       analyse: judged(analyseActivation),
     });
     if (activated && activated.ok === false) {
-      const { expectActivated } = require('./activationOrList');
       await expectActivated(
         activated,
         handler.connection,
