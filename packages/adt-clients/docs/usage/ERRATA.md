@@ -133,13 +133,16 @@ and the active source both said so), SAP_BASIS 751 to `false`.
 | empty | activated |
 | any other document | not activated: the answer does not state the activation |
 
-For the two checklists the inactive list decides, every adt-clients member
-that sends `POST /activation` reads `GET /sap/bc/adt/activation/inactiveobjects`
-once, after those answers only, and hands the list to `analyse`
-(`IAdtAnalyseContext`); the client judges neither, the verdict is the
+For the two checklists the inactive list decides (`readUnstatedActivation`
+answers `silent` or `unstated`), the caller reads
+`GET /sap/bc/adt/activation/inactiveobjects` after the answer and hands the
+list to `analyseActivation` (`IAdtAnalyseContext`) with the uris the activation
+named. Until adt-clients 48.0.0 every member that sends `POST /activation` read
+it itself; since 49.0.0 it sends the activation alone (one member, one
+endpoint, one request), and the client judges neither, the verdict is the
 strategy's. After the checklist with no verdict, a read that fails leaves the
-answer as it was and hands the refusal's response, if any, as the list;
-an entry counts when its `uri` or `parentUri` is one the request named
+answer as it was and the refusal's response, if any, is the list; an entry
+counts when its `uri` or `parentUri` is one the request named
 (`stillInactiveAmong`). A caller who wants another verdict passes its own
 `analyse`.
 

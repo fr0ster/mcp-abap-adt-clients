@@ -19,7 +19,9 @@ import { join } from 'node:path';
  * `activateAndWait` was one of these for a commit and is not here because it no
  * longer exists anywhere: a wait is four lines, so each caller writes its own.
  * Its name stays in the entry-point check below, so bringing it back as an
- * export fails a test rather than passing review.
+ * export fails a test rather than passing review. So does
+ * `answeringActivation`'s (49.0.0): an activation read the inactive list
+ * after it, two requests behind one member.
  */
 const SEQUENCES = [
   'packageWalk.ts',
@@ -48,6 +50,9 @@ describe("a consumer's sequence", () => {
       'functionGroupChildren',
       'selectEveryColumn',
       'activateAndWait',
+      // C7 (49.0.0): the activation and the inactive list are two calls of
+      // the caller's; the helper that joined them is gone.
+      'answeringActivation',
     ]) {
       expect(api[name]).toBeUndefined();
     }

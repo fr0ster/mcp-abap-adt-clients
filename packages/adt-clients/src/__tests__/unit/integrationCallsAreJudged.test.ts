@@ -52,6 +52,18 @@ const SCOPES = ['src/__tests__/integration', 'src/__tests__/helpers'];
 /** `<file>:<member>:<first 60 characters of the call>` → why it is allowed. */
 const ALLOWED: ReadonlyMap<string, string> = new Map([
   [
+    'src/__tests__/helpers/activationJudged.ts:activate:activate((verdict, wire) => { started = verdict; answer = wi',
+    "The caller's activation recipe (C7, 49.0.0): its analyse records the starting verdict and the answer unjudged, and the recipe judges them with analyseActivation itself, once, after reading the inactive list when the answer leaves the outcome to it; each caller reads the exception document after it.",
+  ],
+  [
+    'src/__tests__/integration/shared/activationAnswers.test.ts:activate:cls.activate( { className }, { headers: integrationHeadersOf',
+    "Passed through activationJudged, which hands the recording analyse and judges with analyseActivation after the caller's read of the inactive list (C7).",
+  ],
+  [
+    "src/__tests__/integration/shared/activationAnswers.test.ts:activateObjects:utils.activateObjects([{ type: 'FUGR/F', name: group }], fal",
+    "Passed through activationJudged, which hands the recording analyse and judges with analyseActivation after the caller's read of the inactive list (C7).",
+  ],
+  [
     'src/__tests__/integration/shared/responseContract.test.ts:activate:client.getClass().activate( { className: NEVER_EXISTS }, { h [analyse: refusalIsAFailure]',
     'The test exists to show a consumer judging the answer with its own strategy (refusalIsAFailure); the call before it uses analyseException.',
   ],

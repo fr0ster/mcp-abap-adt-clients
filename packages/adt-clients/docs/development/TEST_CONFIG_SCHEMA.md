@@ -276,7 +276,7 @@ available_in: ["onprem"]
 
 ## Activation Answers
 
-What an activation answers on premise (`integration/shared/activationAnswers.test.ts`): discovery listing `/sap/bc/adt/activation/runs`; a class activated with the default, then again with `preauditRequested=false` (nothing to activate, the inactive list read once); a function group's reference alone with `true` (not activated, `stillInactive`), with `false` (the silent checklist, not activated), and the second step through `activateObjects`. Both objects are created and deleted by the test.
+What an activation answers on premise (`integration/shared/activationAnswers.test.ts`): discovery listing `/sap/bc/adt/activation/runs`; a class activated with the default, then again with `preauditRequested=false` (nothing to activate; the member sends the POST alone and the test reads the inactive list once, as a caller); a function group's reference alone with `true` (not activated, `stillInactive`), with `false` (the silent checklist, not activated), and the second step through `activateObjects`. Both objects are created and deleted by the test.
 
 ```yaml
 activation_answers:
