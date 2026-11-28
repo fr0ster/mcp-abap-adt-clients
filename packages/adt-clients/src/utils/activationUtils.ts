@@ -76,7 +76,10 @@ export function buildObjectUri<C extends AdtAddressableCode>(
 
   const { entry, facts } = first;
   if (facts.parent === null) {
-    return `${facts.collection ?? entry.collection}/${seg(name)}`;
+    // A type group's name is kept as given (its record, `TYPE_GROUP.uri`);
+    // every other code's is folded to lower case by `seg`.
+    const segment = type === 'TYPE/DG' ? encodeURIComponent(name) : seg(name);
+    return `${facts.collection ?? entry.collection}/${segment}`;
   }
 
   // A parented code is addressed under its parent, and the address means

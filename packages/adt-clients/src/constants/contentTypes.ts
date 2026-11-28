@@ -240,6 +240,12 @@ export const CT_METADATA_EXTENSION = 'application/vnd.sap.adt.ddic.ddlx.v1+xml';
 // Access Controls
 export const CT_ACCESS_CONTROL = 'application/vnd.sap.adt.dclSource+xml';
 
+// Type groups (TYPE/DG): v3 is the newest media type on-premise discovery
+// lists; v2 answers the same document. The metadata read is refused without an
+// Accept (400, measured), so the library always sends one.
+export const ACCEPT_TYPE_GROUP =
+  'application/vnd.sap.adt.ddic.typegroups.v3+xml';
+
 // Transformations (XSLT)
 export const ACCEPT_TRANSFORMATION =
   'application/vnd.sap.adt.transformations+xml';

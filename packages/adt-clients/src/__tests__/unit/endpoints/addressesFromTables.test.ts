@@ -41,6 +41,7 @@ import {
   TABLE_TYPE,
   TEXT_ELEMENTS,
   TRANSFORMATION,
+  TYPE_GROUP,
 } from '../../../endpoints/objects';
 import { buildObjectUri } from '../../../utils/activationUtils';
 import {
@@ -86,6 +87,8 @@ const EXPECTED: Readonly<
   'DSFD/SCF': SCALAR_FUNCTION.uri(NAME),
   'DSFI/SFI': SCALAR_FUNCTION_IMPLEMENTATION.uri(NAME),
   'XSLT/VT': TRANSFORMATION.uri(NAME),
+  // Kept as given, not case-folded: the type group's record.
+  'TYPE/DG': TYPE_GROUP.uri(NAME),
   'MSAG/N': MESSAGE_CLASS.uri(NAME),
   'FTG2/FT': FEATURE_TOGGLE.uri(NAME),
   AUTH: AUTHORIZATION_FIELD.uri(NAME),

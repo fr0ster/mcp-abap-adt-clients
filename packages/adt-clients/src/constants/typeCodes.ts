@@ -45,4 +45,5 @@ export const TYPE_CODE = {
   table: 'TABL/DT',
   tableType: 'TTYP/DA',
   transformation: 'XSLT/VT',
+  typeGroup: 'TYPE/DG',
 } as const satisfies { readonly [A in AdtApi<'onprem'>]?: CodeOf<A> };

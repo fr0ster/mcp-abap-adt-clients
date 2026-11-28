@@ -259,6 +259,19 @@ export const TRANSFORMATION = {
   uri: (name: string) => `/sap/bc/adt/xslt/transformations/${seg(name)}`,
 } as const;
 
+/**
+ * A type group (`TYPE/DG`). Its name goes into the path **as given**, encoded
+ * and never case-folded: the measured requests address it in upper case and in
+ * lower case alike, and the type group's own goal keeps every name as the
+ * caller sent it.
+ */
+export const TYPE_GROUP = {
+  collection: '/sap/bc/adt/ddic/typegroups',
+  validation: '/sap/bc/adt/ddic/typegroups/validation',
+  uri: (name: string) =>
+    `/sap/bc/adt/ddic/typegroups/${encodeURIComponent(name)}`,
+} as const;
+
 export const MESSAGE_CLASS = {
   collection: '/sap/bc/adt/messageclass',
   validation: '/sap/bc/adt/messageclass/validation',
@@ -344,6 +357,7 @@ export const RECORDS = {
   ACCESS_CONTROL,
   METADATA_EXTENSION,
   TRANSFORMATION,
+  TYPE_GROUP,
   MESSAGE_CLASS,
   FEATURE_TOGGLE,
   AUTHORIZATION_FIELD,
