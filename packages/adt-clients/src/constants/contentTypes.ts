@@ -282,6 +282,23 @@ export const ACCEPT_APPLICATION_LOG_OBJECT =
   'application/vnd.sap.adt.blues.v1+xml';
 export const ACCEPT_APPLICATION_LOG_SOURCE = 'application/json';
 
+/**
+ * Application job catalog (`SAJC`) and template (`SAJT`) reads. Measured on
+ * ABAP cloud and on premise (2026-11-28): the object document answers `200`
+ * `application/vnd.sap.adt.blues.v2+xml`, the source `200` `application/json`.
+ */
+export const ACCEPT_APPLICATION_JOB_OBJECT =
+  'application/vnd.sap.adt.blues.v2+xml';
+export const ACCEPT_APPLICATION_JOB_SOURCE = 'application/json';
+
+/**
+ * The ABAP keyword documentation (`/sap/bc/adt/docu/abap/langu`). Measured on
+ * ABAP cloud and on premise (2026-11-28): every form answers this type, and a
+ * request with `Accept: application/xml` answered `406` naming it.
+ */
+export const ACCEPT_KEYWORD_DOCUMENTATION =
+  'application/vnd.sap.adt.docu.v1+html';
+
 // Feature Toggles (FTG2/FT) — metadata uses the shared blues envelope
 // same as APS IAM; state and domain endpoints use dedicated JSON types.
 export const ACCEPT_FEATURE_TOGGLE_METADATA =
