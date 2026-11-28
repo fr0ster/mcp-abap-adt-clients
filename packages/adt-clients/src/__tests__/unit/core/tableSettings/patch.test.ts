@@ -115,10 +115,25 @@ describe('patchTableSettings', () => {
   });
 
   it('sends the area-key count read when none is named, whatever the type', () => {
-    const patched = patchTableSettings(ONPREM, { buffering: { type: 'P' } });
-    expect(patched.ok && patched.settings.buffering.areaKeyFields).toBe(
-      ONPREM.settings.buffering.areaKeyFields,
-    );
+    // A read of a G table with a count (the recorded one has none): the
+    // count read goes back with a type-only change.
+    const read = {
+      ...ONPREM,
+      settings: {
+        ...ONPREM.settings,
+        buffering: {
+          ...ONPREM.settings.buffering,
+          type: 'G',
+          areaKeyFields: 3,
+        },
+      },
+    };
+    const patched = patchTableSettings(read, { buffering: { type: 'P' } });
+    expect(patched.ok && patched.settings.buffering).toEqual({
+      allowed: ONPREM.settings.buffering.allowed,
+      type: 'P',
+      areaKeyFields: 3,
+    });
   });
 
   it('refuses an areaKeyFields change whose resulting type is not G', () => {
