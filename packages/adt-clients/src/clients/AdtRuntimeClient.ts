@@ -6,6 +6,7 @@
  * - getCrossTrace() — Cross trace analysis
  * - getSt05Trace() — ST05 performance traces
  * - getApplicationLog() — Application log analysis
+ * - getKeywordDocumentation() — the ABAP keyword documentation, one member per form
  * - getAtc() — ATC: the check variant, a worklist, a run, its status, its findings
  * - getAtcLog() — ATC check failure and execution logs
  * - getDdicActivation() — DDIC activation graph
@@ -82,6 +83,12 @@ import {
   gatewayErrorLogDocuments,
   type IGatewayErrorLogResults,
 } from '../runtime/gatewayErrorLog/GatewayErrorLog';
+import {
+  type IKeywordDocumentationResults,
+  KeywordDocumentation,
+  type KeywordDocumentationValues,
+  keywordDocumentationDocuments,
+} from '../runtime/keywordDocumentation/KeywordDocumentation';
 import {
   type ISystemMessagesResults,
   SystemMessages,
@@ -167,6 +174,26 @@ export class AdtRuntimeClient {
       logger: this.logger,
       results,
     });
+  }
+
+  /**
+   * The ABAP keyword documentation (`/sap/bc/adt/docu/abap/langu`): `query`,
+   * `topic` and `position`, one `GET` each, each page answered by the result
+   * set's strategy (the page as sent, by default).
+   */
+  getKeywordDocumentation(): KeywordDocumentation<
+    ResultValuesOf<typeof keywordDocumentationDocuments>
+  >;
+  getKeywordDocumentation<R extends IKeywordDocumentationResults>(
+    results: R,
+  ): KeywordDocumentation<ResultValuesOf<R>>;
+  getKeywordDocumentation(
+    results: IKeywordDocumentationResults = keywordDocumentationDocuments,
+  ): KeywordDocumentation<KeywordDocumentationValues> {
+    return new KeywordDocumentation<KeywordDocumentationValues>(
+      this.connection,
+      { logger: this.logger, results },
+    );
   }
 
   getApplicationLog(): ApplicationLog<

@@ -211,6 +211,19 @@ import {
   type TransportValues,
   transportDocuments,
 } from '../core/transport';
+import {
+  ApplicationJobCatalog,
+  ApplicationJobTemplate,
+  type ApplicationJobValues,
+  applicationJobDocuments,
+  type IApplicationJobResults,
+} from '../runtime/applicationJob/ApplicationJob';
+import {
+  ApplicationLog,
+  type ApplicationLogValues,
+  applicationLogDocuments,
+  type IApplicationLogResults,
+} from '../runtime/applicationLog/ApplicationLog';
 import { withRequestTrace } from '../utils/requestTrace';
 import type { ResultValuesOf } from '../utils/resultStrategy';
 import type { AdtModernVariant, AdtServedBy } from './variant';
@@ -1178,6 +1191,68 @@ export class AdtClient<V extends AdtVariant = AdtModernVariant> {
       logger: this.logger,
       systemContext: this.systemContext,
       lockRegistry: this.lockRegistry,
+      results,
+    });
+  }
+
+  /**
+   * An application log object (`APLO/TYP`), read as its definition: its
+   * object document and its source. The same handler
+   * `AdtRuntimeClient.getApplicationLog()` answers, gated here by the type
+   * tables.
+   */
+  getApplicationLog(
+    this: this & AdtServedBy<'applicationLog'>,
+  ): ApplicationLog<ResultValuesOf<typeof applicationLogDocuments>>;
+  getApplicationLog<R extends IApplicationLogResults>(
+    this: this & AdtServedBy<'applicationLog'>,
+    results: R,
+  ): ApplicationLog<ResultValuesOf<R>>;
+  getApplicationLog(
+    this: this & AdtServedBy<'applicationLog'>,
+    results: IApplicationLogResults = applicationLogDocuments,
+  ): ApplicationLog<ApplicationLogValues> {
+    this.assertConnected();
+    return new ApplicationLog<ApplicationLogValues>(this.connection, {
+      logger: this.logger,
+      results,
+    });
+  }
+
+  /** An application job catalog (`SAJC`), read as its definition. */
+  getApplicationJobCatalog(
+    this: this & AdtServedBy<'applicationJobCatalog'>,
+  ): ApplicationJobCatalog<ResultValuesOf<typeof applicationJobDocuments>>;
+  getApplicationJobCatalog<R extends IApplicationJobResults>(
+    this: this & AdtServedBy<'applicationJobCatalog'>,
+    results: R,
+  ): ApplicationJobCatalog<ResultValuesOf<R>>;
+  getApplicationJobCatalog(
+    this: this & AdtServedBy<'applicationJobCatalog'>,
+    results: IApplicationJobResults = applicationJobDocuments,
+  ): ApplicationJobCatalog<ApplicationJobValues> {
+    this.assertConnected();
+    return new ApplicationJobCatalog<ApplicationJobValues>(this.connection, {
+      logger: this.logger,
+      results,
+    });
+  }
+
+  /** An application job template (`SAJT`), read as its definition. */
+  getApplicationJobTemplate(
+    this: this & AdtServedBy<'applicationJobTemplate'>,
+  ): ApplicationJobTemplate<ResultValuesOf<typeof applicationJobDocuments>>;
+  getApplicationJobTemplate<R extends IApplicationJobResults>(
+    this: this & AdtServedBy<'applicationJobTemplate'>,
+    results: R,
+  ): ApplicationJobTemplate<ResultValuesOf<R>>;
+  getApplicationJobTemplate(
+    this: this & AdtServedBy<'applicationJobTemplate'>,
+    results: IApplicationJobResults = applicationJobDocuments,
+  ): ApplicationJobTemplate<ApplicationJobValues> {
+    this.assertConnected();
+    return new ApplicationJobTemplate<ApplicationJobValues>(this.connection, {
+      logger: this.logger,
       results,
     });
   }

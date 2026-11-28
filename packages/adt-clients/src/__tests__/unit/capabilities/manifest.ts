@@ -1426,4 +1426,10 @@ export const HANDLERS = {
 export const NOT_HANDLERS: Record<string, string> = {
   getUtils:
     'AdtUtils — search, where-used, package hierarchy, SQL. Not an object handler and has no capability matrix.',
+  getApplicationLog:
+    'ApplicationLog — an application log object read as its definition (getObject, getSource, validateName): no atom of the matrix; its contract is IApplicationLog.',
+  getApplicationJobCatalog:
+    'ApplicationJobCatalog — a job catalog read as its definition (getObject, getSource): no atom of the matrix; its contract is IApplicationJobCatalog.',
+  getApplicationJobTemplate:
+    'ApplicationJobTemplate — a job template read as its definition (getObject, getSource): no atom of the matrix; its contract is IApplicationJobTemplate.',
 };
