@@ -2,14 +2,14 @@
   "case": "APLO-TYP--abi",
   "step": 3,
   "stepTag": "metadata",
-  "capturedAt": "2026-11-28T11:25:58.719Z",
+  "capturedAt": "2026-11-28T12:16:18.015Z",
   "request": {
     "method": "GET",
-    "url": "/sap/bc/adt/applicationlog/objects/abi",
+    "url": "/sap/bc/adt/applicationlog/objects/ABI",
     "params": {
       "version": "active"
     },
-    "effectiveUrl": "/sap/bc/adt/applicationlog/objects/abi?version=active",
+    "effectiveUrl": "/sap/bc/adt/applicationlog/objects/ABI?version=active",
     "headers": {
       "Accept": "application/vnd.sap.adt.blues.v1+xml"
     },
@@ -28,9 +28,9 @@
       "last-modified": "Sat, 01 Apr 1972 00:00:00 GMT",
       "sap-cache-control": "+0",
       "sap-isc-uagent": "0",
-      "x-sap-adt-profiling": "server-time=135696",
+      "x-sap-adt-profiling": "server-time=39765",
       "sap-server": "true",
-      "sap-perf-fesrec": "141094.000000"
+      "sap-perf-fesrec": "45089.000000"
     },
     "bodyFile": "APLO-TYP--abi--03-metadata.body.xml"
   }

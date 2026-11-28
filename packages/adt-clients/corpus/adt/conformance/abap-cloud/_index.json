@@ -698,8 +698,8 @@
       "location": null,
       "urimapperAccept": "application/xml",
       "urimapperUri": "/sap/bc/adt/applicationlog/objects/abi",
-      "libraryUri": "/sap/bc/adt/applicationlog/objects/abi",
-      "urimapperMatchesLibrary": true
+      "libraryUri": "/sap/bc/adt/applicationlog/objects/ABI",
+      "urimapperMatchesLibrary": false
     },
     "SAJC": {
       "apis": ["applicationJobCatalog"],
@@ -721,8 +721,8 @@
       "location": null,
       "urimapperAccept": "application/xml",
       "urimapperUri": "/sap/bc/adt/applicationjob/catalogs/aps_gsm_metric_collector",
-      "libraryUri": "/sap/bc/adt/applicationjob/catalogs/aps_gsm_metric_collector",
-      "urimapperMatchesLibrary": true
+      "libraryUri": "/sap/bc/adt/applicationjob/catalogs/APS_GSM_METRIC_COLLECTOR",
+      "urimapperMatchesLibrary": false
     },
     "SAJT": {
       "apis": ["applicationJobTemplate"],
@@ -744,8 +744,8 @@
       "location": null,
       "urimapperAccept": "application/xml",
       "urimapperUri": "/sap/bc/adt/applicationjob/templates/aps_gsm_metric_collection_template",
-      "libraryUri": "/sap/bc/adt/applicationjob/templates/aps_gsm_metric_collection_template",
-      "urimapperMatchesLibrary": true
+      "libraryUri": "/sap/bc/adt/applicationjob/templates/APS_GSM_METRIC_COLLECTION_TEMPLATE",
+      "urimapperMatchesLibrary": false
     }
   },
   "apisWithoutCodes": {

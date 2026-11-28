@@ -2,7 +2,7 @@
   "case": "SAJC--aps_gsm_metric_collector",
   "step": 1,
   "stepTag": "template",
-  "capturedAt": "2026-11-28T11:25:58.719Z",
+  "capturedAt": "2026-11-28T12:16:18.016Z",
   "request": {
     "method": "GET",
     "url": "/sap/bc/adt/vit/wb/object_type/sajc/object_name/APS_GSM_METRIC_COLLECTOR",
@@ -24,9 +24,9 @@
       "sap-adt-saplb": "REDACTED",
       "sap-cache-control": "+0",
       "sap-isc-uagent": "0",
-      "x-sap-adt-profiling": "server-time=42487",
+      "x-sap-adt-profiling": "server-time=35689",
       "sap-server": "true",
-      "sap-perf-fesrec": "47955.000000"
+      "sap-perf-fesrec": "41768.000000"
     },
     "bodyFile": "SAJC--aps_gsm_metric_collector--01-template.body.xml"
   }

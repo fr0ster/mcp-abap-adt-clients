@@ -2,7 +2,7 @@
   "case": "SAJC--aps_gsm_metric_collector",
   "step": 2,
   "stepTag": "urimapper",
-  "capturedAt": "2026-11-28T11:25:58.719Z",
+  "capturedAt": "2026-11-28T12:16:18.016Z",
   "request": {
     "method": "GET",
     "url": "/sap/bc/adt/vit/urimapper",
@@ -26,9 +26,9 @@
       "sap-adt-saplb": "REDACTED",
       "sap-cache-control": "+0",
       "sap-isc-uagent": "0",
-      "x-sap-adt-profiling": "server-time=9732",
+      "x-sap-adt-profiling": "server-time=8811",
       "sap-server": "true",
-      "sap-perf-fesrec": "15148.000000"
+      "sap-perf-fesrec": "13637.000000"
     },
     "bodyFile": "SAJC--aps_gsm_metric_collector--02-urimapper.body.xml"
   }

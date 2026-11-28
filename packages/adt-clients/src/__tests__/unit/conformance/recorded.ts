@@ -44,6 +44,39 @@ const TABLE_SETTINGS_SAMPLE =
 const TEXT_ELEMENTS_SAMPLE =
   "open: no PROG/PX or CLAS/OCX sample is recorded: the live conformance run builds each sample's template, urimapper and metadata reads from that sample's recorded files, so a code with none cannot be recorded until a sample is seeded (RSPARAM's text elements on premise and on the cloud, a class's); seeding them is a separate tooling task";
 
+const DEFINITION_ADDRESS =
+  "the library sends the name as the caller gives it, case kept (a name goes to SAP exactly as given, fr0ster/mcp-abap-adt#404); SAP's urimapper answers the lowercase address. Both are served: the sample's metadata read at the case-kept address answered 200 (conformance/<release>, 03-metadata), and on ABAP cloud the upper-, mixed- and lowercase addresses of the object document and the source of all three answered 200 (2026-11-28)";
+
+/** The three definition codes: the library keeps the name's case, urimapper lowercases it. */
+const DEFINITION_ADDRESS_DIVERGENCES: IDivergence[] = (
+  [
+    [
+      'applicationJobCatalog',
+      'SAJC',
+      '/sap/bc/adt/applicationjob/catalogs/',
+      'APS_GSM_METRIC_COLLECTOR',
+    ],
+    [
+      'applicationJobTemplate',
+      'SAJT',
+      '/sap/bc/adt/applicationjob/templates/',
+      'APS_GSM_METRIC_COLLECTION_TEMPLATE',
+    ],
+    [
+      'applicationLog',
+      'APLO/TYP',
+      '/sap/bc/adt/applicationlog/objects/',
+      'ABI',
+    ],
+  ] as const
+).map(([api, code, collection, name]) => ({
+  rule: 'address',
+  api,
+  code,
+  detail: `the library addresses ${collection}${name}, urimapper answers ${collection}${name.toLowerCase()}`,
+  reason: DEFINITION_ADDRESS,
+}));
+
 /** The text elements' two codes, with no sample on either release. */
 const TEXT_ELEMENTS_DIVERGENCES: IDivergence[] = [
   {
@@ -72,6 +105,7 @@ export const DIVERGENCES: { readonly [R in RecordedRelease]: IDivergence[] } = {
       detail: 'no sample is recorded',
       reason: TABLE_SETTINGS_SAMPLE,
     },
+    ...DEFINITION_ADDRESS_DIVERGENCES,
     ...TEXT_ELEMENTS_DIVERGENCES,
     {
       rule: 'address',
@@ -90,6 +124,7 @@ export const DIVERGENCES: { readonly [R in RecordedRelease]: IDivergence[] } = {
       detail: 'no sample is recorded',
       reason: TABLE_SETTINGS_SAMPLE,
     },
+    ...DEFINITION_ADDRESS_DIVERGENCES,
     ...TEXT_ELEMENTS_DIVERGENCES,
     {
       rule: 'address',
