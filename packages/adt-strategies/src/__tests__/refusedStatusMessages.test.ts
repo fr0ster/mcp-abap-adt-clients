@@ -357,8 +357,9 @@ describe('an exception document refused with a non-2xx status', () => {
 
 /**
  * The activation answered 200 with a silent checklist, and the inactive-list
- * read after it failed 500: the client hands the activation's answer with
- * the read's failure as the verdict (adt-clients `activationExchange`). The
+ * read after it failed 500: the caller hands the activation's answer with
+ * the read's failure as the verdict (adt-clients 48.0.0's `activationExchange`
+ * did; since 49.0.0 the caller's recipe does). The
  * failure is not the checklist's, so the checklist is not read as a refused
  * body: the answer stays 0.23.2's, the read's failure in the message.
  */

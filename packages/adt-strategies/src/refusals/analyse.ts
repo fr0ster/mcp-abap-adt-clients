@@ -216,7 +216,7 @@ function analyser(
     activation?: AdtActivationFacts,
   ) => AdtRefusal | null,
 ): IAnalyse<IAdtMessageFailure> {
-  // The facts a member read beside the answer travel to the reading: a
+  // The facts a caller read beside the answer travel to the reading: a
   // dispatcher that dropped them would judge an activation without its list.
   return (verdict, answer, context) => {
     if (verdict !== ADT_NO_FAILURE)
@@ -241,13 +241,13 @@ export interface IAdtActivationFailure extends IAdtMessageFailure {
  *
  * A silent checklist (`activationExecuted="false"`, no message), and a
  * checklist with no `activationExecuted` and only `W`/`I`/`S` messages
- * (fr0ster/mcp-abap-adt#360), are judged by the inactive list the member read
+ * (fr0ster/mcp-abap-adt#360), are judged by the inactive list the caller read
  * after it, handed as `context.activation`; without it the outcome is not
  * decided, and that is a failure too.
  *
  * The verdict is this strategy's — the consumer's choice of strategy, not
- * the client's: adt-clients hands the answer and the list and judges
- * neither.
+ * the client's: adt-clients hands the answer, the caller the list, and
+ * neither judges.
  */
 export const analyseActivation: IAnalyse<IAdtActivationFailure> = (
   verdict,

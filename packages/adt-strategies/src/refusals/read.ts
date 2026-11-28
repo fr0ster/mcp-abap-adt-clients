@@ -377,7 +377,7 @@ export interface AdtActivationRefusal extends AdtRefusal {
   readonly stillInactive: ReadonlyArray<IAdtStillInactive>;
 }
 
-/** The facts an activation member hands beside a silent checklist. */
+/** The facts a caller hands beside a checklist the inactive list decides. */
 export type AdtActivationFacts = NonNullable<IAdtAnalyseContext['activation']>;
 
 /** A well-formed XML document, parsed; `null` for anything else. */
@@ -411,7 +411,7 @@ function listedObjects(document: unknown): IAdtStillInactive[] | null {
  *
  * The one judgement both activation paths make after a silent checklist
  * (`activationExecuted="false"`, no message):
- * `readActivationRefusal` calls it with the list the member read, and a
+ * `readActivationRefusal` calls it with the list the caller read, and a
  * consumer of the run sequence calls it with the list it read after
  * `getActivationResults`. An empty array: none of the named objects is still
  * inactive. `null`: the answer is no `2xx` inactive-objects list, so nothing
@@ -496,7 +496,7 @@ const LIST_DECIDES_BESIDE: ReadonlySet<string> = new Set(['W', 'I', 'S']);
 
 /**
  * The judgement of a checklist the document alone cannot decide, by the
- * inactive list the member read after it: an object the activation named
+ * inactive list the caller read after it: an object the activation named
  * still listed is not activated; none is activated. Without the list, or
  * with one that cannot be read, the outcome is not decided. `answered` is
  * what SAP answered, in the words the undecided sentences begin with;
@@ -644,9 +644,10 @@ function checklistMessagesOf(root: unknown): AdtMessage[] {
  * **The silent checklist** (`activationExecuted="false"`, no message) answered
  * the re-activation of an object already active (ABAP cloud, S/4HANA 2025) and
  * an activation that left a function group inactive (S/4HANA 2025): the
- * document alone cannot tell them apart. The member that sent the activation
- * reads `GET /activation/inactiveobjects` once after it and hands the list as
- * `activation`: an object the activation named still listed (by
+ * document alone cannot tell them apart. The caller reads
+ * `GET /activation/inactiveobjects` after it ({@link readUnstatedActivation}
+ * says when; adt-clients 49.0.0 sends the activation alone) and hands the list
+ * as `activation`: an object the activation named still listed (by
  * `uri` or `parentUri`, {@link stillInactiveAmong}) is not activated; none is
  * nothing to activate. Without the list, or with a list that cannot be read,
  * the outcome is not decided and is answered as not activated.
@@ -1302,7 +1303,7 @@ export function isIndeterminateWalkAnswer(document: unknown): boolean {
  * not written for — the failure mode that makes `deletionRefusal` report every
  * successful delete as refused when it meets a `deletionResult`.
  *
- * `activation` is the facts an activation member read beside its answer, handed
+ * `activation` is the facts the caller read beside an activation's answer, handed
  * to the activation reading for a checklist.
  *
  * Returns `null` for a document that is not a refusal **and** for one that is
