@@ -1392,9 +1392,10 @@ export class AdtUtils<
   }
 
   /**
-   * Get all valid ADT object types
+   * Get the repository's ADT object types
    *
-   * Retrieves list of all valid ADT object types from the repository.
+   * Reads what SAP answers for the count given (`maxItemCount`), or for none
+   * (SAP's own bound).
    *
    * @param maxItemCount - Maximum number of items to return, sent as given;
    *   none given, none is sent and SAP's own bound applies (100 on the BTP

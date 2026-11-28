@@ -1,7 +1,8 @@
 /**
- * All types operations for ABAP objects
+ * Object types operations for ABAP objects
  *
- * Retrieves all valid ADT object types from the repository.
+ * Reads the repository's ADT object types: what SAP answers for the count
+ * given, or for none (SAP's own bound).
  */
 
 import type {

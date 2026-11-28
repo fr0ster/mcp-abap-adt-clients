@@ -1755,6 +1755,18 @@ and 2147483647 with `400` ("If UP TO or OFFSET is used, … cannot be
 specified"); 2147483646 was the largest accepted. Until 48.0.0 a missing or `0`
 bound was sent as 100.
 
+**`getTableContents` sends `max_rows` as given, and none when none is given.**
+`/datapreview/ddic` gets `rowNumber` exactly as given; without one the URL
+carries none, and SAP answered 101 records (its 100 and one more) and ignored
+`0` the same way (BTP ABAP environment, 2026-11-27). Until 48.0.0 a missing or
+`0` bound was sent as 100.
+
+**`getAllTypes` sends `maxItemCount` as given, and none when none is given.**
+It answers what SAP answers for that count: without one 100 of 375 object types
+(`0` and `-1` the same), 999 to 2147483647 all 375, 2147483648 refused `400`
+(BTP ABAP environment, 2026-11-27). A caller that wants every type passes a
+count, e.g. 2147483647. Until 48.0.0 a missing one was sent as 999.
+
 **`getSqlQuery` sends a line longer than 255 characters wrapped.** The
 freestyle preview (`/datapreview/freestyle`) keeps the first 255 characters of
 each line of the statement and drops the rest without a word (measured on
