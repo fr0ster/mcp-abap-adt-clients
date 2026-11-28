@@ -15,14 +15,11 @@ The goal (`2026-11-28-type-groups-goal.md`) and the spec bind every task.
 - **Known red cases.** A task that leaves a test red names it as known red, and names the task
   that turns it green.
 
-**Versions:**
-- `@mcp-abap-adt/interfaces-adt` takes the next minor of the version in its `package.json` when
-  Task 3 starts (33.0.0 today, so 33.1.0).
-- `@mcp-abap-adt/adt-clients` takes the next minor on top of the latest version on the registry
-  when Task 4 starts. The patch 48.0.1 is published before type groups, so that is most likely
-  48.1.0. The branch takes that release from `main` before Task 4, and Task 12 writes the
-  version.
-- adt-strategies and adt-clients-legacy keep their versions.
+**Versions:** no task bumps a version or publishes anything.
+- Every open adt-clients task merges on its own, and one adt-clients 49.0.0 is cut after them.
+- interfaces-adt is released once for all of them.
+- The CHANGELOG entries go under **Unreleased**. The release itself, with its versions, tags,
+  publishing and clean installs, is the controller's step after the tasks merge.
 
 **Pull requests:**
 - interfaces-adt is a separate repository. Its change is one PR in that repository, linked
@@ -84,19 +81,17 @@ as `docExamples33.ts` does for its release.
 **Files:**
 - `README.md` and the package docs, wherever they list API names, atoms or rows.
 - `docs/architecture/`, wherever it lists atoms.
-- `CHANGELOG.md`: the minor's entry, dated on the day of each edit.
-- `package.json`: the next minor (see "Versions").
-- The root `package-lock.json`: `npm install --package-lock-only`.
+- `CHANGELOG.md`: the entry under **Unreleased** (see "Versions").
 
-**Commits:** the docs; then the CHANGELOG, the version and the lockfile.
+**Commits:** the docs; then the CHANGELOG.
 
 **Then:**
 1. Codex reviews the PR, then the owner.
-2. The PR is merged and tagged, and the owner publishes.
-3. A clean install from the registry, outside the repository, proves it: the version resolves,
-   and `ADT_TYPES_CLOUD.typeGroup` carries the cloud row.
+2. The controller merges it and publishes interfaces-adt.
+3. A clean install from the registry, outside the repository, proves the release: the version
+   resolves, and `ADT_TYPES_CLOUD.typeGroup` carries the cloud row.
 
-Nothing in adt-clients goes on before this.
+Task 4 waits for this. adt-clients never builds against an unpublished contract.
 
 ## Task 4 — adt-clients: the published contract, a buildable milestone
 
@@ -324,11 +319,9 @@ before adt-clients goes on:
 - `docs/usage/CLIENT_API_REFERENCE.md` and `ADT_OBJECT_ENTITIES.md`: the members and requests.
 - `docs/usage/ERRATA.md`: the four entries of spec 7.
 - `docs/architecture/`, wherever it lists object types or atoms.
-- `CHANGELOG.md`: the minor's entry, dated on the day of each edit.
-- `packages/adt-clients/package.json`: the next minor (see "Versions").
-- The root `package-lock.json`: `npm install --package-lock-only`, then the link check.
+- `CHANGELOG.md`: the entry under **Unreleased** (see "Versions").
 
-**Commits:** the README and usage docs; ERRATA; the CHANGELOG, the version and the lockfile.
+**Commits:** the README and usage docs; ERRATA; the CHANGELOG.
 
 ## Task 13 — release gate and hand-off
 
@@ -348,8 +341,6 @@ What they still owe goes into the PR description first:
 
 **Then:**
 1. Codex reviews, then the owner.
-2. Once approved, the PR is merged and tagged `adt-clients-v<version>`, and the publish checkout
-   is prepared.
-3. The owner publishes.
-4. A clean install from the registry, outside the repository, proves it.
-5. mcp-abap-adt takes the release in its own change.
+2. The controller merges the PR, rebasing on #336 if that merged first. adt-clients 49.0.0 is
+   cut, published and proven by a clean install once all the open tasks have merged.
+3. mcp-abap-adt takes the release in its own change.
