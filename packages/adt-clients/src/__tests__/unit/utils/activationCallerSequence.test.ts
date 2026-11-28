@@ -172,7 +172,10 @@ const NAMED = [
 ];
 
 /** The group's activation, judged by the caller's recipe. */
-async function judgedGroup(replay: IReplay) {
+async function judgedGroup(
+  replay: IReplay,
+  judge: IAnalyse | null = analyseActivation,
+) {
   const { client, sent } = replaying(replay);
   const group = client.getFunctionGroup();
   const utils = client.getUtils({ ...utilDocuments, inactive: wireItself });
@@ -184,6 +187,7 @@ async function judgedGroup(replay: IReplay) {
       ),
     () => utils.getInactiveObjects(),
     NAMED,
+    judge,
   );
   return { judged, sent };
 }
@@ -438,5 +442,147 @@ describe('a credential refusal SAP never saw, on the read, is thrown as it came'
     await expect(judgedGroup({ activation, inactive: refusal })).rejects.toBe(
       refusal,
     );
+  });
+});
+
+/**
+ * The failure paths of 48.0.0's exchange, held by the recipe (C7): the read
+ * with no response after a silent checklist, the exact verdict and answer the
+ * strategy is handed, the recipe with no strategy, and the session marks.
+ */
+describe("the recipe's failure paths, as 48.0.0's exchange had them", () => {
+  it("after a silent checklist, a read with no response is the call's failure, carrying no response", async () => {
+    const { judged } = await judgedGroup({
+      activation: SILENT,
+      inactive: new Error('socket hang up'),
+    });
+    if (judged.verdict === ADT_NO_FAILURE)
+      throw new Error('expected a failure');
+    expect(judged.verdict.message).toContain(
+      "The activation's outcome could not be decided: SAP answered that no activation ran and gave no message, and reading the inactive objects failed: socket hang up",
+    );
+    expect(judged.verdict.response).toBeUndefined();
+    expect(judged.answer).toMatchObject(SILENT);
+  });
+
+  it('hands the strategy the starting verdict, the activation answer and the list', async () => {
+    const { analyse, seen } = spying();
+    await judgedGroup(
+      { activation: UNSTATED_WARNING, inactive: LISTED },
+      analyse,
+    );
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.verdict).toBe(ADT_NO_FAILURE);
+    expect(seen[0]?.answer).toMatchObject(UNSTATED_WARNING);
+    expect(seen[0]?.context?.activation?.named).toEqual(NAMED);
+    expect(seen[0]?.context?.activation?.inactiveObjects).toMatchObject(LISTED);
+  });
+
+  it("after a silent checklist and a refused read, hands the strategy the read's failure as the verdict and the activation's answer", async () => {
+    const { analyse, seen } = spying();
+    await judgedGroup({ activation: SILENT, inactive: refused(500) }, analyse);
+    const verdict = seen[0]?.verdict;
+    if (verdict === undefined || verdict === ADT_NO_FAILURE)
+      throw new Error('expected the read failure as the verdict');
+    expect(verdict.message).toContain(
+      "activation's outcome could not be decided",
+    );
+    expect(verdict.response?.status).toBe(500);
+    expect(seen[0]?.answer).toMatchObject(SILENT);
+    expect(seen[0]?.context).toBeUndefined();
+  });
+
+  it('with no strategy, a read that fails after a silent checklist stays a failure', async () => {
+    const { judged } = await judgedGroup(
+      { activation: SILENT, inactive: refused(500) },
+      null,
+    );
+    expect(judged.verdict).not.toBe(ADT_NO_FAILURE);
+  });
+
+  it('with no strategy, after an unstated checklist the verdict is what it was before the read existed', async () => {
+    const { judged, sent } = await judgedGroup(
+      { activation: UNSTATED_WARNING, inactive: refused(500) },
+      null,
+    );
+    expect(sent.map((r) => r.method)).toEqual(['POST', 'GET']);
+    expect(judged.verdict).toBe(ADT_NO_FAILURE);
+  });
+
+  describe('the session marks: each answer names the request it is built from', () => {
+    const REPLACED = ADT_SESSION_ERROR.SESSION_REPLACED;
+
+    function connectionAnswering(
+      activation: IAdtWireResponse,
+      inactive: IAdtWireResponse | Error,
+    ): IAbapConnection {
+      return {
+        connect: async () => undefined,
+        getBaseUrl: async () => undefined,
+        getSessionId: () => null,
+        setSessionType: () => undefined,
+        makeAdtRequest: async <T, D>(options: { url: string }) => {
+          const answer = options.url === INACTIVE ? inactive : activation;
+          if (answer instanceof Error) throw answer;
+          return answer as IAdtWireResponse<T, D>;
+        },
+      };
+    }
+
+    const spent = () =>
+      Object.assign(new Error('the session is gone'), {
+        code: ADT_SESSION_ERROR.NOT_CONNECTED,
+      });
+
+    async function judgedOver(
+      connection: IAbapConnection,
+      judge: IAnalyse | null,
+    ) {
+      const client = new AdtClient(connection, createLibraryLogger());
+      const group = client.getFunctionGroup();
+      const utils = client.getUtils({ ...utilDocuments, inactive: wireItself });
+      return activationJudged(
+        (analyse) =>
+          group.activate(
+            { functionGroupName: 'ZACT751P9325' },
+            { headers: headersOf(group, 'activate'), analyse },
+          ),
+        () => utils.getInactiveObjects(),
+        NAMED,
+        judge,
+      );
+    }
+
+    it("a marked activation whose read is refused: the read's code, no mark", async () => {
+      const judged = await judgedOver(
+        connectionAnswering({ ...SILENT, sessionLost: REPLACED }, spent()),
+        null,
+      );
+      if (judged.verdict === ADT_NO_FAILURE)
+        throw new Error('expected a failure');
+      expect(judged.verdict.sessionError).toBe(ADT_SESSION_ERROR.NOT_CONNECTED);
+      expect('sessionLost' in judged.verdict).toBe(false);
+    });
+
+    it("cleared, the success carries the activation answer's mark", async () => {
+      const clears: IAnalyse = () => ADT_NO_FAILURE;
+      const judged = await judgedOver(
+        connectionAnswering({ ...SILENT, sessionLost: REPLACED }, spent()),
+        clears,
+      );
+      expect(judged.verdict).toBe(ADT_NO_FAILURE);
+      expect(judged.answer?.sessionLost).toBe(REPLACED);
+    });
+
+    it('a marked read after an unmarked activation: no mark on the answer', async () => {
+      const judged = await judgedOver(
+        connectionAnswering(SILENT, { ...LISTED, sessionLost: REPLACED }),
+        () => ADT_NO_FAILURE,
+      );
+      expect(judged.verdict).toBe(ADT_NO_FAILURE);
+      expect(
+        judged.answer !== undefined && 'sessionLost' in judged.answer,
+      ).toBe(false);
+    });
   });
 });
