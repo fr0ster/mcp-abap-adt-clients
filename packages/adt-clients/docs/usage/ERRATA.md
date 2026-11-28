@@ -43,6 +43,11 @@ the next request on that session answers `400` "Session no longer exists". The
 refusal. Measured on premise (2026-10-11), BASIS 816; the server code that
 handles the method (BASIS 816, read 2026-10-11) releases the debugger's session
 inside the request, and nothing in it writes an ADT answer after that.
+`@mcp-abap-adt/connection` 22.0.1 and later reads that `400` as the session
+gone: the stack read then fails with `sessionError: 'ADT_SESSION_REPLACED'`
+and no response, and that connection instance is spent (on premise,
+2026-11-28, connection 25.2.0: the read came back with no status and the
+connection's "The SAP session no longer exists" words).
 
 **Why the library has a strategy for it.** `analyseDebuggerFreed` from
 `@mcp-abap-adt/adt-strategies` (0.9.0), passed to `terminateDebugger`, answers

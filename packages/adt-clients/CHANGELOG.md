@@ -24,6 +24,17 @@ same consequence of independent versions.
   
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Documentation
+
+- **ERRATA, "The debugger freeing its session is answered as an ICF 500":**
+  SAP's `400` "Session no longer exists" on the next request reaches the
+  caller as the connection's verdict since `@mcp-abap-adt/connection` 22.0.1 —
+  a failure with `sessionError: 'ADT_SESSION_REPLACED'` and no response
+  (on premise, 2026-11-28, connection 25.2.0). The library passes it on as it
+  came; no code changed.
+
 ## [48.0.0] - 2026-11-27
 
 fr0ster/mcp-abap-adt-clients#304: this package's `src` holds no cast but
