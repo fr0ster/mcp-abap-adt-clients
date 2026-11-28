@@ -12,6 +12,7 @@
  * the same object than the link's.
  */
 
+import type { IAdtNavigationTargetOptions } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -22,13 +23,6 @@ import { buildQueryString } from '../../utils/internalUtils';
 /** The Accept the target answers by default (discovery lists `application/xml`). */
 export const ACCEPT_NAVIGATION_TARGET = 'application/xml';
 
-/** The template's parameters besides `uri`, and the Accept to send. */
-export interface INavigationTargetRequest {
-  filter?: string | undefined;
-  fullname?: string | undefined;
-  accept?: string | undefined;
-}
-
 /**
  * One request, no body. `uri` is the reference as given, encoded once as a
  * query value; `filter` and `fullname` only when given.
@@ -36,7 +30,7 @@ export interface INavigationTargetRequest {
 export async function getNavigationTarget(
   connection: IAbapConnection,
   uri: string,
-  options?: INavigationTargetRequest,
+  options?: IAdtNavigationTargetOptions,
 ): Promise<IAdtWireResponse> {
   const query = buildQueryString({
     uri,

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { IUtilResults } from '@mcp-abap-adt/interfaces-adt';
-import { AdtUtils } from '../../../core/shared/AdtUtils';
+import { type AdtUtilResults, AdtUtils } from '../../../core/shared/AdtUtils';
 import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { rawDocument } from '../../../utils/resultStrategy';
 
@@ -26,8 +26,7 @@ describe('AdtUtils readings', () => {
   });
 
   /**
-   * `getObjectOutline`, `getNavigationTarget`, the two element-info reads and
-   * `getTypeStructure` are
+   * The two element-info reads and `getTypeStructure` are
    * the members whose reading cannot be injected yet: `IUtilResults` of interfaces-adt has no slot for
    * them, and a slot added here would make `getUtils` take a wider set than
    * the one a consumer composes from the contract package. They answer the
@@ -35,8 +34,6 @@ describe('AdtUtils readings', () => {
    * member stays held.
    */
   const AWAITING_ITS_SLOT = [
-    'getObjectOutline',
-    'getNavigationTarget',
     'getStructureElementInfo',
     'getServiceDefinitionElementInfo',
     'getTypeStructure',
@@ -68,13 +65,13 @@ describe('AdtUtils readings', () => {
     expect(awaiting).toEqual(AWAITING_ITS_SLOT);
   });
 
-  it('names a slot for each of the twenty-two members that make a request', () => {
+  it('names a slot for each of the twenty-four members that make a request', () => {
     const named = new Set(
       [...source.matchAll(/this\.results\.(\w+)/g)].map((m) => m[1]),
     );
 
     expect([...named].sort()).toEqual(Object.keys(utilDocuments).sort());
-    expect(named.size).toBe(22);
+    expect(named.size).toBe(24);
   });
 
   it('ships a default for every slot', () => {
@@ -90,6 +87,8 @@ describe('AdtUtils readings', () => {
     }
     // `satisfies`, so the shipped set is assignable to the contract it fills.
     const asContract: IUtilResults = utilDocuments;
+    const asTaken: AdtUtilResults = utilDocuments;
+    expect(asTaken.navigationTarget).toBe(rawDocument);
     expect(asContract.activation).toBe(utilDocuments.activation);
   });
 

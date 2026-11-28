@@ -6,6 +6,10 @@
  * `adtcore:objectReference` whose `uri` ends `#start=line,column`.
  */
 
+import type {
+  IAdtNavigationTargetReadable,
+  IAdtObjectOutlineReadable,
+} from '@mcp-abap-adt/interfaces-adt';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
 import { utilDocuments } from '../../../core/shared/utilResultSet';
 import { noopLogger } from '../../../utils/noopLogger';
@@ -95,5 +99,37 @@ describe('getNavigationTarget', () => {
     expect(seen).toEqual([200]);
     expect(answer.ok).toBe(true);
     expect(answer.ok && answer.getResult().value).toBe('');
+  });
+});
+
+describe('the outline and navigation atoms', () => {
+  it('AdtUtils is each atom of interfaces-adt, typed by its slot', () => {
+    const connection = new RecordingConnection();
+    const shipped = utils(connection);
+    // Compile-time conformance: a consumer composing its contract from the
+    // atoms alone takes the class as it is.
+    const outline: IAdtObjectOutlineReadable<string> = shipped;
+    const navigation: IAdtNavigationTargetReadable<string> = shipped;
+    expect(outline).toBe(navigation);
+  });
+
+  it('reads the answer through the navigationTarget slot it was given', async () => {
+    const connection = new RecordingConnection();
+    const read = new AdtUtils(connection, {
+      logger: noopLogger,
+      results: { ...utilDocuments, navigationTarget: () => 'read' as const },
+    });
+    const answer = await read.getNavigationTarget(FRAGMENT);
+    expect(answer.ok && answer.getResult().value).toBe('read');
+  });
+
+  it('reads the answer through the objectOutline slot it was given', async () => {
+    const connection = new RecordingConnection();
+    const read = new AdtUtils(connection, {
+      logger: noopLogger,
+      results: { ...utilDocuments, objectOutline: () => 'outline' as const },
+    });
+    const answer = await read.getObjectOutline('CLAS/OC', 'ZCL_X');
+    expect(answer.ok && answer.getResult().value).toBe('outline');
   });
 });
