@@ -45,7 +45,7 @@ const TEXT_ELEMENTS_SAMPLE =
   "open: no PROG/PX or CLAS/OCX sample is recorded: the live conformance run builds each sample's template, urimapper and metadata reads from that sample's recorded files, so a code with none cannot be recorded until a sample is seeded (RSPARAM's text elements on premise and on the cloud, a class's); seeding them is a separate tooling task";
 
 const DEFINITION_ADDRESS =
-  "the library sends the name as the caller gives it, case kept (a name goes to SAP exactly as given, fr0ster/mcp-abap-adt#404); SAP's urimapper answers the lowercase address. Both are served: the sample's metadata read at the case-kept address answered 200 (conformance/<release>, 03-metadata), and on ABAP cloud the upper-, mixed- and lowercase addresses of the object document and the source of all three answered 200 (2026-11-28)";
+  'SAP\'s measured behaviour (docs/usage/ERRATA.md, "The urimapper names a definition by its lowercase address"): the library sends the name as the caller gives it, case kept, and urimapper answers the lowercase address; both are served — the samples\' metadata reads at the case-kept address answered 200 on ABAP cloud and on premise (conformance/<release>, 03-metadata, 2026-11-28), and on ABAP cloud the upper-, mixed- and lowercase addresses of the object document and the source answered 200 alike. Kept as an entry because the address rule compares the two addresses exactly, for every code';
 
 /** The three definition codes: the library keeps the name's case, urimapper lowercases it. */
 const DEFINITION_ADDRESS_DIVERGENCES: IDivergence[] = (

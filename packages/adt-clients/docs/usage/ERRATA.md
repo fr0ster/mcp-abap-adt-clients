@@ -532,3 +532,23 @@ inferred, not verified.
 **What the library does.** The name goes to SAP as given, percent-encoded, case kept, and
 the `500` comes back through `analyse` as SAP sent it; nothing checks the name's
 length.
+
+## The urimapper names a definition by its lowercase address
+
+**Symptom.** `GET /sap/bc/adt/vit/urimapper?uri=/sap/bc/adt/vit/wb/object_type/<type>/object_name/<NAME>`
+for an application log object, a job catalog or a job template answers the
+lowercase address (`/sap/bc/adt/applicationlog/objects/abi`), while the library
+sends the name as the caller gives it, case kept (`…/objects/ABI`). Measured on
+ABAP cloud and on premise, 2026-11-28 (`corpus/adt/conformance/<release>/`,
+`APLO-TYP--abi`, `SAJC--aps_gsm_metric_collector`,
+`SAJT--aps_gsm_metric_collection_template`).
+
+**What actually happened.** Both addresses are served: the metadata read at the
+case-kept address answered `200` on both kinds, and on ABAP cloud the upper-,
+mixed- and lowercase addresses of the object document and the source answered
+`200` alike. The urimapper's lowercase is its own spelling, not a requirement.
+
+**What the library does.** It keeps the name as given and does not rewrite it
+to the urimapper's spelling. The type tables' conformance check lists the
+difference as a recorded divergence of the `address` rule, with this entry as
+its evidence.

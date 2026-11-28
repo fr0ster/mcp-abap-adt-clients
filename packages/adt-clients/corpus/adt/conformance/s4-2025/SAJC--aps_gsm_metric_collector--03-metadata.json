@@ -2,14 +2,14 @@
   "case": "SAJC--aps_gsm_metric_collector",
   "step": 3,
   "stepTag": "metadata",
-  "capturedAt": "2026-11-28T11:35:46.586Z",
+  "capturedAt": "2026-11-28T12:38:45.284Z",
   "request": {
     "method": "GET",
-    "url": "/sap/bc/adt/applicationjob/catalogs/aps_gsm_metric_collector",
+    "url": "/sap/bc/adt/applicationjob/catalogs/APS_GSM_METRIC_COLLECTOR",
     "params": {
       "version": "active"
     },
-    "effectiveUrl": "/sap/bc/adt/applicationjob/catalogs/aps_gsm_metric_collector?version=active",
+    "effectiveUrl": "/sap/bc/adt/applicationjob/catalogs/APS_GSM_METRIC_COLLECTOR?version=active",
     "headers": {
       "Accept": "application/vnd.sap.adt.blues.v2+xml"
     },
@@ -28,9 +28,9 @@
       "last-modified": "Mon, 28 Nov 2022 15:12:45 GMT",
       "sap-cache-control": "+0",
       "sap-isc-uagent": "0",
-      "x-sap-adt-profiling": "server-time=50191",
+      "x-sap-adt-profiling": "server-time=50416",
       "sap-server": "true",
-      "sap-perf-fesrec": "53810.000000"
+      "sap-perf-fesrec": "54760.000000"
     },
     "bodyFile": "SAJC--aps_gsm_metric_collector--03-metadata.body.xml"
   }

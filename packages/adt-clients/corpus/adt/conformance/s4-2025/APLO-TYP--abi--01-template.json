@@ -2,7 +2,7 @@
   "case": "APLO-TYP--abi",
   "step": 1,
   "stepTag": "template",
-  "capturedAt": "2026-11-28T11:35:46.585Z",
+  "capturedAt": "2026-11-28T12:38:45.282Z",
   "request": {
     "method": "GET",
     "url": "/sap/bc/adt/vit/wb/object_type/aplotyp/object_name/ABI",
@@ -24,9 +24,9 @@
       "sap-adt-saplb": "REDACTED",
       "sap-cache-control": "+0",
       "sap-isc-uagent": "0",
-      "x-sap-adt-profiling": "server-time=13329",
+      "x-sap-adt-profiling": "server-time=13237",
       "sap-server": "true",
-      "sap-perf-fesrec": "17363.000000"
+      "sap-perf-fesrec": "17172.000000"
     },
     "bodyFile": "APLO-TYP--abi--01-template.body.xml"
   }
