@@ -4,8 +4,8 @@
 
 A consumer of `@mcp-abap-adt/adt-clients` works with type groups as it does with every other
 source-based object type. `getTypeGroup()` on the client answers `AdtTypeGroup`. Its members
-answer through the result strategy and the caller's `analyse`, and each is one ADT request
-(activation has the library's one exception, below).
+answer through the result strategy and the caller's `analyse`, and each is one ADT request,
+activation included.
 
 The members are exactly these ten operations:
 
@@ -19,7 +19,7 @@ The members are exactly these ten operations:
 | lock | `POST …/{name}?_action=LOCK&accessMode=MODIFY` |
 | unlock | `POST …/{name}?_action=UNLOCK&lockHandle=…` |
 | activate | `POST /sap/bc/adt/activation` |
-| versions | `GET …/{name}/source/main/versions` |
+| versions | `GET …/{name}/source/main/versions`; the version source an entry names, `GET <its content uri>` (the version atom's pair) |
 | delete | `DELETE …/{name}?lockHandle=…` |
 
 No other operation is part of this goal. The check run, deletion check, metadata write and
@@ -51,6 +51,7 @@ the tracking issue's table: raw requests on S/4HANA 2025, recordings kept for th
 | Metadata links | enhancement options and implementations | enhancement options and implementations |
 | `GET …/{name}/source/main`, `text/plain` | 200 | 200 |
 | `GET …/{name}/source/main/versions` | 200, atom feed | 200, atom feed |
+| `GET <an entry's content uri>` (version source) | not measured | not measured |
 | `GET …/{name}/objectstructure` | 404 | 404 |
 | `GET …/typegroups` (the collection) | 400, no type group name | 400, no type group name |
 | `GET …/typegroups/validation` | 405 | 405 |
@@ -71,10 +72,11 @@ header; that is not verified.
 ## Holds throughout
 
 - **One endpoint, one member.** Each member sends exactly one request, and nothing composes
-  lock, write, unlock and activate for the caller. Activation is the library's shared member,
-  and its documented exception applies to type groups unchanged: the one read of the inactive
-  objects after a checklist that does not state its outcome (README, "Activation: what
-  activated, and which endpoint"). No exception of its own is added for type groups.
+  lock, write, unlock and activate for the caller. Activation is one request too: the type
+  group's `activate` sends `POST /sap/bc/adt/activation` and nothing after it. The library's
+  follow-up read of the inactive objects does not apply to it; a consumer that wants the
+  inactive list reads it through the existing separate member
+  (`getUtils().getInactiveObjects`).
 - **The library interprets nothing.** What SAP answers comes back as the answer: the empty 200
   of a valid name, the 400 of a refused one, a create's empty 200. No member reads, judges or
   rewrites an answer. Any reading a consumer needs lives in `@mcp-abap-adt/adt-strategies`, and
@@ -82,14 +84,15 @@ header; that is not verified.
 - **The library does not second-guess SAP.** The name is sent as given. Its length and its
   validity are SAP's to refuse, and validation and create answer them. The table's
   `nameMaxLength` (5) is data for the consumer, not a check in the member.
-- **Headers are the caller's, with the library's pair as the default.**
-  - The metadata read sends `Accept: application/vnd.sap.adt.ddic.typegroups.v3+xml` by default.
-    That is the newest media type on-premise discovery lists. v2 answers the same body, so the
-    default is a choice, not a requirement.
+- **Headers are the caller's; the library's value is a default only where the atom has one.**
+  - The metadata read sends `Accept: application/vnd.sap.adt.ddic.typegroups.v3+xml` by default,
+    and a caller's `options.accept` replaces it. v3 is the newest media type on-premise
+    discovery lists; v2 answers the same body, so the default is a choice, not a requirement.
   - A read that sends no Accept at all is refused on premise (raw, 400), so the library always
     sends one.
-  - Create sends `Content-Type: application/vnd.sap.adt.ddic.typegroups.v3+xml` by default.
-  - A caller's `options.headers` replaces either default.
+  - The writes (create, source write, activate, delete) send the caller's `headers` pair, which
+    their atoms require. The pair measured for create is v3 for both Accept and Content-Type.
+  - Validation and lock send the fixed Accept every type's validation and lock send.
 - **Validation sends `objtype=TYPE%2FDG`.** It sends that exact value, URL-encoded, never `typedg`, `type` or `TYPEDG`, which are measured refused (400).
 - **Addresses live in one place.** The collection, validation and object addresses are a record
   in `src/endpoints/objects.ts`. No module writes the path.
@@ -113,9 +116,9 @@ header; that is not verified.
   3. Where discovery does not describe the operation, the typestructure capabilities decide.
   4. Every operation the cloud row lists is measured on the trial before the release. One that
      cannot be measured there stays out of the cloud row.
-  - Today the cloud's create is unverified. Its collection is listed with an empty
-    `app:accept`, and its typestructure lists CREATE. Which of the two says what is not settled
-    until the trial check.
+  - The cloud's create is unverified today: its collection is listed with an empty
+    `app:accept`, and its typestructure lists CREATE. A live measurement outranks discovery: if
+    the trial measures create served, it is in the cloud row.
 - **Every claim about SAP behaviour is measured or read in SAP's handler.** The document or test
   that states it says which, and an unmeasured claim is marked unverified.
 - **The corpus holds the answers.** The scrubbed recordings of both releases go into the corpus
@@ -142,24 +145,12 @@ header; that is not verified.
 
 ## Out of scope
 
-- **SAP_BASIS 7.40 (`adt-clients-legacy`)** (open question below).
+- **SAP_BASIS 7.40 (`adt-clients-legacy`).** It belongs to the legacy-coverage task. 7.40's
+  discovery lists no type group collection, while its typestructure lists `TYPE/DG` with CREATE;
+  nothing was measured there.
 - **The types inside a type group (`TYPE/DGT`)** as objects of their own.
 - **A type group's enhancement options and implementations.** The metadata of both releases
   links to them.
 - **The object structure.** It answered 404 on both measured releases.
-- **The check run, deletion check, metadata write and transport assignment.**
+- **The check run, deletion check, metadata write and transport assignment.** They go to a later task.
 - **The mcp-abap-adt tools.** They are the server's change, made on the published library.
-
-## Open questions
-
-- **Activation.** Does the library's documented activation exception apply to type groups, or
-  should their activation be one request only?
-- **The cloud create.** If the trial measures create served despite the empty `app:accept`,
-  does it enter the cloud row (rule 1), or does discovery's empty `app:accept` keep it out?
-- **The four operations left out.** Are the check run, deletion check, metadata write and
-  transport assignment part of #305 (to be measured first), or a later task?
-- **SAP_BASIS 7.40.**
-  - 7.40's discovery lists no type group collection, but its typestructure lists `TYPE/DG` with
-    CREATE.
-  - It answers 401 before logon, so nothing was measured there.
-  - Is 7.40 left out of #305, or measured over RFC first?
