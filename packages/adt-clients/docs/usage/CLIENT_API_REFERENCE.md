@@ -1569,28 +1569,31 @@ if (failure && 'stillInactive' in failure && failure.stillInactive.length > 0) {
 }
 ```
 
-**The one read after a silent checklist.** `chkl:messages` with
-`activationExecuted="false"` and no message answers both a re-activation that
-had nothing to do and an activation that left a function group inactive
-(S/4HANA 2025): the document alone cannot tell them apart. After that answer,
-and only that one, the member reads `GET /sap/bc/adt/activation/inactiveobjects`
-once (the `Accept` `getInactiveObjects` sends) and hands the list to `analyse`
-as its third parameter, `context.activation` (`IAdtAnalyseContext` of
-`@mcp-abap-adt/interfaces-adt`): `named`, the uris of the references the
-activation request sent, and `inactiveObjects`, the answer. `analyseActivation`
-judges by it: a named object still listed (by `uri` or `parentUri`) is not
-activated; none is nothing to activate. A read that fails is the call's
-failure ("the activation's outcome could not be decided"), carrying the read's
-response. This is the one exception to "a member issues one request"; every
-other answer is handed on with no second request.
+**The read after a silent checklist is the caller's** (49.0.0). `chkl:messages`
+with `activationExecuted="false"` and no message answers both a re-activation
+that had nothing to do and an activation that left a function group inactive
+(S/4HANA 2025): the document alone cannot tell them apart. The member sends
+the activation alone, one request, and calls `analyse` with the verdict and
+the answer. When `readUnstatedActivation` (adt-strategies) answers `silent`,
+the caller reads `getUtils().getInactiveObjects()` (over `wireItself`, the
+answer as it came) and hands it to `analyseActivation` as its third
+parameter, `context.activation` (`IAdtAnalyseContext` of
+`@mcp-abap-adt/interfaces-adt`): `named`, the uris the activation request sent
+(`buildObjectUri` of each object; a function group names its `source/main`
+too), and `inactiveObjects`, the answer. `analyseActivation` judges by it: a
+named object still listed (by `uri` or `parentUri`) is not activated; none is
+nothing to activate. A read that fails makes the verdict the read's failure
+("the activation's outcome could not be decided"), carrying its response. The
+recipe, and what 48.0.0 did, are in [MIGRATION-49.md](MIGRATION-49.md).
 
 **And after a checklist with no verdict and warnings alone** (45.5.2,
 fr0ster/mcp-abap-adt#360). `chkl:messages` with no `activationExecuted` and
 only `W`/`I`/`S` messages answered, on SAP_BASIS 7.52, a program SAP
-activated: SAP sets the attribute only once its activation run starts. The
-member reads the inactive list after it too, the same way. The client judges
-nothing: a read that fails here leaves the answer as it was and hands the
-refusal's response, if any, as `inactiveObjects`. `analyseActivation`
+activated: SAP sets the attribute only once its activation run starts.
+`readUnstatedActivation` answers `unstated` for it, and the caller reads the
+inactive list after it too, the same way. A read that fails here leaves the
+starting verdict as it was and the refusal's response, if any, is
+`inactiveObjects`. `analyseActivation`
 (adt-strategies 0.23.1) judges it like the silent checklist, SAP's warnings
 kept beside its sentence; with no readable list the outcome is not decided.
 
@@ -1746,6 +1749,26 @@ consumer reads; what the server said is, and that is `message` and `response`.
 On a legacy system (`@mcp-abap-adt/adt-clients-legacy`) `getSqlQuery` and `getTableContents` answer a refusal
 without a request (`origin: 'refusal'`, `UNSUPPORTED_OPERATION`) — the endpoint
 is not there.
+
+**`getSqlQuery` sends `row_number` as given, and none when none is given.**
+`rowNumber` carries the caller's bound exactly, `0` included; without one the
+URL carries no `rowNumber` and SAP's own bound applies: 100 records, measured on
+the BTP ABAP environment (2026-11-27). There SAP refused `0`, a negative number
+and 2147483647 with `400` ("If UP TO or OFFSET is used, … cannot be
+specified"); 2147483646 was the largest accepted. Until 48.0.0 a missing or `0`
+bound was sent as 100.
+
+**`getTableContents` sends `max_rows` as given, and none when none is given.**
+`/datapreview/ddic` gets `rowNumber` exactly as given; without one the URL
+carries none, and SAP answered 101 records (its 100 and one more) and ignored
+`0` the same way (BTP ABAP environment, 2026-11-27). Until 48.0.0 a missing or
+`0` bound was sent as 100.
+
+**`getAllTypes` sends `maxItemCount` as given, and none when none is given.**
+It answers what SAP answers for that count: without one 100 of 375 object types
+(`0` and `-1` the same), 999 to 2147483647 all 375, 2147483648 refused `400`
+(BTP ABAP environment, 2026-11-27). A caller that wants every type passes a
+count, e.g. 2147483647. Until 48.0.0 a missing one was sent as 999.
 
 **`getSqlQuery` sends a line longer than 255 characters wrapped.** The
 freestyle preview (`/datapreview/freestyle`) keeps the first 255 characters of
@@ -2154,7 +2177,9 @@ if (!listed.ok) {
 
 `search(criteria, options?)` is one `GET
 /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=…&maxResults=…`
-(`maxResults` 100 when not given), `Accept: application/xml`, with
+(`maxResults` exactly as given, `0` included, and none when not given: SAP's
+own bound then applies — 200 hits, measured on the BTP ABAP environment
+2026-11-27, where `maxResults=0` answered 200 too), `Accept: application/xml`, with
 `&objectType=<name>` when `criteria.objectType` is given. The default `search`
 slot answers the `adtcore:objectReferences` document as it came;
 `utilSearchHits` from `@mcp-abap-adt/adt-strategies` reads it into hits.
@@ -2817,8 +2842,9 @@ document; no finding model is published, because none has been confirmed
 against more than one system.
 
 `maximumVerdicts` (an option of `startRun`) is a **cap on results**, not a page
-size. Defaults to 100; a caller wanting everything raises it rather than
-paging. It must be a positive integer, and the object set must not be empty —
+size. Not given, the run payload carries none, and the cap is SAP's (SAP
+accepted such a run on the BTP ABAP environment, 2026-11-27; until 48.0.0 the
+library sent 100). Given, it must be a positive integer, and the object set must not be empty —
 both thrown before the request, because the argument is what is wrong.
 
 **Nothing here turns a missing value into a verdict.** Until 23.0.0 the chain

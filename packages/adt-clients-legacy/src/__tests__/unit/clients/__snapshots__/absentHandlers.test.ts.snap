@@ -1336,11 +1336,6 @@ exports[`an absent legacy handler refuses every operation, as before getTableSet
       "message": "TableSettings is not supported on this SAP system: /sap/bc/adt/ddic/db/settings, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
       "origin": "refusal",
     },
-    "patchMetadata": {
-      "code": "ADT_UNSUPPORTED_OPERATION",
-      "message": "TableSettings is not supported on this SAP system: /sap/bc/adt/ddic/db/settings, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",
-      "origin": "refusal",
-    },
     "readMetadata": {
       "code": "ADT_UNSUPPORTED_OPERATION",
       "message": "TableSettings is not supported on this SAP system: /sap/bc/adt/ddic/db/settings, the endpoint this type needs, is absent from the discovery of a legacy system (7.40 SP04): not advertised, not measured, so the type is refused until a run measures it.",

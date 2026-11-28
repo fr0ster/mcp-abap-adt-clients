@@ -53,6 +53,7 @@ export {
   type AdtActivationRefusal,
   type AdtMessage,
   type AdtRefusal,
+  type AdtUnstatedActivation,
   type IAdtStillInactive,
   isIndeterminateWalkAnswer,
   readActivationRefusal,
@@ -66,6 +67,7 @@ export {
   readObjectPropertiesAbsence,
   readPublicationRefusal,
   readUnitTestRefusal,
+  readUnstatedActivation,
   readValidationRefusal,
   stillInactiveAmong,
 } from './refusals/read';

@@ -509,13 +509,7 @@ const ABSENT = {
   getApplicationJobCatalog: ['getObject', 'getSource'],
   getApplicationJobTemplate: ['getObject', 'getSource'],
   getAppendStructure: [...SOURCE_OBJECT_MEMBERS],
-  getTableSettings: [
-    'lock',
-    'patchMetadata',
-    'readMetadata',
-    'unlock',
-    'updateMetadata',
-  ],
+  getTableSettings: ['lock', 'readMetadata', 'unlock', 'updateMetadata'],
   getTextElements: ['lock', 'read', 'unlock', 'update'],
   getAuthorizationField: [
     'activate',

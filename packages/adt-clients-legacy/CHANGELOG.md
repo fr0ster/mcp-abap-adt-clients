@@ -6,6 +6,18 @@ one changelog per package.
 
 ## [Unreleased]
 
+For adt-clients 49.0.0 (C7: one member, one endpoint, one request; to be
+released as 0.13.0 on `@mcp-abap-adt/adt-clients` `^49.0.0`).
+
+### Changed (breaking)
+
+- **`AdtFunctionGroupLegacy.activate` sends the activation alone**, through
+  `answering`: after a silent checklist it no longer reads the inactive list
+  (`answeringActivation` is gone from adt-clients). The caller reads it; the
+  group's reference is `buildObjectUri(name, 'FUGR/F')`.
+- **The absent table settings handler has no `patchMetadata`**, as adt-clients
+  has none.
+
 ### Added
 
 - **`getApplicationLog()`, `getApplicationJobCatalog()` and

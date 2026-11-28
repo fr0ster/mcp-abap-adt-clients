@@ -2301,15 +2301,18 @@
     </app:collection>
   </app:workspace>
   <app:workspace>
-    <atom:title>Others</atom:title>
+    <atom:title>Connectivity</atom:title>
     <app:collection href="/sap/bc/adt/conn/commtargets">
       <atom:title>Communication Target</atom:title>
-      <app:accept>application/vnd.sap.adt.blues.v1+xml</app:accept>
+      <app:accept>application/vnd.sap.adt.blues.v2+xml</app:accept>
       <app:accept>text/html</app:accept>
       <atom:category term="cotatyp" scheme="http://www.sap.com/wbobj/commtargetobjects"/>
       <adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility">
         <adtcomp:templateLink rel="http://www.sap.com/wbobj/commtargetobjects/cotatyp/properties" template="/sap/bc/adt/conn/commtargets/{object_name}{?corrNr,lockHandle,version,accessMode,_action}"/>
         <adtcomp:templateLink rel="http://www.sap.com/wbobj/commtargetobjects/cotatyp/source" template="/sap/bc/adt/conn/commtargets/{object_name}/source/main{?corrNr,lockHandle,version}"/>
+        <adtcomp:templateLink title="Server driven framework - Schema" rel="http://www.sap.com/adt/categories/objects/new/schema/additional" template="/sap/bc/adt/conn/commtargets/$new/schema{?relatedObjectUri}" type="application/vnd.sap.adt.serverdriven.schema.v1+json; framework=newObjectTypes.v1"/>
+        <adtcomp:templateLink title="Server driven framework - Configuration" rel="http://www.sap.com/adt/categories/objects/new/configuration/additional" template="/sap/bc/adt/conn/commtargets/$new/configuration{?relatedObjectUri}" type="application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=newObjectTypes.v1"/>
+        <adtcomp:templateLink title="Server driven framework - Content" rel="http://www.sap.com/adt/categories/objects/new/content/additional" template="/sap/bc/adt/conn/commtargets/$new/content{?relatedObjectUri}" type="application/vnd.sap.adt.serverdriven.content.v1+json; framework=newObjectTypes.v1"/>
         <adtcomp:templateLink rel="http://www.sap.com/adt/serverdriven/sideeffect" template="/sap/bc/adt/conn/commtargets/$new/sideeffect{?path,determination,featureControl}" type="application/vnd.sap.adt.serverdriven.sideeffects.result.v1+xml; framework=newObjectTypes.v1"/>
       </adtcomp:templateLinks>
     </app:collection>
@@ -2332,7 +2335,7 @@
       <adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility"/>
     </app:collection>
     <app:collection href="/sap/bc/adt/conn/commtargets/validation">
-      <atom:title>Communication Target Name Validation</atom:title>
+      <atom:title>Object Name Validation</atom:title>
       <atom:category term="cotatyp/validation" scheme="http://www.sap.com/wbobj/commtargetobjects"/>
       <adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility"/>
     </app:collection>
@@ -2920,7 +2923,8 @@
     </app:collection>
     <app:collection href="/sap/bc/adt/ddic/dtix/sources">
       <atom:title>Entity Index</atom:title>
-      <app:accept/>
+      <app:accept>application/vnd.sap.adt.blues.v1+xml</app:accept>
+      <app:accept>text/html</app:accept>
       <atom:category term="dtixdf" scheme="http://www.sap.com/wbobj/dictionary"/>
       <adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility"/>
     </app:collection>
@@ -2974,7 +2978,8 @@
     </app:collection>
     <app:collection href="/sap/bc/adt/ddic/dtsc/sources">
       <atom:title>Static Cache</atom:title>
-      <app:accept/>
+      <app:accept>application/vnd.sap.adt.blues.v1+xml</app:accept>
+      <app:accept>text/html</app:accept>
       <atom:category term="dtscdf" scheme="http://www.sap.com/wbobj/dictionary"/>
       <adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility"/>
     </app:collection>
@@ -3181,6 +3186,32 @@
   </app:workspace>
   <app:workspace>
     <atom:title>Texts</atom:title>
+    <app:collection href="/sap/bc/adt/documentation/doc/objects">
+      <atom:title>General Text</atom:title>
+      <app:accept/>
+      <atom:category term="doctdoc" scheme="http://www.sap.com/wbobj/textobj"/>
+      <adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility">
+        <adtcomp:templateLink rel="http://www.sap.com/wbobj/textobj/doctdoc/properties" template="/sap/bc/adt/documentation/doc/objects/{object_name}{?corrNr,lockHandle,version,accessMode,_action}"/>
+        <adtcomp:templateLink rel="http://www.sap.com/wbobj/textobj/doctdoc/source" template="/sap/bc/adt/documentation/doc/objects/{object_name}/source/main{?corrNr,lockHandle,version}"/>
+      </adtcomp:templateLinks>
+    </app:collection>
+    <app:collection href="/sap/bc/adt/documentation/doc/objects/$metadata">
+      <atom:title>Grammar metadata for type General Text</atom:title>
+      <atom:category term="doctdoc/metadata" scheme="http://www.sap.com/wbobj/textobj"/>
+      <adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility"/>
+    </app:collection>
+    <app:collection href="/sap/bc/adt/documentation/doc/objects/$elementinfo">
+      <atom:title>Element Info for type DOCT</atom:title>
+      <atom:category term="doctdoc/elementinfo" scheme="http://www.sap.com/wbobj/textobj"/>
+      <adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility">
+        <adtcomp:templateLink rel="elementinfo" template="/sap/bc/adt/documentation/doc/objects/$elementinfo{?uri,objectName,objectType}"/>
+      </adtcomp:templateLinks>
+    </app:collection>
+    <app:collection href="/sap/bc/adt/documentation/doc/objects/validation">
+      <atom:title>General Text Name Validation</atom:title>
+      <atom:category term="doctdoc/validation" scheme="http://www.sap.com/wbobj/textobj"/>
+      <adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility"/>
+    </app:collection>
     <app:collection href="/sap/bc/adt/documentation/ktd/documents">
       <atom:title>Knowledge Transfer Document</atom:title>
       <app:accept>application/vnd.sap.adt.sktdv2+xml</app:accept>
@@ -4780,6 +4811,8 @@
     </app:collection>
     <app:collection href="/sap/bc/adt/atc/runs">
       <atom:title>ATC runs</atom:title>
+      <app:accept>application/vnd.sap.atc.run.objectsets.v2+xml</app:accept>
+      <app:accept>application/vnd.sap.adt.chkev1+xml</app:accept>
       <atom:category term="atcruns" scheme="http://www.sap.com/adt/categories/atc"/>
       <adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility">
         <adtcomp:templateLink title="ATC run in worklist mode" rel="http://www.sap.com/adt/atc/relations/worklist" template="/sap/bc/adt/atc/runs{?worklistId,clientWait}"/>
@@ -4852,6 +4885,21 @@
       <adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility">
         <adtcomp:templateLink rel="http://www.sap.com/adt/atc/relations/variants/referenceVariant" template="/sap/bc/adt/atc/variants{?maxItemCount,data}"/>
       </adtcomp:templateLinks>
+    </app:collection>
+    <app:collection href="/sap/bc/adt/atc/reasons">
+      <atom:title>List of Reasons</atom:title>
+      <atom:category term="atcreasons" scheme="http://www.sap.com/adt/categories/atc"/>
+      <adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility"/>
+    </app:collection>
+    <app:collection href="/sap/bc/adt/atc/checkclasses">
+      <atom:title>List of Check Classes</atom:title>
+      <atom:category term="atccheckclasses" scheme="http://www.sap.com/adt/categories/atc"/>
+      <adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility"/>
+    </app:collection>
+    <app:collection href="/sap/bc/adt/atc/messagecodes">
+      <atom:title>List of Message Codes</atom:title>
+      <atom:category term="atcmessagecodes" scheme="http://www.sap.com/adt/categories/atc"/>
+      <adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility"/>
     </app:collection>
     <app:collection href="/sap/bc/adt/atc/exemptions/apply">
       <atom:title>Exemptions Apply</atom:title>
@@ -5242,6 +5290,13 @@
         <adtcomp:templateLink rel="http://www.sap.com/adt/relations/migration/logs" template="/sap/bc/adt/ddic/ddl/migration/logs/{logId}" type="application/vnd.sap.adt.ddl.migrationlog.v2+xml"/>
       </adtcomp:templateLinks>
     </app:collection>
+    <app:collection href="/sap/bc/adt/ddic/cds/dependencies/info">
+      <atom:title>Recursive Usage Explorer - Object Information</atom:title>
+      <atom:category term="objectinfo" scheme="http://www.sap.com/adt/categories/ddic/cds/dependency"/>
+      <adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility">
+        <adtcomp:templateLink rel="http://www.sap.com/adt/categories/ddic/cds/dependency" template="/sap/bc/adt/ddic/cds/dependencies/info{?uri}" type="application/vnd.sap.adt.cds.dependencies.objectinfo.v1+xml"/>
+      </adtcomp:templateLinks>
+    </app:collection>
   </app:workspace>
   <app:workspace>
     <atom:title>CDS Metadata Extensions</atom:title>
@@ -5374,6 +5429,23 @@
       <atom:title>Entity Buffer Navigation Support</atom:title>
       <atom:category term="dtebdf/navigation" scheme="http://www.sap.com/wbobj/dictionary"/>
       <adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility"/>
+    </app:collection>
+  </app:workspace>
+  <app:workspace>
+    <atom:title>Entity Index</atom:title>
+    <app:collection href="/sap/bc/adt/ddic/dtix/createstatements">
+      <atom:title>Entity Index Create SQL Statement Resource</atom:title>
+      <atom:category term="dtix/createstatements" scheme="http://www.sap.com/wbobj/dictionary"/>
+      <adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility">
+        <adtcomp:templateLink rel="http://www.sap.com/adt/relations/ddic/dtix/createstatements" template="/sap/bc/adt/ddic/dtix/createstatements/{object_name}"/>
+      </adtcomp:templateLinks>
+    </app:collection>
+    <app:collection href="/sap/bc/adt/docu/dtix/langu">
+      <atom:title>Entity Index Language Help</atom:title>
+      <atom:category term="dtixdf/languagehelp" scheme="http://www.sap.com/wbobj/dictionary"/>
+      <adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility">
+        <adtcomp:templateLink rel="http://www.sap.com/adt/relations/docu/dtix/langu" template="/sap/bc/adt/docu/dtix/langu{?uri}"/>
+      </adtcomp:templateLinks>
     </app:collection>
   </app:workspace>
   <app:workspace>
@@ -5742,6 +5814,7 @@
       <atom:title>Check</atom:title>
       <atom:category term="checkruns" scheme="http://www.sap.com/adt/categories/check"/>
       <adtcomp:templateLinks xmlns:adtcomp="http://www.sap.com/adt/compatibility">
+        <adtcomp:templateLink rel="http://www.sap.com/adt/relations/runs/check" template="/sap/bc/adt/checkruns{?kernelVersion}"/>
         <adtcomp:templateLink rel="http://www.sap.com/adt/categories/check/relations/reporters" template="/sap/bc/adt/checkruns{?reporters}"/>
       </adtcomp:templateLinks>
     </app:collection>

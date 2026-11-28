@@ -16,9 +16,13 @@
  */
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AdtClient } from '../../../clients/AdtClient';
+import { utilDocuments } from '../../../core/shared/utilResultSet';
+import { buildObjectUri } from '../../../utils/activationUtils';
+import { wireItself } from '../../../utils/resultStrategy';
+import { activationJudged } from '../../helpers/activationJudged';
 import { headersOf } from '../../helpers/adtHeaders';
 import { readExchange } from '../../helpers/recordedConformance';
 import { CriticalSectionConnection } from '../../helpers/recordingConnection';
@@ -134,13 +138,21 @@ async function judge(
   });
   const client = new AdtClient(connection, createLibraryLogger());
   const group = client.getFunctionGroup();
-  const answered = await group.activate(
-    { functionGroupName: 'ZACT751P9325' },
-    { headers: headersOf(group, 'activate'), analyse: analyseActivation },
+  const utils = client.getUtils({ ...utilDocuments, inactive: wireItself });
+  const groupUri = buildObjectUri('ZACT751P9325', 'FUGR/F');
+  const judged = await activationJudged(
+    (analyse) =>
+      group.activate(
+        { functionGroupName: 'ZACT751P9325' },
+        { headers: headersOf(group, 'activate'), analyse },
+      ),
+    () => utils.getInactiveObjects(),
+    [groupUri, `${groupUri}/source/main`],
   );
   const listRead = connection.sent.some((r) => r.url === INACTIVE);
-  if (answered.ok) return { ok: true, listRead };
-  const failure = answered.getError();
+  expect(listRead).toBe(judged.listRead);
+  if (judged.verdict === ADT_NO_FAILURE) return { ok: true, listRead };
+  const failure = judged.verdict;
   if (!('stillInactive' in failure))
     throw new Error('expected the activation failure');
   return {

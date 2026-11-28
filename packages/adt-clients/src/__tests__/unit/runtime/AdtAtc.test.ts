@@ -161,7 +161,7 @@ const urlsOf = (calls: { url: string }[]) => calls.map((c) => c.url);
 describe('AdtAtc — resolving the check variant', () => {
   // The interface makes `options` optional. A handler reading `options.wait`
   // throws on this call, and a test passing `{}` would sail past it.
-  it('run(target) with no options at all uses every default', async () => {
+  it('run(target) with no options at all: the system variant, no wait, no cap', async () => {
     const { connection, calls } = connectionFor();
 
     const result = expectResult(
@@ -177,7 +177,10 @@ describe('AdtAtc — resolving the check variant', () => {
     const run = calls.find((c) => c.url.includes('/atc/runs?'));
     expect(run?.url).toContain('clientWait=false');
     expect(run?.url).toContain(`worklistId=${WORKLIST_ID}`);
-    expect(run?.data).toContain('maximumVerdicts="100"');
+    // No cap of the library's (mcp-abap-adt#391): SAP accepted a run without
+    // the attribute (BTP ABAP environment, 2026-11-27).
+    expect(run?.data).toContain('<atc:run xmlns:atc=');
+    expect(run?.data).not.toContain('maximumVerdicts');
   });
 
   it('reads customizing with GET and uses systemCheckVariant', async () => {

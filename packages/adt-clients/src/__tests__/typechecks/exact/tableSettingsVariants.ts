@@ -3,7 +3,9 @@
  * interfaces-adt 30.1.0 has them: on the cloud a write requires
  * `isWritableByAMDP` (a cloud PUT without it reset it to `false`, measured),
  * on premise it refuses it (nothing maps it there, Code); `AdtTableSettings`
- * of each variant is the contract's patchable and updatable of that variant.
+ * of each variant is the contract's updatable of that variant. A change of
+ * some settings is `patchTableSettings` (49.0.0): typed by the read and the
+ * change set, its answer goes to the write of that variant.
  *
  * Compiled by `npm run test:check` under `tsconfig.test.exact.json`, against
  * the built declarations (`npm run build` first). Nothing here runs.
@@ -15,11 +17,15 @@ import {
   type ResultValuesOf,
   tableSettingsDocuments,
 } from '@mcp-abap-adt/adt-clients';
-import { AdtTableSettings } from '@mcp-abap-adt/adt-clients/core';
+import {
+  AdtTableSettings,
+  patchTableSettings,
+} from '@mcp-abap-adt/adt-clients/core';
 import type {
-  IAdtTableSettingsPatchable,
   IAdtTableSettingsUpdatable,
   ITableSettings,
+  ITableSettingsRead,
+  ITableSettingsReadOf,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 
@@ -33,10 +39,6 @@ declare const onPremise: AdtTableSettings<
 >;
 declare const settings: ITableSettings;
 
-export const cloudPatchable: IAdtTableSettingsPatchable<string, 'cloud'> =
-  cloud;
-export const onPremisePatchable: IAdtTableSettingsPatchable<string, 'onprem'> =
-  onPremise;
 export const cloudUpdatable: IAdtTableSettingsUpdatable<string, 'cloud'> =
   cloud;
 export const onPremiseUpdatable: IAdtTableSettingsUpdatable<string, 'onprem'> =
@@ -60,21 +62,71 @@ export const onPremiseWithFlag = onPremise.updateMetadata(
   },
   { headers, lockHandle: 'H' },
 );
-export const onPremisePatchFlag = onPremise.patchMetadata(
-  // @ts-expect-error on premise a patch names no isWritableByAMDP
-  { tableName: 'ZT', changes: { isWritableByAMDP: true } },
-  {
-    headers: { accept: 'application/vnd.sap.adt.table.settings.v2+xml' },
-    lockHandle: 'H',
-  },
+declare const cloudRead: {
+  description: string;
+  settings: ITableSettingsReadOf<'cloud'>;
+};
+declare const onPremiseRead: {
+  description: string;
+  settings: ITableSettingsRead;
+};
+// The cloud patch's answer is the cloud write's settings, the flag among them.
+const cloudPatched = patchTableSettings(
+  cloudRead,
+  { sizeCategory: '1' },
+  'cloud',
 );
-export const cloudPatchFlag = cloud.patchMetadata(
-  { tableName: 'ZT', changes: { isWritableByAMDP: false } },
-  {
-    headers: { accept: 'application/vnd.sap.adt.table.settings.v2+xml' },
-    lockHandle: 'H',
-  },
+export const cloudPatchWritten = cloudPatched.ok
+  ? cloud.updateMetadata(
+      {
+        tableName: 'ZT',
+        description: cloudPatched.description,
+        settings: cloudPatched.settings,
+      },
+      { headers, lockHandle: 'H', ifMatch: 'E' },
+    )
+  : undefined;
+export const cloudPatchFlag = patchTableSettings(
+  cloudRead,
+  { isWritableByAMDP: false },
+  'cloud',
 );
+// @ts-expect-error a cloud patch takes a cloud read: the flag must be there
+export const cloudFromGenericRead = patchTableSettings(
+  onPremiseRead,
+  { sizeCategory: '1' },
+  'cloud',
+);
+// @ts-expect-error a patch names at least one setting
+export const emptyPatch = patchTableSettings(onPremiseRead, {}, 'onprem');
+// @ts-expect-error a buffering change names at least one field
+export const emptyBuffering = patchTableSettings(
+  onPremiseRead,
+  { buffering: {} },
+  'onprem',
+);
+// @ts-expect-error on premise a change does not name isWritableByAMDP
+export const onPremiseFlag = patchTableSettings(
+  onPremiseRead,
+  { isWritableByAMDP: true },
+  'onprem',
+);
+// The on-premise answer is the on-premise write's settings, as it is.
+const onPremisePatched = patchTableSettings(
+  onPremiseRead,
+  { sizeCategory: '1' },
+  'onprem',
+);
+export const onPremisePatchWritten = onPremisePatched.ok
+  ? onPremise.updateMetadata(
+      {
+        tableName: 'ZT',
+        description: onPremisePatched.description,
+        settings: onPremisePatched.settings,
+      },
+      { headers, lockHandle: 'H', ifMatch: 'E' },
+    )
+  : undefined;
 
 // The declared system kind is tied to the handler's type (Codex round 2).
 declare const connection: IAbapConnection;
@@ -92,22 +144,17 @@ export const inferredOnPremise: AdtTableSettings<
   'onprem'
 > = new AdtClientOnPrem(connection).getTableSettings();
 
-// An explicit on-premise handler refuses the cloud declaration.
-export const onPremiseDeclaredCloud = new AdtTableSettings<
+// The handler takes no declaration of its own: the variant is its type
+// (49.0.0; the constructor's variant option went with patchMetadata).
+export const cloudHandler = new AdtTableSettings<
   ResultValuesOf<typeof tableSettingsDocuments>,
-  'onprem'
+  'cloud'
+>(connection, { results: tableSettingsDocuments });
+export const cloudDeclaredRefused = new AdtTableSettings<
+  ResultValuesOf<typeof tableSettingsDocuments>,
+  'cloud'
 >(connection, {
   results: tableSettingsDocuments,
-  // @ts-expect-error only a cloud handler takes the cloud declaration
+  // @ts-expect-error the variant option is gone
   variant: 'cloud',
 });
-// A cloud handler requires it.
-export const cloudUndeclared = new AdtTableSettings<
-  ResultValuesOf<typeof tableSettingsDocuments>,
-  'cloud'
-  // @ts-expect-error a cloud handler requires variant: 'cloud'
->(connection, { results: tableSettingsDocuments });
-export const cloudDeclared = new AdtTableSettings<
-  ResultValuesOf<typeof tableSettingsDocuments>,
-  'cloud'
->(connection, { results: tableSettingsDocuments, variant: 'cloud' });

@@ -123,7 +123,7 @@ describe('Shared - getTableContents', () => {
   );
 
   gate('table_contents', 'get_table_contents_default_max_rows')(
-    'should use default max_rows if not provided',
+    "should read without max_rows, SAP's own bound applying",
     async () => {
       // Get test case from YAML configuration
       const resolver = new TestConfigResolver({
@@ -145,7 +145,7 @@ describe('Shared - getTableContents', () => {
       // Get table name from params or standard_objects.tables
       const tableName = resolver.getObjectName('table_name', 'table')!;
 
-      logTestStep('get table contents with default max_rows', testsLogger);
+      logTestStep('get table contents without max_rows', testsLogger);
       // The contract, not the status: ADT answers a refusal inside a 200, and
       // on a legacy system this endpoint is absent altogether — both come back
       // as the failure half, naming which.

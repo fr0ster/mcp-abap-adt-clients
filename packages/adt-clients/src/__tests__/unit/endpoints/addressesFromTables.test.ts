@@ -46,12 +46,21 @@ import {
   TRANSFORMATION,
 } from '../../../endpoints/objects';
 import { buildObjectUri } from '../../../utils/activationUtils';
+import {
+  NOT_YET_SERVED_CODES,
+  type NotYetServedCode,
+} from '../../helpers/notYetServed';
+
+/** The codes of the APIs not served yet, as strings a table key is. */
+const NOT_SERVED_CODES: ReadonlySet<string> = new Set(NOT_YET_SERVED_CODES);
 
 const NAME = '/NSP/ZOBJ_X';
 const GROUP = 'ZFG_X';
 
 /** The record's address for each code with an address of its own. */
-const EXPECTED: Readonly<Record<Exclude<AdtTypeCode, 'MSAG/NN'>, string>> = {
+const EXPECTED: Readonly<
+  Record<Exclude<AdtTypeCode, 'MSAG/NN' | NotYetServedCode>, string>
+> = {
   'CLAS/OC': CLASS.uri(NAME),
   'INTF/OI': INTERFACE.uri(NAME),
   'PROG/P': PROGRAM.uri(NAME),
@@ -114,6 +123,8 @@ function everyCode(): [string, string][] {
 
 describe('every code of every table is addressed as its record addresses it', () => {
   it.each(everyCode())('%s %s', (_variant, code) => {
+    // A code of an API this package does not serve yet has no record here.
+    if (NOT_SERVED_CODES.has(code)) return;
     // A code the expectations do not cover is a new code of the tables: its
     // address is written into EXPECTED before this passes.
     if (!covered(code)) throw new Error(`no expected address for ${code}`);

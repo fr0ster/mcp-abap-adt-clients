@@ -9,18 +9,12 @@
 import type {
   AdtParentedTypeCode,
   AdtTypeCode,
-  IAdtError,
   IAdtHeaders,
-  IAdtResponse,
-  IAnalyse,
-  IResultStrategy,
 } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
-  IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { fetchInactiveObjects } from '../core/shared/getInactiveObjects';
 import {
   type AdtAddressableCode,
   codeEntries,
@@ -30,13 +24,6 @@ import {
   parentEntry,
 } from '../endpoints/codes';
 import { seg } from '../endpoints/objects';
-import { namedIn, unstatedOutcome } from './activationReading';
-import {
-  answeringExchange,
-  type IAdtExchange,
-  isUnansweredCredentialRefusal,
-  recogniseFailure,
-} from './adtResponse';
 import { requestHeaders } from './requestHeaders';
 
 /** {@link PARENTED_SEGMENT}, read by any code: absent for an unparented one. */
@@ -151,118 +138,4 @@ export async function activateObjectInSession(
   // and neither does this function. Whether a checklist body means the
   // activation happened is read by the caller's own `analyse`.
   return response;
-}
-
-/**
- * The connection a low-level activation function is given: the member's own,
- * keeping the request it sends, so the read after it names what that request
- * named — taken from the body sent, not built a second time.
- */
-function keepingRequests(
-  connection: IAbapConnection,
-  sent: IAbapRequestOptions[],
-): IAbapConnection {
-  return {
-    connect: () => connection.connect(),
-    getBaseUrl: () => connection.getBaseUrl(),
-    getSessionId: () => connection.getSessionId(),
-    setSessionType: (type) => connection.setSessionType(type),
-    makeAdtRequest: (options: IAbapRequestOptions) => {
-      sent.push(options);
-      return connection.makeAdtRequest(options);
-    },
-  };
-}
-
-/**
- * An activation, and the one read its answer may need.
- *
- * **The one exception to "a member issues one request"** (fr0ster/mcp-abap-adt#351). `send` issues the activation — `POST /sap/bc/adt/activation` — and
- * after a checklist that does not state the outcome itself
- * (`UnstatedOutcome` in `activationReading.ts`: `activationExecuted="false"` with no message, or
- * no `activationExecuted` and only `W`/`I`/`S` messages) this reads
- * `GET /sap/bc/adt/activation/inactiveobjects` once, with the
- * `Accept` `getInactiveObjects` sends, and hands the list and the uris the
- * request named to `analyse` as `context.activation`. After every other
- * answer, and when the activation itself failed, nothing more is sent. The
- * client judges neither: the verdict is the consumer's `analyse` (the
- * shipped one is adt-strategies' `analyseActivation`).
- *
- * After a `silent` checklist, a read that fails is the call's failure: the
- * verdict `analyse` starts from names that the activation's outcome could not
- * be decided and carries the read's response; the activation's answer stays
- * the one a cleared verdict is read from. After an `unstated` one, a read that
- * fails leaves the starting verdict as it was before the read existed — no
- * failure — and hands the refusal's response as `inactiveObjects`, or no
- * context when none came back; adt-strategies' `analyseActivation` reads
- * either as an outcome it could not decide. A credential refusal SAP never
- * saw is thrown as it came.
- */
-async function activationExchange(
-  connection: IAbapConnection,
-  send: (connection: IAbapConnection) => Promise<IAdtWireResponse>,
-): Promise<IAdtExchange> {
-  const sent: IAbapRequestOptions[] = [];
-  const answer = await send(keepingRequests(connection, sent));
-  const unstated = unstatedOutcome(answer);
-  if (unstated === undefined) return { answer };
-
-  const named = namedIn(sent.find((request) => request.method === 'POST'));
-  try {
-    const inactiveObjects = await fetchInactiveObjects(connection);
-    return { answer, context: { activation: { named, inactiveObjects } } };
-  } catch (error: unknown) {
-    if (isUnansweredCredentialRefusal(error)) throw error;
-    const cause = recogniseFailure(error);
-    if (unstated === 'unstated') {
-      // The starting verdict stays the activation's own, as it was before
-      // this read existed: the read is a fact for `analyse`, not a verdict.
-      // What came back, a refusal's response included, is handed as the
-      // list; with no response there is no list to hand.
-      return cause.response === undefined
-        ? { answer }
-        : {
-            answer,
-            context: { activation: { named, inactiveObjects: cause.response } },
-          };
-    }
-    return {
-      answer,
-      failure: {
-        ...cause,
-        message: `The activation's outcome could not be decided: SAP answered that no activation ran and gave no message, and reading the inactive objects failed: ${cause.message}`,
-      },
-    };
-  }
-}
-
-/**
- * Run an activation member's request through {@link activationExchange} and
- * compose the two strategies over its answer, as `answering` does. Exported
- * beside `answering` for the handler classes built on this package (the
- * legacy package's activation overrides); the read itself is not.
- */
-export function answeringActivation<T, E extends IAdtError>(
-  connection: IAbapConnection,
-  send: (connection: IAbapConnection) => Promise<IAdtWireResponse>,
-  read: IResultStrategy<T>,
-  analyse: IAnalyse<E>,
-): Promise<IAdtResponse<T, E | IAdtError>>;
-export function answeringActivation<T>(
-  connection: IAbapConnection,
-  send: (connection: IAbapConnection) => Promise<IAdtWireResponse>,
-  read: IResultStrategy<T>,
-  analyse?: IAnalyse,
-): Promise<IAdtResponse<T>>;
-export function answeringActivation<T, E extends IAdtError = IAdtError>(
-  connection: IAbapConnection,
-  send: (connection: IAbapConnection) => Promise<IAdtWireResponse>,
-  read: IResultStrategy<T>,
-  analyse?: IAnalyse<E>,
-): Promise<IAdtResponse<T, E | IAdtError>> {
-  return answeringExchange(
-    () => activationExchange(connection, send),
-    read,
-    analyse,
-  );
 }

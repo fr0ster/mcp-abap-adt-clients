@@ -67,6 +67,23 @@ describe('tableSettings', () => {
     expect(() => readTableSettings(xml.replace(part, ''))).toThrow(named);
   });
 
+  // A count past Number.MAX_SAFE_INTEGER reads as another number, and a
+  // write would send that one back: refused, as adt-clients 48.0.0's own
+  // reading of the patch refused it (C7, 49.0.0: the strategy is the read).
+  it.each(['9'.repeat(400), '9007199254740993'])(
+    'refuses an area-key count that is no safe integer (%#)',
+    (digits) => {
+      const xml = String(recorded('read-table-settings-s4-2025').data);
+      const part = '<ts:areaKeyFields>0</ts:areaKeyFields>';
+      expect(xml).toContain(part);
+      expect(() =>
+        readTableSettings(
+          xml.replace(part, `<ts:areaKeyFields>${digits}</ts:areaKeyFields>`),
+        ),
+      ).toThrow('not a count');
+    },
+  );
+
   it('refuses a document that is not ts:tableSettings', () => {
     expect(() => readTableSettings('<other/>')).toThrow(
       'no ts:tableSettings document',

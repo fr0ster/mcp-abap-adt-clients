@@ -45,11 +45,10 @@ export class AdtClientOnPrem extends AdtClient<'onprem'> {
 /**
  * ABAP cloud — `ADT_TYPES_CLOUD`. Choosing it is the declaration that the
  * system is a cloud one. Its table settings handler is typed for the cloud
- * kind (the type of its write requires `isWritableByAMDP`) and, the one
- * runtime use of the declaration, constructed with `variant: 'cloud'`:
- * `patchMetadata` refuses a read without `ts:isWritableByAMDP`, whatever
- * static type the instance is held as. Its getter overrides the base's, as
- * `AdtClientLegacy` overrides the getters it serves differently.
+ * kind: the type of its write requires `isWritableByAMDP`, which a cloud
+ * read answers (`cloudTableSettings` in adt-strategies throws on a read
+ * without it). Its getter overrides the base's, as `AdtClientLegacy`
+ * overrides the getters it serves differently.
  */
 export class AdtClientCloud extends AdtClient<'cloud'> {
   override getTableSettings(
@@ -68,7 +67,6 @@ export class AdtClientCloud extends AdtClient<'cloud'> {
       logger: this.logger,
       lockRegistry: this.lockRegistry,
       results,
-      variant: 'cloud',
     });
   }
 }

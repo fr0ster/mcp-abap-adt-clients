@@ -17,8 +17,12 @@ import {
   type IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtClient } from '../../../clients/AdtClient';
+import { NOT_YET_SERVED } from '../../helpers/notYetServed';
 import { ACTIVATION_OK, recordingClient } from '../capabilities/behaviourGuard';
 import { HANDLERS } from '../capabilities/manifest';
+
+/** The APIs the tables name and this package does not serve yet. */
+const NOT_SERVED: ReadonlySet<string> = new Set(NOT_YET_SERVED);
 
 /** What every activation member takes, as these tests call it. */
 export interface IActivating {
@@ -48,7 +52,7 @@ export const TABLE_ACTIVATING_APIS: string[] = [
   ...new Set(
     TABLES.flatMap((table) =>
       Object.entries(table)
-        .filter(([, entry]) => activates(entry))
+        .filter(([api, entry]) => activates(entry) && !NOT_SERVED.has(api))
         .map(([api]) => api),
     ),
   ),

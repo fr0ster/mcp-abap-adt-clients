@@ -39,8 +39,12 @@ import {
 } from '../../endpoints/codes';
 import { buildObjectUri } from '../../utils/activationUtils';
 import { integrationHeadersOf } from './adtHeaders';
+import { NOT_YET_SERVED, type NotYetServedApi } from './notYetServed';
 import { isAdtTypeCode } from './typeCode';
 import { attributeOf, elementsNamed, textOf } from './xmlTree';
+
+/** The APIs not served yet, as strings a table key is. */
+const NOT_SERVED: ReadonlySet<string> = new Set(NOT_YET_SERVED);
 
 // ---------------------------------------------------------------------------
 // The answers
@@ -266,9 +270,11 @@ class NoRequests implements IAbapConnection {
   }
 }
 
-/** Each API's handler, from the client's own factory. */
+/** Each API's handler, from the client's own factory — but the ones not served yet. */
 const HANDLER: {
-  readonly [A in AdtApiName]: (client: AdtClient<'onprem'>) => object;
+  readonly [A in Exclude<AdtApiName, NotYetServedApi>]: (
+    client: AdtClient<'onprem'>,
+  ) => object;
 } = {
   class: (c) => c.getClass(),
   interface: (c) => c.getInterface(),
@@ -311,8 +317,8 @@ const HANDLER: {
   request: (c) => c.getRequest(),
 };
 
-/** Whether a table key is an API name: every key of a typed table is. */
-function isApiName(key: string): key is AdtApiName {
+/** Whether a table key is an API name this package serves. */
+function isApiName(key: string): key is Exclude<AdtApiName, NotYetServedApi> {
   return Object.hasOwn(HANDLER, key);
 }
 
@@ -332,7 +338,7 @@ let lookupClient: AdtClient<'onprem'> | undefined;
  * member (`integrationHeadersOf`); `undefined` where none is recorded.
  */
 export function updateMetadataMediaType(
-  api: AdtApiName,
+  api: Exclude<AdtApiName, NotYetServedApi>,
   code: string | undefined,
 ): string | undefined {
   lookupClient ??= new AdtClient<'onprem'>(new NoRequests());
@@ -673,6 +679,8 @@ export function checkTypeTable(
   const sampleChecked = new Set<string>();
 
   for (const api of Object.keys(table)) {
+    // An API this package does not serve yet is checked with its factory.
+    if (NOT_SERVED.has(api)) continue;
     if (!isApiName(api)) throw new Error(`table key ${api} is no API name`);
     const entry = table[api];
     if (!entry) continue;

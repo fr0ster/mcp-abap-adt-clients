@@ -131,9 +131,10 @@ does not expand `PATH`.
 activation answers to the requests the library sends: discovery lists
 `/activation/runs`; a class activates with the default, and a re-activation
 with `preauditRequested=false` is nothing to activate after one read of the
-inactive list; a function group's reference alone answers not activated with
-`stillInactive` for `true`, the silent checklist (not activated, one read of
-the list) for `false`, and the group with its main program activates through
+inactive list, which the test makes as a caller (49.0.0: the member sends the
+POST alone; the recipe is `helpers/activationJudged.ts`); a function group's reference alone answers not activated with
+`stillInactive` for `true`, the silent checklist (not activated, the caller's one
+read of the list) for `false`, and the group with its main program activates through
 `activateObjects`. Each object is created and deleted by the test. The
 answers it holds are recorded in `corpus/adt/answers/`
 (`activation-*-s4-2025`). The 7.40 counterpart is the legacy utils cycle

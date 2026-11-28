@@ -51,9 +51,6 @@ import {
   startAtcRun,
 } from './run';
 
-/** The default cap on results, and the only value anyone has run with. */
-const DEFAULT_MAXIMUM_VERDICTS = 100;
-
 /** One strategy per distinct answer of an ATC run. */
 export interface IAtcResults {
   /** `/atc/customizing` — `resolveCheckVariant`. */
@@ -179,11 +176,15 @@ export class AdtAtc<T extends AtcValues = ResultValuesOf<typeof atcDocuments>>
     options?: IAtcRunOptions & IAdtAnalyseOptions<E>,
   ): Promise<IAdtResponse<T['waitingRun'] | T['startedRun'], E | IAdtError>> {
     const wait = options?.wait ?? false;
-    const maximumVerdicts =
-      options?.maximumVerdicts ?? DEFAULT_MAXIMUM_VERDICTS;
+    // No cap of the library's (mcp-abap-adt#391): the caller's, or none —
+    // SAP accepted a run payload without `maximumVerdicts` (BTP ABAP
+    // environment, 2026-11-27). Until 48.0.0 a missing cap was sent as 100.
+    const maximumVerdicts = options?.maximumVerdicts;
 
     this.assertTarget(target);
-    this.assertMaximumVerdicts(maximumVerdicts);
+    if (maximumVerdicts !== undefined) {
+      this.assertMaximumVerdicts(maximumVerdicts);
+    }
 
     const uris = target.objects.map((o) => buildAtcObjectUri(o));
 

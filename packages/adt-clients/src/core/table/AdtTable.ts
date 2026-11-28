@@ -43,7 +43,6 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtModernVariant, AdtPerformedBy } from '../../clients/variant';
 import { TABLE } from '../../endpoints/objects';
-import { answeringActivation } from '../../utils/activationUtils';
 import { answering } from '../../utils/adtResponse';
 import { withCallTimeout } from '../../utils/callTimeout';
 import { lockHandleOf } from '../../utils/lockHandle';
@@ -524,11 +523,10 @@ export class AdtTable<
 
     const name = this.name(config);
 
-    return answeringActivation(
-      connection,
-      (sent) =>
+    return answering(
+      () =>
         activateTable(
-          sent,
+          connection,
           options.headers,
           name,
           options.preauditRequested ?? true,
