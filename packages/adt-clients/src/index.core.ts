@@ -183,6 +183,10 @@ export {
 } from './core/table';
 export {
   AdtTableSettings,
+  type ITableSettingsPatchRead,
+  patchTableSettings,
+  type TableSettingsPatch,
+  type TableSettingsPatchRefusal,
   type TableSettingsValues,
 } from './core/tableSettings';
 export {

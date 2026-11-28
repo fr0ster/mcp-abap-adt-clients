@@ -202,6 +202,7 @@ const RUNTIME_EXPORTS = [
   'patchFunctionGroupDocument',
   'patchMessageClassDocument',
   'patchPackageDocument',
+  'patchTableSettings',
   'patchTableTypeDocument',
   'Profiler',
   'profilerDocuments',
