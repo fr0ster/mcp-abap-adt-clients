@@ -1,0 +1,34 @@
+{
+  "case": "type-group-cycle-abap-cloud",
+  "step": 7,
+  "stepTag": "create",
+  "capturedAt": "2026-11-28",
+  "note": "Recorded by the type group measurement probe through @mcp-abap-adt/connection on ABAP Cloud, in the configured test package: validation and the create attempt (refused 403 EU/519 S_DEVELOP, nothing created). Scrubbed of host, user and lock handle.",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/ddic/typegroups",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/ddic/typegroups",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.ddic.typegroups.v3+xml",
+      "Content-Type": "application/vnd.sap.adt.ddic.typegroups.v3+xml",
+      "sap-language": "EN"
+    },
+    "headersNote": "Caller-supplied headers only, as the probe sent them through @mcp-abap-adt/connection; the connection adds the session, CSRF and Authorization headers below this point.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><atypgr:abapTypeGroup xmlns:atypgr=\"https://host.example/adt/ddic/typegroups\" xmlns:adtcore=\"https://host.example/adt/core\" adtcore:description=\"ADT probe type group\" adtcore:language=\"EN\" adtcore:masterLanguage=\"EN\" adtcore:name=\"ZTG3A\" adtcore:type=\"TYPE/DG\">\n  <adtcore:packageRef adtcore:name=\"ZADT_BLD_PKG03\"/>\n</atypgr:abapTypeGroup>"
+  },
+  "response": {
+    "status": 403,
+    "statusText": "Forbidden",
+    "headers": {
+      "set-cookie": "REDACTED",
+      "content-type": "application/xml",
+      "content-length": "612",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0"
+    },
+    "bodyFile": "type-group-cycle-abap-cloud--07-create.body.xml"
+  }
+}

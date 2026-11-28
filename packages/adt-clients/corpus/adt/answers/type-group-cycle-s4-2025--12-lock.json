@@ -1,0 +1,32 @@
+{
+  "case": "type-group-cycle-s4-2025",
+  "step": 12,
+  "stepTag": "lock",
+  "capturedAt": "2026-11-28",
+  "note": "Recorded by the type group measurement probe through @mcp-abap-adt/connection, S/4HANA 2025 on premise: one Z type group of its own in a local package, created, written, activated and deleted by the probe. Scrubbed of host, user, system id and lock handle.",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/ddic/typegroups/ZTG3A?_action=LOCK&accessMode=MODIFY",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/ddic/typegroups/ZTG3A?_action=LOCK&accessMode=MODIFY",
+    "headers": {
+      "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+    },
+    "headersNote": "Caller-supplied headers only, as the probe sent them through @mcp-abap-adt/connection; the connection adds the session, CSRF and Authorization headers below this point.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "set-cookie": "REDACTED",
+      "content-type": "application/vnd.sap.as+xml; charset=utf-8; dataname=com.sap.adt.lock.Result",
+      "content-length": "323",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0"
+    },
+    "bodyFile": "type-group-cycle-s4-2025--12-lock.body.xml"
+  }
+}

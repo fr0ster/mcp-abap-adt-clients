@@ -1,0 +1,31 @@
+{
+  "case": "type-group-cycle-s4-2025",
+  "step": 5,
+  "stepTag": "validate-long",
+  "capturedAt": "2026-11-28",
+  "note": "Recorded by the type group measurement probe through @mcp-abap-adt/connection, S/4HANA 2025 on premise: one Z type group of its own in a local package, created, written, activated and deleted by the probe. Scrubbed of host, user, system id and lock handle.",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/ddic/typegroups/validation?objtype=TYPE%2FDG&objname=ZTG4817&description=probe",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/ddic/typegroups/validation?objtype=TYPE%2FDG&objname=ZTG4817&description=probe",
+    "headers": {
+      "Accept": "application/vnd.sap.as+xml"
+    },
+    "headersNote": "Caller-supplied headers only, as the probe sent them through @mcp-abap-adt/connection; the connection adds the session, CSRF and Authorization headers below this point.",
+    "body": null
+  },
+  "response": {
+    "status": 400,
+    "statusText": "Bad Request",
+    "headers": {
+      "content-type": "application/xml",
+      "content-length": "444",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0"
+    },
+    "bodyFile": "type-group-cycle-s4-2025--05-validate-long.body.xml"
+  }
+}

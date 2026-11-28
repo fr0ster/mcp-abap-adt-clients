@@ -1,0 +1,31 @@
+{
+  "case": "type-group-cycle-abap-cloud",
+  "step": 5,
+  "stepTag": "validate-long",
+  "capturedAt": "2026-11-28",
+  "note": "Recorded by the type group measurement probe through @mcp-abap-adt/connection on ABAP Cloud, in the configured test package: validation and the create attempt (refused 403 EU/519 S_DEVELOP, nothing created). Scrubbed of host, user and lock handle.",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/ddic/typegroups/validation?objtype=TYPE%2FDG&objname=ZTG4817&description=probe",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/ddic/typegroups/validation?objtype=TYPE%2FDG&objname=ZTG4817&description=probe",
+    "headers": {
+      "Accept": "application/vnd.sap.as+xml"
+    },
+    "headersNote": "Caller-supplied headers only, as the probe sent them through @mcp-abap-adt/connection; the connection adds the session, CSRF and Authorization headers below this point.",
+    "body": null
+  },
+  "response": {
+    "status": 400,
+    "statusText": "Bad Request",
+    "headers": {
+      "content-type": "application/xml",
+      "content-length": "442",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0"
+    },
+    "bodyFile": "type-group-cycle-abap-cloud--05-validate-long.body.xml"
+  }
+}

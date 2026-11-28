@@ -1,0 +1,3 @@
+TYPE-POOL ztg3a .
+
+TYPES ztg3a_flag TYPE c LENGTH 1.
