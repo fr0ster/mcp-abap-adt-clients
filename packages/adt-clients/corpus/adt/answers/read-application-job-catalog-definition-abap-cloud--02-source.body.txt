@@ -1,0 +1,10 @@
+{
+  "formatVersion": "1",
+  "header": {
+    "description": "APS-TMO: Metric Collector",
+    "originalLanguage": "en"
+  },
+  "generalInformation": {
+    "className": "CL_GSM_CO_COLLECTOR_APJ"
+  }
+}

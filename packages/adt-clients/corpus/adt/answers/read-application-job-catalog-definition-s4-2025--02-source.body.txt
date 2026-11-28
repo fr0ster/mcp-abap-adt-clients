@@ -1,0 +1,28 @@
+{
+  "formatVersion": "1",
+  "header": {
+    "description": "Job Catalog for Background job on Mass processing",
+    "originalLanguage": "en"
+  },
+  "generalInformation": {
+    "className": "",
+    "programName": "/ACCGO/ACM_BGJOB_MASS_PROCSSNG"
+  },
+  "exitClasses": {
+    "notification": "/ACCGO/CL_APPL_NOTIF_ABORT"
+  },
+  "parameters": [
+    {
+      "name": "P_ACTTYP"
+    },
+    {
+      "name": "S_APLDOC"
+    },
+    {
+      "name": "P_JOBCNT"
+    },
+    {
+      "name": "P_JOBNAM"
+    }
+  ]
+}

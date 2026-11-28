@@ -1,0 +1,24 @@
+{
+  "case": "refusal-application-log-absent-s4-2025",
+  "step": 1,
+  "stepTag": "object",
+  "capturedAt": "2026-11-28",
+  "note": "Recorded 2026-11-28 by a GET-only probe (curl, no CSRF, no session), on premise (S/4HANA 2025); fr0ster/mcp-abap-adt#404. Scrubbed of host, user fields (SAPUSER01), sap-client and the application server name.",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/applicationlog/objects/zznoobj",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/applicationlog/objects/zznoobj",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.blues.v1+xml"
+    }
+  },
+  "response": {
+    "status": 404,
+    "statusText": "Not Found",
+    "headers": {
+      "content-type": "application/xml"
+    },
+    "bodyFile": "refusal-application-log-absent-s4-2025--01-object.body.txt"
+  }
+}

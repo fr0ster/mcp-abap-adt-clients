@@ -1,0 +1,31 @@
+{
+  "formatVersion": "1",
+  "header": {
+    "description": "",
+    "originalLanguage": "en"
+  },
+  "subobjects": [
+    {
+      "name": ""
+    },
+    {
+      "name": "/ACCGO/LDC_PAR",
+      "description": "LDC Bulk Processing"
+    },
+    {
+      "name": "/ACCGO/UIS"
+    },
+    {
+      "name": "/ACCGO/UIS_ANALYSIS"
+    },
+    {
+      "name": "/ACCGO/UIS_EVENT"
+    },
+    {
+      "name": "/ACCGO/UIS_EVENTREL"
+    },
+    {
+      "name": "/ACCGO/UIS_WEIGHT"
+    }
+  ]
+}

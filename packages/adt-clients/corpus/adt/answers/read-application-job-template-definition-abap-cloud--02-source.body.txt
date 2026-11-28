@@ -1,0 +1,10 @@
+{
+  "formatVersion": "1",
+  "header": {
+    "description": "Collect Metric Provider Values",
+    "originalLanguage": "en"
+  },
+  "generalInformation": {
+    "catalogName": "APS_GSM_METRIC_COLLECTOR"
+  }
+}

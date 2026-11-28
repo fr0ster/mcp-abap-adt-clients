@@ -1,0 +1,761 @@
+{
+  "case": "read-keyword-documentation-topic-s4-2025",
+  "step": 1,
+  "stepTag": "topic",
+  "capturedAt": "2026-11-28",
+  "note": "Recorded 2026-11-28 by a GET-only probe (curl, no CSRF, no session), on premise (S/4HANA 2025); fr0ster/mcp-abap-adt#404. Scrubbed of host, user fields (SAPUSER01), sap-client and the application server name.",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/docu/abap/langu?format=eclipse&language=EN&object=ABAPSELECT",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/docu/abap/langu?format=eclipse&language=EN&object=ABAPSELECT",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.docu.v1+html"
+    }
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.docu.v1+html; charset=utf-8"
+    },
+    "bodyFile": "read-keyword-documentation-topic-s4-2025--01-topic.body.txt"
+  },
+  "links": [
+    {
+      "kind": "other",
+      "href": "",
+      "label": "Mail Feedback"
+    },
+    {
+      "kind": "other",
+      "href": "http://onprem.example:8000/sap/public/bc/abap/docu?sap-language=EN&tree=X&version=X&sap-client=000&object=ABAPSELECT&style=adt",
+      "label": "Browser Version ADT Style"
+    },
+    {
+      "kind": "other",
+      "href": "http://onprem.example:8000/sap/public/bc/abap/docu?sap-language=EN&tree=X&version=X&sap-client=000&object=ABAPSELECT&style=ui5",
+      "label": "Browser Version UI5 Style"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abenabap",
+      "object": "abenabap",
+      "version": "X",
+      "language": "EN",
+      "label": "ABAP - Keyword Documentation"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abenabap_reference",
+      "object": "abenabap_reference",
+      "version": "X",
+      "language": "EN",
+      "label": "ABAP Programming Language"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abendb_access",
+      "object": "abendb_access",
+      "version": "X",
+      "language": "EN",
+      "label": "ABAP - Database Access"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abenabap_sql",
+      "object": "abenabap_sql",
+      "version": "X",
+      "language": "EN",
+      "label": "ABAP SQL"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abenabap_sql_reading",
+      "object": "abenabap_sql_reading",
+      "version": "X",
+      "language": "EN",
+      "label": "ABAP SQL - Read Access with DQL"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_shortref",
+      "object": "abapselect_shortref",
+      "version": "X",
+      "language": "EN",
+      "label": "Short Reference"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_mainquery",
+      "object": "abapselect_mainquery",
+      "version": "X",
+      "language": "EN",
+      "label": "mainquery_clauses"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapunion",
+      "object": "abapunion",
+      "version": "X",
+      "language": "EN",
+      "label": "UNION|INTERSECT|EXCEPT ..."
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapinto_clause",
+      "object": "abapinto_clause",
+      "version": "X",
+      "language": "EN",
+      "label": "INTO|APPENDING"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_up_to_offset",
+      "object": "abapselect_up_to_offset",
+      "version": "X",
+      "language": "EN",
+      "label": "UP TO ...] [OFFSET ...]"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_options",
+      "object": "abapselect_options",
+      "version": "X",
+      "language": "EN",
+      "label": "OPTIONS ..."
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapendselect",
+      "object": "abapendselect",
+      "version": "X",
+      "language": "EN",
+      "label": "ENDSELECT"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abenabap_sql_glosry",
+      "object": "abenabap_sql_glosry",
+      "version": "X",
+      "language": "EN",
+      "label": "ABAP SQL"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abenddic_db_table_glosry",
+      "object": "abenddic_db_table_glosry",
+      "version": "X",
+      "language": "EN",
+      "label": "DDIC database tables"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abenddic_view_glosry",
+      "object": "abenddic_view_glosry",
+      "version": "X",
+      "language": "EN",
+      "label": "DDIC views"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abencds_sql_entity_glosry",
+      "object": "abencds_sql_entity_glosry",
+      "version": "X",
+      "language": "EN",
+      "label": "CDS persistent entities"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_mainquery",
+      "object": "abapselect_mainquery",
+      "version": "X",
+      "language": "EN",
+      "label": "mainquery_clauses"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abencds_set_operators_glosry",
+      "object": "abencds_set_operators_glosry",
+      "version": "X",
+      "language": "EN",
+      "label": "set operators"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapunion",
+      "object": "abapunion",
+      "version": "X",
+      "language": "EN",
+      "label": "UNION"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapunion",
+      "object": "abapunion",
+      "version": "X",
+      "language": "EN",
+      "label": "INTERSECT"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapunion",
+      "object": "abapunion",
+      "version": "X",
+      "language": "EN",
+      "label": "EXCEPT"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapunion_clause",
+      "object": "abapunion_clause",
+      "version": "X",
+      "language": "EN",
+      "label": "query_clauses"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapinto_clause",
+      "object": "abapinto_clause",
+      "version": "X",
+      "language": "EN",
+      "label": "INTO"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_up_to_offset",
+      "object": "abapselect_up_to_offset",
+      "version": "X",
+      "language": "EN",
+      "label": "UP TO"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_up_to_offset",
+      "object": "abapselect_up_to_offset",
+      "version": "X",
+      "language": "EN",
+      "label": "OFFSET"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_options",
+      "object": "abapselect_options",
+      "version": "X",
+      "language": "EN",
+      "label": "OPTIONS"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abencds_access_control_glosry",
+      "object": "abencds_access_control_glosry",
+      "version": "X",
+      "language": "EN",
+      "label": "CDS access control"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abentable_buffering_glosry",
+      "object": "abentable_buffering_glosry",
+      "version": "X",
+      "language": "EN",
+      "label": "table buffering"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapendselect",
+      "object": "abapendselect",
+      "version": "X",
+      "language": "EN",
+      "label": "ENDSELECT"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapinto_clause",
+      "object": "abapinto_clause",
+      "version": "X",
+      "language": "EN",
+      "label": "INTO|APPENDING ... TABLE"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_single",
+      "object": "abapselect_single",
+      "version": "X",
+      "language": "EN",
+      "label": "SINGLE"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_list",
+      "object": "abapselect_list",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT list"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abenaggregate_function_glosry",
+      "object": "abenaggregate_function_glosry",
+      "version": "X",
+      "language": "EN",
+      "label": "aggregate functions"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapgroupby_clause",
+      "object": "abapgroupby_clause",
+      "version": "X",
+      "language": "EN",
+      "label": "GROUP BY"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapunion_clause",
+      "object": "abapunion_clause",
+      "version": "X",
+      "language": "EN",
+      "label": "UNION"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapunion_clause",
+      "object": "abapunion_clause",
+      "version": "X",
+      "language": "EN",
+      "label": "INTERSECT"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapunion_clause",
+      "object": "abapunion_clause",
+      "version": "X",
+      "language": "EN",
+      "label": "EXCEPT"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapinto_clause",
+      "object": "abapinto_clause",
+      "version": "X",
+      "language": "EN",
+      "label": "INTO|APPENDING ... TABLE"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abendatabase_cursor_glosry",
+      "object": "abendatabase_cursor_glosry",
+      "version": "X",
+      "language": "EN",
+      "label": "database cursor"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abenabap_sql_interface_glosry",
+      "object": "abenabap_sql_interface_glosry",
+      "version": "X",
+      "language": "EN",
+      "label": "ABAP SQL interface"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapexit_loop",
+      "object": "abapexit_loop",
+      "version": "X",
+      "language": "EN",
+      "label": "EXIT"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abenleave_processing_blocks",
+      "object": "abenleave_processing_blocks",
+      "version": "X",
+      "language": "EN",
+      "label": "exiting the current processing block"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abenabap_leave_program",
+      "object": "abenabap_leave_program",
+      "version": "X",
+      "language": "EN",
+      "label": "exiting the current program"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapcontinue",
+      "object": "abapcontinue",
+      "version": "X",
+      "language": "EN",
+      "label": "CONTINUE"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapcheck_processing_blocks",
+      "object": "abapcheck_processing_blocks",
+      "version": "X",
+      "language": "EN",
+      "label": "CHECK"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapinto_clause",
+      "object": "abapinto_clause",
+      "version": "X",
+      "language": "EN",
+      "label": "INTO clause"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_up_to_offset",
+      "object": "abapselect_up_to_offset",
+      "version": "X",
+      "language": "EN",
+      "label": "UP TO"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_up_to_offset",
+      "object": "abapselect_up_to_offset",
+      "version": "X",
+      "language": "EN",
+      "label": "OFFSET"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_options",
+      "object": "abapselect_options",
+      "version": "X",
+      "language": "EN",
+      "label": "abap_options"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_aggregate",
+      "object": "abapselect_aggregate",
+      "version": "X",
+      "language": "EN",
+      "label": "aggregate expressions"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_clause_col_spec",
+      "object": "abapselect_clause_col_spec",
+      "version": "X",
+      "language": "EN",
+      "label": "specified as columns"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_list",
+      "object": "abapselect_list",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT list"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_single",
+      "object": "abapselect_single",
+      "version": "X",
+      "language": "EN",
+      "label": "FOR UPDATE NOWAIT"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_single",
+      "object": "abapselect_single",
+      "version": "X",
+      "language": "EN",
+      "label": "FOR UPDATE"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abenprimary_key_glosry",
+      "object": "abenprimary_key_glosry",
+      "version": "X",
+      "language": "EN",
+      "label": "primary key"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_aggregate",
+      "object": "abapselect_aggregate",
+      "version": "X",
+      "language": "EN",
+      "label": "aggregate expressions"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_clause_col_spec",
+      "object": "abapselect_clause_col_spec",
+      "version": "X",
+      "language": "EN",
+      "label": "specified in columns"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_list",
+      "object": "abapselect_list",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT list"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abendatabase_interface_glosry",
+      "object": "abendatabase_interface_glosry",
+      "version": "X",
+      "language": "EN",
+      "label": "database interface"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abenabap_sql_oview",
+      "object": "abenabap_sql_oview",
+      "version": "X",
+      "language": "EN",
+      "label": "packages"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapinto_clause",
+      "object": "abapinto_clause",
+      "version": "X",
+      "language": "EN",
+      "label": "INTO"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapinto_clause",
+      "object": "abapinto_clause",
+      "version": "X",
+      "language": "EN",
+      "label": "APPENDING"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abensubquery_glosry",
+      "object": "abensubquery_glosry",
+      "version": "X",
+      "language": "EN",
+      "label": "subquery"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abendb_commit",
+      "object": "abendb_commit",
+      "version": "X",
+      "language": "EN",
+      "label": "database commit"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abendb_rollback",
+      "object": "abendb_rollback",
+      "version": "X",
+      "language": "EN",
+      "label": "database rollback"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abendatabase_cursor_glosry",
+      "object": "abendatabase_cursor_glosry",
+      "version": "X",
+      "language": "EN",
+      "label": "database cursor"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapwith",
+      "object": "abapwith",
+      "version": "X",
+      "language": "EN",
+      "label": "WITH"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapopen_cursor",
+      "object": "abapopen_cursor",
+      "version": "X",
+      "language": "EN",
+      "label": "OPEN CURSOR"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abenabap_sql_writing",
+      "object": "abenabap_sql_writing",
+      "version": "X",
+      "language": "EN",
+      "label": "write accesses"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abenselect_into_lob_handles",
+      "object": "abenselect_into_lob_handles",
+      "version": "X",
+      "language": "EN",
+      "label": "reader streams"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abendb_isolation",
+      "object": "abendb_isolation",
+      "version": "X",
+      "language": "EN",
+      "label": "isolation level"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abendb_commit",
+      "object": "abendb_commit",
+      "version": "X",
+      "language": "EN",
+      "label": "database commit"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abendatabase_luw_glosry",
+      "object": "abendatabase_luw_glosry",
+      "version": "X",
+      "language": "EN",
+      "label": "database LUW"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_obsolete",
+      "object": "abapselect_obsolete",
+      "version": "X",
+      "language": "EN",
+      "label": "short form"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_list",
+      "object": "abapselect_list",
+      "version": "X",
+      "language": "EN",
+      "label": "*"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abenddic_view_glosry",
+      "object": "abenddic_view_glosry",
+      "version": "X",
+      "language": "EN",
+      "label": "classic view"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abentable_work_area_glosry",
+      "object": "abentable_work_area_glosry",
+      "version": "X",
+      "language": "EN",
+      "label": "table work area"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abaptables",
+      "object": "abaptables",
+      "version": "X",
+      "language": "EN",
+      "label": "TABLES"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapopen_cursor",
+      "object": "abapopen_cursor",
+      "version": "X",
+      "language": "EN",
+      "label": "OPEN CURSOR"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abensap_puffering",
+      "object": "abensap_puffering",
+      "version": "X",
+      "language": "EN",
+      "label": "buffered"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapinto_clause",
+      "object": "abapinto_clause",
+      "version": "X",
+      "language": "EN",
+      "label": "INTO clause"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abenabap_sql_strictmode_740_sp08",
+      "object": "abenabap_sql_strictmode_740_sp08",
+      "version": "X",
+      "language": "EN",
+      "label": "strict mode as of ABAP release 7.40, SP08"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapfrom_clause",
+      "object": "abapfrom_clause",
+      "version": "X",
+      "language": "EN",
+      "label": "FROM clause"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abenabap_sql_strictmode_760",
+      "object": "abenabap_sql_strictmode_760",
+      "version": "X",
+      "language": "EN",
+      "label": "strict mode"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_up_to_offset",
+      "object": "abapselect_up_to_offset",
+      "version": "X",
+      "language": "EN",
+      "label": "UP TO"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_up_to_offset",
+      "object": "abapselect_up_to_offset",
+      "version": "X",
+      "language": "EN",
+      "label": "OFFSET"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_options",
+      "object": "abapselect_options",
+      "version": "X",
+      "language": "EN",
+      "label": "abap_options"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_clause",
+      "object": "abapselect_clause",
+      "version": "X",
+      "language": "EN",
+      "label": "SELECT"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapfrom_clause",
+      "object": "abapfrom_clause",
+      "version": "X",
+      "language": "EN",
+      "label": "FROM"
+    },
+    {
+      "kind": "topic",
+      "href": "adtcom:/sap/bc/adt/docu/abap/langu?sap-language=EN&version=X&style=&object=abapselect_join",
+      "object": "abapselect_join",
+      "version": "X",
+      "language": "EN",
+      "label": "INNER JOIN"
+    }
+  ]
+}
