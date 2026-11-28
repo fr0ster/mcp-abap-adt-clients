@@ -251,9 +251,12 @@ nothing else changed:
 - **Names as given.** The name and the package are sent as the caller gave them: no upper- or
   lower-casing, no trimming. The only change is the encoding the context needs: URL encoding in
   a path or query, XML escaping in a body. The name's length is never checked.
-- **No description truncation.** The description is sent whole. `limitDescription` is not used,
-  because no measurement and no SAP handler shows a limit for type groups; SAP refuses a value it
-  does not take.
+- **No description truncation.** The description is sent whole; `limitDescription` (60
+  characters) is not used.
+  - The metadata of both releases advertises `adtcore:descriptionTextLimit="70"`
+    (`type-group-reads-s4-2025--01`, `type-group-reads-abap-cloud--01`). That is a fact for the
+    consumer, not a check in the member.
+  - What SAP does with a longer description (refuse, truncate or keep it) is unverified.
 - **Optional parts are sent only when the caller gives them.**
   - The language attributes (measured in `62-create`) and `sap-language` are written only when
     `masterLanguage` is given (`languageAttributes`, `createRequestHeaders`). No value is

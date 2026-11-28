@@ -15,7 +15,7 @@
       "sap-language": "EN"
     },
     "headersNote": "Caller-supplied headers only, as the probe sent them through @mcp-abap-adt/connection; the connection adds the session, CSRF and Authorization headers below this point.",
-    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><atypgr:abapTypeGroup xmlns:atypgr=\"https://host.example/adt/ddic/typegroups\" xmlns:adtcore=\"https://host.example/adt/core\" adtcore:description=\"ADT probe type group\" adtcore:language=\"EN\" adtcore:masterLanguage=\"EN\" adtcore:name=\"ZTG3A\" adtcore:type=\"TYPE/DG\">\n  <adtcore:packageRef adtcore:name=\"ZADT_BLD_PKG03\"/>\n</atypgr:abapTypeGroup>"
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><atypgr:abapTypeGroup xmlns:atypgr=\"http://www.sap.com/adt/ddic/typegroups\" xmlns:adtcore=\"http://www.sap.com/adt/core\" adtcore:description=\"ADT probe type group\" adtcore:language=\"EN\" adtcore:masterLanguage=\"EN\" adtcore:name=\"ZTG3A\" adtcore:type=\"TYPE/DG\">\n  <adtcore:packageRef adtcore:name=\"ZADT_BLD_PKG03\"/>\n</atypgr:abapTypeGroup>"
   },
   "response": {
     "status": 403,
