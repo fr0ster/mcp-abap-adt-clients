@@ -100,6 +100,7 @@ describe('the published surface', () => {
       'readTextSymbols',
       'readTransportItem',
       'readUnitTestRefusal',
+      'readUnstatedActivation',
       'readValidationRefusal',
       'selectionTexts',
       'serviceDefinitionElementInfo',

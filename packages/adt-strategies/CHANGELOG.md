@@ -16,11 +16,36 @@ The tags made before the packages moved under `packages/` are
 
 ## [Unreleased]
 
+For adt-clients 49.0.0 (C7: one member, one endpoint, one request), whose
+activation members no longer read the inactive list (to be released as
+0.30.0).
+
 ### Added
 
 - **`readNavigationTarget` / `navigationTarget`** — the include a navigation answer leads to and
   its `start`; a refusal or a reference without a readable start reads as `undefined`
   (fr0ster/mcp-abap-adt#401).
+- **`readUnstatedActivation(answer)`** and its type `AdtUnstatedActivation`:
+  whether a 2xx `chkl:messages` leaves the activation's outcome to the inactive
+  list — `silent` (`activationExecuted="false"`, no message) or `unstated` (no
+  `activationExecuted`, `W`/`I`/`S` messages alone) — `undefined` otherwise. It
+  is the one predicate `readActivationRefusal` decides by (no second copy), so
+  it answers a kind exactly when that reading, without a list, answers "could
+  not be decided". It answers what adt-clients 48.0.0's private reading
+  answered on every recorded activation answer.
+
+### Fixed
+
+- **The settings reading takes a count only as a safe integer**:
+  `tableSettings` / `cloudTableSettings` throw for an `areaKeyFields` past
+  `Number.MAX_SAFE_INTEGER` (`not a count`), which would read as another
+  number and be written back. adt-clients' own reading for `patchMetadata`
+  refused it; since that reading is gone, the strategy is the read.
+
+### Docs
+
+- `analyseActivation`, `readActivationRefusal` and the README say the caller
+  hands the inactive list, not the member.
 
 ## [0.29.0] - 2026-11-27
 

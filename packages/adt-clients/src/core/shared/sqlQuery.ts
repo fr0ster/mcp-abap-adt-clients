@@ -31,6 +31,15 @@ import type { IGetSqlQueryParams } from './types';
  * lines fit is sent as given, since SAP_BASIS 751 refuses any line break inside
  * the statement (mcp-abap-adt#363).
  *
+ * **No row bound of the library's.** `row_number` goes out as `rowNumber`
+ * exactly as given, `0` included; without one the URL carries none and SAP's
+ * own bound applies (mcp-abap-adt#391). Measured on the BTP ABAP environment
+ * (2026-11-27): without `rowNumber` SAP answered 100 records of selections of
+ * 163, 249, 1716 and 8466; `0`, a negative number and 2147483647 were refused
+ * `400` ("If UP TO or OFFSET is used, … cannot be specified"), and 2147483646
+ * was the largest accepted. Until 48.0.0 a missing or `0` bound was sent as
+ * 100.
+ *
  * @param connection - ABAP connection
  * @param params - SQL query parameters
  * @returns Query results
@@ -40,8 +49,10 @@ export async function getSqlQuery(
   headers: IAdtHeaders,
   params: IGetSqlQueryParams,
 ): Promise<IAdtWireResponse> {
-  const rowNumber = params.row_number || 100;
-  const url = `/sap/bc/adt/datapreview/freestyle?rowNumber=${rowNumber}`;
+  const url =
+    params.row_number === undefined
+      ? '/sap/bc/adt/datapreview/freestyle'
+      : `/sap/bc/adt/datapreview/freestyle?rowNumber=${params.row_number}`;
 
   return connection.makeAdtRequest({
     url,

@@ -379,10 +379,6 @@ export class AdtTableSettingsAbsentLegacy extends AdtTableSettings<
     return failed(this.#absence());
   }
 
-  override async patchMetadata(): Promise<IAdtResponse<never>> {
-    return failed(this.#absence());
-  }
-
   override async lock(): Promise<IAdtResponse<never>> {
     return failed(this.#absence());
   }

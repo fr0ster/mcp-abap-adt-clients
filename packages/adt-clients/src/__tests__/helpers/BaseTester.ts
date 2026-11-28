@@ -53,6 +53,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { LogLevel } from '@mcp-abap-adt/interfaces-utils';
 import type { AdtClient } from '../../clients/AdtClient';
+import { expectActivated, watchActivations } from './activationOrList';
 import { integrationHeadersOf } from './adtHeaders';
 import { configuredCase, missingCaseMessage } from './caseGate';
 import { expectResult, failureOf } from './contract';
@@ -363,6 +364,7 @@ export class BaseTester<TConfig extends object, TState = unknown> {
     logger?: ILogger,
   ) {
     this.adtObject = adtObject;
+    watchActivations(BaseTester.connectionOf(adtObject));
     this.loggerPrefix = loggerPrefix;
     this.testCaseKey = testCaseKey;
     this.testCaseName = testCaseName;
@@ -730,6 +732,29 @@ export class BaseTester<TConfig extends object, TState = unknown> {
     // SAP's answer, by `failureOf`: the request's query is the lock handle,
     // which no log line may hold.
     return `${failureOf(released, 'unlock after update')}; the handle may still be held`;
+  }
+
+  /**
+   * An activation expected to succeed: since adt-clients 49.0.0 a checklist
+   * the inactive list decides is read here, by the caller
+   * (`activationOrList.ts`).
+   */
+  /** The connection a handler sends through (a protected field, read as data). */
+  private static connectionOf(handler: object): IAbapConnection | undefined {
+    return (handler as { connection?: IAbapConnection }).connection;
+  }
+
+  private async expectActivated(
+    answer: IAdtResponse<unknown>,
+    config: object,
+    what: string,
+  ): Promise<void> {
+    if (answer.ok) return;
+    // The handler's own connection, which `watchActivations` records the
+    // activation POST on.
+    const connection = BaseTester.connectionOf(this.adtObject);
+    if (!connection) throw new Error(failureOf(answer, what));
+    await expectActivated(answer, connection, config, what, this.logger);
   }
 
   /**
@@ -1223,11 +1248,12 @@ export class BaseTester<TConfig extends object, TState = unknown> {
 
       if (options?.activateOnCreate && this.adtObject.activate) {
         logTestStep('activate (after create)', this.logger);
-        expectResult(
+        await this.expectActivated(
           await this.adtObject.activate(config as Partial<TConfig>, {
             headers: integrationHeadersOf(this.adtObject, 'activate'),
             analyse: judged(analyseActivation),
           }),
+          config as Partial<TConfig>,
           'activate after create',
         );
       }
@@ -1332,11 +1358,12 @@ export class BaseTester<TConfig extends object, TState = unknown> {
 
         if (options?.activateOnUpdate && this.adtObject.activate) {
           logTestStep('activate (after update)', this.logger);
-          expectResult(
+          await this.expectActivated(
             await this.adtObject.activate(config as Partial<TConfig>, {
               headers: integrationHeadersOf(this.adtObject, 'activate'),
               analyse: judged(analyseActivation),
             }),
+            config as Partial<TConfig>,
             'activate after update',
           );
         }
@@ -1366,11 +1393,12 @@ export class BaseTester<TConfig extends object, TState = unknown> {
         logTestStep(currentStep, this.logger);
         // A refused activation is a failure in the answer: `analyseActivation`
         // reads `activationExecuted="false"` and `<msg type="E">` inside the 200.
-        expectResult(
+        await this.expectActivated(
           await this.adtObject.activate(config as Partial<TConfig>, {
             headers: integrationHeadersOf(this.adtObject, 'activate'),
             analyse: judged(analyseActivation),
           }),
+          config as Partial<TConfig>,
           'activate',
         );
         // Delay after activate
@@ -1513,11 +1541,12 @@ export class BaseTester<TConfig extends object, TState = unknown> {
         );
         if (this.adtObject.activate) {
           logTestStep('activate (after metadata update)', this.logger);
-          expectResult(
+          await this.expectActivated(
             await this.adtObject.activate(config as Partial<TConfig>, {
               headers: integrationHeadersOf(this.adtObject, 'activate'),
               analyse: judged(analyseActivation),
             }),
+            config as Partial<TConfig>,
             'activate after metadata update',
           );
         }
@@ -1545,11 +1574,12 @@ export class BaseTester<TConfig extends object, TState = unknown> {
               'updateMetadata (after update)',
             );
             if (this.adtObject.activate) {
-              expectResult(
+              await this.expectActivated(
                 await this.adtObject.activate(config, {
                   headers: integrationHeadersOf(this.adtObject, 'activate'),
                   analyse: judged(analyseActivation),
                 }),
+                config,
                 'activate (after update)',
               );
             }
@@ -1737,6 +1767,7 @@ export class BaseTester<TConfig extends object, TState = unknown> {
     this.adtObject = (
       client as unknown as Record<string, () => TestableObject<TConfig>>
     )[factory]();
+    watchActivations(BaseTester.connectionOf(this.adtObject));
     this.client = client;
     return { connection, client };
   }
@@ -2164,11 +2195,12 @@ export class BaseTester<TConfig extends object, TState = unknown> {
         logTestStep(currentStep, this.logger);
         // A refused activation is a failure in the answer; the status this
         // read off a state bag is not on a returned failure.
-        expectResult(
+        await this.expectActivated(
           await this.adtObject.activate(config as Partial<TConfig>, {
             headers: integrationHeadersOf(this.adtObject, 'activate'),
             analyse: judged(analyseActivation),
           }),
+          config as Partial<TConfig>,
           'activate',
         );
         await this.waitDelay(

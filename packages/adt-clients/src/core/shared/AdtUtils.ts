@@ -173,10 +173,7 @@ import {
   codeHas,
   isGroupOnlyCode,
 } from '../../endpoints/codes';
-import {
-  answeringActivation,
-  buildObjectUri,
-} from '../../utils/activationUtils';
+import { buildObjectUri } from '../../utils/activationUtils';
 // Import types
 import {
   type AdtActivationCode,
@@ -650,9 +647,12 @@ export class AdtUtils<
    * `ACTIVATION_RUNS_COLLECTION` in `@mcp-abap-adt/adt-strategies`), and
    * choosing the member is the caller's: this one reads no discovery.
    *
-   * `preauditRequested` defaults to `false`, the group member's. After a
-   * silent checklist (`activationExecuted="false"`, no message) alone, the
-   * inactive list is read once and handed to `analyse` (`IAdtAnalyseContext`).
+   * `preauditRequested` defaults to `false`, the group member's. One request,
+   * whatever it answers (49.0.0): after a checklist that does not state its
+   * outcome (`readUnstatedActivation` in `@mcp-abap-adt/adt-strategies`), the
+   * inactive list is the caller's to read with {@link getInactiveObjects} and
+   * to hand to its `analyse` (`IAdtAnalyseContext`), with each object's
+   * `buildObjectUri`.
    */
   activateObjects<E extends IAdtError>(
     objects: IAdtCodedReference<AdtActivationCode<V>>[],
@@ -676,10 +676,14 @@ export class AdtUtils<
       objects.filter((o) => !isActivatedWithoutTable(o.type)),
       'activate',
     );
-    return answeringActivation(
-      this.connection,
-      (sent) =>
-        activateObjects(sent, options.headers, objects, preauditRequested),
+    return answering(
+      () =>
+        activateObjects(
+          this.connection,
+          options.headers,
+          objects,
+          preauditRequested,
+        ),
       this.results.objectActivation,
       options?.analyse,
     );
@@ -1439,19 +1443,24 @@ export class AdtUtils<
   }
 
   /**
-   * Get all valid ADT object types
+   * Get the repository's ADT object types
    *
-   * Retrieves list of all valid ADT object types from the repository.
+   * Reads what SAP answers for the count given (`maxItemCount`), or for none
+   * (SAP's own bound).
    *
-   * @param maxItemCount - Maximum number of items to return (default: 999)
+   * @param maxItemCount - Maximum number of items to return, sent as given;
+   *   none given, none is sent and SAP's own bound applies (100 on the BTP
+   *   ABAP environment, 2026-11-27)
    * @param name - Name filter pattern (default: '*')
    * @param data - Data filter (default: 'usedByProvider')
-   * @returns Axios response with XML containing all object types
+   * @returns The object types list: as many types as `maxItemCount` asks
+   *   for, or SAP's own bound (100) without one
    *
    * @example
    * ```typescript
-   * const response = await utils.getAllTypes();
-   * // Response contains XML with all ADT object types
+   * // The bound the library used to send, 999, read all 375 types on the BTP
+   * // ABAP environment (2026-11-27); 2147483647 is the largest SAP accepts.
+   * const response = await utils.getAllTypes(2147483647);
    * ```
    */
   getAllTypes<E extends IAdtError>(
@@ -1467,7 +1476,7 @@ export class AdtUtils<
     options?: IAdtAnalyseOptions<IAdtError>,
   ): Promise<IAdtResponse<T['types'], IAdtError>>;
   async getAllTypes<E extends IAdtError = IAdtError>(
-    maxItemCount: number = 999,
+    maxItemCount?: number,
     name: string = '*',
     data: string = 'usedByProvider',
     options?: IAdtAnalyseOptions<E>,

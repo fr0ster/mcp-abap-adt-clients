@@ -17,6 +17,7 @@ const {
 } = require('@mcp-abap-adt/adt-strategies');
 // Every expected-success call is judged, the exception document first.
 const { judged } = require('./judged');
+const { ADT_NO_FAILURE } = require('@mcp-abap-adt/interfaces-adt');
 const { failureOf, whatFailureSays } = require('./contract');
 const {
   loadTestConfigFrom,
@@ -47,14 +48,25 @@ const configExtensions = [];
 async function writeAndActivate(handler, config, options, logger) {
   await writeSource(handler, config, options, logger);
   if (typeof handler.activate === 'function') {
-    // `analyseActivation` reads the verdict inside the 200:
-    // activationExecuted="false" or a message of type E is a refusal.
+    // `analyseActivation` reads the verdict inside the 200: a message of type
+    // E is a refusal. A checklist that leaves the outcome to the inactive
+    // list — a re-activation with nothing to do answers the silent one —
+    // is decided by the list, which the caller reads since adt-clients
+    // 49.0.0 (the member sends the activation alone).
+    const { expectActivated, watchActivations } = require('./activationOrList');
+    watchActivations(handler.connection);
     const activated = await handler.activate(config, {
       headers: integrationHeadersOf(handler, 'activate', config),
       analyse: judged(analyseActivation),
     });
     if (activated && activated.ok === false) {
-      throw new Error(failureOf(activated, 'activate'));
+      await expectActivated(
+        activated,
+        handler.connection,
+        config,
+        'activate',
+        logger,
+      );
     }
   }
 }
@@ -1917,16 +1929,41 @@ async function activateSharedFunctionGroup(
   transportRequest,
   logger,
 ) {
-  const answer = await client.getFunctionGroup().activate(
-    { functionGroupName: name, transportRequest },
-    {
-      headers: integrationHeadersOf(client.getFunctionGroup(), 'activate'),
-      analyse: judged(analyseActivation),
-    },
+  // The activation, and — when its checklist leaves the outcome to the
+  // inactive list (a re-activation with nothing to do answers the silent
+  // checklist) — the caller's read of the list (adt-clients 49.0.0: the
+  // member sends the activation alone; `activationJudged`, the recipe).
+  const { activationJudged } = require('./activationJudged');
+  const { buildObjectUri } = require('../../utils/activationUtils');
+  const { wireItself } = require('../../utils/resultStrategy');
+  const {
+    utilDocuments: wiredUtils,
+  } = require('../../core/shared/utilResultSet');
+  const group = client.getFunctionGroup();
+  const groupUri = buildObjectUri(name, 'FUGR/F');
+  const judgedAnswer = await activationJudged(
+    (analyse) =>
+      group.activate(
+        { functionGroupName: name, transportRequest },
+        {
+          headers: integrationHeadersOf(group, 'activate'),
+          analyse,
+        },
+      ),
+    () =>
+      client
+        .getUtils({ ...wiredUtils, inactive: wireItself })
+        .getInactiveObjects({ analyse: analyseException }),
+    [groupUri, `${groupUri}/source/main`],
   );
-  if (!answer.ok) {
+  // An `exc:exception` inside a 200 is no checklist: read it first, as
+  // `judged` does.
+  const exception = analyseException(ADT_NO_FAILURE, judgedAnswer.answer);
+  const verdict =
+    exception !== ADT_NO_FAILURE ? exception : judgedAnswer.verdict;
+  if (verdict !== ADT_NO_FAILURE) {
     throw new Error(
-      `Shared function group ${name} could not be activated: ${whatFailureSays(answer.getError())}`,
+      `Shared function group ${name} could not be activated: ${whatFailureSays(verdict)}`,
     );
   }
 

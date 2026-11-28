@@ -31,10 +31,19 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 > message); the system-message and gateway-error readings answer what SAP
 > writes. See [`docs/usage/MIGRATION-47.md`](docs/usage/MIGRATION-47.md).
 >
+> **Unreleased (49.0.0, C7):** one member, one endpoint, one request. An
+> activation member sends the activation alone and no longer reads the
+> inactive list after a checklist that does not state its outcome — the
+> caller reads it (`getInactiveObjects`) and hands it to `analyseActivation`;
+> `answeringActivation` is gone. `getTableSettings().patchMetadata` is gone:
+> a settings change is `readMetadata`, the pure `patchTableSettings` and
+> `updateMetadata` with the read's ETag. See
+> [`docs/usage/MIGRATION-49.md`](docs/usage/MIGRATION-49.md).
+>
 > **On a cloud client, 46.1.0** (on `interfaces-adt` ^30.1.0) requires
 > `isWritableByAMDP` in a settings write — 46.0.0 reset it on every cloud
-> write — and adds `patchMetadata` to `getTableSettings()`. See the
-> [CHANGELOG](CHANGELOG.md) and "A table's technical settings" below.
+> write. See the [CHANGELOG](CHANGELOG.md) and "A table's technical
+> settings" below.
 >
 > **From 45.x?** 46.0.0 (on `interfaces-adt` ^30.0.0) adds `getTextElements()`
 > and `getTableSettings()`, and where-used of `PROG/PX` names its
@@ -847,8 +856,8 @@ their own that the table's lock does not cover (`ENQUEUE_ESDICT` with
 `objtype` `TABT` in `CL_TABT_WB_PERSIST->lock`, Code on both systems; the
 table's lock and the settings' held at once, in either order, measured on
 both). `getTableSettings()` answers them: `readMetadata`, `lock`,
-`updateMetadata` and `unlock` send one request each, and `patchMetadata` a
-GET and then the PUT, stopping before either when it refuses (below). SAP created default settings when it created the table,
+`updateMetadata` and `unlock` send one request each, and the pure
+`patchTableSettings` none (below). SAP created default settings when it created the table,
 and activating the table alone activated them (measured on both): the
 library has no create, delete or activation of the settings.
 
@@ -990,50 +999,69 @@ before the PUT is sent. On SAP_BASIS 7.40 the factory does not compile
 `/ddic/db/settings`, and the legacy client's getter refuses every member
 without a request.
 
-**`patchMetadata`** writes the named settings and sends the rest as read,
-under the caller's lock (decision 51 of interfaces-adt): it reads the working
-area (`?version=inactive`) with its ETag, overlays `changes`, and PUTs the
-whole document with `If-Match` and the media type without a charset — a GET
-and a PUT, the exception decision 51 makes to "one endpoint, one member".
-Every setting not named is sent as read, the description too, and
-`isWritableByAMDP` as read unless named. `translation` changes by its
-`value`; `buffering` field by field. The area-key count read is sent when no
-count is named, whatever the resulting type; SAP keeps it only for `G`
-(Code on both) and clears it otherwise.
+**A change of some settings is the caller's three calls** under the
+settings' lock (decision 53 of interfaces-adt, superseding 51; since 49.0.0):
 
-Thrown before any request: an empty `lockHandle`, a change set whose
-top-level fields are all absent or `undefined` (`{}` does not compile; the
-runtime check looks at the top level only, so `{ buffering: {} }` is refused
-by the type alone). Answered as a failure carrying the read, before the PUT:
-a read without an ETag, a document without every setting the write needs,
-an `areaKeyFields` change whose merged buffering type is not `G` (SAP writes
-the count only for `G`, Code on both), and — on a declared cloud handler — a
-read without `ts:isWritableByAMDP`. A custom `analyse` may clear any of
-these. An answer whose XML the parser rejects fails the call as a connection
-failure with no response attached, and no PUT is sent; what the parser
-accepts is read as above. The library retries nothing; the connection may refresh its CSRF
+1. `readMetadata` of the working area (`version: 'inactive'`) right before
+   the PUT, read with adt-strategies' `tableSettings` — `cloudTableSettings`
+   on the cloud, which throws on a read without `ts:isWritableByAMDP` —, so
+   the read has every setting, the description and the ETag. A read made
+   earlier may be stale; a read with no ETag means no write.
+2. `patchTableSettings(read, changes, variant)` — sends no request, typed by the
+   declared system kind (`'onprem'` or `'cloud'`): the settings read
+   with `changes` (`ITableSettingsChangesOf<V>`) overlaid. Every setting not
+   named is as read, the description too, and `isWritableByAMDP` as read
+   unless named. `translation` changes by its `value`; `buffering` field by
+   field. The area-key count read is sent when no count is named, whatever
+   the resulting type; SAP keeps it only for `G` (Code on both) and clears it
+   otherwise. It refuses (`ok: false`, `area-key-fields-need-type-g`) an
+   `areaKeyFields` change whose merged buffering type is not `G`.
+3. `updateMetadata` of the whole document with `ifMatch` set to the read's
+   ETag; with `If-Match` the PUT's `Content-Type` goes without a charset
+   (measured: with one SAP answered `412` `SADT_RESOURCE/043`).
+
+What used to be checked inside `patchMetadata` is the caller's now: a failed
+read, a read without an ETag, an incomplete read (the strategies throw,
+naming the missing setting), a cloud read without the flag. `updateMetadata`
+still throws on an empty `lockHandle`, and an empty change set does not
+compile. The library retries nothing; the connection may refresh its CSRF
 token and resend.
 
-**The cloud refusal follows the instance, not the static type.**
-`AdtClientCloud` (also what `await createAdtClient(connection, { variant:
-'cloud' })` answers) constructs its handler with `variant: 'cloud'`, the
-declaration that the system is a cloud one, never inferred from an answer.
-An `AdtClientCloud` held as `AdtClient<'cloud'>`, or answered by the
-factory's union overload, refuses too. An `AdtClient` constructed directly
-declares no kind and writes a read without the flag as read: without the
-flag, unless the patch names it, in which case it writes the value named,
-`false` included. On a cloud system use the cloud client or the factory, and
-read with adt-strategies' `cloudTableSettings`, which throws for such a read.
-A handler constructed directly takes `variant: 'cloud'` only when typed
-`AdtTableSettings<T, 'cloud'>`.
+**The cloud flag follows the client.** `AdtClientCloud` (also what `await
+createAdtClient(connection, { variant: 'cloud' })` answers) types its handler
+`'cloud'`, so its write requires `isWritableByAMDP`; read on the cloud with
+`cloudTableSettings`. An `AdtClient` constructed directly declares no kind.
 
 ```typescript
-import { TABLE_SETTINGS_MEDIA_TYPE } from '@mcp-abap-adt/interfaces-adt';
+import {
+  analyseException,
+  cloudTableSettings,
+} from '@mcp-abap-adt/adt-strategies';
+import { patchTableSettings, tableSettingsDocuments } from '@mcp-abap-adt/adt-clients';
 
-const patched = await settings.patchMetadata(
-  { tableName: 'ZTABLE', changes: { sizeCategory: '2' } },
-  { headers: { accept: TABLE_SETTINGS_MEDIA_TYPE }, lockHandle },
+const settings = cloudClient.getTableSettings({
+  ...tableSettingsDocuments,
+  metadata: cloudTableSettings,
+});
+// …under the settings' lock (`lockHandle`):
+const read = await settings.readMetadata(
+  { tableName: 'ZTABLE' },
+  { version: 'inactive', analyse: analyseException },
 );
+if (read.ok) {
+  const current = read.getResult().value;
+  const patched = patchTableSettings(current, { sizeCategory: '2' }, 'cloud');
+  if (current.etag && patched.ok) {
+    await settings.updateMetadata(
+      {
+        tableName: 'ZTABLE',
+        description: patched.description,
+        settings: patched.settings,
+      },
+      { headers, lockHandle, ifMatch: current.etag },
+    );
+  }
+}
 ```
 
 ### Text elements
@@ -1451,12 +1479,11 @@ Each answer carries the facts of the **one request it answers**: a failure,
 those of the request its verdict was built from; a success, the mark of the
 answer it was read from. The thrown value is read as data — own properties
 only (a getter is never run), each compared with its list — and a refusal
-the connection layers over a frozen error keeps its mark. Where a member sends
-more than one request: a chain's success carries the mark of its last request,
-and its failure the failing request's facts; activation's read after a silent
-checklist is not the request the member answers, so its success's mark is not
-carried (its failure carries its own facts); each part of a batch carries the
-mark of the envelope it travelled in.
+the connection layers over a frozen error keeps its mark. Each part of a
+batch carries the mark of the envelope it travelled in. A caller who reads
+the inactive list after an activation (49.0.0) holds two answers, each with
+its own mark: a cleared verdict is read from the activation's answer, and a
+failure built from the read carries the read's facts.
 
 **Your own `analyse` owns the failure it answers.** It receives the library's
 verdict, which carries these fields, and the answer, whose `sessionLost` is
@@ -1636,10 +1663,15 @@ An activation answers `200` whether or not it activated; the verdict is the
 reads `ioc:inactiveObjects` and an answer that does not state the activation
 as **not activated**, with the objects SAP still lists in `stillInactive`.
 Every single-object activation takes `options.preauditRequested` (absent,
-`true`); after a `chkl:messages` with `activationExecuted="false"` and no
-message, or with no `activationExecuted` and only `W`/`I`/`S` messages
-(45.5.2, fr0ster/mcp-abap-adt#360), and only then, the member reads the
-inactive list once and hands it to `analyse`. Group activation is two members, one endpoint each:
+`true`) and sends the activation request alone (49.0.0). After a
+`chkl:messages` with `activationExecuted="false"` and no message, or with no
+`activationExecuted` and only `W`/`I`/`S` messages (fr0ster/mcp-abap-adt#360)
+— `readUnstatedActivation` of adt-strategies answers `silent` or `unstated` —
+the outcome is the inactive list's to decide, and reading it is the caller's:
+`getUtils().getInactiveObjects()`, handed with the uris the activation named
+(`buildObjectUri` of its code, name and parent; a function group names its
+`source/main` too) to `analyseActivation` as `context.activation`. The recipe
+is in [`MIGRATION-49.md`](docs/usage/MIGRATION-49.md). Group activation is two members, one endpoint each:
 `activateObjectsGroup` (`/activation/runs`) and `activateObjects`
 (`/activation`); which one a system offers is in its discovery, and the
 choice is yours. Details and examples:
@@ -2166,6 +2198,7 @@ See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-a
 One document per breaking release, each written for a consumer on the contract
 before it:
 
+- **[48.x → 49.0.0](docs/usage/MIGRATION-49.md)** (unreleased) — one member, one endpoint, one request: an activation member sends the activation alone, and the inactive list after a checklist that does not state its outcome is the caller's to read and hand to `analyseActivation` (`readUnstatedActivation`, adt-strategies 0.30.0); `answeringActivation` is gone; `getTableSettings().patchMetadata` and the handler's `variant` constructor option are gone — a settings change is `readMetadata`, the pure `patchTableSettings` and `updateMetadata` with the read's ETag.
 - **[44.x → 45.0.0](docs/usage/MIGRATION-45.md)** — interfaces-adt 27: a full `IUtilResults` names `objectActivation`; `getUtils().activateObjects` posts a group activation to `/activation` (the caller picks it or `activateObjectsGroup` from discovery); every single-object activation takes `options.preauditRequested` (absent, `true`); after a silent checklist the member reads the inactive list once and hands it to `analyse`; the low-level activation functions take `preauditRequested`. With adt-strategies 0.22.0, `analyseActivation` reads an activation that activated nothing as a failure, with `stillInactive`.
 - **[43.x → 44.0.0](docs/usage/MIGRATION-44.md)** — `@mcp-abap-adt/interfaces-adt-connection` 4: `getBaseUrl()` answers `Promise<string | undefined>` (`undefined` over RFC), `AdtBatchConnection` hands it on and `isCloudEnvironment` asks `systeminformation` without a URL; adt-strategies 0.21.0 and adt-clients-legacy 0.8.0 declare the same range. The test configuration states `environment.connection_type` (required, `"http"` or `"rfc"`); over RFC it states `SAP_ASHOST` + `SAP_SYSNR` (or the message-server keys), `SAP_CLIENT` and `SAP_LANGUAGE`, and no `SAP_URL`.
 - **[42.x → 43.0.0](docs/usage/MIGRATION-43.md)** — a create invents no language: given one, it writes `adtcore:language` / `adtcore:masterLanguage` and sends `sap-language`, one value, from the config else the system context; given none, neither (no `EN` default); `AdtFunctionModule.validate` requires `description`; class create takes no `abstract` and program create no program type (SAP ignores both on create); a run id of `.` or `..` is refused before anything is sent.

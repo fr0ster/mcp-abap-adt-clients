@@ -110,10 +110,14 @@ function flag(value: string, where: string): boolean {
   );
 }
 
-/** A count, as the document writes it. */
+/**
+ * A count, as the document writes it: a safe integer, or a throw — a count
+ * past `Number.MAX_SAFE_INTEGER` reads as another number, which a write would
+ * then send back.
+ */
 function count(value: string, where: string): number {
   const parsed = Number(value);
-  if (value.trim() === '' || !Number.isInteger(parsed)) {
+  if (value.trim() === '' || !Number.isSafeInteger(parsed)) {
     throw new Error(`ts:tableSettings: ${where} is '${value}', not a count`);
   }
   return parsed;

@@ -115,6 +115,23 @@ describe('capability guard — behaviour', () => {
 
             assertIssuesItsRequest(name, entry, method, calls, refusal);
           });
+
+          // One member, one endpoint, one request (C7): never a second one
+          // behind the first, whatever the first answered.
+          it(`${atom}: ${method} issues exactly one request`, async () => {
+            const { client, calls } = recordingClient();
+            const handler = entry.factory(client) as unknown as Record<
+              string,
+              unknown
+            >;
+            try {
+              await invoke(handler, method, entry.config);
+            } catch {
+              // A refusal before any request is the check above's concern.
+            }
+            if (calls.length === 0) return;
+            expect(calls.map((c) => `${c.method} ${c.url}`)).toHaveLength(1);
+          });
         }
       }
     });

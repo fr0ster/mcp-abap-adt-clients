@@ -4,7 +4,10 @@
  * cloud, not on 7.40.
  */
 
-import { functionGroupDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  buildObjectUri,
+  functionGroupDocuments,
+} from '@mcp-abap-adt/adt-clients';
 import {
   CriticalSectionConnection,
   RecordingConnection,
@@ -64,11 +67,11 @@ describe('AdtFunctionGroupLegacy.activate', () => {
     },
   );
 
-  it('reads the inactive list once after a silent checklist, naming the group', async () => {
+  it('after a silent checklist sends the activation alone, and hands analyse no context (C7)', async () => {
     const silent =
       '<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties checkExecuted="false" activationExecuted="false" generationExecuted="false"/></chkl:messages>';
     const conn = new CriticalSectionConnection(() => silent);
-    let named: readonly string[] | undefined;
+    const contexts: unknown[] = [];
     await new AdtFunctionGroupLegacy(conn, {
       logger: createLibraryLogger(),
       results: functionGroupDocuments,
@@ -77,15 +80,30 @@ describe('AdtFunctionGroupLegacy.activate', () => {
       {
         headers: { accept: 'application/xml', contentType: 'application/xml' },
         analyse: (verdict, _answer, context) => {
-          named = context?.activation?.named;
+          contexts.push(context);
           return verdict;
         },
       },
     );
     expect(conn.events).toEqual([
       'POST /sap/bc/adt/activation?method=activate&preauditRequested=true',
-      'GET /sap/bc/adt/activation/inactiveobjects',
     ]);
-    expect(named).toEqual(['/sap/bc/adt/functions/groups/zfg_act']);
+    expect(contexts).toEqual([undefined]);
+  });
+
+  it('names the uri buildObjectUri builds for the group, which a caller reading the inactive list uses (C7)', async () => {
+    const conn = new RecordingConnection();
+    await new AdtFunctionGroupLegacy(conn, {
+      logger: createLibraryLogger(),
+      results: functionGroupDocuments,
+    }).activate(
+      { functionGroupName: 'ZFG_ACT' },
+      {
+        headers: { accept: 'application/xml', contentType: 'application/xml' },
+      },
+    );
+    expect(String(conn.sent[0]?.data)).toContain(
+      `adtcore:uri="${buildObjectUri('ZFG_ACT', 'FUGR/F')}"`,
+    );
   });
 });
