@@ -398,6 +398,29 @@ describe('lock and unlock', () => {
     expect(client.pendingLocks).toContain('TypeGroup/ZTG3A');
   });
 
+  it.each<[string, IAnalyse<IAdtError>]>([
+    ['reports a failure', () => ({ origin: 'refusal', message: 'judged' })],
+    [
+      'throws',
+      () => {
+        throw new Error('the analyse threw');
+      },
+    ],
+  ])(
+    "records a lock SAP granted when the caller's analyse %s",
+    async (_what, analyse) => {
+      const { connection } = recording(
+        recorded('type-group-cycle-s4-2025--12-lock'),
+      );
+      const client = new AdtClientOnPrem(connection);
+      await client
+        .getTypeGroup()
+        .lock({ typeGroupName: 'ZTG3A' }, { analyse })
+        .catch(() => undefined);
+      expect(client.pendingLocks).toContain('TypeGroup/ZTG3A');
+    },
+  );
+
   it('records the handle in the lock registry and releases it on unlock', async () => {
     const { connection } = recording(
       recorded('type-group-cycle-s4-2025--12-lock'),
