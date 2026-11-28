@@ -643,9 +643,12 @@ export class AdtUtils<
    * `ACTIVATION_RUNS_COLLECTION` in `@mcp-abap-adt/adt-strategies`), and
    * choosing the member is the caller's: this one reads no discovery.
    *
-   * `preauditRequested` defaults to `false`, the group member's. After a
-   * silent checklist (`activationExecuted="false"`, no message) alone, the
-   * inactive list is read once and handed to `analyse` (`IAdtAnalyseContext`).
+   * `preauditRequested` defaults to `false`, the group member's. One request,
+   * whatever it answers (49.0.0): after a checklist that does not state its
+   * outcome (`readUnstatedActivation` in `@mcp-abap-adt/adt-strategies`), the
+   * inactive list is the caller's to read with {@link getInactiveObjects} and
+   * to hand to its `analyse` (`IAdtAnalyseContext`), with each object's
+   * `buildObjectUri`.
    */
   activateObjects<E extends IAdtError>(
     objects: IAdtCodedReference<AdtActivationCode<V>>[],

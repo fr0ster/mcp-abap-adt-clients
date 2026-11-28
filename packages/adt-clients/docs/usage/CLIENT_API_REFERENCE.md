@@ -1569,28 +1569,31 @@ if (failure && 'stillInactive' in failure && failure.stillInactive.length > 0) {
 }
 ```
 
-**The one read after a silent checklist.** `chkl:messages` with
-`activationExecuted="false"` and no message answers both a re-activation that
-had nothing to do and an activation that left a function group inactive
-(S/4HANA 2025): the document alone cannot tell them apart. After that answer,
-and only that one, the member reads `GET /sap/bc/adt/activation/inactiveobjects`
-once (the `Accept` `getInactiveObjects` sends) and hands the list to `analyse`
-as its third parameter, `context.activation` (`IAdtAnalyseContext` of
-`@mcp-abap-adt/interfaces-adt`): `named`, the uris of the references the
-activation request sent, and `inactiveObjects`, the answer. `analyseActivation`
-judges by it: a named object still listed (by `uri` or `parentUri`) is not
-activated; none is nothing to activate. A read that fails is the call's
-failure ("the activation's outcome could not be decided"), carrying the read's
-response. This is the one exception to "a member issues one request"; every
-other answer is handed on with no second request.
+**The read after a silent checklist is the caller's** (49.0.0). `chkl:messages`
+with `activationExecuted="false"` and no message answers both a re-activation
+that had nothing to do and an activation that left a function group inactive
+(S/4HANA 2025): the document alone cannot tell them apart. The member sends
+the activation alone, one request, and calls `analyse` with the verdict and
+the answer. When `readUnstatedActivation` (adt-strategies) answers `silent`,
+the caller reads `getUtils().getInactiveObjects()` (over `wireItself`, the
+answer as it came) and hands it to `analyseActivation` as its third
+parameter, `context.activation` (`IAdtAnalyseContext` of
+`@mcp-abap-adt/interfaces-adt`): `named`, the uris the activation request sent
+(`buildObjectUri` of each object; a function group names its `source/main`
+too), and `inactiveObjects`, the answer. `analyseActivation` judges by it: a
+named object still listed (by `uri` or `parentUri`) is not activated; none is
+nothing to activate. A read that fails makes the verdict the read's failure
+("the activation's outcome could not be decided"), carrying its response. The
+recipe, and what 48.0.0 did, are in [MIGRATION-49.md](MIGRATION-49.md).
 
 **And after a checklist with no verdict and warnings alone** (45.5.2,
 fr0ster/mcp-abap-adt#360). `chkl:messages` with no `activationExecuted` and
 only `W`/`I`/`S` messages answered, on SAP_BASIS 7.52, a program SAP
-activated: SAP sets the attribute only once its activation run starts. The
-member reads the inactive list after it too, the same way. The client judges
-nothing: a read that fails here leaves the answer as it was and hands the
-refusal's response, if any, as `inactiveObjects`. `analyseActivation`
+activated: SAP sets the attribute only once its activation run starts.
+`readUnstatedActivation` answers `unstated` for it, and the caller reads the
+inactive list after it too, the same way. A read that fails here leaves the
+starting verdict as it was and the refusal's response, if any, is
+`inactiveObjects`. `analyseActivation`
 (adt-strategies 0.23.1) judges it like the silent checklist, SAP's warnings
 kept beside its sentence; with no readable list the outcome is not decided.
 

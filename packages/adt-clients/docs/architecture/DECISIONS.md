@@ -995,3 +995,52 @@ itself.
 **What would change it.** A system whose documents use other prefixes or
 another nesting for the same fields: the patch refuses them `element-missing`
 rather than writing elsewhere, and the path table grows a variant.
+
+## 20. An activation sends the activation alone; a settings change is the caller's three calls
+
+**Decided 2026-11-28, for 49.0.0** (C7, the owner's rule: one member, one
+endpoint, one request; the owner approved the split).
+
+**Problem.** Two kinds of member still sent two requests. Every activation
+member read `GET /sap/bc/adt/activation/inactiveobjects` after a checklist
+that does not state its outcome (fr0ster/mcp-abap-adt#351, #360) and handed it
+to `analyse`; `AdtTableSettings.patchMetadata` read the working area and PUT
+the whole document (interfaces-adt decision 51).
+
+**Decided.**
+
+- An activation member sends `POST /sap/bc/adt/activation` alone and calls
+  `analyse` with the verdict and the answer. When the answer leaves the
+  outcome to the inactive list — `readUnstatedActivation` of adt-strategies,
+  the predicate `readActivationRefusal` decides by — the caller reads it with
+  `getInactiveObjects` and hands it to `analyseActivation` as
+  `context.activation`, with the uris the activation named
+  (`activationNamesItsUris.test.ts` pins them per member).
+  `answeringActivation`, the exchange and this package's copy of the
+  activation reading are gone: the client reads nothing of an activation's
+  answer.
+- `patchMetadata` is gone. A settings change is `readMetadata` under the
+  lock, the pure `patchTableSettings(read, changes)` — decision 19's kind of
+  patch, over the typed read of adt-strategies' strict readings rather than
+  the XML — and `updateMetadata` with the read's ETag as `ifMatch`
+  (interfaces-adt decision 53). The handler's `variant` option went with it.
+
+**Against.** Keeping either as a named exception: refused by the rule, as the
+message class message's was in 48.0.0.
+
+**Why it stays true.** `behaviour.test.ts` asserts exactly one request for
+every member of the capability manifest; `activationOneRequest.test.ts` runs
+every activation member against a silent and an unstated checklist (red on
+48.0.0); `activationEquivalence.test.ts` runs the caller's recipe
+(`helpers/activationJudged.ts`) against 48.0.0's verdicts on every recorded
+answer; `patch.test.ts` counts the three calls one by one;
+`consumerSequencesStayOut.test.ts` keeps `answeringActivation` from returning
+as an export.
+
+**What it costs.** Every consumer that judged an activation by the list
+composes the two calls itself (mcp-abap-adt's follow-up), and every consumer
+of `patchMetadata` the three.
+
+**What would change it.** For the settings, decision 53's condition: SAP
+accepting a partial settings document. For the activation, an answer that
+states its outcome on every system.
