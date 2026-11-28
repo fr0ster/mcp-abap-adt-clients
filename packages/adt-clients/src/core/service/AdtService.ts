@@ -66,6 +66,11 @@ import {
 import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { writeObjectDocument } from '../shared/documentWrite';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
+import {
+  createLockTracker,
+  failedWireStatus,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import { lockServiceBinding, unlockServiceBinding } from './lock';
 import type {
   IActivateServiceBindingParams,
@@ -137,19 +142,26 @@ export class AdtServiceBinding<
   public readonly objectType: string = 'ServiceBinding';
 
   private readonly results: ResultStrategiesOf<T>;
+  private readonly lockTracker: LockTracker;
 
   constructor(
     connection: IAbapConnection,
     options: AdtHandlerOptions<
       ResultStrategiesOf<T>,
-      'logger' | 'systemContext'
+      'logger' | 'systemContext' | 'lockRegistry'
     >,
   ) {
-    const { logger, systemContext } = options;
+    const { logger, systemContext, lockRegistry } = options;
     this.results = options.results;
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (name, lockHandle) =>
+        unlockServiceBinding(this.connection, name, lockHandle),
+    );
   }
 
   /** The binding name, or the caller's mistake. */
@@ -660,10 +672,20 @@ export class AdtServiceBinding<
     // The handle is read by `lockHandleOf`; a 200 carrying none reads as `''`,
     // and whether that is a refusal is the caller's `analyse` to say.
     return answering(
-      () =>
-        inStatefulSession(this.connection, () =>
+      async () => {
+        const locked = await inStatefulSession(this.connection, () =>
           lockServiceBinding(this.connection, name),
-        ),
+        );
+        // The registry records SAP's state, not the caller's verdict: a lock
+        // SAP granted (a 2xx carrying a handle) is recorded here, before any
+        // `analyse` runs, so one it reports as a failure, or throws over, is
+        // still released by `unlockAll`.
+        const handle = lockHandleOf(locked);
+        if (!failedWireStatus(locked) && handle) {
+          this.lockTracker.track(name, handle);
+        }
+        return locked;
+      },
       lockHandleOf,
       options?.analyse,
     );
@@ -696,10 +718,15 @@ export class AdtServiceBinding<
     return answering(
       // The UNLOCK reaches the context the LOCK opened only if it is sent
       // stateful; stateless, it releases nothing and still answers 200.
-      () =>
-        inStatefulSession(this.connection, () =>
+      async () => {
+        const unlocked = await inStatefulSession(this.connection, () =>
           unlockServiceBinding(this.connection, name, lockHandle),
-        ),
+        );
+        // The lock leaves the registry only when SAP answered the UNLOCK with
+        // a 2xx, before any `analyse` runs.
+        if (!failedWireStatus(unlocked)) this.lockTracker.untrack(name);
+        return unlocked;
+      },
       nothing,
       options?.analyse,
     );

@@ -57,6 +57,11 @@ import { inStatefulSession } from '../shared/capabilities/statefulSession';
 import { checkDeletionByUri } from '../shared/deletionCheckByUri';
 import { writeObjectDocument } from '../shared/documentWrite';
 import type { AdtHandlerOptions } from '../shared/handlerOptions';
+import {
+  createLockTracker,
+  failedWireStatus,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import { activateInclude } from './activation';
 import { create } from './create';
 import { deleteInclude } from './delete';
@@ -132,18 +137,25 @@ export class AdtInclude<
   private readonly contentTypes: IAdtContentTypes | undefined;
   protected readonly results: ResultStrategiesOf<T>;
   private readonly systemContext: IAdtSystemContext;
+  private readonly lockTracker: LockTracker;
+  public readonly objectType: string = 'Include';
 
   constructor(
     protected readonly connection: IAbapConnection,
     options: AdtHandlerOptions<
       ResultStrategiesOf<T>,
-      'logger' | 'contentTypes' | 'systemContext'
+      'logger' | 'contentTypes' | 'systemContext' | 'lockRegistry'
     >,
   ) {
     this.logger = options.logger;
     this.contentTypes = options.contentTypes;
     this.results = options.results;
     this.systemContext = options.systemContext ?? {};
+    this.lockTracker = createLockTracker(
+      options.lockRegistry,
+      this.objectType,
+      (name, lockHandle) => unlockInclude(this.connection, name, lockHandle),
+    );
   }
 
   /** Read the host's enhancement elements. */
@@ -652,13 +664,24 @@ export class AdtInclude<
   ): Promise<IAdtResponse<string, E | IAdtError>> {
     const includeName = requireName(config);
     const answer = await answering(
-      () =>
-        inStatefulSession(this.connection, () =>
+      async () => {
+        const locked = await inStatefulSession(this.connection, () =>
           lockInclude(this.connection, includeName),
-        ),
+        );
+        // The registry records SAP's state, not the caller's verdict: a lock
+        // SAP granted (a 2xx carrying a handle) is recorded here, before any
+        // `analyse` runs, so one it reports as a failure, or throws over, is
+        // still released by `unlockAll`.
+        const handle = lockHandleOf(locked);
+        if (!failedWireStatus(locked) && handle) {
+          this.lockTracker.track(includeName, handle);
+        }
+        return locked;
+      },
       lockHandleOf,
       options?.analyse,
     );
+    // The caller's own callback follows the caller's verdict, as before.
     if (answer.ok && answer.getResult().value) {
       config.onLock?.(answer.getResult().value);
     }
@@ -694,10 +717,15 @@ export class AdtInclude<
   ): Promise<IAdtResponse<void, E | IAdtError>> {
     const includeName = requireName(config);
     return answering(
-      () =>
-        inStatefulSession(this.connection, () =>
+      async () => {
+        const unlocked = await inStatefulSession(this.connection, () =>
           unlockInclude(this.connection, includeName, lockHandle),
-        ),
+        );
+        // The lock leaves the registry only when SAP answered the UNLOCK with
+        // a 2xx, before any `analyse` runs.
+        if (!failedWireStatus(unlocked)) this.lockTracker.untrack(includeName);
+        return unlocked;
+      },
       nothing,
       options?.analyse,
     );

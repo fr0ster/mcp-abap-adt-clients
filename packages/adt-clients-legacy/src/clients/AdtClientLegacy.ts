@@ -302,6 +302,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
       contentTypes: this.contentTypes,
       results,
       systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
     });
   }
 
@@ -791,6 +792,7 @@ export class AdtClientLegacy extends AdtClient<'basis740'> {
     return new AdtServiceBindingAbsentLegacy(this.connection, {
       logger: this.logger,
       systemContext: this.systemContext,
+      lockRegistry: this.lockRegistry,
       results,
     });
   }
