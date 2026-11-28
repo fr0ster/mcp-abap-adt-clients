@@ -81,17 +81,18 @@ describe('records', () => {
   // Measured on premise (2026-11-28): the namespaced names' %2f addresses
   // answered 200 (fr0ster/mcp-abap-adt#404).
   it('application log, job catalog and job template definitions', () => {
-    expect(APPLICATION_LOG.uri('/NS/LOG')).toBe(
-      '/sap/bc/adt/applicationlog/objects/%2Fns%2Flog',
+    // The name as given, case kept: only encoded.
+    expect(APPLICATION_LOG.uri('/ABC/MyLog')).toBe(
+      '/sap/bc/adt/applicationlog/objects/%2FABC%2FMyLog',
     );
     expect(APPLICATION_LOG.validation).toBe(
       '/sap/bc/adt/applicationlog/objects/validation',
     );
-    expect(APPLICATION_JOB_CATALOG.uri('Z_CAT')).toBe(
-      '/sap/bc/adt/applicationjob/catalogs/z_cat',
+    expect(APPLICATION_JOB_CATALOG.uri('Z_Cat')).toBe(
+      '/sap/bc/adt/applicationjob/catalogs/Z_Cat',
     );
     expect(APPLICATION_JOB_TEMPLATE.uri('Z T')).toBe(
-      '/sap/bc/adt/applicationjob/templates/z%20t',
+      '/sap/bc/adt/applicationjob/templates/Z%20T',
     );
     expect(KEYWORD_DOCUMENTATION.collection).toBe(
       '/sap/bc/adt/docu/abap/langu',

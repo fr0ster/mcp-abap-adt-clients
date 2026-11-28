@@ -41,15 +41,21 @@ export const REFUSALS = {
   ),
 } as const;
 
-/** The name cases of a definition read, each with the segment `seg()` makes of it. */
+/**
+ * The name cases of a definition read, each with the segment it must become:
+ * percent-encoded, its case as given (a name goes to SAP exactly as given;
+ * measured on ABAP cloud 2026-11-28: the upper- and mixed-case addresses of
+ * the three types answer 200 as the lowercase ones do).
+ */
 export const NAME_CASES: ReadonlyArray<readonly [string, string]> = [
-  ['Z_UPPER', 'z_upper'],
+  ['Z_UPPER', 'Z_UPPER'],
   ['z_lower', 'z_lower'],
-  ['Z_Mixed', 'z_mixed'],
-  ['/NS/NAME', '%2Fns%2Fname'],
-  [' Z IN NER ', '%20z%20in%20ner%20'],
-  ['ZZ_NO_SUCH_OBJECT_XYZ', 'zz_no_such_object_xyz'],
-  ['Z'.repeat(41), 'z'.repeat(41)],
+  ['Z_Mixed', 'Z_Mixed'],
+  ['/NS/NAME', '%2FNS%2FNAME'],
+  ['/ABC/MyLog', '%2FABC%2FMyLog'],
+  [' Z IN NER ', '%20Z%20IN%20NER%20'],
+  ['ZZ_NO_SUCH_OBJECT_XYZ', 'ZZ_NO_SUCH_OBJECT_XYZ'],
+  ['Z'.repeat(41), 'Z'.repeat(41)],
 ];
 
 /** A connection double: records every request, answers `answer` or rejects as the connection does. */
