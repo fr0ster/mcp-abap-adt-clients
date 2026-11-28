@@ -65,7 +65,9 @@ decision 53). See [MIGRATION-49.md](docs/usage/MIGRATION-49.md).
 
 ### Added
 
-- **`patchTableSettings(read, changes)`**, with `TableSettingsPatch`,
+- **`patchTableSettings(read, changes, variant)`**, typed by the declared
+  system kind (on premise neither the change nor the answer carries
+  `isWritableByAMDP`), with `TableSettingsPatch`,
   `TableSettingsPatchRefusal` and `ITableSettingsPatchRead`: the settings read
   with `changes` overlaid — sends no request. Every setting not named as read,
   `buffering` field by field, `translation` by its value, the cloud's

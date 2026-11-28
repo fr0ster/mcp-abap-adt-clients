@@ -1007,7 +1007,8 @@ settings' lock (decision 53 of interfaces-adt, superseding 51; since 49.0.0):
    on the cloud, which throws on a read without `ts:isWritableByAMDP` —, so
    the read has every setting, the description and the ETag. A read made
    earlier may be stale; a read with no ETag means no write.
-2. `patchTableSettings(read, changes)` — sends no request: the settings read
+2. `patchTableSettings(read, changes, variant)` — sends no request, typed by the
+   declared system kind (`'onprem'` or `'cloud'`): the settings read
    with `changes` (`ITableSettingsChangesOf<V>`) overlaid. Every setting not
    named is as read, the description too, and `isWritableByAMDP` as read
    unless named. `translation` changes by its `value`; `buffering` field by
@@ -1049,7 +1050,7 @@ const read = await settings.readMetadata(
 );
 if (read.ok) {
   const current = read.getResult().value;
-  const patched = patchTableSettings(current, { sizeCategory: '2' });
+  const patched = patchTableSettings(current, { sizeCategory: '2' }, 'cloud');
   if (current.etag && patched.ok) {
     await settings.updateMetadata(
       {

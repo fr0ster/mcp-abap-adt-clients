@@ -1020,7 +1020,7 @@ the whole document (interfaces-adt decision 51).
   activation reading are gone: the client reads nothing of an activation's
   answer.
 - `patchMetadata` is gone. A settings change is `readMetadata` under the
-  lock, the pure `patchTableSettings(read, changes)` — decision 19's kind of
+  lock, the pure `patchTableSettings(read, changes, variant)` — decision 19's kind of
   patch, over the typed read of adt-strategies' strict readings rather than
   the XML — and `updateMetadata` with the read's ETag as `ifMatch`
   (interfaces-adt decision 53). The handler's `variant` option went with it.

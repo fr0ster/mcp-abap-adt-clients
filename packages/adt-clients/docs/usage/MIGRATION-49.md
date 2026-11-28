@@ -128,8 +128,9 @@ document in one member (interfaces-adt decision 51). It is removed, with the
 exported type `TableSettingsPatchConfig`; interfaces-adt removes
 `IAdtTableSettingsPatchable`, `ITableSettingsPatchConfig`,
 `IAdtTableSettingsPatchHeaders` and `IAdtTableSettingsPatchOptions` (decision
-53). The overlay is a pure function, `patchTableSettings(read, changes)`, which
-sends no request.
+53). The overlay is a pure function, `patchTableSettings(read, changes, variant)`,
+which sends no request; `variant` is the declared system kind, and it types
+the change set and the answer (on premise no `isWritableByAMDP` in either).
 
 ### What fails
 
@@ -154,7 +155,7 @@ const read = await settings.readMetadata({ tableName }, { version: 'inactive' })
 if (!read.ok) return read; // the read's failure, no write
 const current = read.getResult().value;
 if (!current.etag) return; // no ETag, no write
-const patched = patchTableSettings(current, { sizeCategory: '2' });
+const patched = patchTableSettings(current, { sizeCategory: '2' }, 'onprem'); // 'cloud' on the cloud
 if (!patched.ok) return; // patched.reason, patched.message
 await settings.updateMetadata(
   { tableName, transportRequest, description: patched.description, settings: patched.settings },
@@ -162,9 +163,11 @@ await settings.updateMetadata(
 );
 ```
 
-On premise the on-premise client's write takes the settings without
-`isWritableByAMDP`, which an on-premise read never carries (Code): leave the key
-out (`const { isWritableByAMDP: _cloudOnly, ...settings } = patched.settings`).
+The `variant` argument is the declared system kind and types the call: with
+`'onprem'` the change set names no `isWritableByAMDP` and the answer carries
+none, so it goes to the on-premise client's write as it is; with `'cloud'` the
+read must be `cloudTableSettings`' (the flag present), and the flag goes back as
+read unless named.
 With `ifMatch` the PUT's `Content-Type` goes without a charset, as before.
 
 ## The settings handler takes no `variant`
