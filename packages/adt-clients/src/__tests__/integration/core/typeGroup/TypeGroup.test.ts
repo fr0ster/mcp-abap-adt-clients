@@ -325,21 +325,37 @@ describe('Type groups (AdtTypeGroup)', () => {
     },
   );
 
-  readsCase(
-    "lists an SAP type group's versions and reads one version's source",
-    async (group, sapGroup) => {
-      const feed = String(
-        expectResult(
-          await group.getVersions(
-            { typeGroupName: sapGroup },
-            { analyse: analyseException },
-          ),
-          'getVersions',
+  /** The content uri of an SAP type group's first version, from its feed. */
+  async function firstVersionUri(
+    group: ReturnType<typeof reader>,
+    sapGroup: string,
+  ): Promise<string> {
+    const feed = String(
+      expectResult(
+        await group.getVersions(
+          { typeGroupName: sapGroup },
+          { analyse: analyseException },
         ),
-      );
-      const at = feed.indexOf('src="');
-      expect(at).toBeGreaterThan(-1);
-      const contentUri = feed.slice(at + 5, feed.indexOf('"', at + 5));
+        'getVersions',
+      ),
+    );
+    const at = feed.indexOf('src="');
+    expect(at).toBeGreaterThan(-1);
+    return feed.slice(at + 5, feed.indexOf('"', at + 5));
+  }
+
+  readsCase("lists an SAP type group's versions", async (group, sapGroup) => {
+    expect(await firstVersionUri(group, sapGroup)).toContain(
+      '/source/main/versions/',
+    );
+  });
+
+  readsCase(
+    "reads one version's source of an SAP type group",
+    async (group, sapGroup) => {
+      // The content uri is read from the feed first: the version source is
+      // addressed by what the list names.
+      const contentUri = await firstVersionUri(group, sapGroup);
       const version = expectResult(
         await group.getVersionSource(contentUri, {
           analyse: analyseException,
