@@ -44,6 +44,24 @@ const TABLE_SETTINGS_SAMPLE =
 const TEXT_ELEMENTS_SAMPLE =
   "open: no PROG/PX or CLAS/OCX sample is recorded: the live conformance run builds each sample's template, urimapper and metadata reads from that sample's recorded files, so a code with none cannot be recorded until a sample is seeded (RSPARAM's text elements on premise and on the cloud, a class's); seeding them is a separate tooling task";
 
+const DEFINITIONS_SAMPLE =
+  "open: no APLO/TYP, SAJC or SAJT sample is recorded: the live conformance run builds each sample's template, urimapper and metadata reads from that sample's recorded files, so a code with none cannot be recorded until a sample is seeded; the definition reads themselves are recorded in corpus/adt/answers (read-application-*-definition-<release>, fr0ster/mcp-abap-adt#404) and measured live; seeding the conformance samples is a separate tooling task";
+
+/** The three definition codes, with no conformance sample on either release. */
+const DEFINITIONS_DIVERGENCES: IDivergence[] = (
+  [
+    ['applicationJobCatalog', 'SAJC'],
+    ['applicationJobTemplate', 'SAJT'],
+    ['applicationLog', 'APLO/TYP'],
+  ] as const
+).map(([api, code]) => ({
+  rule: 'sample',
+  api,
+  code,
+  detail: 'no sample is recorded',
+  reason: DEFINITIONS_SAMPLE,
+}));
+
 /** The text elements' two codes, with no sample on either release. */
 const TEXT_ELEMENTS_DIVERGENCES: IDivergence[] = [
   {
@@ -72,6 +90,7 @@ export const DIVERGENCES: { readonly [R in RecordedRelease]: IDivergence[] } = {
       detail: 'no sample is recorded',
       reason: TABLE_SETTINGS_SAMPLE,
     },
+    ...DEFINITIONS_DIVERGENCES,
     ...TEXT_ELEMENTS_DIVERGENCES,
     {
       rule: 'address',
@@ -90,6 +109,7 @@ export const DIVERGENCES: { readonly [R in RecordedRelease]: IDivergence[] } = {
       detail: 'no sample is recorded',
       reason: TABLE_SETTINGS_SAMPLE,
     },
+    ...DEFINITIONS_DIVERGENCES,
     ...TEXT_ELEMENTS_DIVERGENCES,
     {
       rule: 'address',
